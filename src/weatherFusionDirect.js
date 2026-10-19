@@ -15,6 +15,11 @@ const LABELS = { hrrr: 'NOAA HRRR · 3 km', ecmwf: 'ECMWF IFS · 0.25° Open Dat
 const SOURCE = { hrrr: 'https://www.nco.ncep.noaa.gov/pmb/products/hrrr/', nbm: 'https://www.nco.ncep.noaa.gov/pmb/products/blend/', ecmwf: 'https://www.ecmwf.int/en/forecasts/datasets/open-data' };
 const CONUS_MAP_BOUNDS = '[[20,-130],[55,-60]]';
 const LEGACY_REGIONAL_MAP_BOUNDS = '[[32.5,-85],[38,-74]]';
+// Native collector contract: temperatures in Fahrenheit, speeds in mph,
+// visibility in miles and pressure in inHg. Optional invalid measurements are
+// missing; they must not discard otherwise valid temperature/rain guidance.
+const NATIVE_CORE_RANGES={temperature_2m:[-160,160],precipitation:[0,100],wind_speed_10m:[0,300]};
+const NATIVE_OPTIONAL_FIELDS={dew_point_2m:['°F',-160,160],relative_humidity_2m:['%',0,100],wind_gusts_10m:['mp/h',0,350],wind_direction_10m:['°',0,360],cloud_cover:['%',0,100],visibility:['mi',0,200],pressure_msl:['inHg',20,35],apparent_temperature:['°F',-250,250],reflectivity:['dBZ',-100,100],nearby_reflectivity:['dBZ',-100,100],weather_code:['wmo code',0,99]};
 export function modelStatus(model, runAt, validUntil, now = Date.now()) {
   const run = Date.parse(runAt), end = Date.parse(validUntil);
   if (!LABELS[model] || !finite(run) || !finite(end) || run > now + 15 * 60000 || end <= now) return 'unavailable';
@@ -32,13 +37,25 @@ export function validateSnapshot(data, id, location, now) {
   const h = point.hourly, u = point.hourly_units, run = Date.parse(data.runAt)/1000;
   if (!Array.isArray(h?.time) || h.time.length < 12 || h.time.length > 500 || u?.temperature_2m !== '°F' || u.precipitation !== 'inch' || u.wind_speed_10m !== 'mp/h') throw new Error('Invalid model units or time axis.');
   if (h.time.some((t,i) => !finite(t) || t < run || (i > 0 && t-h.time[i-1] !== 3600))) throw new Error('The model time axis is not a continuous hourly axis.');
+  const hourly={...h,time:[...h.time]};
   for (const [field, values] of Object.entries(h)) {
+    const optional=NATIVE_OPTIONAL_FIELDS[field];
+    if(optional){
+      const [unit,min,max]=optional,validUnit=u[field]===undefined||u[field]===unit;
+      hourly[field]=h.time.map((_,index)=>{
+        const value=values?.[index];
+        return validUnit&&Array.isArray(values)&&values.length===h.time.length&&finite(value)&&value>=min&&value<=max&&(field!=='weather_code'||Number.isInteger(value))?value:null;
+      });
+      continue;
+    }
     if (!Array.isArray(values) || values.length !== h.time.length || values.some((v) => v !== null && !finite(v))) throw new Error(`Invalid model series: ${field}`);
+    const range=NATIVE_CORE_RANGES[field];
+    if(range&&values.some(value=>finite(value)&&(value<range[0]||value>range[1])))throw new Error(`Invalid model range: ${field}`);
   }
   if (!h.temperature_2m?.some((v,i) => finite(v) && h.time[i]*1000 > now)) throw new Error('No future native model temperatures.');
   const intervals = point.precipitationIntervals;
   if (!Array.isArray(intervals) || intervals.some((r,i) => !finite(r.start) || !finite(r.end) || !finite(r.value) || r.end <= r.start || r.value < 0 || r.value > 100 || r.start < run || (i>0 && r.start < intervals[i-1].end))) throw new Error('Invalid model precipitation intervals.');
-  return { status, value: { ...point, direct: true, runAt: data.runAt, validUntil: data.validUntil, resolution: data.resolution, sourceUrl: SOURCE[id], interpolation: data.interpolation, timezone: 'America/New_York' }, message: `${data.resolution}; native grid extraction; initialized ${data.runAt}.` };
+  return { status, value: { ...point, hourly, hourly_units:{...u}, direct: true, runAt: data.runAt, validUntil: data.validUntil, resolution: data.resolution, sourceUrl: SOURCE[id], interpolation: data.interpolation, timezone: 'America/New_York' }, message: `${data.resolution}; native grid extraction; initialized ${data.runAt}.` };
 }
 export function createDirectModels({ fetchImpl = globalThis.fetch, now = Date.now } = {}) {
   const cache = new Map(), pending = new Map();

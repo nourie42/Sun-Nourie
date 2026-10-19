@@ -4,12 +4,14 @@ import {timeAt,summarizeFeels} from './hourly-feels.js?v=current-rain-20261017-v
 import {forecastSample} from './weather-display.js?v=low-rain-display-v1';
 import {weatherState} from './weather-state.js?v=current-rain-20261017-v3';
 import {winterSceneExpected,selectedHourSnowPhase} from './exposure-scene.js?v=current-rain-20261017-v3';
+import {forecastSnapshotFreshness} from './weather-freshness.js?v=accuracy-20261019-v1';
 export function comfortMode(time,zone='America/New_York'){
  const hour=localHour(time,zone);return isTonightPeriod(time,zone)?'overnight':hour<5?'predawn':'day';
 }
 const dateAt=(t,z)=>new Intl.DateTimeFormat('en-CA',{timeZone:z,year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(t));
 /** The warmest card uses only the hours remaining before local midnight. */
 export function warmestTodayWindow(forecast,now=Date.now()){
+ if(forecastSnapshotFreshness(forecast,now).expired)return null;
  const zone=forecast?.location?.timeZone||'America/New_York',today=dateAt(now,zone);
  const tomorrow=new Date(Date.parse(today+'T12:00:00Z')+86400000).toISOString().slice(0,10);
  const start=Math.max(timeAt(today,0,zone),Math.ceil(now/3600000)*3600000),end=timeAt(tomorrow,0,zone),points=[];
@@ -22,9 +24,10 @@ export function warmestTodayWindow(forecast,now=Date.now()){
  }
  if(!points.length)return null;
  const high=points.reduce((a,b)=>a.value>=b.value?a:b);
- return {mode:'day',chosen:high,high,points,available,expected,partial:available<expected,label:'Warmest feels like in the sun today'};
+ return {mode:'day',chosen:high,high,points,available,expected,partial:available<expected,label:'Warmest sun feels like from now'};
 }
 export function comfortWindow(forecast,now=Date.now()){
+ if(forecastSnapshotFreshness(forecast,now).expired)return null;
  const zone=forecast?.location?.timeZone||'America/New_York',mode=comfortMode(now,zone),today=dateAt(now,zone),tomorrow=new Date(Date.parse(today+'T12:00:00Z')+86400000).toISOString().slice(0,10);
  const start=mode==='overnight'?timeAt(today,18,zone):timeAt(today,0,zone),end=mode==='predawn'?timeAt(today,8,zone):timeAt(tomorrow,0,zone);
  const summary=summarizeFeels(forecast,start,end,now+1);if(!summary)return null;

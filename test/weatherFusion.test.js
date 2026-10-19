@@ -157,6 +157,8 @@ test('weather routes register without changing any existing route', () => {
   assert.ok(!routes.some(([p]) => p === '/'));
 });
 test('live radar distinguishes the selected point from precipitation nearby', async () => {
+  const radarPoint={radarStation:'KRAX',timeZone:'America/New_York',
+    forecast:'https://api.weather.gov/gridpoints/RAH/80,58/forecast',forecastHourly:'https://api.weather.gov/gridpoints/RAH/80,58/forecast/hourly',forecastGridData:'https://api.weather.gov/gridpoints/RAH/80,58'};
   const points=radarSampleLocations({latitude:35.787,longitude:-78.4806});
   assert.equal(points.length,41);assert.equal(points[0].distanceMiles,0);assert.ok(points.some(point=>point.distanceMiles===5));assert.equal(Math.max(...points.map(point=>point.distanceMiles)),36);
   assert.equal(radarFeatureActive({features:[{properties:{ALPHA_BAND:255}}]}),true);
@@ -178,7 +180,7 @@ test('live radar distinguishes the selected point from precipitation nearby', as
   const xml=`<Dimension name="time">${new Date(now-2*60000).toISOString()}</Dimension>`;
   const fetchImpl=async value=>{
     const url=new URL(value),request=url.searchParams.get('request')?.toLowerCase();
-    if(url.pathname.startsWith('/points/'))return response({properties:{radarStation:'KRAX'}});
+    if(url.pathname.startsWith('/points/'))return response({properties:radarPoint});
     if(request==='getcapabilities')return new Response(xml,{status:200,headers:{'content-type':'application/xml'}});
     if(request==='getfeatureinfo'){
       const [west,,east]=url.searchParams.get('bbox').split(',').map(Number),longitude=(west+east)/2;
@@ -196,7 +198,7 @@ test('live radar distinguishes the selected point from precipitation nearby', as
 
   const reflectivityOnlyFetch=async value=>{
     const url=new URL(value),request=url.searchParams.get('request')?.toLowerCase();
-    if(url.pathname.startsWith('/points/'))return response({properties:{radarStation:'KRAX'}});
+    if(url.pathname.startsWith('/points/'))return response({properties:radarPoint});
     if(request==='getcapabilities'){
       if(url.pathname.includes('_bdhc'))throw new Error('Dual-pol classification delayed');
       return new Response(xml,{status:200,headers:{'content-type':'application/xml'}});
@@ -215,7 +217,7 @@ test('live radar distinguishes the selected point from precipitation nearby', as
   const staleHydrometeorXml=`<Dimension name="time">${new Date(now-15*60000).toISOString()}</Dimension>`;
   const staleHydrometeorFetch=async value=>{
     const url=new URL(value),request=url.searchParams.get('request')?.toLowerCase();
-    if(url.pathname.startsWith('/points/'))return response({properties:{radarStation:'KRAX'}});
+    if(url.pathname.startsWith('/points/'))return response({properties:radarPoint});
     if(request==='getcapabilities'){
       if(url.pathname.includes('_bdhc'))return new Response(staleHydrometeorXml,{status:200,headers:{'content-type':'application/xml'}});
       return new Response(xml,{status:200,headers:{'content-type':'application/xml'}});

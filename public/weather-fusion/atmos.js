@@ -15,7 +15,7 @@ import {fetchJsonWithDeadline} from './request-deadline.js?v=loading-recovery-v1
 import {withLiveAlerts,retainUnverifiedAlerts,alertLocationKey,alertHealth,ALERT_REFRESH_MS} from './live-alerts.js?v=county-warnings-v3';
 import {pavementEstimate,petSurfaceSubtitle} from './pavement.js?v=current-rain-20261017-v3';
 import {uvCategory} from './daily-uv.js?v=weather-art-labels-v10';
-import {aqiBand} from './air-quality.js?v=mobile-repair-v1';
+import {aqiBand,airQualityAtTime} from './air-quality.js?v=mobile-repair-v1';
 import {dewpointFeelLevel,forecastFeelLevel} from './dewpoint-meter.js?v=feel-chart-v3';
 import {currentSample,forecastSample} from './weather-display.js?v=low-rain-display-v1';
 import {timeAt} from './calendar-day.js?v=calendar-days-v1';
@@ -230,6 +230,7 @@ function select(index,{instant=false,fromPlay=false}={}){
  highlightCharts();
  section('street-pavement',renderPavement);
  section('street-sun',renderSun);
+ section('street-air',renderAir);
  section('dressed',()=>renderDressed(step()));
 }
 function hourText(s){
@@ -811,7 +812,7 @@ function renderGrid(){
   const el=$('golden-grid'),{width}=chartFrame(el,0),label=width<520?46:64,headerH=20,rowH=width<520?24:30,gap=2;
   const cols=24,cellW=(width-label)/cols,height=headerH+grid.length*(rowH+gap);
   const r=PERFECT_RULES;
-  $('golden-science').innerHTML=`<p><strong>A perfect hour</strong> is ${r.band.min}–${r.band.max}° with wind at ${r.calm} mph or less and a dew point under ${r.dewpoint}°, or ${r.breezyBand.min}–${r.breezyBand.max}° with an ${r.breeze.min}–${r.breeze.max} mph breeze. Either way the sky has to be clear or partly cloudy, with no storm risk. These are the same rules the main page uses.</p>
+  $('golden-science').innerHTML=`<p><strong>A perfect hour</strong> has an outdoor feels-like of ${r.band.min}–${r.band.max}°, dew point at most ${r.dewpoint}°, cloud cover at most ${r.cloud}%, rain likelihood at most ${r.rain}%, and less than ${r.precipitation.toFixed(2)} inch of forecast precipitation. It must be daylight without rain, fog or other adverse conditions. Gold uses the main page's exact qualifying hours for the next ${r.horizonDays} local dates.</p>
    <p><strong>Every other hour</strong> is colored by its feels-like temperature. Comfortable is 65–79°, centered on the ${r.ideal}° ideal. The warm side follows the UTCI heat-stress limits (78.8°, 89.6° and 100.4°F); the cold side steps down through cool, cold and freezing.</p>
    <p>A dot marks an hour with a rain chance of 50% or more.</p>`;
   const header=[0,6,12,18].map(h=>`<text x="${(label+cellW*h).toFixed(1)}" y="13">${h===0?'12a':h===12?'12p':h<12?`${h}a`:`${h-12}p`}</text>`).join('');
@@ -833,16 +834,15 @@ function renderGrid(){
   $('golden-legend').innerHTML='<span class="key"><i class="perfect"></i>Perfect</span>'+COMFORT_BINS.map(bin=>`<span class="key"><i class="swatch" style="--c:var(--${bin.key})"></i>${esc(bin.label)} ${esc(bin.range)}</span>`).join('')+'<span class="key"><i class="rain-mark"></i>Rain likely</span>';
   const windows=perfectWindows(grid),z=zone();
   const describe=w=>{
-   const rules=w.rules.includes('A')&&w.rules.includes('B')?'Calm to breezy':w.rules.includes('A')?'Calm and dry':'Pleasant breeze';
    const temps=finite(w.low)?(Math.round(w.low)===Math.round(w.high)?`${deg(w.low)}`:`${Math.round(w.low)}–${deg(w.high)}`):'';
-   return `${rules}${temps?`, ${temps}`:''}${w.rules.includes('A')&&finite(w.dewpoint)?`, dew point ${deg(w.dewpoint)}`:''}`;
+   return `Dry daylight${temps?`, feels like ${temps} outdoors`:''}${finite(w.dewpoint)?`, dew point ${deg(w.dewpoint)}`:''}`;
   };
   const list=windows.slice(0,4).map(w=>{
    const inClock=steps.findIndex(s=>!s.isNow&&s.time===w.start);
-   const span=`${longDayLabel(w.start,z)} ${hourLabel(w.start,z)} to ${localParts(w.end,z).date!==localParts(w.start,z).date?`${longDayLabel(w.end,z).slice(0,3)} `:''}${hourLabel(w.end,z)}`;
-   return `<li><span class="span">${esc(span)}</span><span class="why">${esc(describe(w))}, ${w.hours} hour${w.hours===1?'':'s'}</span>${inClock>=0?`<button type="button" data-jump="${inClock}">Show it in the sky</button>`:''}</li>`;
+   const span=`${longDayLabel(w.start,z)} ${clockLabel(w.start,z)} to ${localParts(w.end,z).date!==localParts(w.start,z).date?`${longDayLabel(w.end,z).slice(0,3)} `:''}${clockLabel(w.end,z)}`;
+   return `<li><span class="span">${esc(span)}</span><span class="why">${esc(describe(w))}, ${w.hours} forecast hour${w.hours===1?'':'s'}</span>${inClock>=0?`<button type="button" data-jump="${inClock}">Show it in the sky</button>`:''}</li>`;
   }).join('');
-  $('golden-windows').innerHTML=windows.length?`<h3>Coming up</h3><ul class="window-list">${list}</ul>`:'<h3>No perfect hours this week</h3><p class="none">None of the next seven days has an hour that meets the rules. The colors still show the most comfortable stretches.</p>';
+  $('golden-windows').innerHTML=windows.length?`<h3>Coming up</h3><ul class="window-list">${list}</ul>`:`<h3>No perfect hours in the next ${r.horizonDays} days</h3><p class="none">No available hour meets the same rules as the main page. The seven-day colors still show how the remaining hours are forecast to feel.</p>`;
   $('golden-windows').querySelectorAll('[data-jump]').forEach(button=>button.addEventListener('click',()=>{setPlaying(false);select(Number(button.dataset.jump));$('hero').scrollIntoView({behavior:sky.reducedMotion?'auto':'smooth'});}));
  });
 }
@@ -859,7 +859,7 @@ function bindGrid(el){
  el.addEventListener('click',event=>{const cell=gridCell(el,event);if(!cell)return;const i=steps.findIndex(s=>s.hourStart===cell.time&&!s.isNow);if(i>=0){setPlaying(false);select(i);}showTip(cellTip(cell),event.clientX,event.clientY);});
 }
 function cellTip(cell){
- const z=zone(),verdict=cell.perfect?`Perfect hour (${cell.perfect==='A'?'calm and dry':'pleasant breeze'})`:cell.bin?.label||'';
+ const z=zone(),verdict=cell.perfect?'Perfect hour (outdoor feels-like, dry daylight)':cell.bin?.label||'';
  return `<strong>${esc(`${longDayLabel(cell.time,z).slice(0,3)} ${hourLabel(cell.time,z)}`)}</strong>${esc(verdict)}<br>Feels like ${deg(cell.feels)}, thermometer ${deg(cell.temperature)}<br>Dew point ${deg(cell.dewpoint)}, wind ${finite(cell.wind)?Math.round(cell.wind)+' mph':'–'}<br>Rain ${finite(cell.rain)?chance(cell.rain):'–'}, ${esc(cell.condition||'')}`;
 }
 function updateGridSelection(){
@@ -969,11 +969,11 @@ function renderSun(){
   <p class="note">Sunrise and sunset are calculated astronomical times. Golden hour starts when the sun drops below 6°. ${uv&&uv.index>=3?'Sun protection is recommended at UV 3 and above.':''}</p>`;
 }
 function renderAir(){
- const el=$('street-air'),aq=forecast?.airQuality;
- if(!aq||!finite(aq.aqi)){el.innerHTML='<h3 id="air-title">Air quality</h3><p class="note">Current air-quality data is unavailable for this place. The weather forecast is unaffected.</p>';return;}
+ const el=$('street-air'),s=step(),aq=s?airQualityAtTime(forecast,s.isNow?Date.now():s.time,s.isNow):null;
+ if(!aq||!finite(aq.aqi)){el.innerHTML=`<h3 id="air-title">Air quality</h3><p class="note">${s?.isNow?'Current air-quality data':'Air-quality forecast for the selected hour'} is unavailable for this place. The weather forecast is unaffected.</p>`;return;}
  const band=aqiBand(aq.aqi),color={good:'var(--aqi-good)',moderate:'var(--aqi-moderate)',sensitive:'var(--aqi-sensitive)',unhealthy:'var(--aqi-unhealthy)','very-unhealthy':'var(--aqi-very-unhealthy)',hazardous:'var(--aqi-hazardous)'}[band.key]||'var(--none)';
- const parts=[finite(aq.pm25)?`<li><b>${aq.pm25.toFixed(1)}</b>PM2.5, µg/m³</li>`:'',finite(aq.ozone)?`<li><b>${Math.round(aq.ozone)}</b>ozone, µg/m³</li>`:'',finite(aq.next24HourPeak)?`<li><b>${Math.round(aq.next24HourPeak)}</b>next 24 h peak</li>`:''].join('');
- el.innerHTML=`<h3 id="air-title">Air quality</h3><p class="sub">U.S. AQI from ${esc(aq.source||'Open-Meteo / CAMS')}</p><div class="aqi-ring"><strong>${Math.round(aq.aqi)}</strong><span class="aqi-pill" style="--aqi:${color}">${esc(band.label)}</span></div><p class="note">${esc(band.summary)}</p>${parts?`<ul class="facts">${parts}</ul>`:''}`;
+ const parts=[finite(aq.pm25)?`<li><b>${aq.pm25.toFixed(1)}</b>PM2.5, µg/m³</li>`:'',finite(aq.ozone)?`<li><b>${Math.round(aq.ozone)}</b>ozone, µg/m³</li>`:'',finite(aq.next24HourPeak)?`<li><b>${Math.round(aq.next24HourPeak)}</b>available 24 h forecast peak</li>`:''].join('');
+ el.innerHTML=`<h3 id="air-title">Air quality</h3><p class="sub">${s.isNow?'Current modeled AQI':'Selected-hour AQI forecast'} · ${esc(clockLabel(Date.parse(aq.time),zone()))} · ${esc(aq.source||'Open-Meteo / CAMS')}</p><div class="aqi-ring"><strong>${Math.round(aq.aqi)}</strong><span class="aqi-pill" style="--aqi:${color}">${esc(band.label)}</span></div><p class="note">${esc(band.summary)}</p>${parts?`<ul class="facts">${parts}</ul>`:''}`;
 }
 
 /* ---------- Sources ---------- */

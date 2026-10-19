@@ -81,7 +81,7 @@ export function currentSample(forecast, now = Date.now()) {
   return {windDirection:current.windDirection,pop:rainChanceValue(currentLikelihood),officialPop:currentHour?.officialPop??currentHour?.pop,rainLikelihood:currentLikelihood,currentPrecipitation,rainExpected,rainAround,radarThreat,precipitation:state.precipitation,precipitationBlend:currentHour?.precipitationBlend,uvIndex:hourlyUvValue(forecast,now),id:'now', now:true, time:current.time, temperature:finite(current.temperature) ? current.temperature : null,
     feels:exposure.value, exposure, comfort:displayComfort, condition:displayCondition || 'Sky conditions unavailable',
     isDay:comfort.daylight ?? (solarElevation(now,forecast.location.latitude,forecast.location.longitude) > 0),
-    source:current.type === 'observation' ? 'Station observation' : 'Current estimate', inputs:shownInputs};
+    source:current.type === 'observation' ? 'Station observation' : current.type==='unavailable'?'Unavailable':'Current estimate', inputs:shownInputs};
 }
 export function forecastSample(forecast, time) {
   const epoch = Date.parse(time), hour = forecast?.hours?.find(row => Date.parse(row.time) === epoch);
@@ -132,7 +132,7 @@ export function renderHourlyWeather(forecast, now = Date.now()) {
   root.scrollLeft = scroll;
 }
 export function peakComparison(summary, currentSun) {
-  const label='Warmest feels like in the sun today';
+  const label='Warmest sun feels like from now';
   if (!summary) return {kind:'missing', label:'No direct sun in the remaining forecast today', value:null, time:null, now:false};
   const peak = summary.chosen.value;
   if (summary.mode === 'day' && finite(currentSun) && currentSun > peak) {
@@ -144,7 +144,7 @@ export function peakComparisonHTML(summary, currentSun, zone = 'America/New_York
   const comparison = peakComparison(summary,currentSun);
   if(!summary&&finite(currentSun)){
     const clock=new Intl.DateTimeFormat('en-US',{timeZone:zone,hour:'numeric',minute:'2-digit'}).format(new Date(now));
-    return `<div class="comfort-later" data-comparison="current-only"><span>Warmest feels like in the sun today</span><span class="peak-reading"><strong>${degrees(currentSun)}</strong></span><small>Now · ${esc(clock)} · sunny forecast unavailable</small></div>`;
+    return `<div class="comfort-later" data-comparison="current-only"><span>Warmest sun feels like from now</span><span class="peak-reading"><strong>${degrees(currentSun)}</strong></span><small>Now · ${esc(clock)} · sunny forecast unavailable</small></div>`;
   }
   if (!summary) return '<p class="comfort-later" data-comparison="no-direct-sun"><span>No direct sun in the remaining forecast today</span><small>Clouds, rain, night, or missing sky inputs can remove the sunny-hour estimate.</small></p>';
   const clock=new Intl.DateTimeFormat('en-US',{timeZone:zone,hour:'numeric',minute:'2-digit'}).format(new Date(comparison.time));
@@ -152,6 +152,7 @@ export function peakComparisonHTML(summary, currentSun, zone = 'America/New_York
   return `<div class="comfort-later" data-peak-time="${esc(comparison.time)}" data-comparison="${comparison.kind}"><span>${esc(comparison.label)}${summary.partial ? ' · partial forecast' : ''}</span><span class="peak-reading"><strong>${degrees(comparison.value)}</strong></span><small>${esc(time)}</small></div>`;
 }
 export function sampleCaption(sample, zone = 'America/New_York') {
+  if(sample.now&&sample.source==='Unavailable')return 'Current conditions unavailable'+(sample.inputs?.comfortSourceNote?' · '+sample.inputs.comfortSourceNote:'');
   const valid = Number.isFinite(Date.parse(sample.time));
   const time = valid ? new Intl.DateTimeFormat('en-US',{timeZone:zone,weekday:'short',hour:'numeric',minute:'2-digit'}).format(new Date(sample.time)) : 'time unavailable';
   const station=sample.inputs?.station,km=sample.inputs?.stationDistanceKm;
@@ -161,6 +162,7 @@ export function sampleCaption(sample, zone = 'America/New_York') {
 }
 
 export function heroFeelsHTML(sample,{sunExposure=false}={}) {
+  if(sample.source==='Unavailable')return 'Feels like <strong>—</strong><small>Current estimate unavailable</small>';
   const source = sample.source === 'Station observation' ? 'based on the current station reading'+(sample.inputs.comfortSourceNote?' · '+sample.inputs.comfortSourceNote:'') : 'estimated from forecast data';
   return `${sunExposure?'UTCI feels like':'Feels like'} <strong>${degrees(sample.feels)}</strong><small>${esc(sample.exposure.label)} · ${source}</small>`;
 }

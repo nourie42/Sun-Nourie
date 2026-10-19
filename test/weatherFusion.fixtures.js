@@ -19,7 +19,7 @@ export const hourlyPeriods = Array.from({ length: 48 }, (_, i) => ({ ...periods[
 export const grid = { quantitativePrecipitation: { uom: 'wmoUnit:mm', values: [{ validTime: '2026-09-04T04:00:00Z/P10D', value: 25.4 }] } };
 export const inputs = { now, location: coordinates({ location: 'knightdale' }), point: { cwa: 'RAH', timeZone: 'America/New_York' }, forecast: { periods }, hourly: { periods: hourlyPeriods }, grid,
   discussion: { office: 'RAH', issuanceTime: '2026-09-05T14:00:00Z', text: 'TEST FIXTURE — not a live forecast. A weak front will bring a chance of showers tomorrow.', url: 'https://api.weather.gov/products/test-afd' },
-  observation: { temperature: 82, condition: 'Partly Cloudy', time: '2026-09-05T15:51:00Z', station: 'KRDU', humidity: 65, dewpoint: 68, wind: 8, gust: 14, windDirection: 230, visibility: 10, pressure: 30.02 },
+  observation: { temperature: 82, condition: 'Partly Cloudy', time: '2026-09-05T15:51:00Z', station: 'TEST', stationName:'Synthetic nearby test station', stationDistanceKm:4, humidity: 65, dewpoint: 68, wind: 8, gust: 14, windDirection: 230, visibility: 10, pressure: 30.02 },
   alerts: [], models: { hrrr: model(81, .02, 72), ecmwf: model(79, .01), nbm: model(80, .015) },
   feeds: ['nws', 'hourly', 'grid', 'afd', 'observation', 'hrrr', 'ecmwf', 'nbm', 'alerts'].map((id) => ({ id, label: id === 'afd' ? 'NWS RAH discussion' : id.toUpperCase(), status: 'ready', fetchedAt: '2026-09-05T16:00:00Z', issuedAt: ['nws', 'afd'].includes(id) ? '2026-09-05T14:00:00Z' : null, url: id === 'hrrr' ? 'https://api.open-meteo.com/v1/forecast' : 'https://api.weather.gov/points/35.787,-78.4806' })) };
 export const preview = { ...buildForecast(inputs), aiConfigured: false, modelAccessConfigured: true };

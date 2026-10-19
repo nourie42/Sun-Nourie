@@ -1,3 +1,4 @@
+import {currentReadingFreshness} from './weather-freshness.js?v=accuracy-20261019-v1';
 const finite=v=>typeof v==='number'&&Number.isFinite(v);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const HOUR=3600000;
@@ -64,6 +65,7 @@ export function dewpointPoints(forecast,now,hours=240){
  return [...unique.values()].sort((a,b)=>a.epoch-b.epoch);
 }
 export function currentDewpointValue(forecast,now=Date.now()){
+ if(currentReadingFreshness(forecast,now).expired)return null;
  const observed=forecast?.current?.dewpoint;
  if(finite(observed))return observed;
  const currentHour=(forecast?.metricForecasts?.series?.dewpoint||[]).find(point=>{

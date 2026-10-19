@@ -171,8 +171,9 @@ function aqiDaily(aqHours, days, tz) {
   if (!aqHours?.length) return days.map(() => null);
   const byDay = {};
   for (const h of aqHours) {
-    if (!finite(h.aqi)) continue;
-    const key = localDateKey(Date.parse(h.time), tz);
+    const time=Date.parse(h?.time);
+    if (!finite(h?.aqi) || h.aqi<0 || !finite(time)) continue;
+    const key = localDateKey(time, tz);
     const b = (byDay[key] = byDay[key] || []);
     b.push(h.aqi);
   }

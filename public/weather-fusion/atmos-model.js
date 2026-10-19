@@ -8,7 +8,8 @@ import {hourlyDisplaySamples} from './weather-display.js?v=low-rain-display-v1';
 import {weatherState} from './weather-state.js?v=current-rain-20261017-v3';
 import {finite,thermalHumidity,wetBulb,solarElevation} from './weather-math.js?v=current-rain-20261017-v3';
 import {hideLowRainChance} from './rain-display.js?v=low-rain-display-v1';
-import {classifyHour,PERFECT_TEMP_IDEAL_F,PERFECT_TEMP_BAND_F,RULE_B_TEMP_F,CALM_WIND_MAX_MPH,BREEZY_WIND_F,DEWPOINT_MAX_EXCLUSIVE_F} from './whats-up-classify.js?v=current-rain-20261017-v3';
+import {classifyHour} from './whats-up-classify.js?v=current-rain-20261017-v3';
+import {buildForecastWindows,PERFECT_WEATHER_RULES} from './forecast-windows.js?v=forecast-windows-v1';
 import {thermalRisk} from './thermal-risk.js?v=weather-art-labels-v10';
 import {referenceScene,clothingForFeels,comfortSceneState} from './exposure-scene.js?v=current-rain-20261017-v3';
 import {calendarDayWindow} from './calendar-day.js?v=calendar-days-v1';
@@ -16,7 +17,7 @@ import {dailyForecastReadings} from './seven-day.js?v=low-rain-display-v1';
 
 export const ATMOS_VERSION='atmos-v2';
 export const H=3600000;
-export const PERFECT_RULES={ideal:PERFECT_TEMP_IDEAL_F,band:PERFECT_TEMP_BAND_F,breezyBand:RULE_B_TEMP_F,calm:CALM_WIND_MAX_MPH,breeze:BREEZY_WIND_F,dewpoint:DEWPOINT_MAX_EXCLUSIVE_F};
+export const PERFECT_RULES={ideal:72,band:PERFECT_WEATHER_RULES.feels,dewpoint:PERFECT_WEATHER_RULES.dewpointMax,cloud:PERFECT_WEATHER_RULES.cloudMax,rain:PERFECT_WEATHER_RULES.rainMax,precipitation:PERFECT_WEATHER_RULES.precipitationMaxExclusive,horizonDays:PERFECT_WEATHER_RULES.horizonDays};
 export const SOURCE_ORDER=['nws','hrrr','ecmwf','nbm','wn'];
 export const SOURCES={
  nws:{label:'NWS',name:'National Weather Service forecast'},
@@ -241,6 +242,7 @@ export function comfortGrid(forecast,now=Date.now(),dayCount=7){
  const rainRows=new Map((forecast?.rainTimeline||[]).map(row=>[Date.parse(row.time),row]));
  const hourRows=new Map((forecast?.hours||[]).map(row=>[Date.parse(row.time),row]));
  const current=Math.floor(now/H)*H;
+ const perfectHours=new Map(buildForecastWindows(forecast,now).perfect.flatMap(window=>window.hours.map(hour=>[Date.parse(hour.forecastTime),hour])));
  const days=(forecast?.days||[]).filter(day=>/^\d{4}-\d{2}-\d{2}$/.test(day?.date||'')).slice(0,dayCount);
  const grid=days.map((day,i)=>{
   const noon=Date.parse(`${day.date}T12:00:00Z`);
@@ -256,10 +258,11 @@ export function comfortGrid(forecast,now=Date.now(),dayCount=7){
   const condition=rainRow?.condition||hourRow?.condition||point.condition||'';
   const skyCover=finite(hourRow?.skyCover)?hourRow.skyCover:finite(point.inputs?.skyCover)?point.inputs.skyCover:null;
   const verdict=classifyHour({temperature,dewpoint,wind,condition,skyCover,rainLikelihood:rainRow?.rainLikelihood||hourRow?.rainLikelihood||null,officialPop:rainRow?.officialPop??hourRow?.officialPop??null});
-  const past=time<current;
+  const past=time<current,perfectHour=perfectHours.get(time);
   row.cells[hour]={time,hour,past,feels:finite(point.value)?point.value:null,temperature:finite(temperature)?temperature:null,
    dewpoint:finite(dewpoint)?dewpoint:null,wind:finite(wind)?wind:null,condition,kind:verdict.sky.kind,
-   rain:finite(verdict.rainChance)?verdict.rainChance:null,storm:verdict.storm,perfect:past?null:verdict.perfect,bin:comfortBin(point.value)};
+   date,rain:finite(verdict.rainChance)?verdict.rainChance:null,storm:verdict.storm,perfect:!past&&perfectHour?'outdoor':null,
+   perfectStart:perfectHour?Date.parse(perfectHour.time):null,bin:comfortBin(point.value)};
  }
  return grid;
 }
@@ -269,11 +272,11 @@ export function perfectWindows(grid){
  const windows=[];let open=null;
  for(const cell of cells){
   if(!cell.perfect){open=null;continue;}
-  if(open&&cell.time===open.end){open.end+=H;open.cells.push(cell);continue;}
-  open={start:cell.time,end:cell.time+H,cells:[cell]};windows.push(open);
+  if(open&&cell.time===open.end&&cell.date===open.date){open.end+=H;open.cells.push(cell);continue;}
+  open={date:cell.date,start:finite(cell.perfectStart)?Math.max(cell.time,cell.perfectStart):cell.time,end:cell.time+H,cells:[cell]};windows.push(open);
  }
  return windows.map(({start,end,cells:list})=>{
-  const temps=list.map(c=>c.temperature).filter(finite),dews=list.map(c=>c.dewpoint).filter(finite),winds=list.map(c=>c.wind).filter(finite);
+  const temps=list.map(c=>c.feels).filter(finite),dews=list.map(c=>c.dewpoint).filter(finite),winds=list.map(c=>c.wind).filter(finite);
   return {start,end,hours:list.length,rules:[...new Set(list.map(c=>c.perfect))].sort(),
    low:temps.length?Math.min(...temps):null,high:temps.length?Math.max(...temps):null,
    dewpoint:dews.length?Math.max(...dews):null,wind:winds.length?winds.reduce((a,b)=>a+b,0)/winds.length:null};

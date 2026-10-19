@@ -3,6 +3,9 @@ import assert from 'node:assert/strict';
 import {buildForecastWindows} from '../public/weather-fusion/forecast-windows.js';
 import {forecastWindowBannerHTML,forecastWindowDetailHTML} from '../public/weather-fusion/forecast-window-banners.js';
 import {thermalComfort} from '../public/weather-fusion/weather-math.js';
+import {forecastSample} from '../public/weather-fusion/weather-display.js';
+import {warmestTodayWindow} from '../public/weather-fusion/comfort-outlook.js';
+import {sunExposureTemperature} from '../public/weather-fusion/outdoor-feels.js';
 
 const HOUR = 3600000;
 const base = Date.parse('2026-09-26T12:00:00Z');
@@ -25,13 +28,13 @@ function refreshHour(data,index){
   const comfort=thermalComfort(inputs,data.location,time);
   point.value=Number(comfort.rawOutdoors.toFixed(1));point.daylight=comfort.daylight;point.condition=inputs.condition;
 }
-function setSunTemperature(data,index,target){
+function setOutdoorFeels(data,index,target){
   const point=data.metricForecasts.series.feels[index],inputs=point.inputs,time=Date.parse(point.time);
   let air=target;
   for(let n=0;n<8;n++){
     inputs.temperature=air;refreshHour(data,index);
-    const comfort=thermalComfort(inputs,data.location,time),sun=air+comfort.rawOutdoors-comfort.rawShade;
-    air+=target-sun;
+    const comfort=thermalComfort(inputs,data.location,time);
+    air+=target-comfort.rawOutdoors;
   }
   inputs.temperature=air;refreshHour(data,index);
 }
@@ -40,7 +43,7 @@ function fixture(count=4, start=base) {
   const hours = Array.from({length:count},(_,index) => ({time:at(index,start),isDay:true,
     temperature:70,skyCover:20,dewpoint:50,condition:'Clear',windMph:0,gust:5,
     precipitation:0,rainLikelihood:{value:10},pop:99}));
-  const data={location:{...location},hours,
+  const data={assembledAt:new Date(start).toISOString(),location:{...location},hours,
     rainTimeline:hours.map(hour => ({time:hour.time,end:at(1,Date.parse(hour.time)),precipitation:0,rainLikelihood:{value:10},officialPop:99})),
     metricForecasts:{series:{
       temperature:hours.map(hour=>({time:hour.time,value:70})),
@@ -49,11 +52,11 @@ function fixture(count=4, start=base) {
       gust:hours.map(hour => ({time:hour.time,value:5})),
     }},
   };
-  for(let i=0;i<count;i++)setSunTemperature(data,i,72);
+  for(let i=0;i<count;i++)setOutdoorFeels(data,i,72);
   return data;
 }
 
-test('perfect uses modeled feels in direct sun, same-hour sky and dry blend values',()=>{
+test('perfect uses the canonical outdoor feels-like, same-hour sky and dry blend values',()=>{
   const data = fixture();
   const result = buildForecastWindows(data,base);
   assert.equal(result.perfect.length,1);
@@ -62,23 +65,79 @@ test('perfect uses modeled feels in direct sun, same-hour sky and dry blend valu
   assert.equal(result.perfect[0].end,base+4*HOUR);
   assert.equal(result.perfect[0].hours.length,4);
   assert.equal(Math.round(result.perfect[0].hours[0].feels),72);
-  data.metricForecasts.series.feels.forEach((_,index)=>setSunTemperature(data,index,81));
-  assert.deepEqual(buildForecastWindows(data,base).perfect,[],'Comfort uses air plus the matching sun exposure lift, not air or shade temperature alone.');
+  data.metricForecasts.series.feels.forEach((_,index)=>setOutdoorFeels(data,index,81));
+  assert.deepEqual(buildForecastWindows(data,base).perfect,[],'Perfect uses the same modeled outdoor value as the hourly forecast.');
+});
+
+test('cool sunny October weather cannot become perfect by adding radiant lift to air temperature',()=>{
+  const start=Date.parse('2026-10-19T16:00:00Z'),data=fixture(4,start);
+  for(let index=0;index<data.hours.length;index++){
+    Object.assign(data.metricForecasts.series.feels[index].inputs,{temperature:64,dewpoint:42,wind:11,skyCover:0,condition:'Sunny'});
+    data.metricForecasts.series.dewpoint[index].value=42;
+    refreshHour(data,index);
+  }
+  const sample=forecastSample(data,at(0,start)),comfort=sample.comfort;
+  const incompatibleEstimate=sample.temperature+comfort.rawOutdoors-comfort.rawShade;
+  assert.ok(incompatibleEstimate>=70&&incompatibleEstimate<=75,'This reproduces the old false-perfect calculation.');
+  assert.ok(sample.feels<70,'The canonical hourly estimate correctly remains cool.');
+  assert.equal(sunExposureTemperature(sample).value,sample.feels);
+  assert.deepEqual(buildForecastWindows(data,start).perfect,[]);
+});
+
+test('every perfect reading equals its hourly reading and stays at or below the daily sunny peak',()=>{
+  const data=fixture(4,Date.parse('2026-10-19T16:00:00Z')),now=Date.parse(data.hours[0].time);
+  [70,72,75,73].forEach((target,index)=>setOutdoorFeels(data,index,target));
+  const windows=buildForecastWindows(data,now).perfect,peak=warmestTodayWindow(data,now);
+  assert.ok(windows.length);
+  assert.ok(peak);
+  for(const hour of windows.flatMap(window=>window.hours)){
+    const sample=forecastSample(data,hour.forecastTime);
+    assert.equal(hour.feels,sample.feels);
+    assert.equal(hour.feels,sample.exposure.value);
+    assert.ok(hour.feels<=peak.chosen.value);
+  }
+});
+
+test('perfect recommendations require a fresh, valid snapshot while rain retains its original update time',()=>{
+  const data=fixture(2);
+  assert.equal(buildForecastWindows(data,base).perfect.length,1);
+  const changes=[
+    row=>delete row.assembledAt,
+    row=>{row.assembledAt=null;},
+    row=>{row.assembledAt='not-a-clock';},
+    row=>{row.assembledAt=new Date(base-90*60000-1).toISOString();},
+    row=>{row.assembledAt=new Date(base+5*60000+1).toISOString();},
+  ];
+  for(const change of changes){
+    const snapshot=structuredClone(data);change(snapshot);
+    assert.deepEqual(buildForecastWindows(snapshot,base).perfect,[]);
+    snapshot.rainTimeline.forEach(row=>row.rainLikelihood.value=80);
+    const view=buildForecastWindows(snapshot,base);
+    assert.equal(view.rain.length,1,'A stale snapshot must not erase the last-known rain outlook.');
+    assert.match(forecastWindowBannerHTML(view,'rain',base),/Last-known rain &amp; storm forecast/);
+    assert.match(forecastWindowDetailHTML(view,'rain','Knightdale',base),/Last-known forecast/);
+  }
+  const stale=structuredClone(data);stale.assembledAt=new Date(base-91*60000).toISOString();
+  stale.rainTimeline.forEach(row=>row.rainLikelihood.value=80);
+  const view=buildForecastWindows(stale,base);
+  assert.match(forecastWindowDetailHTML(view,'rain','Knightdale',base),/snapshot updated Sep 26, 6:29 AM EDT/);
+  assert.equal(view.snapshotFreshness.time,stale.assembledAt,'Rendering must preserve the original assembly clock.');
+  const futureForecast=fixture(1,base+72*HOUR);futureForecast.assembledAt=at(0);
+  assert.equal(buildForecastWindows(futureForecast,base).perfect.length,1,'Future valid time does not make a fresh forecast stale.');
 });
 
 test('sun feels-like must be 70–75°F inclusive, and every individual limiting field is required',()=>{
   const accepted = fixture(1);
   accepted.metricForecasts.series.feels.forEach((row,index)=>{row.inputs.skyCover=40;refreshHour(accepted,index);});
-  setSunTemperature(accepted,0,70);
+  setOutdoorFeels(accepted,0,70);
   accepted.metricForecasts.series.dewpoint.forEach(row => row.value=60);
   accepted.rainTimeline.forEach(row => {row.rainLikelihood.value=20;row.precipitation=.009;});
   assert.equal(buildForecastWindows(accepted,base).perfect.length,1);
-  const upper=structuredClone(accepted);setSunTemperature(upper,0,75);
+  const upper=structuredClone(accepted);setOutdoorFeels(upper,0,75);
   assert.equal(buildForecastWindows(upper,base).perfect.length,1);
   const cases = [
-    data => setSunTemperature(data,0,69.9),
-    data => setSunTemperature(data,0,75.01),
-    data => setSunTemperature(data,0,75.1),
+    data => setOutdoorFeels(data,0,69.9),
+    data => setOutdoorFeels(data,0,75.1),
     data => {data.metricForecasts.series.feels[0].inputs.skyCover=40.1;refreshHour(data,0);},
     data => data.metricForecasts.series.dewpoint[0].value=60.1,
     data => data.rainTimeline[0].rainLikelihood.value=20.1,
@@ -118,7 +177,7 @@ test('explicit precipitation and obscured-sky wording prevent perfect even when 
 
 test('wind speed itself does not veto otherwise qualifying sun hours',()=>{
   const data=fixture(2);
-  data.metricForecasts.series.feels.forEach((row,index)=>{row.inputs.wind=20;refreshHour(data,index);setSunTemperature(data,index,72);});
+  data.metricForecasts.series.feels.forEach((row,index)=>{row.inputs.wind=20;refreshHour(data,index);setOutdoorFeels(data,index,72);});
   data.hours.forEach(row=>{row.windMph=20;row.gust=30;});
   assert.equal(buildForecastWindows(data,base).perfect.length,1);
   assert.deepEqual(buildForecastWindows(data,base).rain,[]);
@@ -175,6 +234,7 @@ test('coarse condition wording attached to feels data cannot replace missing hou
 
 test('broad later-day rain prose cannot override qualifying numeric blended hours',()=>{
   const start=base+72*HOUR,data=fixture(3,start);
+  data.assembledAt=at(0);
   data.metricForecasts.series.feels.forEach(row => row.condition='Slight chance of rain during the day');
   const perfect=buildForecastWindows(data,base).perfect;
   assert.equal(perfect.length,1);
@@ -185,12 +245,25 @@ test('broad later-day rain prose cannot override qualifying numeric blended hour
 test('elapsed hours disappear and a qualifying current hour is shown clipped',()=>{
   const data=fixture(4);
   const now=base+2.5*HOUR;
+  data.assembledAt=new Date(now).toISOString();
   const perfect=buildForecastWindows(data,now).perfect;
   assert.equal(perfect.length,1);assert.equal(perfect[0].start,now);
+  data.assembledAt=at(.5);
   const ongoing=buildForecastWindows(data,base+.5*HOUR).perfect[0];
   assert.equal(ongoing.start,base+.5*HOUR);
   assert.equal(ongoing.hours[0].time,at(.5));
   assert.equal(ongoing.hours[0].forecastTime,at(0));
+  const partialView=buildForecastWindows(data,base+.5*HOUR);
+  const html=forecastWindowDetailHTML(partialView,'perfect','Knightdale',base+.5*HOUR);
+  const banner=forecastWindowBannerHTML(partialView,'perfect',base+.5*HOUR);
+  assert.match(html,/Forecast hour/);
+  assert.match(html,/Feels like outdoors/);
+  assert.match(html,/Current-hour entries are forecasts, not current observations/);
+  assert.match(html,/data-forecast-hour="2026-09-26T12:00:00.000Z"/);
+  assert.match(html,/8am EDT/);
+  assert.doesNotMatch(html,/8:30am EDT|Feels like in sun|Now–/);
+  assert.match(banner,/Perfect weather forecast/);
+  assert.doesNotMatch(banner,/Now–/);
   data.rainTimeline.forEach(row => row.rainLikelihood.value=75);
   const rain=buildForecastWindows(data,now).rain[0];
   assert.equal(rain.start,now);

@@ -18,7 +18,7 @@ test('hero stays current in daylight and at night, independently of daily low',(
  assert.equal(currentHero({current:{temperature:null}}).temperature,null);
 });
 test('dry radar uses current-hour sky when wet wording has no supporting point forecast',()=>{
- const f={current:{temperature:79,type:'guidance',condition:'Chance Showers And Thunderstorms',conditionSource:'Selected-location current-hour forecast',radarPrecipitation:{status:'ready',atLocation:false,nearby:false}},hours:[{time:new Date(now).toISOString(),skyCover:58}]};
+ const f={assembledAt:new Date(now).toISOString(),current:{temperature:79,type:'guidance',time:new Date(now).toISOString(),condition:'Chance Showers And Thunderstorms',conditionSource:'Selected-location current-hour forecast',radarPrecipitation:{status:'ready',observedAt:new Date(now).toISOString(),atLocation:false,nearby:false}},hours:[{time:new Date(now).toISOString(),skyCover:58}]};
  assert.equal(currentHero(f,false,now).condition,'Partly cloudy');
  f.current.radarPrecipitation.atLocation=true;
  assert.equal(currentHero(f,false,now).condition,'Rain now');
