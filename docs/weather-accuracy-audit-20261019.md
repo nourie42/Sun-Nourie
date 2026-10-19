@@ -32,16 +32,21 @@ This validates numerical implementation for those inputs. It does not validate e
 ## Validation performed
 
 - **61 focused regression tests pass**, including 320 independent UTCI vectors inside the reference test.
-- Broader direct Node runs: **908 passed, 29 failed** across 937 reported test cases. Failures and blocked suites were compared against a separate unchanged source snapshot; **no new failing test names or newly failing files remain**.
-- The unchanged snapshot itself reports 35 failed assertions. Remaining failures include outdated wording/layout assertions, omitted binary image fixtures, missing Express dependencies and sandbox-blocked loopback networking. Therefore the full repository suite is **not green**.
-- Corrected relevant numerical test fixtures: NWS point mocks now contain required forecast references. Rainfall tests explicitly cover 24/24, 8/24 and 0/24 hours and preserve `null` for incomplete amounts or likelihoods.
-- Changed JavaScript syntax checks and `git diff --check` pass. The new freshness module has an explicit static route with revalidation.
+- Full genuine checkouts with npm dependencies and image assets were compared. The original production source reports **947 passes and 26 failures** out of 973 tests. The final release reports **994 passes and 20 failures** out of 1,014 tests, with **no new failing assertion names** and six original failures resolved. Existing failures concern older presentation contracts, refresh-test VM stubs and comparison contribution counts; the suite is not fully green.
+- The broader run caught a real comparison-page adapter regression after the status freshness expression changed. The hook now attaches at the completed render boundary and preserves all freshness checks. Its regression tests compile the adapted client and exercise the comparison routes.
+- Actual Chromium browser checks reproduce the screenshot case: current hourly and outdoor values both show **54°F**, with no perfect-weather window. The **61°F** later forecast peak has an explicit label and local time. A separate warm fixture verifies every Perfect Weather detail row against its matching canonical hourly value.
+- Browser checks also cover 320, 390, 430 and 1365 px layouts, expired current temperature / outdoor comfort / AQI / pavement data, and Atmos selected-hour AQI (28 current versus 80 forecast). No runtime errors or failed local asset requests were observed.
+- Reproduce those four browser scenarios with `node scripts/weatherAccuracyBrowserSmoke.js` after installing Playwright/Chromium. Optional `PLAYWRIGHT_EXECUTABLE_PATH` selects an installed Chromium binary; `WEATHER_ACCURACY_PROOF_DIR` selects the report/screenshot directory.
+- Corrected relevant numerical test fixtures: NWS point mocks contain required forecast references. Rainfall tests explicitly cover 24/24, 8/24 and 0/24 hours and preserve `null` for incomplete amounts or likelihoods.
+- Changed JavaScript syntax checks and `git diff --check` pass. The freshness module has an explicit static route with revalidation.
 
-## Remaining verification and model limits
+## Production verification and model limits
 
-The live page/API could not be retrieved in this session: the public fetch tool could not access the address, and Firecrawl returned insufficient credits. Shell network access was blocked by the execution sandbox, and local browser launch failed. No current production payload, provider observation or responsive production browser result was obtained.
+Production is the Render **Sun-Nourie-Live** service, linked to this repository's `main` branch with automatic deployment and an HTTP `/health` check. Its pre-release commit was `52475da5dca594574ab81e80320a317b6655c854`.
 
-Render workspace selection remains pending. These changes are prepared for review; production deployment and post-deployment checks have not been completed. Verify the deployed API reports `accuracyVersion: weather-accuracy-20261019-v1`, compare current and forecast timestamps, and repeat the screenshot case against the same deployed payload.
+The pre-release page and API were retrieved successfully. The mobile production page loaded without browser runtime errors, failed same-origin requests or horizontal overflow. NOAA's independent KJNX observation at `2026-10-19T17:15:00Z` reported 18°C (64.4°F), 6°C dew point and 11 kt wind, matching the API's reference-station evidence. That station is 28.6 km from the selected coordinates, so its temperature was correctly rejected as the local reading; the apparent-temperature leak is repaired by this release.
+
+The release is identified by `accuracyVersion: weather-accuracy-20261019-v1`. Deployment completion requires Render status `live`, matching deployed module content, a healthy API, and a post-deployment browser check. Deployment-specific results are recorded on the pull request rather than inferred from a successful merge.
 
 The site still uses estimated mean radiant temperature and a custom cold-weather blend. The blend extends the wind-chill expression outside standard NWS wind-chill applicability and is explicitly identified as custom. Missing sky/solar inputs are disclosed as assumptions. Surface temperatures remain modeled estimates rather than measurements. Relative forecast confidence and custom blended rain likelihood are not independently calibrated forecast probabilities. Useful county/radar metadata can still be discarded if an upstream NWS point response is incomplete.
 

@@ -69,7 +69,9 @@ export function comparisonApp(original,config){
  s=replaceOnce(s,'`/api/weather-fusion/${path}${params ?',"`${COMPARE.source==='google'&&path==='forecast'?'/api/weather-fusion/compare/google':'/api/weather-fusion/'+path}${params ?");
  s=replaceOnce(s,'data.rainTrend=updateRainTrend(data,Date.now());',"data.rainTrend=COMPARE.source==='google'?null:updateRainTrend(data,Date.now());");
  s=replaceOnce(s,"$('status').classList.add('error');","if(COMPARE.source==='google'&&e.status===404)$('status').textContent='WeatherNext is not yet connected for this location. Use the main weather page for your local forecast.';\n    $('status').classList.add('error');");
- s=replaceOnce(s,"$('status').classList.toggle('error', unavailable.length > 0 || failedPanels.length > 0);","$('status').classList.toggle('error', unavailable.length > 0 || failedPanels.length > 0);\n  compareBridge.rendered(data);");
+ // Attach to the shared render boundary, preserving its complete status and
+ // source-freshness logic when those conditions change.
+ s=replaceOnce(s,'\n}\nfunction renderAlerts(data) {','\n  compareBridge.rendered(data);\n}\nfunction renderAlerts(data) {');
  s=replaceOnce(s,'installExperience();\nstartDeviceLocation();',"const compareBridge=installComparisonPane(COMPARE,{selectHour:selectComfortHour,showDay,refresh:()=>load(),getForecast:()=>forecast});\ninstallExperience();\nif(COMPARE.explicitLocation)chooseLocation({...COMPARE.point,source:'comparison'});else startDeviceLocation();");
  return s;
 }
