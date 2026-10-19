@@ -280,6 +280,12 @@ export function dailyHighComparison(built,index){
   return {published:summarize(published),contributing:summarize(built.contributingHighs?.[index])};
 }
 function renderChart(container, built, varDef, varId) {
+  // A resize, variable switch or forecast refresh replaces the graph. Retire
+  // its document/window handlers along with the old elements.
+  container._wnTooltipAbort?.abort();
+  const tooltipController=new AbortController(),{signal}=tooltipController;
+  container._wnTooltipAbort=tooltipController;
+  container._wnShow=null;
   const { days } = built;
   const displayName=id=>id==='nourie'&&built.nwsFallback?'Weather Nourie forecast':NAMES[id];
   // Size the SVG to its real pixel width so text stays legible on phones.
@@ -346,15 +352,20 @@ function renderChart(container, built, varDef, varId) {
     + `<div class="wn-chart-wrap" style="position:relative;touch-action:pan-y">`
     + `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" style="width:100%;height:auto;display:block;cursor:crosshair" role="img" aria-label="${varId==='temp'?'Daily high temperature':varDef.label} comparison chart">${ylabels}${labels}${lines}${dots}`
     + `<line class="wn-cross" x1="0" x2="0" y1="${PT - 10}" y2="${H - PB}" stroke="#fff" stroke-width="1.5" stroke-dasharray="3,3" opacity="0"/><g class="wn-cross-dots"></g></svg>`
-    + `<div class="wn-tip" role="status" aria-live="polite" style="position:absolute;top:4px;display:none;min-width:130px;padding:8px 10px;border-radius:12px;background:rgba(10,20,40,.88);border:1px solid rgba(255,255,255,.22);color:#fff;font-size:12px;line-height:1.45;pointer-events:none;box-shadow:0 6px 18px rgba(0,0,0,.35)"></div></div>${note}`;
+    + `<div class="wn-tip" role="status" aria-live="polite" style="position:absolute;top:4px;display:none;min-width:130px;padding:8px 10px;border-radius:12px;background:rgba(10,20,40,.88);border:1px solid rgba(255,255,255,.22);color:#fff;font-size:12px;line-height:1.45;pointer-events:none;box-shadow:0 6px 18px rgba(0,0,0,.35)"><button type="button" class="wn-tip-close" aria-label="Close model values" style="position:absolute;top:3px;right:3px;width:32px;height:32px;border:0;border-radius:6px;background:transparent;color:#fff;font-size:24px;line-height:1;cursor:pointer;pointer-events:auto">×</button><div class="wn-tip-content"></div></div></div>${note}`;
   container.querySelectorAll('button.wn-chip').forEach((b) => b.addEventListener('click', () => {
     const id = b.dataset.model; if (hiddenModels.has(id)) hiddenModels.delete(id); else hiddenModels.add(id);
     renderChart(container, built, varDef, varId);
-  }));
-  const svg = container.querySelector('svg'), tip = container.querySelector('.wn-tip'), cross = container.querySelector('.wn-cross'), cdots = container.querySelector('.wn-cross-dots'), wrap = container.querySelector('.wn-chart-wrap');
+  },{signal}));
+  const svg = container.querySelector('svg'), tip = container.querySelector('.wn-tip'), tipContent=container.querySelector('.wn-tip-content'), cross = container.querySelector('.wn-cross'), cdots = container.querySelector('.wn-cross-dots'), wrap = container.querySelector('.wn-chart-wrap');
+  let selectedIndex=null,gesture=null;
+  const indexAt=clientX=>{
+    const r=svg.getBoundingClientRect(),sx=(clientX-r.left)*(W/r.width);
+    return Math.max(0,Math.min(n-1,Math.round(((sx-PL)/(W-PL-PR))*(n-1))));
+  };
   const show = (clientX) => {
-    const r = svg.getBoundingClientRect(), sx = (clientX - r.left) * (W / r.width);
-    const i = Math.max(0, Math.min(n - 1, Math.round(((sx - PL) / (W - PL - PR)) * (n - 1))));
+    const r = svg.getBoundingClientRect(), i=indexAt(clientX);
+    selectedIndex=i;
     const x = X(i);
     svg.querySelectorAll('[data-point-label]').forEach(label => { label.style.visibility = Number(label.dataset.pointLabel) === i ? 'hidden' : ''; });
     cross.setAttribute('x1', x); cross.setAttribute('x2', x); cross.setAttribute('opacity', '0.8');
@@ -364,22 +375,44 @@ function renderChart(container, built, varDef, varId) {
     const precision=comparison?Math.max(...[comparison.published,comparison.contributing].map(range=>finite(range?.spread)?temperatureRangePrecision(range):1)):1;
     const range=(summary,label)=>finite(summary?.spread)?`<span style="display:block;margin-top:5px">${label}: <b>${summary.low.value.toFixed(precision)}–${summary.high.value.toFixed(precision)}°F</b> · ${summary.spread.toFixed(1)}°F spread</span>`:'';
     const hasComparisonOnly=comparison?.published.sources.some(source=>!Object.hasOwn(built.contributingHighs?.[i]||{},source.id));
-    tip.innerHTML = `<b style="display:block;margin-bottom:3px">${dayName(days[i], i, true)}</b>${varId==='temp'?'<b style="display:block;margin-bottom:3px">Daily highs (°F)</b>':''}`
+    tipContent.innerHTML = `<b style="display:block;margin-bottom:3px;padding-right:30px">${dayName(days[i], i, true)}</b>${varId==='temp'?'<b style="display:block;margin-bottom:3px">Daily highs (°F)</b>':''}`
       + (rows.length ? rows.map(([id, v]) => `<span data-tip-series="${id}" style="display:flex;justify-content:space-between;gap:10px"><span><i style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${COLORS[id]};margin-right:5px"></i>${displayName(id) || varDef.label}${varId==='temp'&&id!=='nourie'&&finite(v)&&!Object.hasOwn(built.contributingHighs?.[i]||{},id)?' (comparison only)':''}</span><b>${finite(v) ? varId==='temp'?v.toFixed(precision)+'°':varDef.fmt(v) : 'Unavailable'}</b></span>`).join('') : varId==='pop'?'<span>No rain chances of 5% or higher</span>':'<span>No model data</span>')
       +(comparison?range(comparison.published,'All published model highs')+(hasComparisonOnly?range(comparison.contributing,'Contributing model highs'):'')+'<small style="display:block">Ranges exclude the blended forecast and include hidden models.</small>':'');
     tip.style.display = 'block';
     const px = (x / W) * r.width, tw = tip.offsetWidth;
     tip.style.left = `${Math.max(0, Math.min(r.width - tw, px > r.width / 2 ? px - tw - 12 : px + 12))}px`;
   };
-  const hide = () => { tip.style.display = 'none'; cross.setAttribute('opacity', '0'); cdots.innerHTML = ''; svg.querySelectorAll('[data-point-label]').forEach(label => { label.style.visibility = ''; }); };
-  let dragging = false;
-  svg.addEventListener('pointerdown', (e) => { dragging = true; show(e.clientX); });
-  svg.addEventListener('pointermove', (e) => { if (dragging || e.pointerType === 'mouse') show(e.clientX); });
-  svg.addEventListener('pointerup', (e) => { dragging = false; if (e.pointerType === 'mouse') return; });
-  svg.addEventListener('pointerleave', (e) => { dragging = false; if (e.pointerType === 'mouse') hide(); });
-  svg.addEventListener('pointercancel', () => { dragging = false; });
-  wrap.addEventListener('touchmove', (e) => { if (dragging && e.touches[0]) { show(e.touches[0].clientX); e.preventDefault(); } }, { passive: false });
-  document.addEventListener('pointerdown', (e) => { if (!wrap.contains(e.target)) hide(); }, { once: true });
+  const hide = () => { selectedIndex=null;gesture=null;tip.style.display = 'none'; cross.setAttribute('opacity', '0'); cdots.innerHTML = ''; svg.querySelectorAll('[data-point-label]').forEach(label => { label.style.visibility = ''; }); };
+  svg.addEventListener('pointerdown', e=>{
+    gesture={id:e.pointerId,x:e.clientX,y:e.clientY,moved:false,toggle:e.pointerType!=='mouse'&&tip.style.display!=='none'&&selectedIndex===indexAt(e.clientX)};
+    show(e.clientX);
+  },{signal});
+  svg.addEventListener('pointermove', e=>{
+    if(gesture&&gesture.id===e.pointerId){
+      const dx=Math.abs(e.clientX-gesture.x),dy=Math.abs(e.clientY-gesture.y);
+      if(Math.max(dx,dy)>8)gesture.moved=true;
+      // Keep vertical page scrolling native; horizontal dragging scrubs days.
+      if(e.pointerType!=='mouse'&&dy>8&&dy>dx){hide();return;}
+      show(e.clientX);
+    }else if(e.pointerType==='mouse')show(e.clientX);
+  },{signal});
+  svg.addEventListener('pointerup', e=>{
+    if(!gesture||gesture.id!==e.pointerId)return;
+    const toggle=gesture.toggle&&!gesture.moved;
+    gesture=null;
+    if(toggle)hide();else show(e.clientX);
+  },{signal});
+  svg.addEventListener('pointerleave', e=>{
+    // Touch browsers emit leave after a completed tap. Keep that selection
+    // open, but dismiss an active gesture that actually leaves the graph.
+    if(e.pointerType==='mouse'||gesture)hide();
+  },{signal});
+  svg.addEventListener('pointercancel',hide,{signal});
+  container.querySelector('.wn-tip-close').addEventListener('click',hide,{signal});
+  document.addEventListener('pointerdown',e=>{if(!wrap.contains(e.target))hide();},{capture:true,signal});
+  document.addEventListener('keydown',e=>{if(e.key==='Escape')hide();},{signal});
+  window.addEventListener('scroll',hide,{capture:true,passive:true,signal});
+  signal.addEventListener('abort',hide,{once:true});
   container._wnShow = show;
 }
 
