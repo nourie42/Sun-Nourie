@@ -16,7 +16,7 @@ test('Now renders the current local weekday even when its observation time is un
  for(const time of [undefined,null,'invalid timestamp']){
   const f=forecast(time),html=render(f);
   assert.match(html,/<span>Now<\/span><small class="hour-date">Sat<\/small>/);
-  assert.match(html,/<strong>65°<\/strong>/);
+  assert.match(html,/<strong>—<\/strong>/,'An observation with no usable timestamp is not a verified current temperature');
   assert.equal(currentSample(f,now).time,time,'Rendering must not fabricate a source observation time');
   assert.equal(f.current.time,time);
  }

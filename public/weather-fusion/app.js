@@ -3,6 +3,7 @@ import {DAN_TAKE_VERSION,visibleDanTakeItems,danTakeText,rebindDanTake} from './
 import {danCard,danTakeDisplay} from './dans-summary.js?v=current-rain-20261017-v3';
 import {fetchJsonWithDeadline} from './request-deadline.js?v=loading-recovery-v1';
 import {dailyUvHTML} from './daily-uv.js?v=weather-art-labels-v10';
+import {currentReadingFreshness} from './weather-freshness.js?v=accuracy-20261019-v1';
 import {weatherIcon,renderHourlyWeather,currentSample} from './weather-display.js?v=low-rain-display-v1';
 import {dayGraphHTML,dayGraphPoints,installDayGraph} from './day-graph.js?v=low-rain-display-v1';
 import {degrees,feelsAt,GUSTY_FEELS_DISPLAY_MPH} from './hourly-feels.js?v=current-rain-20261017-v3';
@@ -203,9 +204,11 @@ function render(data) {
   const officialInterrupted=(data.feeds||[]).some(f=>['nws','hourly'].includes(f.id)&&f.status!=='ready'&&f.recovered!==true);
   const retainedOfficial=(data.feeds||[]).some(f=>f.recovered===true);
   const recoveryNotice=modelRecovery&&officialInterrupted?'Official forecast update interrupted; available model guidance is shown.':retainedOfficial?'Official update delayed; recently verified forecast guidance is shown.':unavailable.length||failedPanels.length?'Some data is temporarily unavailable; use Refresh to retry.':'';
-  $('status').textContent = `Updated ${clock(data.assembledAt)}${recoveryNotice?' · '+recoveryNotice:''}`;
+  const currentFreshness=currentReadingFreshness(data),sourceTime=Date.parse(c.time);
+  const readingNote=currentFreshness.expired?'Current reading stale; refresh needed.':c.type==='unavailable'?'Current reading unavailable':finite(sourceTime)?`${c.type==='observation'?'Observed':'Current forecast hour'} ${clock(c.time)}`:'Current reading time unavailable';
+  $('status').textContent = `Updated ${clock(data.assembledAt)} · ${readingNote}${recoveryNotice?' · '+recoveryNotice:''}`;
   $('status').title = statusDetail;
-  $('status').classList.toggle('error', unavailable.length > 0 || failedPanels.length > 0);
+  $('status').classList.toggle('error', unavailable.length > 0 || failedPanels.length > 0 || currentFreshness.expired);
 }
 function renderAlerts(data) {
   const live=alertSnapshot&&alertLocationKey(alertSnapshot.location)===alertLocationKey(place)?alertSnapshot:null;
@@ -633,6 +636,7 @@ startDeviceLocation();
 
 // Expire passed discussion periods even while this page remains open.
 setInterval(()=>{if(currentBriefing&&forecast)renderBriefing(currentBriefing);},30000);
-setInterval(()=>{if(forecast&&Date.now()-Date.parse(forecast.assembledAt)>90*60000)renderComfort(forecast);},30000);
+// Recheck every visible current value while an offline tab's source ages out.
+setInterval(()=>{if(forecast&&currentReadingFreshness(forecast).expired)render(forecast);},30000);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&currentBriefing&&forecast)renderBriefing(currentBriefing);});
 

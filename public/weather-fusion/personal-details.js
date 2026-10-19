@@ -86,7 +86,7 @@ export function sunShadeHTML(comfort,location,now=Date.now(),context={}){
  const condition=context.condition||comfort?.radiantCondition||comfort?.condition||({clear:'Clear','partly-cloudy':'Partly Cloudy',cloudy:'Cloudy',rain:'Rain',storm:'Thunderstorms',snow:'Snow',fog:'Fog'}[fallbackKind]||'');
  const conditionKind=weatherState(condition,comfort?.inputEvidence?.skyCover).kind;
  const kind=conditionKind==='unknown'?fallbackKind:conditionKind;
- const shadeDisplay=finite(comfort?.shade)?comfort.shade:finite(context.primaryFeels)?context.primaryFeels:null;
+ const shadeDisplay=finite(comfort?.shade)?comfort.shade:null;
  const shade=finite(shadeDisplay)?`${Math.round(shadeDisplay)}°`:'Unavailable';
  const exposure=outdoorExposure({...comfort,daylight,weatherKind:kind,condition});
  const outdoorValue=finite(context.primaryFeels)?context.primaryFeels:exposure.value,rawRiskValue=finite(comfort?.rawOutdoors)?comfort.rawOutdoors:exposure.value;

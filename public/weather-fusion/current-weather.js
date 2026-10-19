@@ -1,16 +1,23 @@
 import {weatherState} from './weather-state.js?v=current-rain-20261017-v3';
+import {currentReadingFreshness} from './weather-freshness.js?v=accuracy-20261019-v1';
 const finite=v=>typeof v==='number'&&Number.isFinite(v);
 const liquid=condition=>['rain','storm'].includes(weatherState(condition).kind);
 
 /** Radar describes detected precipitation, not the probability for the current
  * forecast hour. A radar gap must not erase a supported forecast at this point. */
 export function currentWeatherDisplay(forecast,now=Date.now()){
- const current=forecast?.current||{},kind=weatherState(current.condition).kind;
+ const freshness=currentReadingFreshness(forecast,now);
+ const rawCurrent=forecast?.current||{};
+ const current=freshness.expired?{...rawCurrent,type:'unavailable',condition:'Current conditions unavailable',conditionSource:freshness.reason}:rawCurrent,kind=weatherState(current.condition).kind;
  const currentHour=forecast?.hours?.find(h=>{const t=Date.parse(h.time);return t<=now&&now<t+3600000;});
  const assembled=Date.parse(forecast?.assembledAt),fresh=finite(assembled)&&now-assembled<=90*60000&&now>=assembled-5*60000;
- const stationCondition=(current.type==='observation'||(/observation/i.test(current.conditionSource||'')&&!/forecast \(sky only\)/i.test(current.conditionSource||'')))&&kind!=='unknown';
+ const stationCondition=!freshness.expired&&(current.type==='observation'||(/observation/i.test(current.conditionSource||'')&&!/forecast \(sky only\)/i.test(current.conditionSource||'')))&&kind!=='unknown';
  const activePrecipitation=stationCondition&&['rain','storm','snow'].includes(kind);
- const radar=current.radarPrecipitation,radarReady=radar?.status==='ready';
+ // Radar refreshes independently from station and forecast clocks. Fresh rain
+ // evidence survives an expired thermal reading; an old radar image does not.
+ const radar=current.radarPrecipitation,radarTime=Date.parse(radar?.observedAt);
+ const radarFresh=Object.hasOwn(radar||{},'observedAt')?finite(radarTime)&&now-radarTime<=20*60000&&radarTime-now<=5*60000:fresh&&!freshness.expired;
+ const radarReady=radar?.status==='ready'&&radarFresh;
  const radarHere=radarReady&&radar.atLocation===true;
  const radarClose=radarReady&&(radar.close===true||(radar.close==null&&finite(radar.nearestRainMiles)&&radar.nearestRainMiles<=5));
  const radarThreat=radarHere||radarClose||(radarReady&&radar.approaching===true);

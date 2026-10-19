@@ -2,6 +2,9 @@
  * One API call (/api/weather-fusion/forecast) drives the whole page.
  * Pure builders (feelsLike, skyImage, buildArc, insights, buildGlanceModel)
  * are exported for testing; DOM wiring runs in the browser. */
+import {currentAirQuality} from './air-quality.js?v=mobile-repair-v1';
+import {currentSample,sampleCaption} from './weather-display.js?v=low-rain-display-v1';
+import {hourlyUvValue} from './daily-uv.js?v=weather-art-labels-v10';
 
 const finite = (n) => typeof n === 'number' && Number.isFinite(n);
 const round = (n) => (finite(n) ? Math.round(n) : null);
@@ -144,25 +147,20 @@ export function rainOutlook(hours, timeZone) {
 }
 
 function uvNow(uv, nowMs) {
-  const list = (uv?.hourly || []).filter((e) => Number.isFinite(Date.parse(e.time)));
-  let best = null;
-  for (const e of list) {
-    const t = Date.parse(e.time);
-    if (t <= nowMs && (!best || t > Date.parse(best.time))) best = e;
-  }
-  return best && finite(best.value) ? Math.round(best.value * 10) / 10 : null;
+  const value=hourlyUvValue({uv},nowMs);
+  return finite(value)?Math.round(value*10)/10:null;
 }
 
 export function buildGlanceModel(data, nowMs = Date.now()) {
   const loc = data?.location || {};
   const timeZone = loc.timeZone || 'America/New_York';
-  const cur = data?.current || {};
+  const current=currentSample({...data,location:loc},nowMs),cur=current.inputs;
   const allHours = (data?.hours || [])
     .map((h) => ({ ...h, time: Date.parse(h.time) }))
     .filter((h) => Number.isFinite(h.time));
   const hours = allHours.filter((h) => h.time + 3600000 > nowMs).slice(0, 24);
   const days = (data?.days || []).slice(0, 3);
-  const feels = finite(cur.feelsLike) ? round(cur.feelsLike) : feelsLike(cur.temperature, cur.humidity, cur.wind);
+  const feels = round(current.feels);
   const solar = data?.solar || null;
   const sun = (key) => (solar?.[key] ? timeLabel(Date.parse(solar[key]), timeZone) : null);
   const alerts = (data?.alerts || []).slice(0, 3).map((a) => ({
@@ -176,8 +174,9 @@ export function buildGlanceModel(data, nowMs = Date.now()) {
     sky: skyImage(allHours, nowMs),
     hero: {
       temp: round(cur.temperature),
-      condition: cur.condition || 'Conditions unavailable',
+      condition: current.condition || 'Conditions unavailable',
       feels,
+      feelsSource:sampleCaption(current,timeZone),
       high: round(days[0]?.high),
       low: round(days[0]?.low),
       sunrise: sun('sunrise'),
@@ -199,7 +198,7 @@ export function buildGlanceModel(data, nowMs = Date.now()) {
       ['Wind', finite(cur.wind) ? `${Math.round(cur.wind)} mph` : '—'],
       ['Gusts', finite(cur.gust) ? `${Math.round(cur.gust)} mph` : '—'],
       ['UV index', (() => { const u = uvNow(data?.uv, nowMs); return u != null ? String(u) : '—'; })()],
-      ['Air quality', finite(data?.airQuality?.aqi) ? `AQI ${Math.round(data.airQuality.aqi)}` : '—'],
+      ['Air quality', (()=>{const aq=currentAirQuality(data,nowMs);return aq?`AQI ${Math.round(aq.aqi)}`:'—';})()],
       ['Visibility', finite(cur.visibility) ? `${cur.visibility} mi` : '—'],
       ['Pressure', finite(cur.pressure) ? `${cur.pressure} in` : '—'],
     ],
@@ -247,6 +246,7 @@ export function render(model) {
   el('now-cond').textContent = model.hero.condition;
   el('now-feels').textContent = model.hero.feels != null && model.hero.temp != null && model.hero.feels !== model.hero.temp
     ? `Feels like ${model.hero.feels}°` : '';
+  el('now-feels').title=model.hero.feelsSource||'';
   el('now-hilo').textContent = model.hero.high != null ? `H ${model.hero.high}°  ·  L ${model.hero.low ?? '--'}°` : '';
   el('sun-times').textContent = model.hero.sunrise ? `↑ ${model.hero.sunrise}   ↓ ${model.hero.sunset}` : '';
   const rain = el('rain-line');

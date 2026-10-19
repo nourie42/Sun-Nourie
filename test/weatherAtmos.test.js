@@ -9,7 +9,7 @@ import {skyColours,skyPaint,cloudField,coverShare,CLOUD_W,CLOUD_H} from '../publ
 import {hourlyDisplaySamples} from '../public/weather-fusion/weather-display.js';
 import {forecastValue,displayedFeelsAt} from '../public/weather-fusion/hourly-feels.js';
 import {dailyForecastReadings} from '../public/weather-fusion/seven-day.js';
-import {solarElevation} from '../public/weather-fusion/weather-math.js';
+import {solarElevation,thermalComfort} from '../public/weather-fusion/weather-math.js';
 import {isPublicWeatherPath,isProtectedWeatherPath} from '../src/weatherSiteAccess.js';
 
 const read=name=>readFileSync(new URL(`../public/weather-fusion/${name}`,import.meta.url),'utf8');
@@ -120,18 +120,26 @@ test('comfort classes centre on the 72° ideal and follow the UTCI heat-stress l
 
 test('perfect hours use the shared rules and merge into windows',()=>{
   const data=structuredClone(forecast),series=data.metricForecasts.series;
-  const start=Date.parse(series.feels[3].time);
+  const start=Date.parse('2026-09-06T16:00:00Z'),at=start+5*60000;
+  data.assembledAt=new Date(at).toISOString();
   const set=(key,time,value)=>{const row=series[key].find(p=>Date.parse(p.time)===time);if(row)row.value=value;};
   for(let i=0;i<4;i++){
     const time=start+i*H;
-    set('temperature',time,72);set('dewpoint',time,55);set('wind',time,4);set('feels',time,72);
-    const rain=data.rainTimeline.find(r=>Date.parse(r.time)===time);if(rain){rain.condition='Sunny';rain.rainLikelihood={...rain.rainLikelihood,value:5};}
+    const point=series.feels.find(p=>Date.parse(p.time)===time),inputs={temperature:72,dewpoint:55,wind:4,skyCover:0,condition:'Sunny'};
+    let low=40,high=90;
+    for(let n=0;n<30;n++){inputs.temperature=(low+high)/2;if(thermalComfort(inputs,data.location,time).rawOutdoors<72)low=inputs.temperature;else high=inputs.temperature;}
+    const comfort=thermalComfort(inputs,data.location,time);
+    Object.assign(point,{inputs,daylight:true,value:Number(comfort.rawOutdoors.toFixed(1))});
+    set('temperature',time,inputs.temperature);set('dewpoint',time,55);set('wind',time,4);
+    for(const rows of [data.hours,data.rainTimeline]){
+      const row=rows.find(r=>Date.parse(r.time)===time);if(row)Object.assign(row,{condition:'Sunny',skyCover:0,isDay:true,precipitation:0,rainLikelihood:{value:5}});
+    }
   }
   set('temperature',start+4*H,90);
-  const grid=comfortGrid(data,now),windows=perfectWindows(grid);
-  const window=windows.find(w=>w.start===start);
-  assert.ok(window,'a calm, dry 72° stretch is a perfect window');
-  assert.ok(window.hours>=4&&window.rules.includes('A'));
+  const grid=comfortGrid(data,at),windows=perfectWindows(grid);
+  const window=windows.find(w=>w.start===at);
+  assert.ok(window,'a dry daylight stretch with a canonical outdoor feels-like of72° is a perfect window');
+  assert.ok(window.hours>=4&&window.rules.includes('outdoor'));
   assert.equal(grid.length,Math.min(7,data.days.length));
   assert.ok(grid.every(row=>row.cells.length===24));
 });

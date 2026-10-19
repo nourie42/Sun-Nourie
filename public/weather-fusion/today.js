@@ -3,6 +3,9 @@
  * 7-day, rain, details, comfort, severe outlook, NWS discussion,
  * plus "How the weather is calculated" with the house blend percentages.
  * Pure builders are exported for testing; DOM wiring runs in browser. */
+import {currentAirQuality} from './air-quality.js?v=mobile-repair-v1';
+import {currentSample,sampleCaption,windDirectionLabel} from './weather-display.js?v=low-rain-display-v1';
+import {hourlyUvValue} from './daily-uv.js?v=weather-art-labels-v10';
 
 const MODELS = [
   { id: 'nws', label: 'NWS', color: '#7fd4ff', desc: 'Official National Weather Service forecast' },
@@ -16,23 +19,6 @@ const MODEL_LABEL = { nws: 'NWS', hrrr: 'HRRR', ecmwf: 'ECMWF', nbm: 'NBM' };
 
 function hourLabel(timeMs, timeZone) {
   return new Intl.DateTimeFormat('en-US', { timeZone, hour: 'numeric' }).format(new Date(timeMs));
-}
-function feelsLike(tF, rhPct, windMph) {
-  if (!finite(tF)) return null;
-  if (tF >= 80 && finite(rhPct)) {
-    const T = tF, R = rhPct;
-    let hi = -42.379 + 2.04901523 * T + 10.14333127 * R - 0.22475541 * T * R
-      - 0.00683783 * T * T - 0.05481717 * R * R + 0.00122874 * T * T * R
-      + 0.00085282 * T * R * R - 0.00000199 * T * T * R * R;
-    if (R < 13 && T >= 80 && T <= 112) hi -= ((13 - R) / 4) * Math.sqrt((17 - Math.abs(T - 95)) / 17);
-    else if (R > 85 && T >= 80 && T <= 87) hi += ((R - 85) / 10) * ((87 - T) / 5);
-    return hi;
-  }
-  if (tF <= 50 && finite(windMph) && windMph >= 3) {
-    const w = Math.pow(windMph, 0.16);
-    return 35.74 + 0.6215 * tF - 35.75 * w + 0.4275 * tF * w;
-  }
-  return tF;
 }
 export function skyImage(hours, nowMs) {
   const h = (hours || []).find((x) => x.time <= nowMs && nowMs < x.time + 3600000) || hours?.[0] || null;
@@ -48,7 +34,7 @@ export function skyImage(hours, nowMs) {
 export function buildTodayModel(forecast, nowMs = Date.now()) {
   const loc = forecast?.location || {};
   const timeZone = loc.timeZone || 'America/New_York';
-  const cur = forecast?.current || {};
+  const current=currentSample({...forecast,location:loc},nowMs),cur=current.inputs;
   const allHours = (forecast?.hours || [])
     .map((h) => ({ ...h, time: Date.parse(h.time) }))
     .filter((h) => Number.isFinite(h.time));
@@ -56,7 +42,6 @@ export function buildTodayModel(forecast, nowMs = Date.now()) {
   const weights = forecast?.blendPolicy?.sameDay || { nws: 0.4, hrrr: 0.3, ecmwf: 0.1, nbm: 0.2 };
   const rainWeights = forecast?.blendPolicy?.extendedRain || { nws: 0.15, ecmwf: 0.6, nbm: 0.25 };
   const contrib = Object.fromEntries((forecast?.modelContributions || []).map((m) => [m.id, m]));
-  const h0 = hours[0] || {};
   const solar = forecast?.solar || {};
 
   const fmtT = (iso) => {
@@ -74,25 +59,23 @@ export function buildTodayModel(forecast, nowMs = Date.now()) {
     };
   });
 
-  const uvNow = finite(cur.uvIndex) ? cur.uvIndex : null;
-  const uvToday = finite(forecast?.uv?.today) ? forecast.uv.today : uvNow;
-  const aqi = forecast?.airQuality?.aqi;
-  const feels = feelsLike(cur.temperature, cur.humidity ?? h0.humidity, cur.windMph ?? h0.windMph);
-  const dir8 = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
-  const wdir = finite(cur.windDirection ?? h0.windDirection) ? dir8[Math.round(((cur.windDirection ?? h0.windDirection) % 360) / 45) % 8] : null;
+  const uvNow = hourlyUvValue(forecast,nowMs);
+  const aqi = currentAirQuality(forecast,nowMs)?.aqi;
+  const feels = current.feels;
+  const wdir=windDirectionLabel(cur.windDirection),wind=finite(cur.wind)?cur.wind:cur.windMph;
 
   const details = [
-    { k: 'Wind', v: `${round(cur.windMph ?? h0.windMph) ?? '--'} mph${wdir ? ` ${wdir}` : ''}` },
-    { k: 'Humidity', v: `${round(cur.humidity ?? h0.humidity) ?? '--'}%` },
-    { k: 'Dew point', v: `${round(cur.dewpoint ?? h0.dewpoint) ?? '--'}°` },
+    { k: 'Wind', v: `${round(wind) ?? '--'} mph${wdir&&wdir!=='—' ? ` ${wdir}` : ''}` },
+    { k: 'Humidity', v: `${round(cur.humidity) ?? '--'}%` },
+    { k: 'Dew point', v: `${round(cur.dewpoint) ?? '--'}°` },
     { k: 'Pressure', v: finite(cur.pressureInHg ?? cur.pressure) ? `${(cur.pressureInHg ?? cur.pressure).toFixed(2)} in` : '--' },
-    { k: 'Visibility', v: finite(cur.visibility ?? h0.visibilityMiles) ? `${(cur.visibility ?? h0.visibilityMiles).toFixed(1)} mi` : '--' },
-    { k: 'UV index', v: uvToday != null ? `${uvToday.toFixed(1)}` : '--' },
+    { k: 'Visibility', v: finite(cur.visibility) ? `${cur.visibility.toFixed(1)} mi` : '--' },
+    { k: 'UV index now', v: uvNow != null ? `${uvNow.toFixed(1)}` : '--' },
     { k: 'Air quality', v: finite(aqi) ? `${Math.round(aqi)} AQI` : '--' },
     { k: 'Sun', v: solar.sunrise && solar.sunset ? `↑ ${fmtT(solar.sunrise)} · ↓ ${fmtT(solar.sunset)}` : '--' },
   ];
 
-  const comfort = forecast?.comfort || {};
+  const comfort = current.comfort || {};
   const rainTl = (forecast?.rainTimeline || []).slice(0, 12);
   const rainStart = rainTl.find((r) => (r.rainLikelihood?.value ?? r.officialPop ?? 0) >= 30);
   const discuss = forecast?.discussion || {};
@@ -105,7 +88,8 @@ export function buildTodayModel(forecast, nowMs = Date.now()) {
     hero: {
       temp: round(cur.temperature),
       feels: round(feels),
-      condition: cur.condition || 'Conditions unavailable',
+      condition: current.condition || 'Conditions unavailable',
+      feelsSource:sampleCaption(current,timeZone),
       high: round(forecast?.days?.[0]?.high),
       low: round(forecast?.days?.[0]?.low),
       sunrise: fmtT(solar.sunrise),
@@ -258,6 +242,7 @@ export function render(model) {
   countUp(el('now-temp'), model.hero.temp);
   el('now-cond').textContent = model.hero.condition;
   el('now-feels').textContent = model.hero.feels != null ? `Feels like ${model.hero.feels}°` : '';
+  el('now-feels').title=model.hero.feelsSource||'';
   el('now-hilo').textContent = model.hero.high != null ? `H ${model.hero.high}°  ·  L ${model.hero.low ?? '--'}°` : '';
   el('now-sun').textContent = model.hero.sunrise ? `Sunrise ${model.hero.sunrise} · Sunset ${model.hero.sunset}` : '';
 

@@ -12,6 +12,7 @@ import {hideLowRainChance,displayedRainChance,rainAwareCondition,dailySkyCover} 
 import {resetDewpointMeter} from './dewpoint-meter.js?v=air-moisture-v1';
 import {calendarDayWindow} from './calendar-day.js?v=calendar-days-v1';
 import {forecastPeriodSummary} from './forecast-story.js?v=low-rain-display-v1';
+import {currentAirQuality} from './air-quality.js?v=accuracy-20261019-v1';
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const number=(n,d=0)=>finite(n)?n.toFixed(d):'—';
@@ -145,7 +146,7 @@ export function renderDailyRows(forecast,icon) {
   const lowFeels=feel.low?.low?.value,highFeels=p.tonight?lowFeels:feel.high?.high?.value;
   const feelsText=p.tonight?degrees(highFeels):`${degrees(lowFeels)} / ${degrees(highFeels)}`;
   const wind=dailyWindSummary(forecast,d,p,i,now),gusty=finite(wind.gust)&&wind.gust>=GUSTY_FEELS_DISPLAY_MPH;
-  const aqRows=(forecast.airQuality?.hours||[]).filter(r=>new Intl.DateTimeFormat('en-CA',{timeZone:forecast.location.timeZone}).format(new Date(r.time))===d.date&&finite(r.aqi));
+  const aqRows=(forecast.airQuality?.hours||[]).filter(r=>finite(Date.parse(r.time))&&finite(r.aqi)&&r.aqi>=0&&new Intl.DateTimeFormat('en-CA',{timeZone:forecast.location.timeZone,year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(r.time))===d.date);
   const dayAqi=aqRows.length?Math.max(...aqRows.map(r=>r.aqi)):null;
   const windSpeed=wind.text.replace(/^Wind\s*/,'');
   const confidenceAria=plainConfidenceNotice?` ${plainConfidenceNotice.title}. ${plainConfidenceNotice.text}`:'';
@@ -182,10 +183,10 @@ export function dailyConfidenceNoticeHTML(confidence,dialog=false){
 }
 export function renderMetricTiles(forecast,smallIcon) {
  data=forecast;
- const now=Date.now(),c=data.current,d=dailyDisplay(data.days[0],0,now,data.location.timeZone,data),rain=displayedRainChance(data,forecastPeriodSummary(data,0,'overall',now).chance,{now});
+ const now=Date.now(),c=currentSample(data,now).inputs,d=dailyDisplay(data.days[0],0,now,data.location.timeZone,data),rain=displayedRainChance(data,forecastPeriodSummary(data,0,'overall',now).chance,{now});
  const currentComfort=data.comfort||thermalComfort(c,data.location,Date.parse(data.assembledAt));
  const windText=finite(c.wind)?c.wind<3?'Hardly a breeze.':c.wind<12?'A light breeze.':c.wind<25?'A breezy day.':'Strong winds.':'';
- const aq=data.airQuality,aqValue=finite(aq?.aqi)?Math.round(aq.aqi):null;
+ const aq=currentAirQuality(data,now),aqValue=finite(aq?.aqi)?Math.round(aq.aqi):null;
  const pressureSeries=pointsFor('pressure',24),futurePressure=pressureSeries.find(p=>Date.parse(p.time)>now+2.5*3600000),observedPressure=stationPressureMb(c),currentPressure=observedPressure??pressureSeries.find(p=>finite(p.value))?.value??null;
  const pressureNote=c.pressureTrend?.status==='ready'?pressureTrendText(c):finite(currentPressure)&&finite(futurePressure?.value)?`${futurePressure.value>currentPressure+.2?'↑ Forecast to rise':futurePressure.value<currentPressure-.2?'↓ Forecast to drop':'→ Forecast nearly steady'} · next 3 hours${observedPressure===null?' (forecast baseline)':''}`:finite(currentPressure)?'Sea-level forecast pressure · observed trend unavailable.':'Pressure forecast unavailable — waiting for a usable value.';
  const tiles=[

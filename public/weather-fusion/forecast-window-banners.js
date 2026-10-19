@@ -6,7 +6,17 @@ const value = (n, suffix = '') => finite(n) ? `${Math.round(n)}${suffix}` : '—
 const dateKey = (t, zone) => new Intl.DateTimeFormat('en-CA',{timeZone:zone,year:'numeric',month:'2-digit',day:'2-digit'}).format(t);
 const clock = (t, zone, withZone = false) => new Intl.DateTimeFormat('en-US',{timeZone:zone,hour:'numeric',minute:'2-digit',...(withZone ? {timeZoneName:'short'} : {})}).format(t).replace(':00','').replace(/\s([AP]M)/,'$1').replace(/AM|PM/g,x=>x.toLowerCase());
 const dayLabel = (t, zone, now) => dateKey(t,zone) === dateKey(now,zone) ? 'Today' : new Intl.DateTimeFormat('en-US',{timeZone:zone,weekday:'long',month:'short',day:'numeric'}).format(t);
-const timeRange = (w, zone, now) => `${w.start <= now && w.end > now ? 'Now' : clock(w.start,zone)}–${clock(w.end,zone)}`;
+// A partially elapsed forecast hour is still that hour's forecast, not a new
+// observation at the instant the dialog opens.
+const timeRange = (w, zone) => {
+  const forecastStart=Date.parse(w.hours?.[0]?.forecastTime);
+  return `${clock(finite(forecastStart)?forecastStart:w.start,zone)}–${clock(w.end,zone)}`;
+};
+const snapshotStamp = view => {
+  const time=Date.parse(view.snapshotFreshness?.time);
+  return finite(time)?new Intl.DateTimeFormat('en-US',{timeZone:view.timeZone,month:'short',day:'numeric',hour:'numeric',minute:'2-digit',timeZoneName:'short'}).format(time):null;
+};
+const lastKnownSnapshot = view => view.snapshotFreshness&&view.snapshotFreshness.status!=='fresh';
 const icon = kind => kind === 'perfect'
   ? '<svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="6"/><path d="M16 2v4m0 20v4M2 16h4m20 0h4M6 6l3 3m14 14 3 3M6 26l3-3M23 9l3-3"/></svg>'
   : '<svg viewBox="0 0 32 32" aria-hidden="true"><path d="M8 20a6 6 0 1 1 1-12 8 8 0 0 1 15 3 4.5 4.5 0 0 1 0 9H8ZM10 24l-2 4m10-4-2 4m10-4-2 4"/></svg>';
@@ -29,20 +39,22 @@ export function forecastWindowBannerHTML(view, kind, now = Date.now()) {
   const windows = view[kind] || [], first = windows[0];
   if (!first) return '';
   const perfect = kind === 'perfect';
-  const title = perfect ? 'Perfect weather ahead' : 'Rain & storm outlook';
-  const summary = `${dayLabel(first.start,view.timeZone,now)} · ${timeRange(first,view.timeZone,now)}${windows.length > 1 ? ` · +${windows.length-1} more` : ''}`;
+  const lastKnown=lastKnownSnapshot(view),stamp=snapshotStamp(view);
+  const title = perfect ? 'Perfect weather forecast' : lastKnown?'Last-known rain & storm forecast':'Rain & storm outlook';
+  const summary = `${dayLabel(first.start,view.timeZone,now)} · ${timeRange(first,view.timeZone,now)}${windows.length > 1 ? ` · +${windows.length-1} more` : ''}${lastKnown?` · ${stamp?'updated '+stamp:'update time unavailable'}`:''}`;
   return `<button type="button" class="forecast-window-banner forecast-window-${kind}" data-forecast-window="${kind}" aria-haspopup="dialog" aria-controls="forecast-window-dialog"><span class="forecast-window-icon">${icon(kind)}</span><span class="forecast-window-copy"><strong>${esc(title)}</strong><span>${esc(summary)}</span></span><span class="forecast-window-action">View times <b aria-hidden="true">›</b></span></button>`;
 }
 
 export function forecastWindowDetailHTML(view, kind, place, now = Date.now()) {
   const windows = view[kind] || [], zone = view.timeZone, perfect = kind === 'perfect';
   const heading = perfect ? 'Perfect weather' : 'Rain and storm outlook', groups = new Map();
+  const stamp=snapshotStamp(view),snapshotNote=lastKnownSnapshot(view)?` Last-known forecast; ${stamp?'snapshot updated '+stamp:'update time unavailable'}.`:stamp?` Forecast updated ${stamp}.`:'';
   for (const w of windows) {if(!groups.has(w.date))groups.set(w.date,[]);groups.get(w.date).push(w);}
-  const headers = perfect ? '<th scope="col">Hour</th><th scope="col">Feels like in sun</th><th scope="col">Dew point</th><th scope="col">Clouds</th><th scope="col">Rain</th>' : '<th scope="col">Hour</th><th scope="col">Rain likelihood</th><th scope="col">Outlook</th>';
-  const row = h => `<tr data-forecast-hour="${esc(h.time)}"><th scope="row">${esc(clock(Date.parse(h.time),zone,true))}</th>${perfect ? `<td>${value(h.feels,'°')}</td><td>${value(h.dewpoint,'°')}</td><td>${value(h.cloud,'%')}</td><td>${value(h.rainChance,'%')}</td>` : `<td>${value(h.rainChance,'%')}</td><td>${h.thunder ? 'Thunderstorms possible' : finite(h.rainChance)&&h.rainChance>=80 ? 'High rain likelihood' : 'Rain likely'}</td>`}</tr>`;
+  const headers = perfect ? '<th scope="col">Forecast hour</th><th scope="col">Feels like outdoors</th><th scope="col">Dew point</th><th scope="col">Clouds</th><th scope="col">Rain</th>' : '<th scope="col">Forecast hour</th><th scope="col">Rain likelihood</th><th scope="col">Outlook</th>';
+  const row = h => `<tr data-forecast-hour="${esc(h.forecastTime||h.time)}"><th scope="row">${esc(clock(Date.parse(h.forecastTime||h.time),zone,true))}</th>${perfect ? `<td>${value(h.feels,'°')}</td><td>${value(h.dewpoint,'°')}</td><td>${value(h.cloud,'%')}</td><td>${value(h.rainChance,'%')}</td>` : `<td>${value(h.rainChance,'%')}</td><td>${h.thunder ? 'Thunderstorms possible' : finite(h.rainChance)&&h.rainChance>=80 ? 'High rain likelihood' : 'Rain likely'}</td>`}</tr>`;
   const period = w => `<div class="forecast-window-period"><h4>${esc(timeRange(w,zone,now))}${perfect?'':` <span>${esc(w.title)}</span>`}</h4><div class="forecast-window-table-wrap"><table class="forecast-window-table"><caption class="sr-only">${esc(heading)}: ${esc(dayLabel(w.start,zone,now))}, ${esc(timeRange(w,zone,now))}</caption><thead><tr>${headers}</tr></thead><tbody>${w.hours.map(row).join('')}</tbody></table></div></div>`;
   const content=[...groups.values()].map(group=>`<section class="forecast-window-day"><h3>${esc(dayLabel(group[0].start,zone,now))}</h3>${group.map(period).join('')}</section>`).join('');
-  return `<div class="dialog-eyebrow">${esc(place||'Your location')}</div><h2 id="forecast-window-title">${heading}</h2><p class="forecast-window-intro">All qualifying forecast times in the next 5 days, in local time.</p>${content||'<p class="forecast-window-empty">No matching hours in the next 5 days. Check again as the forecast updates.</p>'}`;
+  return `<div class="dialog-eyebrow">${esc(place||'Your location')}</div><h2 id="forecast-window-title">${heading}</h2><p class="forecast-window-intro">All qualifying hourly forecasts in the next 5 days, in local time.${perfect?' Uses the same outdoor feels-like estimate as the hourly forecast.':''} Current-hour entries are forecasts, not current observations.${esc(snapshotNote)}</p>${content||'<p class="forecast-window-empty">No matching hours in the next 5 days. Check again as the forecast updates.</p>'}`;
 }
 
 function bindDialog() {

@@ -1,10 +1,16 @@
 import {finite,thermalHumidity} from './weather-math.js?v=current-rain-20261017-v3';
+import {currentReadingFreshness} from './weather-freshness.js?v=accuracy-20261019-v1';
 const H=3600000;
 /** Preserve the station air reading. Fill only absent wind/moisture from the
  * current forecast hour, and retain per-field provenance. Never borrow a future
  * hour, another city's cached value, or a snapshot more than 90 minutes old. */
 export function currentComfortInputs(forecast,now=Date.now()){
  const current={...(forecast?.current||{})},filled=[];
+ const freshness=currentReadingFreshness(forecast,now);
+ if(freshness.expired){
+  for(const key of ['temperature','wind','gust','humidity','dewpoint','pressure','pressurePa','visibility','apparent','windDirection'])current[key]=null;
+  return {...current,type:'unavailable',condition:'Current conditions unavailable',conditionSource:freshness.reason,comfortInputSources:{},comfortEstimatedFields:[],comfortSourceNote:freshness.reason,freshness};
+ }
  const assembled=Date.parse(forecast?.assembledAt);
  const fresh=finite(assembled)&&now-assembled<=90*60000&&now>=assembled-5*60000;
  const p=fresh?forecast?.metricForecasts?.series?.feels?.find(p=>{

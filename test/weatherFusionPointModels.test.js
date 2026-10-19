@@ -130,9 +130,9 @@ test('warmest sun card uses the same sunny-hour estimate and says the exposure e
  const expected=sunHours.reduce((a,b)=>a.sun>=b.sun?a:b),summary=warmestTodayWindow(forecast,now);
  assert.ok(comfortWindow(forecast,now),'The feels-like outlook that accompanies the warmest card must keep rendering.');
  assert.equal(summary.chosen.time,expected.hour.time);assert.equal(summary.chosen.value,expected.sun);
- assert.match(peakComparisonHTML(summary,null),/Warmest feels like in the sun today/);
+ assert.match(peakComparisonHTML(summary,null),/Warmest sun feels like from now/);
  assert.match(peakComparisonHTML(summary,summary.chosen.value+5),/data-comparison="now"/);
- assert.match(peakComparisonHTML(null,85,'America/New_York',now),/Warmest feels like in the sun today/);
+ assert.match(peakComparisonHTML(null,85,'America/New_York',now),/Warmest sun feels like from now/);
  assert.match(peakComparisonHTML(null,null,'America/New_York',now),/No direct sun in the remaining forecast today/);
  assert.doesNotMatch(peakComparisonHTML(null,null,'America/New_York',now),/unavailable/i);
  assert.doesNotMatch(peakComparisonHTML(null,85,'America/New_York',now),/Warmest feels like today/);

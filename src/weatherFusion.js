@@ -54,6 +54,7 @@ const PRECIPITATION_HYDROMETEORS = new Set(['dry-snow','wet-snow','rain','heavy-
 const HOUR = 3600000;
 const MINUTE = 60000;
 const VERSION = 'weather-fusion-v2-direct';
+export const ACCURACY_VERSION='weather-accuracy-20261019-v1';
 const PUBLIC_DIR = fileURLToPath(new URL('../public/weather-fusion/', import.meta.url));
 const finite = (v) => typeof v === 'number' && Number.isFinite(v);
 const numeric = (v) => finite(v) ? v : null;
@@ -372,10 +373,12 @@ export function buildForecast({ location, point, forecast, hourly, grid, discuss
   const hours=recoverForecastHours({hours:officialRows,models,rows,exposureWeather,location:forecastLocation,now});
   recoverDailyConditions(days,{hours,models,rows,exposureWeather,location:forecastLocation,now});
   const currentIndex = Math.floor(now / HOUR) * HOUR;
-  const modelNow = rows.hrrr?.find((r) => r.time === currentIndex) || rows.ecmwf?.find((r) => r.time === currentIndex);
+  const modelNow = rows.hrrr?.find((r) => r.time === currentIndex) || rows.ecmwf?.find((r) => r.time === currentIndex) || rows.nbm?.find((r) => r.time === currentIndex);
+  const currentHour=hours.find(hour=>{const time=Date.parse(hour.time);return finite(time)&&time<=now&&now<time+HOUR;});
+  const currentTemperature=modelNow?.temperature_2m??currentHour?.temperature;
   const current = observation ? { ...observation, type: 'observation' } : {
-    type: 'guidance', temperature: rounded(modelNow?.temperature_2m ?? hours[0]?.temperature),
-    condition: hours[0]?.condition || 'Current observation unavailable', conditionSource:hours[0]?.conditionSource || null, time: iso(currentIndex), station: null,
+    type: finite(currentTemperature)?'guidance':'unavailable', temperature: rounded(currentTemperature),
+    condition: currentHour?.condition || 'Current conditions unavailable', conditionSource:currentHour?.conditionSource || null, time: iso(currentIndex), station: null,
     humidity: rounded(modelNow?.relative_humidity_2m), dewpoint: rounded(modelNow?.dew_point_2m),
     wind: rounded(modelNow?.wind_speed_10m), gust: rounded(modelNow?.wind_gusts_10m),
     windDirection: numeric(modelNow?.wind_direction_10m), visibility: null, pressure: null };
@@ -383,7 +386,7 @@ export function buildForecast({ location, point, forecast, hourly, grid, discuss
   current.apparentSource = 'Model-derived feels like';
   const resolvedName = location.name || [point?.relativeLocation?.properties?.city, point?.relativeLocation?.properties?.state].filter(Boolean).join(', ') || 'Selected location';
   const solarIndex = (models.ecmwf?.daily?.time || []).findIndex((t) => dateKey(t * 1000, zone) === today);
-  const output = { version: VERSION, assembledAt: iso(now), location: { ...location, name: resolvedName, timeZone: zone, office: point?.cwa || null },
+  const output = { version: VERSION, accuracyVersion:ACCURACY_VERSION, assembledAt: iso(now), location: { ...location, name: resolvedName, timeZone: zone, office: point?.cwa || null },
     current, hours, days, discussion: discussion || null, alerts: alerts || [], specialDiscussions: specialDiscussions || [], precipitationDiscussions: precipitationDiscussions || [], riskOutlooks: riskOutlooks || [], feeds,
     solar: { sunrise: models.ecmwf?.daily?.sunrise?.[solarIndex] ? iso(models.ecmwf.daily.sunrise[solarIndex] * 1000) : null,
       sunset: models.ecmwf?.daily?.sunset?.[solarIndex] ? iso(models.ecmwf.daily.sunset[solarIndex] * 1000) : null },
@@ -402,7 +405,7 @@ export function buildForecast({ location, point, forecast, hourly, grid, discuss
   output.weatherDisplayVersion='weather-nourie-sky-consistency-v1';
   output.alertBanners = bannerStateFromNwsPeriods(hourly?.periods || [], output, now);
   // Hash all forecast facts and source issuance, not just rainfall. Retrieval time is not model run time.
-  output.signature = hash({ danTakeVersion:DAN_TAKE_VERSION, experienceVersion: output.experienceVersion, metricForecasts:output.metricForecasts, version: VERSION, location: output.location, current:output.current, days, hours, discussion, specialDiscussions:output.specialDiscussions, precipitationDiscussions:output.precipitationDiscussions, riskOutlooks:output.riskOutlooks,
+  output.signature = hash({ accuracyVersion:ACCURACY_VERSION, danTakeVersion:DAN_TAKE_VERSION, experienceVersion: output.experienceVersion, metricForecasts:output.metricForecasts, version: VERSION, location: output.location, current:output.current, days, hours, discussion, specialDiscussions:output.specialDiscussions, precipitationDiscussions:output.precipitationDiscussions, riskOutlooks:output.riskOutlooks,
     precipitation: output.precipitation, rainTimeline:output.rainTimeline, snow:output.snow, airQuality:output.airQuality, modelContributions: output.modelContributions, alerts: output.alerts.map((a) => [a.id, a.sent, a.expires]), feeds: feeds.map((f) => [f.id, f.status, f.issuedAt]) });
   return output;
 }
@@ -748,7 +751,7 @@ export function registerWeatherFusionRoutes(app, options = {}) {
   });
   for (const name of [
     ...COMFORT_SCENE_ASSETS,
-    'forecast-windows.js','forecast-window-banners.js','forecast-window-banners.css','forecast-status.js','forecast-refresh.js','live-alerts.js','urgent-alerts.css',
+    'forecast-windows.js','forecast-window-banners.js','forecast-window-banners.css','forecast-status.js','forecast-refresh.js','weather-freshness.js','live-alerts.js','urgent-alerts.css',
     'seven-day.js','seven-day.css','seven-day-art.css',
     'request-deadline.js','weather-changes.js','air-quality.js','alert-banners.js','app.js','bulletin-facts.js','bulletins.js','car-wash.js','car-wash.css','car-wash-background.webp','car-wash-corvette-hood.webp',
     'model-explanation.js','model-explanation.css','weathernext-site.html','weathernext-site.css','weathernext-site.js','weathernext-data.js','weathernext-catalog.json',

@@ -1,5 +1,5 @@
 import {finite} from './weather-math.js?v=current-rain-20261017-v3';
-export const OUTDOOR_FEELS_VERSION = 'weather-nourie-outdoor-v1';
+export const OUTDOOR_FEELS_VERSION = 'weather-nourie-outdoor-v2';
 /** One exposure contract for every primary feels-like reading. The existing
  * thermal model is unchanged; shade is a separately named comparison, never
  * silently substituted for a valid outdoor result. Explicit missing stays missing.
@@ -24,14 +24,15 @@ export function outdoorExposure(comfort = {}) {
   return {value:finite(candidate)?candidate:null,label,shortLabel,basis:'outdoors'};
 }
 
-/** Air temperature plus the modeled radiant difference between sun and shade.
- * This is a sun-exposure display estimate, not a thermometer reading or UTCI.
+/** The canonical outdoor feels-like value during a sunny forecast hour.
+ * Kept as a named sunny-exposure selector for callers: do not add radiant lift
+ * to air temperature, which creates a second, incompatible feels-like scale.
  */
 export function sunExposureTemperature(sample = {}) {
-  const air=sample.temperature,comfort=sample.comfort||{};
+  const comfort=sample.comfort||{};
   const active=comfort.daylight===true&&['clear','partly-cloudy'].includes(comfort.weatherKind);
-  const shade=comfort.rawShade,sun=comfort.rawOutdoors;
-  if(!active||!finite(air)||!finite(shade)||!finite(sun))return {active:false,value:null,solarLift:null};
-  const solarLift=Math.max(0,sun-shade);
-  return {active:true,value:air+solarLift,solarLift};
+  const outdoors=outdoorExposure(comfort).value;
+  if(!active||!finite(outdoors))return {active:false,value:null,solarLift:null};
+  const solarLift=finite(comfort.shade)?Math.max(0,outdoors-comfort.shade):null;
+  return {active:true,value:outdoors,solarLift};
 }

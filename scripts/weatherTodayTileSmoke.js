@@ -41,7 +41,8 @@ try {
   await page.waitForSelector('#today-forecast .today-weather-card');
 
   assert.equal(await page.locator('#today-forecast .day-name').innerText(), 'Remainder of Today');
-  assert.match(await page.locator('#today-forecast .today-feels').innerText(), /Feels like\s+\d+°/);
+  assert.match(await page.locator('#today-forecast .today-feels').innerText(), /Peak forecast feels like\s+\d+°/);
+  assert.match(await page.locator('#today-forecast .today-feels').innerText(), /\d{1,2}:\d{2} [AP]M · outdoors/);
 
   const feels = await page.locator('#today-forecast .today-feels').boundingBox();
   const metrics = await page.locator('#today-forecast .today-metrics').boundingBox();

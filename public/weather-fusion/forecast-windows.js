@@ -1,10 +1,14 @@
 import {forecastSample} from './weather-display.js?v=low-rain-display-v1';
 import {sunExposureTemperature} from './outdoor-feels.js?v=current-rain-20261017-v3';
 import {finite,rainChanceValue,solarElevation} from './weather-math.js?v=current-rain-20261017-v3';
+import {forecastSnapshotFreshness} from './weather-freshness.js?v=accuracy-20261019-v1';
 
 const HOUR = 3600000;
-const WINDOW_DAYS = 5;
-const PERFECT_SUN_TEMP_F = Object.freeze({min:70,max:75});
+export const PERFECT_WEATHER_RULES = Object.freeze({
+  feels:Object.freeze({min:70,max:75}),dewpointMax:60,cloudMax:40,
+  rainMax:20,precipitationMaxExclusive:.01,horizonDays:5,
+});
+const WINDOW_DAYS = PERFECT_WEATHER_RULES.horizonDays;
 const TITLES = {perfect:'Perfect weather',rain:'Rain likely',high:'High rain likelihood',thunder:'Thunderstorms possible'};
 const percentage = value => finite(value) && value >= 0 && value <= 100 ? value : null;
 const nonnegative = value => finite(value) && value >= 0 ? value : null;
@@ -89,7 +93,8 @@ function groups(rows, key, formatter, now) {
 export function buildForecastWindows(forecast = {}, now = Date.now()) {
   const formatter = dateFormatter(forecast.location?.timeZone || 'America/New_York');
   const timeZone = formatter.resolvedOptions().timeZone;
-  if (!finite(now)) return {perfect:[],rain:[],timeZone};
+  const snapshotFreshness=forecastSnapshotFreshness(forecast,now);
+  if (!finite(now)) return {perfect:[],rain:[],timeZone,snapshotFreshness};
   const startDate = dateKey(now,formatter);
   const hours = timeMap(forecast.hours);
   const series = forecast.metricForecasts?.series || {};
@@ -108,8 +113,8 @@ export function buildForecastWindows(forecast = {}, now = Date.now()) {
     if (!hourlyInterval(hour,time) || !hourlyInterval(feel,time) || !hourlyInterval(wet,time)) continue;
     const sample=forecastSample(forecast,new Date(time).toISOString());
     const sun=sunExposureTemperature(sample||{});
-    const rawSunValue=sun.active&&finite(sun.value)?sun.value:null;
-    const value=finite(rawSunValue)?Math.round(rawSunValue*10)/10:null;
+    const outdoorValue=sun.active&&finite(sun.value)?sun.value:null;
+    const value=finite(outdoorValue)?Math.round(outdoorValue*10)/10:null;
     const dewpoint = dewpoints.has(time) ? dewpoints.get(time).value : hour?.dewpoint;
     const cloud = percentage(feel?.inputs && Object.hasOwn(feel.inputs,'skyCover') ? feel.inputs.skyCover : hour?.skyCover);
     const rainChance = rainChanceValue(wet?.rainLikelihood);
@@ -122,14 +127,15 @@ export function buildForecastWindows(forecast = {}, now = Date.now()) {
     const thunder = /thunder|\btstms?\b|\bt-?storms?\b/i.test(hourlyCondition);
     const adverseCondition = hourlyCondition.replace(/\bwind[ -]?storms?\b/gi,'');
     const adverse = /rain|shower|drizzle|thunder|\bstorms?\b|\btstms?\b|snow|sleet|flurr|ice pellets|fog|mist|haze|smoke|obscured/i.test(adverseCondition);
-    const perfect = finite(rawSunValue) && rawSunValue >= PERFECT_SUN_TEMP_F.min && rawSunValue <= PERFECT_SUN_TEMP_F.max + 1e-6
-      && finite(dewpoint) && dewpoint <= 60 && cloud !== null && cloud <= 40
-      && rainChance !== null && rainChance <= 20
-      && precipitation !== null && precipitation < .01 && !adverse
+    const perfect = snapshotFreshness.status==='fresh'
+      && finite(outdoorValue) && outdoorValue >= PERFECT_WEATHER_RULES.feels.min && outdoorValue <= PERFECT_WEATHER_RULES.feels.max + 1e-6
+      && finite(dewpoint) && dewpoint <= PERFECT_WEATHER_RULES.dewpointMax && cloud !== null && cloud <= PERFECT_WEATHER_RULES.cloudMax
+      && rainChance !== null && rainChance <= PERFECT_WEATHER_RULES.rainMax
+      && precipitation !== null && precipitation < PERFECT_WEATHER_RULES.precipitationMaxExclusive && !adverse
       && daylightFor(forecast,hour,feel,Math.max(time,now),time+HOUR);
     rows.push({epoch:time,feels:value,dewpoint:finite(dewpoint)?dewpoint:null,cloud,rainChance,precipitation,thunder,
       perfect:perfect?'perfect':null,
       rain:thunder?'thunder':rainChance !== null && rainChance >= 80?'high':rainChance !== null && rainChance >= 60?'rain':null});
   }
-  return {perfect:groups(rows,'perfect',formatter,now),rain:groups(rows,'rain',formatter,now),timeZone,horizonDays:WINDOW_DAYS};
+  return {perfect:groups(rows,'perfect',formatter,now),rain:groups(rows,'rain',formatter,now),timeZone,horizonDays:WINDOW_DAYS,snapshotFreshness};
 }

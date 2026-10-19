@@ -93,17 +93,26 @@ test('missing models use a labeled official NWS fallback instead of lowering its
   assert.equal(after.rainLikelihood.sourcePoints.nbm,null);
 });
 
-test('every day and night percentage is the peak of identical canonical hourly evidence',()=>{
+test('every day and night percentage uses identical canonical evidence and preserves uncovered horizons',()=>{
   const data=buildForecast(inputs({chance:45,amount:.008}));
   for(const day of data.days)for(const name of ['rainLikelihood','popDayLikelihood','popNightLikelihood']) {
     const summary=day[name],rows=matchingRows(data,summary);
+    const values=rows.map(row=>row.rainLikelihood.value).filter(Number.isFinite);
     assert.equal(summary.aggregation,'maximum-hourly');
-    assert.equal(summary.coverage.complete,true,`${day.date} ${name}`);
-    assert.equal(summary.value,Math.max(...rows.map(row=>row.rainLikelihood.value)));
+    if(summary.coverage.complete)assert.equal(summary.value,Math.max(...values));
+    else {
+      assert.equal(summary.value,null,`${day.date} ${name}: an incomplete horizon is unavailable, not dry`);
+      assert.ok(summary.coverage.availableHours<summary.coverage.expectedHours);
+    }
+    assert.equal(summary.availablePeak,values.length?Math.max(...values):null);
     const peak=data.rainTimeline.find(row=>row.time===summary.peakTime);
+    if(!values.length){assert.equal(summary.peak,null);assert.equal(summary.peakTime,null);assert.deepEqual(summary.sources,[]);continue;}
     assert.deepEqual(summary.peak,peak.rainLikelihood);
     assert.deepEqual(summary.sources,peak.rainLikelihood.sources);
   }
+  assert.deepEqual(data.days[7].rainLikelihood.coverage,{expectedHours:24,availableHours:24,complete:true});
+  assert.deepEqual(data.days[8].rainLikelihood.coverage,{expectedHours:24,availableHours:8,complete:false});
+  assert.deepEqual(data.days[9].rainLikelihood.coverage,{expectedHours:24,availableHours:0,complete:false});
   for(const hour of data.hours) {
     const row=data.rainTimeline.find(row=>Date.parse(row.time)===Date.parse(hour.time));
     assert.deepEqual(hour.rainLikelihood,row.rainLikelihood);
@@ -191,9 +200,15 @@ test('daily and next-24-hour amounts sum the same canonical hourly graph values'
   const data=inputs({chance:50,amount:.0111});
   data.models.ecmwf.precipitationIntervals.forEach(row=>{row.value=.0222;});
   const forecast=buildForecast(data);
-  const total=(start,end)=>Number(forecast.rainTimeline.filter(row=>Date.parse(row.time)>=Date.parse(start)&&Date.parse(row.end)<=Date.parse(end)).reduce((sum,row)=>sum+row.precipitation,0).toFixed(4));
+  const total=(start,end)=>{
+    const a=Date.parse(start),b=Date.parse(end),rows=forecast.rainTimeline.filter(row=>Date.parse(row.time)>=a&&Date.parse(row.end)<=b);
+    if(rows.length!==(b-a)/H||rows.some(row=>!Number.isFinite(row.precipitation)))return null;
+    return Number(rows.reduce((sum,row)=>sum+row.precipitation,0).toFixed(4));
+  };
   for(const day of forecast.days)assert.equal(day.qpf,total(day.qpfWindow.start,day.qpfWindow.end));
   assert.equal(forecast.precipitation.value,total(forecast.precipitation.start,forecast.precipitation.end));
+  assert.ok(Number.isFinite(forecast.days[0].qpf));
+  assert.equal(forecast.days.at(-1).qpf,null,'an uncovered day must not become zero inches when summed');
 });
 
 test('NWS fills its 40-point share in proportion to the official percentage',()=>{

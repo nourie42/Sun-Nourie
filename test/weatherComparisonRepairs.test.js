@@ -17,7 +17,7 @@ test('supplemental UV and AQI never replace model weather fields',()=>{
  const out=buildGoogleComparison(feedFixture(),'knightdale',now);
  const before=JSON.stringify(out.hours.map(({temperature,dewpoint,precipitation})=>({temperature,dewpoint,precipitation})));
  const exposure=out.exposureWeather;
- addComparisonCompanions(out,{exposure:{uv:[{date:out.days[0].date,value:7}],rows:[{time:out.hours[0].time,uvIndex:3,temperature:999}]},airQuality:{aqi:30,hours:[{time:out.hours[0].time,aqi:35}]}});
+ addComparisonCompanions(out,{exposure:{uv:[{date:out.days[0].date,value:7}],rows:[{time:out.hours[0].time,uvIndex:3,temperature:999}]},airQuality:{time:out.current.time,aqi:30,hours:[{time:out.hours[0].time,aqi:35}]}});
  assert.equal(out.days[0].uvMax,7);assert.equal(out.uv.today,7);assert.equal(out.hours[0].uvIndex,3);
  assert.equal(out.airQuality.aqi,30);assert.equal(out.exposureWeather,exposure);
  assert.equal(JSON.stringify(out.hours.map(({temperature,dewpoint,precipitation})=>({temperature,dewpoint,precipitation}))),before);
@@ -28,6 +28,8 @@ test('comparison app adapter accepts the repository CRLF browser client',()=>{
  const transformed=comparisonApp(original,{source:'google',point:{id:'knightdale',name:'Knightdale / Raleigh',latitude:35.787,longitude:-78.4806},explicitLocation:true});
  assert.match(transformed,/installComparisonPane/);
  assert.match(transformed,/compareBridge\.requestForecast/);
+ assert.equal((transformed.match(/compareBridge\.rendered\(data\)/g)||[]).length,1);
+ assert.match(transformed,/classList\.toggle\('error', unavailable\.length > 0 \|\| failedPanels\.length > 0 \|\| currentFreshness\.expired\);\s*compareBridge\.rendered\(data\);\s*}\s*function renderAlerts/,'Comparison rendering retains the shared freshness check and follows the completed render.');
  assert.match(transformed,/if\(COMPARE\.explicitLocation\)chooseLocation\([\s\S]*else startDeviceLocation\(\);/);
 });
 test('comparison URLs preserve side-by-side comparison and standalone forecast stays separate',async t=>{

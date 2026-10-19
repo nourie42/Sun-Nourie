@@ -7,6 +7,8 @@
 import { weatherIcon, windDirectionLabel } from './weather-display.js?v=low-rain-display-v1';
 import { weatherState } from './weather-state.js?v=current-rain-20261017-v3';
 import { finite, rainChanceValue } from './weather-math.js?v=current-rain-20261017-v3';
+import {currentAirQuality} from './air-quality.js?v=mobile-repair-v1';
+import {hourlyUvValue} from './daily-uv.js?v=weather-art-labels-v10';
 
 export const H = 3600000;
 const round = (n) => (finite(n) ? Math.round(n) : null);
@@ -307,11 +309,10 @@ export function buildModel(data, nowMs = Date.now()) {
   const series = buildSeries(data);
   const feels = round(cur.feelsLike ?? cur.apparent);
   const wind = windMph(cur.wind), gust = windMph(cur.gust);
-  const uvNowPt = series.uv.filter((p) => p.t <= nowMs && finite(p.v)).at(-1);
-  const uvNow = uvNowPt ? Math.round(uvNowPt.v) : null;
+  const uvCurrentValue=hourlyUvValue(data,nowMs),uvNow=finite(uvCurrentValue)?Math.round(uvCurrentValue):null;
   const uvToday = dayPoints(series.uv, dayKey(nowMs, tz), tz).filter((p) => finite(p.v));
   const uvAhead = uvToday.filter((p) => p.t >= nowMs - H && p.v >= 3);
-  const aqi = finite(data?.airQuality?.aqi) ? Math.round(data.airQuality.aqi) : null;
+  const aq = currentAirQuality(data,nowMs), aqi = aq ? Math.round(aq.aqi) : null;
   const sunEvents = sol.flatMap((d) => [{ type: 'Sunrise', t: d.rise }, { type: 'Sunset', t: d.set }]);
   const nextSun = sunEvents.find((e) => e.t > nowMs);
   const otherSun = nextSun && sunEvents.find((e) => e.t > nextSun.t);

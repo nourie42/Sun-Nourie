@@ -182,7 +182,8 @@ export function tier3FeelsLike(current,location,now,exposure='shade') {
   const elevation=solarElevation(now,location?.latitude,location?.longitude),deltaC=estimatedMrtDelta(current,elevation,exposure);
   const tr=current.temperature+deltaC*1.8,rawValue=utciF(current.temperature,tr,current.wind,rh);
   const value=coldWindChillBlend(current.temperature,current.wind,rawValue);
-  return {value,method:finite(value)?'UTCI Tier-3 fallback with estimated mean radiant temperature':'UTCI outside supported range',rh,tr,deltaMrtC:deltaC,
+  const adjusted=finite(value)&&finite(rawValue)&&value>rawValue+.001;
+  return {value,method:finite(value)?`UTCI Tier-3 fallback with estimated mean radiant temperature${adjusted?' and custom cold-weather blend':''}`:'UTCI outside supported range',rh,tr,deltaMrtC:deltaC,
     windUsedMps:Math.max(.5,current.wind*.44704),warmerResultOverride:false,
     windChillFloor:finite(value)&&finite(rawValue)&&value>rawValue+.001};
 }
@@ -202,7 +203,7 @@ export function thermalComfort(current, location, now) {
   return {rawShade:shade.value,rawOutdoors:outdoor.value,
     inputEvidence:{temperature:current.temperature,dewpoint:current.dewpoint,humidity:rh,windMph:current.wind,windUsedMps:outdoor.windUsedMps,skyCover:weather.cover,skySource:weather.source,meanRadiantTemperatureF:outdoor.tr,sourceTime:current.time||null,station:current.station||null,stationDistanceKm:current.stationDistanceKm??null,
       windPolicy:current.wind*.44704<.5?'Calm-wind approximation: UTCI minimum 0.5 m/s':'Source wind; no observation-to-forecast adjustment',
-      radiationBasis:daylight===false?'No solar load at night; unmeasured mean radiant temperature assumed equal to air':'Radiation estimated from the same-hour sky and solar elevation; not measured'},
+      radiationBasis:!finite(elevation)?'Solar position unavailable; unmeasured mean radiant temperature assumed equal to air':daylight===false?'No solar load at night; unmeasured mean radiant temperature assumed equal to air':!weather.known?'Sky data unavailable; no direct-sun adjustment is estimated':'Radiation estimated from the same-hour sky and solar elevation; not measured'},
     radiantCondition:weather.condition,shade:shadeValue,sun:daylight&&(weather.kind==='clear'||weather.kind==='partly-cloudy')?outdoorValue:null,outdoors:outdoorValue,
     weatherKind:weather.kind,weatherLabel:weather.label,condition:current.condition,conditionSource:current.conditionSource||null,
     radiationStatus:daylight===false?'night':weather.known?'estimated-by-sky-state':'unknown',
