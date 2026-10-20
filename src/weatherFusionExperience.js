@@ -46,10 +46,15 @@ export function mixWindDirection(values,policy){
  const value=Math.hypot(x,y)<1e-6?null:(Math.atan2(y,x)*180/Math.PI+360)%360;
  return {...blend,value};
 }
-export function addExperience(out,{models={},grid,periods=[],now,solarTimes,nextDate}) {
+export function addExperience(out,{models={},grid,periods=[],exposureWeather=null,now,solarTimes,nextDate}) {
  const source=(value,name)=>({value:num(value),source:finite(value)?name:null});
  const choose=(...items)=>items.find(x=>finite(x.value))||{value:null,source:null};
  const zone=out.location.timeZone;
+ const exposureRows=new Map((exposureWeather?.rows||[]).map(row=>[Date.parse(row.time),row]));
+ const solarAt=epoch=>{
+  const row=exposureRows.get(epoch),value=row?.solar;
+  return finite(value)&&value>=0?{value,source:`${exposureWeather?.source||'Open-Meteo'} same-hour model shortwave radiation`,time:row.time}:null;
+ };
  const modelIds=['hrrr','ecmwf','nbm',...(models.wn?.verifiedModel?['wn']:[])];
  const mix=(official,time,field)=>{
    const values={nws:official};
@@ -117,6 +122,8 @@ export function addExperience(out,{models={},grid,periods=[],now,solarTimes,next
    out.metricForecasts.notes.dewpoint='Current dew point uses an accepted station observation when available; modeled current conditions use the matching hourly forecast blend. Matching forecast inputs start at NWS 36% / HRRR 27% / ECMWF 9% / NBM 18% / Google WeatherNext 10%. Missing Google WeatherNext hours use the existing available-model policy; unavailable fields remain missing.';
    out.metricForecasts.notes.wind='Timestamp-matched numeric speeds include Google WeatherNext at a 10% starting share where verified data is available. Other model shares retain their relative proportions; missing inputs are excluded.';
  }
+ const currentSolar=solarAt(Math.floor(now/H)*H);
+ if(currentSolar)Object.assign(out.current,{solarRadiation:currentSolar.value,solarSource:currentSolar.source});
  out.comfort=thermalComfort(out.current,out.location,now);
  out.experienceVersion=EXPERIENCE_VERSION;
  for(const d of out.days)d.nightCondition=eveningPeriod(periods,d.date,zone,now)?.shortForecast||'';
@@ -128,12 +135,14 @@ export function addExperience(out,{models={},grid,periods=[],now,solarTimes,next
  rebuildHourlyFeels(out,{now,periods,
   temperatureAt:epoch=>mix(gridSample(grid,'temperature',epoch,'temperature'),epoch,'temperature_2m'),
   humidityAt:epoch=>gridSample(grid,'relativeHumidity',epoch,'percent'),
-  skyAt:epoch=>mix(gridSample(grid,'skyCover',epoch,'percent'),epoch,'cloud_cover')});
+  skyAt:epoch=>mix(gridSample(grid,'skyCover',epoch,'percent'),epoch,'cloud_cover'),
+  solarAt});
  if(out.current?.type!=='observation'){
   alignGuidanceCurrentWithHourly(out,now);
   const inputs=currentComfortInputs(out,now);
   const epoch=Math.floor(now/H)*H,feel=out.metricForecasts.series.feels.find(row=>Date.parse(row.time)===epoch);
-  out.comfort=thermalComfort({...inputs,condition:inputs.thermalCondition},out.location,epoch);
+  const solar=solarAt(epoch);
+  out.comfort=thermalComfort({...inputs,...(solar?{solarRadiation:solar.value,solarSource:solar.source}:{}),condition:inputs.thermalCondition},out.location,epoch);
   // Canonical hourly estimates retain one decimal place. Use those same
   // exposure values for modeled now rather than rounding a second time.
   Object.assign(out.comfort,{outdoors:round(feel?.value),shade:round(feel?.shadeValue),sun:round(feel?.sunValue)});

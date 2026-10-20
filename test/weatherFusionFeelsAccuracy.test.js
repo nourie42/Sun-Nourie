@@ -28,6 +28,58 @@ test('warm windy overcast-night equivalent temperatures agree with an independen
  }
 });
 
+test('warm direct sun projects solar gain onto a standing body without changing shade UTCI',()=>{
+ // Captured Knightdale inputs at 2 PM EDT on 2026-10-20: the old horizontal
+ // solar projection made the direct-sun result colder than the reported feel.
+ const place={latitude:35.787,longitude:-78.4806,timeZone:'America/New_York'};
+ const time=Date.parse('2026-10-20T18:00:00Z');
+ const input={temperature:71,dewpoint:39.6,wind:11,skyCover:1.0931,condition:'Sunny'};
+ const comfort=thermalComfort(input,place,time);
+ const shade=tier3FeelsLike(input,place,time,'shade');
+ assert.equal(comfort.sun,74);
+ assert.ok(comfort.rawOutdoors>=73.5&&comfort.rawOutdoors<74.5,comfort.rawOutdoors);
+ assert.ok(Math.abs(comfort.rawShade-59.516562899543516)<1e-9,'shade retains the standard 10 m UTCI input');
+  assert.equal(shade.windUsedMps,11*.44704);
+  assert.equal(comfort.inputEvidence.windUsedMps,11*.44704);
+  assert.match(comfort.inputEvidence.windPolicy,/Source 10 m wind/);
+  assert.match(comfort.inputEvidence.radiationModel,/standing-person effective radiant field/);
+  assert.ok(comfort.inputEvidence.projectedAreaFactor>.23&&comfort.inputEvidence.projectedAreaFactor<.24);
+  assert.ok(comfort.inputEvidence.meanRadiantTemperatureF>123&&comfort.inputEvidence.meanRadiantTemperatureF<125);
+  const extreme=thermalComfort({...input,solarRadiation:5000,solarSource:'test model radiation'},place,time);
+  assert.ok(extreme.absorbedRadiation<=130,'the final effective radiant field retains the documented ceiling');
+  assert.ok(extreme.inputEvidence.solarScale<=1);
+});
+
+test('standing-person solar load fades smoothly with cloud and solar elevation',()=>{
+ const place={latitude:35.787,longitude:-78.4806},day=Date.parse('2026-10-20T18:00:00Z');
+ const input={temperature:71,dewpoint:40,wind:11,condition:'Sunny'};
+ const clear=thermalComfort({...input,skyCover:0},place,day),overcast=thermalComfort({...input,skyCover:100},place,day);
+ assert.ok(clear.rawOutdoors>overcast.rawOutdoors);
+ assert.ok(Math.abs(overcast.rawOutdoors-overcast.rawShade)<1e-9,'overcast outdoors returns to shade');
+ for(const boundary of [12,62]){
+  const below=thermalComfort({...input,skyCover:boundary-.001},place,day).rawOutdoors;
+  const above=thermalComfort({...input,skyCover:boundary+.001},place,day).rawOutdoors;
+  assert.ok(Math.abs(below-above)<.01,`no cloud-category jump at ${boundary}%`);
+ }
+ const horizon=Date.parse('2026-10-20T11:24:00Z'),before=thermalComfort({...input,skyCover:0},place,horizon-60000),after=thermalComfort({...input,skyCover:0},place,horizon+60000);
+ assert.ok(Math.abs(before.rawOutdoors-after.rawOutdoors)<1,'solar load fades near the horizon');
+});
+
+test('hourly rebuild carries timestamp-matched model radiation into the canonical feels series',()=>{
+ const time='2026-10-20T18:00:00.000Z',epoch=Date.parse(time),point={time};
+ const forecast={location:{latitude:35.787,longitude:-78.4806},current:null,
+  hours:[{time,temperature:71,condition:'Sunny'}],metricForecasts:{notes:{},series:{
+   temperature:[{...point,value:71}],dewpoint:[{...point,value:39.6}],wind:[{...point,value:11}],humidity:[]}}};
+ rebuildHourlyFeels(forecast,{now:epoch,temperatureAt:()=>null,humidityAt:()=>null,
+  skyAt:()=>({value:1.0931,source:'test sky'}),solarAt:()=>({value:703.1,source:'test shortwave'})});
+ const feel=forecast.metricForecasts.series.feels[0];
+ assert.equal(feel.inputs.solarRadiation,703.1);
+ assert.equal(feel.inputs.solarSource,'test shortwave');
+ assert.equal(feel.inputEvidence.solarRadiationWm2,703.1);
+ assert.match(feel.inputEvidence.radiationBasis,/Same-hour model shortwave radiation/);
+ assert.equal(Math.round(feel.value),74);
+});
+
 const nwsWindChill=(tF,windMph)=>{const p=Math.pow(windMph,.16);return 35.74+.6215*tF-35.75*p+.4275*tF*p;};
 test('cold wind feels-like never falls below the NWS wind chill figure',()=>{
  // Daniel's reported case: 36°F air, 13 mph wind showed 8°F; NWS says 27°F.

@@ -14,7 +14,7 @@ import {currentSample} from '../public/weather-fusion/weather-display.js';
 const H=3600000,now=Date.parse('2026-10-19T16:10:00Z'),start=Math.floor(now/H)*H;
 const iso=t=>new Date(t).toISOString();
 const location={latitude:35.787,longitude:-78.4806,timeZone:'America/New_York'};
-function forecast(temperatures=[74,76,72]){
+function forecast(temperatures=[69,70,69]){
  const hours=temperatures.map((temperature,i)=>({time:iso(start+i*H),end:iso(start+(i+1)*H),temperature,dewpoint:42,wind:11,skyCover:0,condition:'Sunny',isDay:true,precipitation:0,rainLikelihood:{value:0}}));
  const feels=hours.map(row=>{
   const inputs={temperature:row.temperature,dewpoint:row.dewpoint,wind:row.wind,skyCover:row.skyCover,condition:row.condition};
@@ -75,7 +75,7 @@ test('Atmos perfect hours and intervals equal the main page canonical outdoor wi
  const windows=perfectWindows(comfortGrid(data,now));
  assert.deepEqual(windows.map(w=>[w.start,w.end]),main.map(w=>[w.start,w.end]));
  assert.equal(windows[0].start,now,'the current forecast hour starts at Now, not an elapsed ten minutes');
- const cool=forecast([72,72,72]);
+ const cool=forecast([66,66,66]);
  assert.ok(cool.metricForecasts.series.feels.every(row=>row.value<70));
  assert.equal(perfectWindows(comfortGrid(cool,now)).length,0,'pleasant air-temperature bands cannot override a cool canonical outdoor reading');
  cool.metricForecasts.series.feels[0].value=null;

@@ -13,12 +13,14 @@ function f(){
  return {location:place,current:{...current,wind:0},assembledAt:new Date(now).toISOString(),hours:times.map(time=>({time,temperature:79,condition:'Mostly sunny, then a chance of thunderstorms',wind:'99 mph'})),days:[],metricForecasts:{notes:{},series:{temperature:rows(79),dewpoint:rows(68),wind:rows(4.3)}}};
 }
 for(const [name,location] of [['Raleigh',place],['Denver',{latitude:39.7392,longitude:-104.9903}],['Seattle',{latitude:47.6062,longitude:-122.3321}],['Jacksonville',{latitude:30.3322,longitude:-81.6557}]]){
- test(name+': identical inputs across sunrise do not generate an observation/forecast-method step',()=>{
+ test(name+': identical inputs through the rising morning sun do not generate a downward method step',()=>{
   let previous=null,checks=0;
   for(let time=now;time<now+12*H;time+=10*60000){
    const e=solarElevation(time,location.latitude,location.longitude);
    const c=thermalComfort({...current,temperature:66,dewpoint:64},location,time);
-   if(previous&&e>previous.e&&e<1){assert.ok(c.rawOutdoors>=previous.value-.001);checks++;}
+   // A standing person's projected direct-sun area can ease as the sun rises,
+   // but a ten-minute change must stay gradual rather than switching methods.
+   if(previous&&e>previous.e&&e<1){assert.ok(c.rawOutdoors>=previous.value-.1);checks++;}
    previous={e,value:c.rawOutdoors};
   }
   assert.ok(checks>10);

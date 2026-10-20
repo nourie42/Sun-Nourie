@@ -2,7 +2,7 @@ import {calendarDayTemperatures,calendarDayWindow,rainWindowPeak} from './calend
 import {weatherState,weatherTransmission,conditionForRainChance} from './weather-state.js?v=current-rain-20261017-v3';
 import {utciF} from './utci.js?v=clear-weather-daygraph-v3';
 /* Pure presentation math shared by the weather API, browser and tests. */
-export const EXPERIENCE_VERSION = 'weather-nourie-friendly-v1';
+export const EXPERIENCE_VERSION = 'weather-nourie-friendly-v2';
 export const finite = n => typeof n === 'number' && Number.isFinite(n);
 export const TONIGHT_START_HOUR = 18;
 const fToC = f => (f - 32) / 1.8;
@@ -147,16 +147,64 @@ export function radiationSky(current={}) {
   const condition=sky||text;
   return {...weatherState(condition),condition,cover:null,source:current.conditionSource||'Weather-description sky estimate'};
 }
-function estimatedMrtDelta(current,elevation,exposure) {
-  if(!finite(elevation)||elevation<=0)return 0;
+const SOLAR_ALTITUDES=[0,15,30,45,60,75,90];
+// Orientation-average of the ASHRAE 55 standing projected-area table. The
+// average avoids inventing which way a person is facing while retaining the
+// way a vertical body intercepts low and mid-angle sunlight.
+const STANDING_PROJECTED_AREA=[.2989583333,.2989583333,.2683333333,.2194166667,.173875,.122,.082];
+function interpolate(x,xs,ys) {
+  if(x<=xs[0])return ys[0];
+  if(x>=xs.at(-1))return ys.at(-1);
+  const i=xs.findIndex(value=>value>=x)-1;
+  return ys[i]+(ys[i+1]-ys[i])*(x-xs[i])/(xs[i+1]-xs[i]);
+}
+/**
+ * Estimated mean-radiant-temperature delta for shade or a standing person.
+ * The prior outdoor estimate projected direct sun onto a horizontal surface,
+ * which substantially understated the load on a standing body. The outdoor
+ * branch now follows the ASHRAE 55 effective-radiant-field structure using an
+ * orientation-average standing projected-area factor. Inputs remain generic
+ * estimates because person orientation, clothing colour and local radiation
+ * are not measured at the selected point.
+ */
+function estimatedMrt(current,elevation,exposure) {
+  if(!finite(elevation)||elevation<=0)return {deltaC:0,transmission:0,projectedAreaFactor:null,effectiveRadiantFieldWm2:0,model:'No solar load'};
   const sky=radiationSky(current),sun=Math.max(0,Math.sin(elevation))**.72;
   const diffuse={clear:18,'partly-cloudy':15,cloudy:8,rain:5,storm:4,snow:10,fog:5,unknown:0}[sky.kind]??0;
-  // Smooth interpolation avoids a threshold jump when cloud cover crosses a category.
   const cloud=finite(sky.cover)?sky.cover/100:null;
-  const trans=cloud===null?(weatherTransmission(sky.condition)||0):Math.max(0,1-cloud);
+  const transmission=cloud===null?(weatherTransmission(sky.condition)||0):Math.max(0,1-cloud);
   const diffuseLoad=cloud===null?diffuse:18-10*cloud;
-  const direct=exposure==='outdoors'?130*sun*trans:0;
-  return (diffuseLoad*sun+direct)/6.1;
+  const shadeDeltaC=diffuseLoad*sun/6.1;
+  if(exposure!=='outdoors')return {deltaC:shadeDeltaC,transmission,projectedAreaFactor:null,effectiveRadiantFieldWm2:shadeDeltaC*6.1,model:'Generic diffuse-sky MRT estimate'};
+
+  const altitudeDegrees=elevation*180/Math.PI,projectedAreaFactor=interpolate(altitudeDegrees,SOLAR_ALTITUDES,STANDING_PROJECTED_AREA);
+  // Generic clear-sky direct normal irradiance. The 800 W/m² ceiling stays
+  // inside the ordinary ASHRAE solar-gain input range and avoids pretending
+  // that a point radiometer is present.
+  const sinAltitude=Math.max(.001,Math.sin(elevation));
+  const directNormalWm2=Math.min(800,1098*Math.exp(-.059/sinAltitude));
+  const diffuseHorizontalWm2=.2*directNormalWm2;
+  const effectiveBodyFraction=.725,skyViewFraction=1,bodyExposureFraction=.5;
+  const shortwaveAbsorptivity=.7,longwaveAbsorptivity=.95,groundReflectance=.2,radiativeCoefficient=6;
+  const diffuseSolar=effectiveBodyFraction*skyViewFraction*.5*diffuseHorizontalWm2;
+  const directSolar=effectiveBodyFraction*projectedAreaFactor*bodyExposureFraction*directNormalWm2;
+  const reflectedSolar=effectiveBodyFraction*skyViewFraction*.5*(directNormalWm2*sinAltitude+diffuseHorizontalWm2)*groundReflectance;
+  const clearEffectiveRadiantField=Math.min(130,(diffuseSolar+directSolar+reflectedSolar)*(shortwaveAbsorptivity/longwaveAbsorptivity));
+  const clearSunDeltaC=clearEffectiveRadiantField/(radiativeCoefficient*effectiveBodyFraction);
+  const clearHorizontalWm2=directNormalWm2*sinAltitude+diffuseHorizontalWm2;
+  const modeledSolar=finite(current.solarRadiation)&&current.solarRadiation>=0?current.solarRadiation:null;
+  // Prefer the timestamp-matched, already cloud-adjusted model radiation.
+  // Scaling the clear-sky body load by GHI preserves its direct/diffuse body
+  // geometry without multiplying the model value by cloud cover a second time.
+  const solarScale=finite(modeledSolar)&&clearHorizontalWm2>0
+    ? Math.min(1,Math.max(0,modeledSolar/clearHorizontalWm2)):transmission;
+  // Without modeled radiation, cloud cover fades from standing direct sun to
+  // shade. With modeled radiation, the same interpolation is driven by GHI.
+  const deltaC=shadeDeltaC+solarScale*Math.max(0,clearSunDeltaC-shadeDeltaC);
+  return {deltaC,shadeDeltaC,clearSunDeltaC,transmission,solarScale,projectedAreaFactor,directNormalWm2,clearHorizontalWm2,
+    solarRadiationWm2:modeledSolar,solarRadiationSource:finite(modeledSolar)?current.solarSource||'Same-hour model shortwave radiation':null,
+    effectiveRadiantFieldWm2:deltaC*radiativeCoefficient*effectiveBodyFraction,
+    model:`ASHRAE-style standing-person effective radiant field (${finite(modeledSolar)?'same-hour model radiation':'sky-cover fallback'})`};
 }
 /** Custom cold-wind floor for feels-like. UTCI's 10 m wind term runs far
  * colder than the U.S. standard index and lived experience in cold wind
@@ -179,12 +227,17 @@ export function tier3FeelsLike(current,location,now,exposure='shade') {
   if(!finite(current?.temperature)||!finite(current?.wind)||current.wind<0)return {value:null,method:'UTCI inputs unavailable'};
   const rh=thermalHumidity(current);
   if(!finite(rh))return {value:null,method:'UTCI moisture unavailable'};
-  const elevation=solarElevation(now,location?.latitude,location?.longitude),deltaC=estimatedMrtDelta(current,elevation,exposure);
+  const elevation=solarElevation(now,location?.latitude,location?.longitude),radiation=estimatedMrt(current,elevation,exposure),deltaC=radiation.deltaC;
   const tr=current.temperature+deltaC*1.8,rawValue=utciF(current.temperature,tr,current.wind,rh);
   const value=coldWindChillBlend(current.temperature,current.wind,rawValue);
   const adjusted=finite(value)&&finite(rawValue)&&value>rawValue+.001;
-  return {value,method:finite(value)?`UTCI Tier-3 fallback with estimated mean radiant temperature${adjusted?' and custom cold-weather blend':''}`:'UTCI outside supported range',rh,tr,deltaMrtC:deltaC,
-    windUsedMps:Math.max(.5,current.wind*.44704),warmerResultOverride:false,
+  const solarMethod=exposure==='outdoors'&&deltaC>0?' (ASHRAE-style standing-person solar projection)':'';
+  return {value,method:finite(value)?`UTCI Tier-3 fallback with estimated mean radiant temperature${solarMethod}${adjusted?' and custom cold-weather blend':''}`:'UTCI outside supported range',rh,tr,deltaMrtC:deltaC,
+    windUsedMps:Math.max(.5,current.wind*.44704),sourceWindMph:current.wind,effectiveWindMph:current.wind,
+    radiationModel:radiation.model,solarTransmission:radiation.transmission,solarScale:radiation.solarScale??radiation.transmission,
+    solarRadiationWm2:radiation.solarRadiationWm2??null,solarRadiationSource:radiation.solarRadiationSource??null,projectedAreaFactor:radiation.projectedAreaFactor,
+    clearSunMrtDeltaC:radiation.clearSunDeltaC??null,effectiveRadiantFieldWm2:radiation.effectiveRadiantFieldWm2,
+    warmerResultOverride:false,
     windChillFloor:finite(value)&&finite(rawValue)&&value>rawValue+.001};
 }
 
@@ -201,14 +254,15 @@ export function thermalComfort(current, location, now) {
   const wet=wetBulb(current.temperature,rh);
   const shadeValue=finite(shade.value)?Math.round(shade.value):null,outdoorValue=finite(outdoor.value)?Math.round(outdoor.value):null;
   return {rawShade:shade.value,rawOutdoors:outdoor.value,
-    inputEvidence:{temperature:current.temperature,dewpoint:current.dewpoint,humidity:rh,windMph:current.wind,windUsedMps:outdoor.windUsedMps,skyCover:weather.cover,skySource:weather.source,meanRadiantTemperatureF:outdoor.tr,sourceTime:current.time||null,station:current.station||null,stationDistanceKm:current.stationDistanceKm??null,
-      windPolicy:current.wind*.44704<.5?'Calm-wind approximation: UTCI minimum 0.5 m/s':'Source wind; no observation-to-forecast adjustment',
-      radiationBasis:!finite(elevation)?'Solar position unavailable; unmeasured mean radiant temperature assumed equal to air':daylight===false?'No solar load at night; unmeasured mean radiant temperature assumed equal to air':!weather.known?'Sky data unavailable; no direct-sun adjustment is estimated':'Radiation estimated from the same-hour sky and solar elevation; not measured'},
+    inputEvidence:{temperature:current.temperature,dewpoint:current.dewpoint,humidity:rh,windMph:current.wind,windUsedMps:outdoor.windUsedMps,skyCover:weather.cover,skySource:weather.source,meanRadiantTemperatureF:outdoor.tr,radiationModel:outdoor.radiationModel,solarTransmission:outdoor.solarTransmission,solarScale:outdoor.solarScale,solarRadiationWm2:outdoor.solarRadiationWm2,solarRadiationSource:outdoor.solarRadiationSource,projectedAreaFactor:outdoor.projectedAreaFactor,clearSunMrtDeltaC:outdoor.clearSunMrtDeltaC,effectiveRadiantFieldWm2:outdoor.effectiveRadiantFieldWm2,sourceTime:current.time||null,station:current.station||null,stationDistanceKm:current.stationDistanceKm??null,
+      windPolicy:current.wind*.44704<.5?'Calm-wind approximation: UTCI minimum 0.5 m/s':'Source 10 m wind; no observation-to-forecast adjustment',
+      radiationBasis:!finite(elevation)?'Solar position unavailable; unmeasured mean radiant temperature assumed equal to air':daylight===false?'No solar load at night; unmeasured mean radiant temperature assumed equal to air':!weather.known?'Sky data unavailable; no direct-sun adjustment is estimated':finite(outdoor.solarRadiationWm2)?'Same-hour model shortwave radiation drives the standing-person solar estimate; not measured at person level':'Standing-person solar load estimated from the same-hour sky and solar elevation; not measured'},
     radiantCondition:weather.condition,shade:shadeValue,sun:daylight&&(weather.kind==='clear'||weather.kind==='partly-cloudy')?outdoorValue:null,outdoors:outdoorValue,
     weatherKind:weather.kind,weatherLabel:weather.label,condition:current.condition,conditionSource:current.conditionSource||null,
     radiationStatus:daylight===false?'night':weather.known?'estimated-by-sky-state':'unknown',
-    method:shade.method,humidity:rh,wetBulb:wet,daylight,absorbedRadiation:finite(weather.cover)?(daylight?130*Math.max(0,Math.sin(elevation))**.72*(1-weather.cover/100):0):estimatedAbsorbedRadiation(weather.condition,elevation),
+    method:outdoor.method,humidity:rh,wetBulb:wet,daylight,
+    absorbedRadiation:daylight===false?0:!weather.known?null:(weather.kind==='clear'||weather.kind==='partly-cloudy'?outdoor.effectiveRadiantFieldWm2:0),
     solarAdjustment:finite(outdoorValue)&&finite(shadeValue)?outdoorValue-shadeValue:null,
     dewpointEffect:dewpointMessage(current.dewpoint),windEffect:windMessage(current.temperature,current.wind),microclimate:localContext,
-    note:`Tier-3 operational fallback from the attached Real-Feel Skin Temperature research: UTCI is the all-season base using air temperature, humidity/dew point and standard wind, with solar elevation and broad sky state used for a generic radiant estimate. The displayed estimate includes a gradual custom cold-wind adjustment toward the NWS wind-chill equation when that result is warmer than UTCI. The standard NWS index is intended for 50°F or below with wind above 3 mph; this site extends the equation only as a smoothing target. The temperature adjustment is full at or below 40°F and fades to zero at 60°F; the wind adjustment fades in from 2 to 4 mph. Warmer conditions use UTCI unchanged. No observation-to-forecast offset is used. Numeric hourly cloud cover is preferred over broad period descriptions. Calm wind uses the UTCI minimum 0.5 m/s; out-of-domain conditions stay unavailable. Cloud attenuation and MRT are estimates, not local radiometer measurements. This is a modeled equivalent temperature, not measured skin temperature or validated EPST. ${dewpointMessage(current.dewpoint)} ${windMessage(current.temperature,current.wind)} ${localContext} Wet bulb is diagnostic only and is not added again to the result.`};
+    note:`Tier-3 operational fallback from the attached Real-Feel Skin Temperature research: UTCI is the all-season base using air temperature, humidity/dew point and standard 10 m wind. Same-hour model shortwave radiation drives the radiant environment when available; solar elevation and broad sky state provide the fallback. Direct sun uses an ASHRAE-style effective-radiant-field calculation for a standing person with orientation averaged because the person's direction is unknown; the radiation or cloud input fades it to the existing shade estimate. The displayed estimate also includes a gradual custom cold-wind adjustment toward the NWS wind-chill equation when that result is warmer than UTCI. The standard NWS index is intended for 50°F or below with wind above 3 mph; this site extends the equation only as a smoothing target. The temperature adjustment is full at or below 40°F and fades to zero at 60°F; the wind adjustment fades in from 2 to 4 mph. Warmer conditions use the standard UTCI wind input while the estimated standing-person solar load can change mean radiant temperature. No observation-to-forecast offset is used. Numeric hourly cloud cover is preferred over broad period descriptions when model radiation is missing. Calm wind uses the UTCI minimum 0.5 m/s; out-of-domain conditions stay unavailable. Model radiation, cloud attenuation, body projection and MRT are estimates, not local radiometer or person-level measurements. This is a modeled equivalent temperature, not measured skin temperature or validated EPST. ${dewpointMessage(current.dewpoint)} ${windMessage(current.temperature,current.wind)} ${localContext} Wet bulb is diagnostic only and is not added again to the result.`};
 }

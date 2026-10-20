@@ -27,10 +27,10 @@ function screenshotForecast(){
  return f;
 }
 
-test('the reported October19 values reproduce without generating false perfect-weather hours',()=>{
+test('the October 19 inputs keep shade separate and use the corrected standing-person sunlight load',()=>{
  const f=screenshotForecast(),current=currentSample(f,now);
  assert.equal(current.comfort.shade,46);
- assert.equal(current.feels,54);
+ assert.equal(current.feels,61);
  assert.equal(currentHero(f,true,now).temperature,59);
  assert.equal(buildForecastWindows(f,now).perfect.length,0);
  for(const hour of f.hours)assert.equal(forecastSample(f,hour.time).feels,hour.feelsLike);
@@ -50,7 +50,7 @@ test('an open tab cannot keep stale observed numbers, rain-now claims or dew-poi
  assert.equal(currentWeatherDisplay(f,later).currentLikelihood.value,null);
  assert.match(sampleCaption(sample),/unavailable/);
  assert.match(heroFeelsHTML(sample),/unavailable/);
- assert.doesNotMatch(heroFeelsHTML(sample),/54°/);
+ assert.doesNotMatch(heroFeelsHTML(sample),/61°/);
 });
 
 test('new source data cannot disguise an expired snapshot and browser rendering never changes its clock',()=>{

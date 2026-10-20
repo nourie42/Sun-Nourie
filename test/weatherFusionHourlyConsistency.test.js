@@ -21,7 +21,7 @@ const rebuild=f=>rebuildHourlyFeels(f,{now,temperatureAt:()=>({value:null}),humi
 test('every displayed hourly temperature is paired with the same canonical feels-like inputs',()=>{
  const f=rebuild(data([80,83,86,90,92]));
  for(const h of f.hours){const p=f.metricForecasts.series.feels.find(p=>Date.parse(p.time)===Date.parse(h.time));assert.equal(p.inputs.temperature,h.temperature);assert.equal(h.feelsLike,p.value);assert.equal(feelsAt(f,h.time),h.feelsLike);assert.ok(Math.abs(p.value-tier3FeelsLike({...p.inputs,condition:h.condition,type:'guidance'},f.location,Date.parse(h.time),'outdoors').value)<=.051);}
- assert.equal(f.thermalVersion,'weather-nourie-hourly-feels-v2');
+ assert.equal(f.thermalVersion,'weather-nourie-hourly-feels-v3');
 });
 test('warmth later in the day produces a later, higher peak when wind and moisture stay equal',()=>{
  const f=rebuild(data([80,83,86,90,92,91]));
@@ -63,7 +63,7 @@ test('calendar-day feels-like ranges honor local midnight and the autumn DST cha
  for(const s of [summary.high,summary.low]){assert.equal(s.available,25);assert.equal(s.expected,25);assert.equal(s.partial,false);assert.ok(s.points.every(p=>Date.parse(p.time)>=start&&Date.parse(p.time)<end));}
 });
 test('the production forecast builder serves the new hourly contract without altering raw air-temperature weights',()=>{
- const f=buildForecast({...testInputs,models:{}});assert.equal(f.thermalVersion,'weather-nourie-hourly-feels-v2');
+ const f=buildForecast({...testInputs,models:{}});assert.equal(f.thermalVersion,'weather-nourie-hourly-feels-v3');
  for(const h of f.hours){const p=f.metricForecasts.series.feels.find(p=>Date.parse(p.time)===Date.parse(h.time));assert.equal(p.inputs.temperature,h.temperature);assert.equal(p.value,h.feelsLike);}
 });
 for(const dp of [40,55,62,66,72,78])test(`Gross Meter ${dp} uses future grammar only in forecast readings`,()=>{

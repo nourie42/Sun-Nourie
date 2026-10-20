@@ -12,7 +12,7 @@ function fixture(count=1){
  const rainTimeline=feels.map(row=>({time:row.time,end:new Date(Date.parse(row.time)+H).toISOString(),officialPop:0,precipitation:0,precipitationBlend:{sources:sources(0)}}));
  return {location:{timeZone:'UTC',latitude:35.787,longitude:-78.4806},days,metricForecasts:{series:{feels}},rainTimeline};
 }
-const calculate=out=>{addConditionConfidence(out,{now});return out.days[0].confidence.weather;};
+const calculate=(out,time=now)=>{addConditionConfidence(out,{now:time});return out.days[0].confidence.weather;};
 
 test('ten days of complete sunny dry agreement remain High independently of temperature or lead time',()=>{
  const out=fixture(10),legacy=out.days.map(day=>({score:day.confidence.score,summary:day.confidence.summary,temperatureSpread:day.confidence.temperatureSpread}));
@@ -27,7 +27,7 @@ test('ten days of complete sunny dry agreement remain High independently of temp
 
 test('cloud agreement uses all raw positive source values rather than the blended cloud percentage',()=>{
  const out=fixture();for(const row of out.metricForecasts.series.feels){row.inputs.skyCover=0;row.inputs.skySources=sources(0);row.inputs.skySources[2].value=100;}
- const weather=calculate(out);assert.equal(weather.key,'low');assert.equal(weather.evidence.sky.worstHour.sources.length,3);
+ const weather=calculate(out);assert.equal(weather.key,'low');assert.ok(weather.evidenceScore<70);assert.equal(weather.sameDayCoverageFloorApplied,false);assert.equal(weather.evidence.sky.worstHour.sources.length,3);
  assert.deepEqual(weather.evidence.sky.worstHour.sources.map(source=>source.value),[0,0,100]);
 });
 
@@ -57,7 +57,35 @@ test('missing rain or cloud measurements remain unknown rather than dry or clear
 
 test('one uncovered current-hour interval prevents a High agreement claim',()=>{
  const out=fixture();out.rainTimeline.splice(12,1);
- const weather=calculate(out);assert.equal(weather.key,'low');assert.equal(weather.evidence.rain.complete,false);assert.equal(weather.evidence.rain.coveredHours,23);
+ const weather=calculate(out);assert.equal(weather.key,'moderate');assert.equal(weather.score,70);assert.equal(weather.evidenceScore,60);assert.equal(weather.sameDayCoverageFloorApplied,true);
+ assert.equal(weather.evidence.rain.complete,false);assert.equal(weather.evidence.rain.coveredHours,23);
+});
+
+test('a missing partially elapsed current interval does not make the remaining same-day forecast Low',()=>{
+ const out=fixture(),time=now+20*60000;
+ out.metricForecasts.series.feels.shift();out.rainTimeline.shift();
+ const weather=calculate(out,time);
+ assert.equal(weather.key,'high');assert.equal(weather.score,100);
+ assert.deepEqual(weather.evidence.currentPartialExcluded,{sky:true,rain:true});
+ assert.equal(weather.evidence.sky.expectedHours,11);assert.equal(weather.evidence.rain.expectedHours,23);
+ assert.match(weather.factors.join(' '),/partially elapsed current hour.*excluded/);
+});
+
+test('a single-source partially elapsed interval is also excluded because it cannot establish agreement',()=>{
+ const out=fixture(),time=now+20*60000;
+ out.metricForecasts.series.feels[0].inputs.skySources=out.metricForecasts.series.feels[0].inputs.skySources.slice(0,1);
+ out.rainTimeline[0].precipitationBlend.sources=out.rainTimeline[0].precipitationBlend.sources.slice(0,1);
+ const weather=calculate(out,time);
+ assert.equal(weather.key,'high');assert.equal(weather.score,100);
+ assert.deepEqual(weather.evidence.currentPartialExcluded,{sky:true,rain:true});
+});
+
+test('no comparable hours remaining today is Unavailable rather than Low',()=>{
+ const out=fixture(),time=now+23*H+20*60000;
+ out.metricForecasts.series.feels.pop();out.rainTimeline.pop();
+ const weather=calculate(out,time);
+ assert.equal(weather.key,'unavailable');assert.equal(weather.score,null);
+ assert.deepEqual(weather.evidence.currentPartialExcluded,{sky:true,rain:true});
 });
 
 test('the existing rain minimum and trace thresholds preserve real drizzle evidence',()=>{
@@ -80,7 +108,7 @@ test('invalid zero-weight and duplicate source records do not inflate independen
 
 test('a duplicate timestamp cannot conceal conflicting canonical data',()=>{
  const out=fixture();out.rainTimeline.push({...out.rainTimeline[12],precipitationBlend:{sources:sources(.2)}});
- const weather=calculate(out);assert.equal(weather.key,'low');assert.equal(weather.evidence.rain.complete,false);
+ const weather=calculate(out);assert.equal(weather.key,'moderate');assert.equal(weather.evidenceScore,60);assert.equal(weather.sameDayCoverageFloorApplied,true);assert.equal(weather.evidence.rain.complete,false);
 });
 
 test('condition confidence does not modify original raw cloud rain or temperature evidence',()=>{
@@ -104,7 +132,7 @@ test('official fallback hours cap the grade and disclose the missing model input
 test('one conflicting official probability cannot be averaged away',()=>{
  for(const [chance,score] of [[25,80],[60,50]]){
   const out=fixture();out.rainTimeline[12].officialPop=chance;
-  const weather=calculate(out);assert.equal(weather.score,score);assert.equal(weather.evidence.rain.score,100);assert.equal(weather.evidence.rain.worstHour.officialPop,chance);
+  const weather=calculate(out);assert.equal(weather.score,score);assert.equal(weather.sameDayCoverageFloorApplied,false);assert.equal(weather.evidence.rain.score,100);assert.equal(weather.evidence.rain.worstHour.officialPop,chance);
  }
 });
 

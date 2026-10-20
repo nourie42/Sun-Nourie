@@ -13,7 +13,7 @@ test('humidity raises the same UTCI cloudy estimate without selecting a warmer u
  assert.match(moist.note,/UTCI is the all-season base/);
  assert.match(moist.note,/custom cold-wind adjustment toward the NWS wind-chill equation/);
  assert.match(moist.note,/standard NWS index is intended for 50°F or below with wind above 3 mph/);
- assert.match(moist.note,/Warmer conditions use UTCI unchanged/);
+ assert.match(moist.note,/Warmer conditions use the standard UTCI wind input/);
 });
 
 test('bulletin card stays hidden when there is no actual message, even if a source is stale',()=>{

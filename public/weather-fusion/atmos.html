@@ -53,7 +53,7 @@
   <link rel="stylesheet" href="/weather-fusion/page-unify.css?v=hour-selection-v1">
   <link rel="stylesheet" href="/weather-fusion/atmos.css?v=atmos-v5">
   <script type="module" src="/weather-fusion/header-sky.js?v=3"></script>
-  <script type="module" src="/weather-fusion/atmos.js?v=weather-portraits-v1"></script>
+  <script type="module" src="/weather-fusion/atmos.js?v=standing-sun-v1"></script>
 </head>
 <body data-sky="day">
   <a class="skip-link" href="#main">Skip to the forecast details</a>
@@ -210,7 +210,7 @@
           <div id="feel-dew"></div>
         </div>
         <details class="evidence-detail"><summary>The science of feels-like</summary><div class="science-body">
-          <p><strong>Feels-like</strong> is the site’s custom outdoor estimate. It starts with UTCI, which combines air temperature, moisture, wind and an estimated sun load, then gradually lifts colder results toward the NWS wind-chill equation when that result is warmer. The standard NWS index is intended for 50°F or below with wind above 3 mph; the site’s fade through 60°F and 2–4 mph is a custom smoothing rule. “In the shade” takes the direct sun estimate out.</p>
+          <p><strong>Feels-like</strong> is the site’s custom outdoor estimate. It starts with UTCI, which combines air temperature, moisture, standard 10 m wind and mean radiant temperature. Direct sun uses an ASHRAE-style standing-person body projection driven by same-hour model shortwave radiation, with solar position and clouds as the fallback. It then gradually lifts colder results toward the NWS wind-chill equation when that result is warmer. The standard NWS index is intended for 50°F or below with wind above 3 mph; the site’s fade through 60°F and 2–4 mph is a custom smoothing rule. “In the shade” takes the direct sun estimate out.</p>
           <p><strong>Dew point</strong> is the temperature at which the air would be saturated. It measures the actual moisture in the air, which is why it tracks how sticky it feels better than relative humidity does. Wet bulb uses Stull’s approximation.</p>
           <p>Risk labels apply UTCI-derived heat-stress thresholds of 78.8°, 89.6° and 100.4°F to that custom estimate. They are estimates, not official heat alerts.</p>
         </div></details>
