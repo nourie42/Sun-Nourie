@@ -4,7 +4,9 @@
  * days[].high/low, rainTimeline, metricForecasts.series and precipitation.
  * Pure builders (model, series, chart layout, summaries) are exported for
  * tests; DOM wiring only runs in the browser. */
-import { weatherIcon, windDirectionLabel } from './weather-display.js?v=low-rain-display-v1';
+import {calendarDayTemperatures,calendarDayWindow} from './calendar-day.js?v=calendar-days-v1';
+import {forecastSnapshotFreshness} from './weather-freshness.js?v=accuracy-20261019-v1';
+import { weatherIcon, windDirectionLabel,currentSample } from './weather-display.js?v=low-rain-display-v1';
 import { weatherState } from './weather-state.js?v=current-rain-20261017-v3';
 import { finite, rainChanceValue } from './weather-math.js?v=current-rain-20261017-v3';
 import {currentAirQuality} from './air-quality.js?v=mobile-repair-v1';
@@ -63,7 +65,7 @@ export function sunProgress(solar, nowMs) {
 }
 
 /* ---------- Categories ---------- */
-export function uvCategory(uv) { return !finite(uv) ? '' : uv < 3 ? 'Low' : uv < 6 ? 'Moderate' : uv < 8 ? 'High' : uv < 11 ? 'Very High' : 'Extreme'; }
+export function uvCategory(uv) { const index=Math.round(uv);return !finite(uv) ? '' : index < 3 ? 'Low' : index < 6 ? 'Moderate' : index < 8 ? 'High' : index < 11 ? 'Very High' : 'Extreme'; }
 export function aqiCategory(aqi) { return !finite(aqi) ? '' : aqi <= 50 ? 'Good' : aqi <= 100 ? 'Moderate' : aqi <= 150 ? 'Unhealthy for Sensitive Groups' : aqi <= 200 ? 'Unhealthy' : aqi <= 300 ? 'Very Unhealthy' : 'Hazardous'; }
 export function dewComfort(dp) { return !finite(dp) ? '' : dp < 50 ? 'dry' : dp < 58 ? 'comfortable' : dp < 63 ? 'a touch humid' : dp < 68 ? 'sticky' : dp < 73 ? 'muggy' : 'oppressive'; }
 export function inches(v) { return !finite(v) ? '—' : v === 0 ? '0"' : v < 0.01 ? '<0.01"' : `${v.toFixed(2)}"`; }
@@ -91,7 +93,7 @@ export function buildSeries(data) {
   const rain = rows.map((r) => ({ t: Date.parse(r.time), v: rainChanceValue(r.rainLikelihood, r.officialPop ?? r.pop), amt: finite(r.precipitation) ? r.precipitation : null }));
   return {
     temperature: merge(points(hours, (h) => h.temperature), points(s.temperature, val)),
-    feels: merge(points(hours, (h) => h.apparent), points(s.feels, val)),
+    feels: s.feels?.length ? points(s.feels,val) : points(hours,h=>h.feelsLike),
     precip: rain.filter((p) => Number.isFinite(p.t)).map((p) => ({ ...p, v: finite(p.v) ? p.v : null })).sort((a, b) => a.t - b.t),
     wind: merge(points(hours, (h) => windMph(h.wind)), points(s.wind, val)),
     gust: merge(points(hours, (h) => windMph(h.gust)), points(s.gust, val)),
@@ -195,11 +197,14 @@ export function layoutChart(spec) {
 }
 
 /* ---------- Summaries ---------- */
-export function story(cur, hours, tz) {
+export function story(cur, hours, tz, nowMs=hours[0]?.time) {
   const parts = [];
-  const h24 = hours.slice(0, 24);
+  const h24 = hours.filter(h=>h.time<nowMs+24*H);
   const nowChance = h24[0]?.chance;
-  if (finite(nowChance) && nowChance >= 50) {
+  const coversNow=finite(nowMs)&&h24[0]?.time<=nowMs&&h24[0]?.time+H>nowMs;
+  const coversWindow=coversNow&&h24.length>=24&&h24.at(-1)?.time+H>=nowMs+24*H&&h24.every((h,i)=>finite(h.chance)&&(i===0||h.time===h24[i-1].time+H));
+  if(!coversWindow)parts.push('Rain outlook is incomplete for the next 24 hours.');
+  else if (finite(nowChance) && nowChance >= 50) {
     const dry = h24.find((h) => finite(h.chance) && h.chance < 30);
     parts.push(dry ? `Rain likely now, easing around ${hourShort(dry.time, tz)}.` : 'Rain likely through the next 24 hours.');
   } else {
@@ -246,7 +251,7 @@ export function dailySummary(metric, pts, extra, dayLabel, tz) {
     case 'dewpoint': return `${when}, the dew point ranges from ${Math.round(min.v)}° to ${Math.round(max.v)}°, which feels ${dewComfort(avg)}.`;
     case 'uv': {
       const prot = ok.filter((p) => p.v >= 3);
-      return max.v < 3 ? `${when}, the UV index stays low.` : `${when}, the UV index peaks at ${Math.round(max.v)} (${uvCategory(max.v)}) around ${at(max)}.${prot.length ? ` Use sun protection from ${at(prot[0])} to ${hourShort(prot.at(-1).t + H, tz)}.` : ''}`;
+      return Math.round(max.v) < 3 ? `${when}, the UV index stays low.` : `${when}, the UV index peaks at ${Math.round(max.v)} (${uvCategory(max.v)}) around ${at(max)}.${prot.length ? ` Use sun protection from ${at(prot[0])} to ${hourShort(prot.at(-1).t + H, tz)}.` : ''}`;
     }
     default: return '';
   }
@@ -265,7 +270,7 @@ export function discussionExcerpt(text) {
 export function buildModel(data, nowMs = Date.now()) {
   const loc = data?.location || {};
   const tz = loc.timeZone || 'America/New_York';
-  const cur = data?.current || {};
+  const current=currentSample({...data,location:loc},nowMs),cur=current.inputs,stale=forecastSnapshotFreshness(data,nowMs).expired;
   const sol = solarDays(data);
   const todaySolar = data?.solar || null;
   const temp = round(cur.temperature);
@@ -273,13 +278,13 @@ export function buildModel(data, nowMs = Date.now()) {
     .map((h) => ({ time: h.t, temp: round(h.temperature), chance: round(rainChanceValue(h.rainLikelihood, h.pop)), condition: h.condition || '', isDay: h.isDay !== false }));
   /* Hourly strip with sunrise/sunset inserted like the iOS app. */
   const windowEnd = (hours[0]?.time ?? nowMs) + 24 * H;
-  const strip = hours.filter((h) => h.time < windowEnd).map((h, i) => ({ type: 'hour', ...h, label: i === 0 ? 'Now' : hourShort(h.time, tz) }));
+  const strip = hours.filter((h) => h.time < windowEnd).map((h, i) => ({ type: 'hour', ...h, label: hourShort(h.time,tz) }));
   for (const d of sol) for (const [type, t] of [['sunrise', d.rise], ['sunset', d.set]]) {
     if (t > nowMs && t < windowEnd) strip.push({ type, time: t, label: clock(t, tz).replace(' ', '') });
   }
   strip.sort((a, b) => (a.label === 'Now' ? -1 : b.label === 'Now' ? 1 : a.time - b.time));
 
-  const rawDays = (data?.days || []).slice(0, 10);
+  const rawDays = (data?.days || []).slice(0, 10).map((day,index)=>({...day,...calendarDayTemperatures(data,index,nowMs)}));
   const days = rawDays.map((d, i) => {
     const noon = Date.parse(`${d.date}T12:00:00Z`), ok = Number.isFinite(noon);
     return {
@@ -306,8 +311,8 @@ export function buildModel(data, nowMs = Date.now()) {
     } : null;
   }
 
-  const series = buildSeries(data);
-  const feels = round(cur.feelsLike ?? cur.apparent);
+  const series=Object.fromEntries(Object.entries(buildSeries(data)).map(([key,rows])=>[key,rows.filter(row=>row.t>=Math.floor(nowMs/H)*H)]));
+  const feels=round(current.feels);
   const wind = windMph(cur.wind), gust = windMph(cur.gust);
   const uvCurrentValue=hourlyUvValue(data,nowMs),uvNow=finite(uvCurrentValue)?Math.round(uvCurrentValue):null;
   const uvToday = dayPoints(series.uv, dayKey(nowMs, tz), tz).filter((p) => finite(p.v));
@@ -317,12 +322,12 @@ export function buildModel(data, nowMs = Date.now()) {
   const nextSun = sunEvents.find((e) => e.t > nowMs);
   const otherSun = nextSun && sunEvents.find((e) => e.t > nextSun.t);
   const nextWet = days.slice(1).find((d) => finite(d.qpf) && d.qpf >= 0.05);
-  const p24 = data?.precipitation?.value;
+  const p24=stale?null:data?.precipitation?.value;
 
   const tiles = [];
   if (aqi != null) tiles.push({ id: 'aqi', title: 'Air Quality', wide: true, value: String(aqi), sub: aqiCategory(aqi), meter: Math.min(1, aqi / 300), note: aqi <= 50 ? 'Air quality is ideal for most people today.' : aqi <= 100 ? 'Acceptable; unusually sensitive people should limit long outdoor exertion.' : 'Consider limiting time outdoors.' });
   tiles.push({ id: 'feels', metric: 'feels', title: 'Feels Like', value: feels != null ? `${feels}°` : '—',
-    sub: finite(cur.feelsLikeShade) && feels != null && Math.round(cur.feelsLikeShade) !== feels ? `${Math.round(cur.feelsLikeShade)}° in shade` : '',
+    sub: finite(current.comfort.shade) && feels != null && Math.round(current.comfort.shade) !== feels ? `${Math.round(current.comfort.shade)}° in shade` : '',
     note: feels == null || temp == null ? '' : feels > temp + 1 ? 'Humidity and sun make it feel warmer than the actual temperature.' : feels < temp - 1 ? 'Wind is making it feel cooler.' : 'Similar to the actual temperature.' });
   tiles.push({ id: 'uv', metric: 'uv', title: 'UV Index', value: uvNow != null ? String(uvNow) : '—', sub: uvNow != null ? uvCategory(uvNow) : 'Not reported', meter: uvNow != null ? Math.min(1, uvNow / 11) : null,
     note: uvAhead.length ? `Use sun protection until ${hourShort(uvAhead.at(-1).t + H, tz)}.` : uvToday.length ? 'Low for the rest of the day.' : 'UV forecast unavailable.' });
@@ -331,7 +336,7 @@ export function buildModel(data, nowMs = Date.now()) {
   tiles.push({ id: 'sun', wide: true, title: nextSun ? nextSun.type : 'Sunset', value: nextSun ? clock(nextSun.t, tz) : '—', progress: sunProgress(todaySolar, nowMs),
     note: otherSun ? `${otherSun.type}: ${clock(otherSun.t, tz)}` : '' });
   tiles.push({ id: 'precip', metric: 'precip', title: 'Precipitation', value: inches(p24), sub: 'in next 24h',
-    note: nextWet ? `Next expected is ${inches(nextWet.qpf)} on ${nextWet.long}.` : finite(p24) && p24 >= 0.01 ? 'Rain is in the forecast for the next 24 hours.' : 'None expected in the coming days.' });
+    note: !finite(p24)?'Precipitation forecast unavailable.':nextWet ? `Next expected is ${inches(nextWet.qpf)} on ${nextWet.long}.` : finite(p24) && p24 >= 0.01 ? 'Rain is in the forecast for the next 24 hours.' : 'No significant precipitation expected in the next 24 hours.' });
   tiles.push({ id: 'humidity', metric: 'humidity', title: 'Humidity', value: finite(cur.humidity) ? `${Math.round(cur.humidity)}%` : '—',
     note: finite(cur.dewpoint) ? `The dew point is ${Math.round(cur.dewpoint)}° right now — ${dewComfort(cur.dewpoint)}.` : '' });
   tiles.push({ id: 'visibility', title: 'Visibility', wide: aqi != null, value: finite(cur.visibility) ? String(Math.round(cur.visibility)) : '—', unit: 'mi',
@@ -339,23 +344,23 @@ export function buildModel(data, nowMs = Date.now()) {
   tiles.push({ id: 'pressure', title: 'Pressure', wide: aqi != null, pressure: finite(cur.pressure) ? cur.pressure : null });
 
   const policy = data?.blendPolicy || {};
-  const SOURCES = [['nws', 'NWS', '#f4f1e8'], ['hrrr', 'HRRR', '#7fd4ff'], ['nbm', 'NBM', '#9ef0c2'], ['ecmwf', 'ECMWF', '#ffc27a']];
+  const SOURCES = [['nws', 'NWS', '#f4f1e8'], ['hrrr', 'HRRR', '#7fd4ff'], ['nbm', 'NBM', '#9ef0c2'], ['ecmwf', 'ECMWF', '#ffc27a'],['wn','Google WeatherNext','#b48cff']];
   const guidance = rawDays[0]?.guidance || {};
   const disc = data?.discussion?.text ? String(data.discussion.text) : '';
   const phaseSolar = todaySolar || (sol[0] && { sunrise: new Date(sol[0].rise).toISOString(), sunset: new Date(sol[0].set).toISOString() });
   return {
-    place: loc.name || '',
+    place: loc.name || '',updatedAt:data.assembledAt||null,
     tz, phase: skyPhase(phaseSolar, nowMs),
-    kind: cur.weather?.kind || weatherState(cur.condition).kind,
+    kind: weatherState(current.condition).kind,
     sunProgress: sunProgress(phaseSolar, nowMs),
     localTime: clock(nowMs, tz),
-    hero: { temp, condition: cur.condition || cur.weather?.label || 'Conditions unavailable', high: days[0]?.high ?? null, low: days[0]?.low ?? null, feels },
-    summary: story({ temp, gust }, hours, tz),
+    hero: { temp, condition: current.condition || 'Conditions unavailable', high: days[0]?.high ?? null, low: days[0]?.low ?? null, feels },
+    summary:stale?'Current weather is unavailable until the forecast refreshes.':story({temp,gust},hours,tz,nowMs),
     strip, days, series, sol, tiles,
     blend: {
       today: SOURCES.map(([id, label, color]) => ({ id, label, color, weight: policy.sameDay?.[id] })).filter((s) => finite(s.weight) && s.weight > 0),
       later: SOURCES.map(([id, label, color]) => ({ id, label, color, weight: policy.extendedRain?.[id] })).filter((s) => finite(s.weight) && s.weight > 0),
-      highs: SOURCES.map(([id, label, color]) => ({ id, label, color, value: id === 'nws' ? round(rawDays[0]?.official?.high ?? rawDays[0]?.high) : round(guidance[id]?.high) })),
+      highs: SOURCES.map(([id,label,color])=>{const window=calendarDayWindow(rawDays[0],0,nowMs,tz),rows=new Map((data.metricForecasts?.series?.temperature||[]).map(row=>[Date.parse(row.time),row.sources?.find(source=>source.id===id)?.value])),values=[];for(let time=window.start;time<window.end;time+=H){const value=rows.get(time);if(!finite(value))return {id,label,color,value:null};values.push(value);}return {id,label,color,value:values.length?round(Math.max(...values)):null};}),
       note: (data?.modelContributions || []).length ? 'Weights renormalize over the sources reporting for this place and hour. Rain chance is a blended score, not a calibrated probability.' : 'Only the NWS forecast is available for this place right now, so it carries the full weight.',
     },
     alerts: (data?.alerts || []).slice(0, 4).map((a) => ({ event: a.event || 'Weather alert', headline: a.headline || '', severe: /warning|emergency/i.test(a.event || '') })),
@@ -621,7 +626,7 @@ function render(m, place) {
   renderBlend(m);
   renderDiscussion(m);
   renderDots();
-  $('updated').textContent = `Updated ${clock(Date.now(), Intl.DateTimeFormat().resolvedOptions().timeZone)}`;
+  $('updated').textContent = Number.isFinite(Date.parse(m.updatedAt))?`Forecast updated ${clock(Date.parse(m.updatedAt),m.tz)}`:'Forecast update time unavailable';
   $('cards').setAttribute('aria-busy', 'false');
   document.body.classList.add('ready');
   sky.set(m.kind, m.phase);
@@ -647,14 +652,15 @@ function renderSheet() {
   const extra = metric === 'wind' ? dayPoints(m.series.gust, day.key, m.tz) : [];
   const first = pts[0]?.t ?? (dayPoints(m.series.temperature, day.key, m.tz)[0]?.t) ?? Date.parse(`${day.key}T12:00:00Z`);
   const isToday = state.sheetDay === 0;
-  const t0 = isToday ? first : first - localHour(first, m.tz) * H;
-  const t1 = isToday ? Math.max(first + 6 * H, (pts.at(-1)?.t ?? first) + H) : t0 + 24 * H;
+  const window=calendarDayWindow({date:day.key},state.sheetDay,Date.now(),m.tz);
+  const t0 = finite(window.start)?window.start:first;
+  const t1 = finite(window.end)?window.end:t0+24*H;
   const ok = pts.filter((p) => finite(p.v));
   const idle = () => {
     let v = '--', t = '';
     if (ok.length) {
       const max = Math.max(...ok.map((p) => p.v)), min = Math.min(...ok.map((p) => p.v));
-      if (metric === 'temperature') { v = `${day.high ?? Math.round(max)}°`; t = `L:${day.low ?? Math.round(min)}° · ${day.condition}`; }
+      if (metric === 'temperature') { v = `${day.high ?? '—'}°`; t = `L:${day.low ?? '—'}° · ${day.condition}`; }
       else if (metric === 'feels' || metric === 'dewpoint') { v = `${Math.round(max)}°`; t = `L:${Math.round(min)}°`; }
       else if (metric === 'precip') { v = `${Math.round(max)}%`; t = 'Peak chance'; }
       else if (metric === 'wind') { v = `${Math.round(min)}–${Math.round(max)}`; t = 'mph'; }
@@ -669,7 +675,7 @@ function renderSheet() {
     $('sheet-v').textContent = fmtValue(metric, p, gust);
     $('sheet-t').textContent = clock(p.t, m.tz);
   });
-  $('sheet-summary').textContent = dailySummary(metric, pts, extra, day.long, m.tz);
+  $('sheet-summary').textContent=metric==='temperature'&&(day.high===null||day.low===null)?'The complete calendar-day temperature range is unavailable.':dailySummary(metric,pts,extra,day.long,m.tz);
   const prev = m.days[state.sheetDay - 1], next = m.days[state.sheetDay + 1], other = prev || next;
   const wrap = $('sheet-compare-wrap');
   if (metric === 'temperature' && day.high != null && other?.high != null) {
@@ -681,7 +687,7 @@ function renderSheet() {
     $('sheet-compare').innerHTML = `<p>${diff === 0 ? `The high is the same as ${esc(ref)}.` : `The high is ${Math.abs(diff)}° ${diff > 0 ? 'warmer' : 'cooler'} than ${esc(ref)}.`}</p>${prev ? row(prev) + row(day) : row(day) + row(next)}`;
     wrap.hidden = false;
   } else wrap.hidden = true;
-  $('sheet-note').textContent = metric === 'precip' ? 'Rain chance is the Weather Nourie blended score (NWS plus HRRR, ECMWF and NBM where available), not a calibrated probability. Amounts are liquid-equivalent forecasts.'
+  $('sheet-note').textContent = metric === 'precip' ? 'Rain chance is the Weather Nourie blended score (NWS plus HRRR, ECMWF, NBM and Google WeatherNext where available), not a calibrated probability. Amounts are liquid-equivalent forecasts.'
     : metric === 'feels' ? 'Feels-like is calculated from forecast temperature, humidity, wind and estimated sun exposure.'
       : metric === 'uv' ? 'UV forecast from Open-Meteo.' : 'Hourly values from the Weather Nourie forecast blend.';
 }
@@ -808,6 +814,7 @@ async function select(index, { force = false } = {}) {
     render(buildModel(data), place);
   } catch (e) {
     if (seq !== loadSeq || e.message === 'auth') return;
+    const cached=state.cache.get(placeKey(place));if(cached)render(buildModel(cached.data),place);
     $('error').hidden = false;
     $('error').textContent = 'Weather data is temporarily unavailable. Please try again shortly.';
     $('cards').setAttribute('aria-busy', 'false');
@@ -934,6 +941,7 @@ function init() {
   initCompactHeader();
   select(start);
   setInterval(() => { if (document.visibilityState === 'visible') select(state.index, { force: true }); }, 10 * 60000);
+  setInterval(()=>{const place=state.places[state.index],cached=place&&state.cache.get(placeKey(place));if(cached)render(buildModel(cached.data),place);},60000);
 }
 
 if (typeof document !== 'undefined' && typeof window !== 'undefined') {

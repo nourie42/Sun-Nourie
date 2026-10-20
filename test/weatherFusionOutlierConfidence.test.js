@@ -56,7 +56,7 @@ test('confidence details retain the full range and show actual reduced weights b
  const c=compute(fixture()),html=confidenceTemperatureEvidenceHTML(c,{timeZone:'UTC',assembledAt:iso(now)});
  assert.match(html,/Full model gap:.*20\.0°F/);assert.match(html,/Gap used for confidence:.*2\.0°F/);
  assert.match(html,/keeps 10%.*other 90% goes to ECMWF/);
- assert.match(html,/NVIDIA WeatherNext<small>reduced weight/);assert.match(html,/1\.4%<small>was 13\.7%/);
+ assert.match(html,/Google WeatherNext<small>reduced weight/);assert.match(html,/1\.4%<small>was 13\.7%/);
  assert.match(html,/24\.7%<small>was 12\.3%/);
  assert.match(html,/80\.0°/);
  assert.match(html,/Reduced temperature weights \(24 hours\)/);

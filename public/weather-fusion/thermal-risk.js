@@ -14,5 +14,5 @@ export function thermalRisk(value){
 }
 export function thermalRiskHTML(value,compact=false){
  const risk=thermalRisk(value);if(!risk)return '';
- return `<span class="thermal-risk${compact?' thermal-risk-compact':''}" data-thermal-risk="${risk.key}" data-risk="${risk.level}" title="${risk.label} · estimated UTCI, not an official alert">${compact?risk.short:risk.label}</span>`;
+ return `<span class="thermal-risk${compact?' thermal-risk-compact':''}" data-thermal-risk="${risk.key}" data-risk="${risk.level}" title="${risk.label} · UTCI-derived threshold applied to a custom outdoor feels-like estimate; not an official alert">${compact?risk.short:risk.label}</span>`;
 }

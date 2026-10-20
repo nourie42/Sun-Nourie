@@ -10,7 +10,7 @@ const iso=time=>finite(time)?new Date(time).toISOString():null;
 const skyCategory=value=>value<=30?'clear':value>=70?'cloudy':'mixed';
 const rainCategory=value=>value<MIN_RAIN_SIGNAL_INCHES?'dry':value<=TRACE_QPF_THRESHOLD_INCHES?'trace':'wet';
 const categories={clear:0,mixed:1,cloudy:2,dry:0,trace:1,wet:1};
-const names={nws:'NWS',hrrr:'HRRR',ecmwf:'ECMWF',nbm:'NBM',wn:'NVIDIA WeatherNext'};
+const names={nws:'NWS',hrrr:'HRRR',ecmwf:'ECMWF',nbm:'NBM',wn:'Google WeatherNext'};
 const number=value=>String(Number(value.toFixed(4)));
 function localClock(time,zone){try{return new Intl.DateTimeFormat('en-US',{timeZone:zone,weekday:'short',hour:'numeric',minute:'2-digit',timeZoneName:'short'}).format(new Date(time)).replace(':00','');}catch{return time;}}
 function rangeSummary(kind,evidence,other,zone){

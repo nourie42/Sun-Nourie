@@ -3,6 +3,9 @@
  * 7-day, rain, details, comfort, severe outlook, NWS discussion,
  * plus "How the weather is calculated" with the house blend percentages.
  * Pure builders are exported for testing; DOM wiring runs in browser. */
+import {calendarDayTemperatures,rainWindowPeak} from './calendar-day.js?v=calendar-days-v1';
+import {forecastSnapshotFreshness} from './weather-freshness.js?v=accuracy-20261019-v1';
+import {installForecastRefresh} from './weathernext-data.js';
 import {currentAirQuality} from './air-quality.js?v=mobile-repair-v1';
 import {currentSample,sampleCaption,windDirectionLabel} from './weather-display.js?v=low-rain-display-v1';
 import {hourlyUvValue} from './daily-uv.js?v=weather-art-labels-v10';
@@ -12,10 +15,14 @@ const MODELS = [
   { id: 'hrrr', label: 'HRRR', color: '#ffd479', desc: '3 km high-resolution rapid refresh' },
   { id: 'ecmwf', label: 'ECMWF', color: '#9dffb0', desc: 'European medium-range model' },
   { id: 'nbm', label: 'NBM', color: '#ff9d9d', desc: 'NWS National Blend of Models' },
+  { id: 'wn', label: 'Google WeatherNext', color: '#b48cff', desc: 'Google WeatherNext model, when verified matching inputs are available' },
 ];
 const finite = (n) => typeof n === 'number' && Number.isFinite(n);
 const round = (n) => (finite(n) ? Math.round(n) : null);
-const MODEL_LABEL = { nws: 'NWS', hrrr: 'HRRR', ecmwf: 'ECMWF', nbm: 'NBM' };
+const rainValue=row=>row?.rainLikelihood&&Object.hasOwn(row.rainLikelihood,'value')?row.rainLikelihood.value:row?.pop??row?.officialPop;
+const MODEL_LABEL = { nws: 'NWS', hrrr: 'HRRR', ecmwf: 'ECMWF', nbm: 'NBM', wn:'Google WeatherNext' };
+const evidenceWeights=sources=>Object.fromEntries((sources||[]).filter(s=>finite(s.weight)).map(s=>[s.id,s.weight]));
+const shareText=weights=>MODELS.filter(m=>finite(weights[m.id])).map(m=>`${m.label} ${Math.round(weights[m.id]*1000)/10}`).join(', ');
 
 function hourLabel(timeMs, timeZone) {
   return new Intl.DateTimeFormat('en-US', { timeZone, hour: 'numeric' }).format(new Date(timeMs));
@@ -39,8 +46,17 @@ export function buildTodayModel(forecast, nowMs = Date.now()) {
     .map((h) => ({ ...h, time: Date.parse(h.time) }))
     .filter((h) => Number.isFinite(h.time));
   const hours = allHours.filter((h) => h.time + 3600000 > nowMs);
-  const weights = forecast?.blendPolicy?.sameDay || { nws: 0.4, hrrr: 0.3, ecmwf: 0.1, nbm: 0.2 };
-  const rainWeights = forecast?.blendPolicy?.extendedRain || { nws: 0.15, ecmwf: 0.6, nbm: 0.25 };
+  const temperatureEvidence=evidenceWeights(hours[0]?.temperatureBlend?.sources);
+  const weights=Object.keys(temperatureEvidence).length?temperatureEvidence:forecast?.blendPolicy?.sameDay||{};
+  const rainEvidence=evidenceWeights(hours[0]?.rainLikelihood?.sources);
+  const rainWeights=Object.keys(rainEvidence).length?rainEvidence:forecast?.blendPolicy?.sameDay||{};
+  const extendedRainWeights=forecast?.blendPolicy?.extendedRain||{};
+  const weightNote=Object.keys(temperatureEvidence).length
+    ? `Temperature source weights for ${hourLabel(hours[0].time,timeZone)}. Each forecast hour can use different available sources and weights.`
+    : 'Published base temperature weights. Matching-hour weights are unavailable; other metrics use their own inputs.';
+  const rainNote=Object.keys(rainWeights).length
+    ? `${Object.keys(rainEvidence).length?`At ${hourLabel(hours[0].time,timeZone)}`:'Current-day base policy'}, rain-signal shares in points: ${shareText(rainWeights)}. ${Object.keys(extendedRainWeights).length?`Later-day base policy: ${shareText(extendedRainWeights)}. `:''}NWS probability fills its share proportionally; other models contribute uncalibrated rainfall signals. Actual shares depend on matching source coverage.`
+    : 'Rain blend shares are unavailable. NWS probability and model rainfall signals are combined separately from temperature.';
   const contrib = Object.fromEntries((forecast?.modelContributions || []).map((m) => [m.id, m]));
   const solar = forecast?.solar || {};
 
@@ -55,7 +71,7 @@ export function buildTodayModel(forecast, nowMs = Date.now()) {
       time: h.time,
       blend: finite(h.temperatureBlend?.value) ? h.temperatureBlend.value : h.temperature,
       models: Object.fromEntries(MODELS.map((m) => [m.id, src[m.id] ?? null])),
-      pop: finite(h.rainLikelihood?.value) ? Math.round(h.rainLikelihood.value) : (finite(h.pop) ? Math.round(h.pop) : null),
+      pop: round(rainValue(h)),
     };
   });
 
@@ -76,13 +92,16 @@ export function buildTodayModel(forecast, nowMs = Date.now()) {
   ];
 
   const comfort = current.comfort || {};
-  const rainTl = (forecast?.rainTimeline || []).slice(0, 12);
-  const rainStart = rainTl.find((r) => (r.rainLikelihood?.value ?? r.officialPop ?? 0) >= 30);
+  const calendarDays=(forecast?.days||[]).map((day,index)=>({...day,...calendarDayTemperatures(forecast,index,nowMs)}));
+  const stale=forecastSnapshotFreshness(forecast,nowMs).expired;
+  const rainTl = (forecast?.rainTimeline || []).filter(row=>Date.parse(row.end||row.time)+(!row.end?3600000:0)>nowMs&&Date.parse(row.time)<nowMs+12*3600000);
+  const rainCoverage=rainWindowPeak(rainTl.map(row=>({...row,rainLikelihood:{value:rainValue(row)}})),{start:nowMs,end:nowMs+12*3600000});
+  const rainStart = rainTl.find((r) => finite(rainValue(r))&&rainValue(r)>=30);
   const discuss = forecast?.discussion || {};
 
   return {
     place: loc.name || 'Knightdale / Raleigh',
-    updatedAt: nowMs,
+    updatedAt: forecast?.assembledAt || null,
     timeZone,
     sky: skyImage(hours, nowMs),
     hero: {
@@ -90,8 +109,8 @@ export function buildTodayModel(forecast, nowMs = Date.now()) {
       feels: round(feels),
       condition: current.condition || 'Conditions unavailable',
       feelsSource:sampleCaption(current,timeZone),
-      high: round(forecast?.days?.[0]?.high),
-      low: round(forecast?.days?.[0]?.low),
+      high: round(calendarDays[0]?.high),
+      low: round(calendarDays[0]?.low),
       sunrise: fmtT(solar.sunrise),
       sunset: fmtT(solar.sunset),
     },
@@ -105,21 +124,21 @@ export function buildTodayModel(forecast, nowMs = Date.now()) {
     hours12: hours.slice(0, 12).map((h) => ({
       time: h.time,
       temp: round(finite(h.temperatureBlend?.value) ? h.temperatureBlend.value : h.temperature),
-      pop: finite(h.rainLikelihood?.value) ? Math.round(h.rainLikelihood.value) : (finite(h.pop) ? Math.round(h.pop) : null),
+      pop: round(rainValue(h)),
     })),
-    days7: (forecast?.days || []).slice(0, 7).map((d) => ({
+    days7: calendarDays.slice(0, 7).map((d) => ({
       label: d.label || d.date,
       high: round(d.high),
       low: round(d.low),
       condition: d.condition || '',
-      pop: finite(d.pop) ? Math.round(d.pop) : null,
+      pop: round(rainValue(d)),
     })),
     rainHours: rainTl.map((r) => ({
       time: Date.parse(r.time),
-      pop: finite(r.rainLikelihood?.value) ? Math.round(r.rainLikelihood.value) : (finite(r.officialPop) ? Math.round(r.officialPop) : null),
+      pop: round(rainValue(r)),
     })),
-    rainNote: rainStart
-      ? `Rain likely around ${hourLabel(Date.parse(rainStart.time), timeZone)} — plan around it.`
+    rainNote: stale ? 'Rain outlook unavailable until the forecast refreshes.' : !finite(rainCoverage.value) ? 'Rain outlook unavailable for some upcoming hours.' : rainStart
+      ? `Rain possible around ${hourLabel(Date.parse(rainStart.time), timeZone)} — ${Math.round(rainValue(rainStart))}% blended rain likelihood.`
       : 'No significant rain expected in the next 12 hours.',
     details,
     comfort: {
@@ -136,6 +155,8 @@ export function buildTodayModel(forecast, nowMs = Date.now()) {
     calc: {
       weights,
       rainWeights,
+      weightNote,
+      rainNote,
       models: MODELS.map((m) => ({
         ...m,
         weight: weights[m.id],
@@ -348,20 +369,21 @@ export function render(model) {
   // How the weather is calculated
   const wb = el('weight-bar');
   wb.innerHTML = '';
-  const order = ['nws', 'hrrr', 'nbm', 'ecmwf'].map((id) => model.calc.models.find((m) => m.id === id)).filter(Boolean);
-  for (const m of order) {
+  el('calc-weight-note').textContent=model.calc.weightNote;
+  const order = ['nws', 'hrrr', 'nbm', 'ecmwf','wn'].map((id) => model.calc.models.find((m) => m.id === id)).filter(Boolean);
+  for (const m of order.filter(m=>finite(m.weight)&&m.weight>0)) {
     const seg = document.createElement('div'); seg.className = 'seg';
     seg.style.width = `${Math.round((m.weight || 0) * 100)}%`;
     seg.style.background = m.color;
-    seg.textContent = `${m.label} ${Math.round((m.weight || 0) * 100)}%`;
-    seg.title = `${m.label}: ${Math.round((m.weight || 0) * 100)}%`;
+    seg.textContent = `${m.label} ${Math.round(m.weight*1000)/10}%`;
+    seg.title = `${m.label}: ${Math.round(m.weight*1000)/10}%`;
     wb.appendChild(seg);
   }
   const cm = el('calc-models');
   cm.innerHTML = '';
   for (const m of order) {
     const c = document.createElement('div'); c.className = 'calc-model';
-    const pct = document.createElement('div'); pct.className = 'pct'; pct.textContent = `${Math.round((m.weight || 0) * 100)}%`; c.appendChild(pct);
+    const pct = document.createElement('div'); pct.className = 'pct'; pct.textContent = finite(m.weight)?`${Math.round(m.weight*1000)/10}%`:'—'; c.appendChild(pct);
     const mid = document.createElement('div');
     const cn = document.createElement('div'); cn.className = 'cn'; cn.textContent = m.label; mid.appendChild(cn);
     const cd = document.createElement('div'); cd.className = 'cd';
@@ -370,16 +392,14 @@ export function render(model) {
     const dot = document.createElement('div'); dot.className = 'dot'; dot.style.background = m.color; c.appendChild(dot);
     cm.appendChild(c);
   }
-  const rw = model.calc.rainWeights;
-  el('rain-blend-note').textContent =
-    `Rain is blended separately: on the current local day, NWS fills its ${Math.round((model.calc.weights.nws || 0) * 100)}-point share proportionally; HRRR is worth ${Math.round((model.calc.weights.hrrr || 0) * 100)} points, ECMWF ${Math.round((model.calc.weights.ecmwf || 0) * 100)} and NBM ${Math.round((model.calc.weights.nbm || 0) * 100)}. ` +
-    `After the current local day, NWS fills a ${Math.round((rw.nws || 0) * 100)}-point share; ECMWF is worth ${Math.round((rw.ecmwf || 0) * 100)} points and NBM ${Math.round((rw.nbm || 0) * 100)}, with no HRRR contribution.`;
+  el('rain-blend-note').textContent=model.calc.rainNote;
 
-  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-  el('updated').textContent = 'Updated ' + new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit', timeZone: tz }).format(new Date(model.updatedAt));
+  el('updated').textContent=Number.isFinite(Date.parse(model.updatedAt))?'Forecast updated '+new Intl.DateTimeFormat('en-US',{hour:'numeric',minute:'2-digit',timeZone:model.timeZone}).format(new Date(model.updatedAt)):'Forecast update time unavailable';
 }
 
+let lastForecast=null,latestRequest=0;
 async function load(locationId) {
+  const request=++latestRequest;
   const err = el('error');
   err.hidden = true;
   el('now-cond').textContent = 'Loading…';
@@ -390,8 +410,12 @@ async function load(locationId) {
       return;
     }
     if (!res.ok) throw new Error(`Weather service responded ${res.status}`);
-    render(buildTodayModel(await res.json()));
+    const data=await res.json();
+    if(request!==latestRequest)return;
+    lastForecast=data;render(buildTodayModel(data));
   } catch (e) {
+    if(request!==latestRequest)return;
+    if(lastForecast)render(buildTodayModel(lastForecast));
     err.hidden = false;
     err.textContent = 'Could not load the forecast right now. Please retry in a bit.';
   }
@@ -409,6 +433,8 @@ function init() {
     load(select.value);
   });
   load(select.value);
+  installForecastRefresh(()=>load(select.value));
+  setInterval(()=>{if(lastForecast)render(buildTodayModel(lastForecast));},60000);
 }
 
 if (typeof document !== 'undefined') {

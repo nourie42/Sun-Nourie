@@ -1,4 +1,5 @@
 import {currentReadingFreshness} from './weather-freshness.js?v=accuracy-20261019-v1';
+import {currentSample} from './weather-display.js?v=low-rain-display-v1';
 const finite=v=>typeof v==='number'&&Number.isFinite(v);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const HOUR=3600000;
@@ -65,13 +66,24 @@ export function dewpointPoints(forecast,now,hours=240){
  return [...unique.values()].sort((a,b)=>a.epoch-b.epoch);
 }
 export function currentDewpointValue(forecast,now=Date.now()){
- if(currentReadingFreshness(forecast,now).expired)return null;
+ if(currentReadingFreshness(forecast,now).expired||forecast?.current?.type==='unavailable')return null;
  const observed=forecast?.current?.dewpoint;
  if(finite(observed))return observed;
  const currentHour=(forecast?.metricForecasts?.series?.dewpoint||[]).find(point=>{
   const start=Date.parse(point.time);return finite(point.value)&&finite(start)&&start<=now&&now<start+HOUR;
  });
  return finite(currentHour?.value)?currentHour.value:null;
+}
+/** Current facts share the hero's freshness gate and custom feels-like model.
+ * A cached comfort object must never revive expired current measurements. */
+export function currentFeelMeterFacts(forecast,now=Date.now()){
+ const sample=currentSample(forecast,now),current=sample.inputs;
+ if(current.type==='unavailable')return {dewpoint:null,humidity:null,temperature:null,feels:null,wind:null};
+ return {dewpoint:currentDewpointValue(forecast,now),
+  humidity:finite(current.humidity)&&current.humidity>=0&&current.humidity<=100?current.humidity:null,
+  temperature:finite(current.temperature)?current.temperature:null,
+  feels:finite(sample.feels)?sample.feels:null,
+  wind:finite(current.wind)&&current.wind>=0?current.wind:null};
 }
 function styles(){
  if(document.getElementById('weather-nourie-dewpoint-meter-css'))return;
@@ -130,7 +142,8 @@ export function renderDewpointMeter(forecast,now=Date.now()){
  let panel=document.getElementById('dewpoint-gross-meter');
  if(!panel){const anchor=document.getElementById('car-wash-forecast')||host;panel=document.createElement('section');panel.id='dewpoint-gross-meter';panel.className='glass dewpoint-gross-meter';panel.setAttribute('aria-labelledby','gross-title');anchor.insertAdjacentElement('afterend',panel);}
  const all=dewpointPoints(forecast,now,240),pts=dewpointPoints(forecast,now,horizon),valid=pts.filter(p=>finite(p.value));
- const zone=forecast.location.timeZone||'America/New_York',dp=currentDewpointValue(forecast,now),level=dewpointFeelLevel(dp,forecast.current.wind),dryFocus=finite(dp)&&dp<50;
+ const facts=currentFeelMeterFacts(forecast,now);
+ const zone=forecast.location.timeZone||'America/New_York',dp=facts.dewpoint,level=dewpointFeelLevel(dp,facts.wind),dryFocus=finite(dp)&&dp<50;
  const extreme=valid.reduce((best,p)=>!best||(dryFocus?p.value<best.value:p.value>best.value)?p:best,null),coverage=all.filter(p=>finite(p.value)).at(-1);
  const hoursAvailable=coverage?Math.max(0,Math.floor((coverage.epoch-now)/HOUR)):0;
  chartResizeObserver?.disconnect();chartResizeObserver=null;
@@ -140,7 +153,7 @@ export function renderDewpointMeter(forecast,now=Date.now()){
  let built=graph(pts,horizon,zone,Math.max(240,Math.min(640,window.innerWidth-76)),start);
  const marker=finite(dp)?Math.max(0,Math.min(100,(dp-20)/60*100)):0;
  const pill=({'nice-breeze':'BREEZE HELPS',gross:'STICKY',nogo:'MUGGY',nope:'VERY MUGGY'})[level.key]||level.key.toUpperCase();
- const humidity=forecast.current.humidity,air=forecast.current.temperature,feels=forecast.comfort?.outdoors;
+ const {humidity,temperature:air,feels}=facts;
  const dryness=dryForecastSummary(forecast,now,horizon),indoorRH=finite(air)&&air<60?heatedIndoorHumidity(dp):null;
  const indoorNote=finite(indoorRH)&&dp<45?`Heating this outdoor air to 68°F without adding moisture would put it near ${indoorRH}% relative humidity. Your actual indoor humidity depends on moisture sources and ventilation.`:'';
  panel.dataset.level=level.key;panel.dataset.hours=String(horizon);

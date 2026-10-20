@@ -90,7 +90,7 @@ try{
  const title=await page.locator('#wn-compare-title').innerText();assert.match(title,/Daily high temperature/);
  await page.locator('#wn-compare-chart').evaluate(el=>{const svg=el.querySelector('svg'),dot=svg.querySelector('[data-series="nourie"][data-index="1"]'),r=svg.getBoundingClientRect();el._wnShow(r.left+Number(dot.getAttribute('cx'))*r.width/svg.viewBox.baseVal.width);});
  const tooltip=await page.locator('#wn-compare-chart .wn-tip').innerText();
- assert.match(tooltip,/Daily highs/);assert.match(tooltip,/NWS\s+72\.0°/);assert.match(tooltip,/ECMWF\s+69\.0°/);assert.match(tooltip,/NVIDIA WeatherNext\s+73\.0°/);assert.match(tooltip,/4\.0°F/);
+ assert.match(tooltip,/Daily highs/);assert.match(tooltip,/NWS\s+72\.0°/);assert.match(tooltip,/ECMWF\s+69\.0°/);assert.match(tooltip,/Google WeatherNext\s+73\.0°/);assert.match(tooltip,/4\.0°F/);
  report.chartTitle=title;report.chartTooltip=tooltip;
  await page.locator('#wn-compare-chart').screenshot({path:path.join(out,'confidence-model-chart-mobile.png')});
  assert.deepEqual(errors,[]);assert.deepEqual(bad,[]);report.success=true;

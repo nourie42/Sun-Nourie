@@ -1,8 +1,9 @@
 /* Blend — how the Weather Nourie forecast is made.
- * Combines the house model blend (NWS/HRRR/ECMWF/NBM) from
- * /api/weather-fusion/forecast with Google WeatherNext AI
- * (published feed, comparison only).
+ * Shows the canonical API blend, including Google WeatherNext when matching
+ * input is available, beside a separate WeatherNext ensemble comparison feed.
  * Pure builders are exported for testing; DOM wiring runs in browser. */
+import {calendarDayTemperatures,calendarDayWindow} from './calendar-day.js?v=calendar-days-v1';
+import {currentSample} from './weather-display.js?v=low-rain-display-v1';
 import {localDate,forecastRows,installForecastRefresh} from './weathernext-data.js';
 
 const WN_FEED_URL = 'https://raw.githubusercontent.com/nourie42/Sun-Nourie/weather-fusion-data/models/weathernext3.json';
@@ -15,6 +16,7 @@ const MODELS = [
 ];
 const finite = (n) => typeof n === 'number' && Number.isFinite(n);
 const round = (n) => (finite(n) ? Math.round(n) : null);
+const rainValue=row=>row?.rainLikelihood&&Object.hasOwn(row.rainLikelihood,'value')?row.rainLikelihood.value:row?.pop??row?.officialPop;
 
 function hourLabel(timeMs, timeZone) {
   return new Intl.DateTimeFormat('en-US', { timeZone, hour: 'numeric' }).format(new Date(timeMs));
@@ -43,16 +45,37 @@ function wnHourMap(point) {
   return map;
 }
 
+/** Every compared high/low uses the same complete calendar-hour window. */
+export function completeTemperatureRange(rows,window,valueFor){
+  const readings=new Map(),duplicates=new Set();
+  for(const row of rows||[]){
+    const time=Date.parse(row.time),value=valueFor(row);
+    if(time<window.start||time>=window.end||!Number.isFinite(time))continue;
+    if(readings.has(time))duplicates.add(time);
+    readings.set(time,value);
+  }
+  const values=[];
+  for(let time=window.start;time<window.end;time+=3600000){
+    const value=readings.get(time);
+    if(duplicates.has(time)||!finite(value))return {high:null,low:null};
+    values.push(value);
+  }
+  return values.length?{high:Math.max(...values),low:Math.min(...values)}:{high:null,low:null};
+}
+
 /* ---- view model (pure) ---- */
 export function buildBlendModel(forecast, wnFeed, locationId, nowMs = Date.now()) {
   const loc = forecast?.location || {};
   const timeZone = loc.timeZone || 'America/New_York';
-  const cur = forecast?.current || {};
+  const current=currentSample({...forecast,location:loc},nowMs),cur=current.inputs;
+  const calendarDays=(forecast?.days||[]).slice(0,7).map((day,index)=>({...day,...calendarDayTemperatures(forecast,index,nowMs)}));
   const hours = (forecast?.hours || [])
     .map((h) => ({ ...h, time: Date.parse(h.time) }))
     .filter((h) => Number.isFinite(h.time) && h.time + 3600000 > nowMs)
     .slice(0, 24);
-  const weights = forecast?.blendPolicy?.sameDay || { nws: 0.4, hrrr: 0.3, ecmwf: 0.1, nbm: 0.2 };
+  const sourceWeights=Object.fromEntries((hours[0]?.temperatureBlend?.sources||[]).filter(s=>finite(s.weight)).map(s=>[s.id,s.weight]));
+  const weights=Object.keys(sourceWeights).length?sourceWeights:forecast?.blendPolicy?.sameDay||{};
+  const weightLabel=Object.keys(sourceWeights).length?`${hourLabel(hours[0].time,timeZone)} temperature weights`:'Base temperature weights';
   const contrib = Object.fromEntries((forecast?.modelContributions || []).map((m) => [m.id, m]));
 
   const point = wnPoint(wnFeed, locationId);
@@ -71,10 +94,10 @@ export function buildBlendModel(forecast, wnFeed, locationId, nowMs = Date.now()
       time: h.time,
       blend: finite(h.temperatureBlend?.value) ? h.temperatureBlend.value : h.temperature,
       models: Object.fromEntries(MODELS.map((m) => [m.id, src[m.id] ?? null])),
-      wnMean: wn && finite(wn.temperatureF) ? wn.temperatureF : null,
+      wnMean: finite(src.wn)?src.wn:wn&&finite(wn.temperatureF)?wn.temperatureF:null,
       wnP10: wn && finite(wn.temperatureP10F) ? wn.temperatureP10F : null,
       wnP90: wn && finite(wn.temperatureP90F) ? wn.temperatureP90F : null,
-      pop: finite(h.rainLikelihood?.value) ? Math.round(h.rainLikelihood.value) : (finite(h.pop) ? Math.round(h.pop) : null),
+      pop: round(rainValue(h)),
       popModels: Object.fromEntries(MODELS.map((m) => [m.id, finite(popSrc[m.id]) ? Math.round(popSrc[m.id]) : null])),
       dewpoint: finite(h.dewpoint) ? h.dewpoint : null,
       wnDewpoint: wn && finite(wn.dewpointF) ? wn.dewpointF : null,
@@ -94,90 +117,52 @@ export function buildBlendModel(forecast, wnFeed, locationId, nowMs = Date.now()
     ai: false,
   }));
   modelCards.push({
-    id: 'weathernext', label: 'WeatherNext', color: '#b48cff',
-    desc: 'Google AI weather model — ensemble mean with uncertainty band',
-    weight: null, runAt: wnFeed?.runAt || null, resolution: wnFeed?.gridResolutionDegrees ? `${wnFeed.gridResolutionDegrees}° grid` : null,
+    id: 'weathernext', label: 'Google WeatherNext', color: '#b48cff',
+    desc: 'Google WeatherNext forecast; separate ensemble guidance includes an uncertainty band',
+    weight: weights.wn, runAt: contrib.wn?.runAt||wnFeed?.runAt||null, resolution: wnFeed?.gridResolutionDegrees ? `${wnFeed.gridResolutionDegrees}° grid` : null,
     nowTemp: h0 ? round(h0.wnMean) : null, ai: true,
   });
 
-  // WeatherNext 7-day highs/lows from its hourly
-  const aiDays = [];
-  if (point) {
-    const byDay = new Map();
-    for (const r of wnRows) {
-      const t = Date.parse(r.time);
-      if (!Number.isFinite(t) || !finite(r.temperatureF)) continue;
-      const key = localDate(t, timeZone);
-      if (key < today) continue;
-      if (!byDay.has(key)) byDay.set(key, { temps: [], p10: [], p90: [], rows: [], sample: t });
-      const g = byDay.get(key);
-      g.rows.push(r);
-      g.temps.push(r.temperatureF);
-      if (finite(r.temperatureP10F)) g.p10.push(r.temperatureP10F);
-      if (finite(r.temperatureP90F)) g.p90.push(r.temperatureP90F);
-    }
-    const sorted = [...byDay.entries()].filter(([,g])=>forecastRows(g.rows,nowMs).length).sort((a, b) => a[1].sample - b[1].sample).slice(0, 7);
-    sorted.forEach(([key, g]) => {
-      const label = key === today ? 'Today' : new Intl.DateTimeFormat('en-US', { timeZone:'UTC', weekday: 'short' }).format(new Date(key+'T12:00:00Z'));
-      aiDays.push({
-        date: key,
-        label,
-        high: round(Math.max(...g.temps)),
-        low: round(Math.min(...g.temps)),
-        band: g.p10.length && g.p90.length ? `${round(Math.min(...g.p10))}°–${round(Math.max(...g.p90))}°` : null,
-      });
-    });
-  }
-
-  // 7-day daily model comparison (from days[].highBlend/lowBlend/guidance + WN daily aggregates)
-  const wnByDay = new Map();
-  if (point) {
-    for (const r of wnRows) {
-      const t = Date.parse(r.time);
-      if (!Number.isFinite(t)) continue;
-      const key = localDate(t, timeZone);
-      if (key < today) continue;
-      if (!wnByDay.has(key)) wnByDay.set(key, { temps: [], winds: [], rows: [], sample: t });
-      const g = wnByDay.get(key);
-      g.rows.push(r);
-      if (finite(r.temperatureF)) g.temps.push(r.temperatureF);
-      if (finite(r.windMph)) g.winds.push(r.windMph);
-    }
-  }
-  const wnDayFor = (dateStr) => {const day=wnByDay.get(dateStr);return day&&forecastRows(day.rows,nowMs).length?day:null;};
-  const week = (forecast?.days || []).slice(0, 7).map((d) => {
-    const mh = Object.fromEntries(((d.highBlend || {}).sources || []).map((s) => [s.id, s.value]));
-    const ml = Object.fromEntries(((d.lowBlend || {}).sources || []).map((s) => [s.id, s.value]));
-    const gd = d.guidance || {};
-    const wnd = wnDayFor(d.date);
+  const temperatureSeries=forecast?.metricForecasts?.series?.temperature||
+    (forecast?.hours||[]).map(row=>({time:row.time,sources:row.temperatureBlend?.sources||[]}));
+  const aiDays=[...new Set(forecastRows(wnRows,nowMs).map(row=>localDate(Date.parse(row.time),timeZone)))].sort().slice(0,7).map(date=>{
+    const window=calendarDayWindow({date},date===today?0:1,nowMs,timeZone);
+    const range=completeTemperatureRange(wnRows,window,row=>row.temperatureF),p10=completeTemperatureRange(wnRows,window,row=>row.temperatureP10F),p90=completeTemperatureRange(wnRows,window,row=>row.temperatureP90F);
+    return {date,label:date===today?'Today':new Intl.DateTimeFormat('en-US',{timeZone:'UTC',weekday:'short'}).format(new Date(date+'T12:00:00Z')),high:round(range.high),low:round(range.low),band:finite(p10.low)&&finite(p90.high)?`${round(p10.low)}°–${round(p90.high)}° hourly range`:null};
+  });
+  const week=calendarDays.map((day,index)=>{
+    const window=calendarDayWindow(day,index,nowMs,timeZone);
+    const modelRanges=Object.fromEntries(MODELS.map(model=>[model.id,completeTemperatureRange(temperatureSeries,window,row=>row.sources?.find(source=>source.id===model.id)?.value)]));
+    const contributingWn=completeTemperatureRange(temperatureSeries,window,row=>row.sources?.find(source=>source.id==='wn')?.value);
+    const wn=finite(contributingWn.high)?contributingWn:completeTemperatureRange(wnRows,window,row=>row.temperatureF);
+    const wnd=wnRows.filter(row=>{const t=Date.parse(row.time);return t>=window.start&&t<window.end;});
+    const winds=wnd.map(row=>row.windMph).filter(finite);
     return {
-      label: d.label || d.date,
-      blendHigh: finite(d.highBlend?.value) ? d.highBlend.value : (finite(d.high) ? d.high : null),
-      modelHighs: Object.fromEntries(MODELS.map((m) => [m.id, mh[m.id] ?? null])),
-      blendLow: finite(d.lowBlend?.value) ? d.lowBlend.value : (finite(d.low) ? d.low : null),
-      modelLows: Object.fromEntries(MODELS.map((m) => [m.id, ml[m.id] ?? null])),
-      pop: finite(d.rainLikelihood?.value) ? Math.round(d.rainLikelihood.value) : (finite(d.pop) ? Math.round(d.pop) : null),
-      gusts: Object.fromEntries(MODELS.map((m) => [m.id, finite(gd[m.id]?.gust) ? gd[m.id].gust : null])),
-      wnHigh: wnd && wnd.temps.length ? Math.max(...wnd.temps) : null,
-      wnLow: wnd && wnd.temps.length ? Math.min(...wnd.temps) : null,
-      wnWind: wnd && wnd.winds.length ? Math.max(...wnd.winds) : null,
+      label:day.label||day.date,
+      blendHigh:day.high,blendLow:day.low,
+      modelHighs:Object.fromEntries(MODELS.map(model=>[model.id,modelRanges[model.id].high])),
+      modelLows:Object.fromEntries(MODELS.map(model=>[model.id,modelRanges[model.id].low])),
+      pop:round(rainValue(day)),
+      gusts:Object.fromEntries(MODELS.map(model=>[model.id,finite(day.guidance?.[model.id]?.gust)?day.guidance[model.id].gust:null])),
+      wnHigh:wn.high,wnLow:wn.low,wnWind:winds.length?Math.max(...winds):null,
     };
   });
 
   return {
     place: loc.name || 'Knightdale / Raleigh',
-    updatedAt: nowMs,
+    updatedAt: forecast?.assembledAt || null,
     sky: skyImage(hours, nowMs),
     hero: {
       temp: round(cur.temperature),
-      condition: cur.condition || 'Conditions unavailable',
-      high: round(forecast?.days?.[0]?.high),
-      low: round(forecast?.days?.[0]?.low),
+      condition: current.condition || 'Conditions unavailable',
+      high: round(calendarDays[0]?.high),
+      low: round(calendarDays[0]?.low),
     },
     series,
     week,
     modelCards,
     weights,
+    weightLabel,
     rainHours: series.slice(0, 12).map((s) => ({ time: s.time, pop: s.pop })),
     aiDays,
     wnAvailable,
@@ -192,13 +177,13 @@ export function buildBlendModel(forecast, wnFeed, locationId, nowMs = Date.now()
  * AI where it publishes that variable). */
 export const CHART_VARS = [
   { id: 'temp', label: 'Temperature', unit: '°', sub: 'The white line is the house blend. Thin lines are the models. The violet band is Google WeatherNext AI\u2019s uncertainty range.' },
-  { id: 'rain', label: 'Rain chance', unit: '%', sub: 'Each model\u2019s own rain probability for the hour, against the blended chance (white).' },
+  { id: 'rain', label: 'Rain chance', unit: '%', sub: 'NWS supplies official probability. Other model lines are uncalibrated rain signals; white shows the custom blended rain likelihood.' },
   { id: 'dewpoint', label: 'Dew point', unit: '°', sub: 'Blended dew point against Google WeatherNext AI\u2019s call — watch the gap for mugginess.' },
   { id: 'wind', label: 'Wind gusts', unit: ' mph', sub: 'Each model\u2019s gust call against the blend. Dashed violet is WeatherNext AI\u2019s sustained wind.' },
 ];
 export const WEEK_VARS = [
-  { id: 'highs', label: 'Highs', unit: '°', sub: 'Each model\u2019s daily high against the blended high, 7 days out. Dashed violet is WeatherNext AI.' },
-  { id: 'lows', label: 'Lows', unit: '°', sub: 'Each model\u2019s overnight low against the blended low, 7 days out.' },
+  { id: 'highs', label: 'Highs', unit: '°', sub: 'Each model\u2019s high within the same calendar date, against the blended high. Dashed violet is WeatherNext AI. Incomplete model dates are unavailable.' },
+  { id: 'lows', label: 'Lows', unit: '°', sub: 'Each model\u2019s lowest temperature within the same calendar date, against the blended low. Incomplete model dates are unavailable.' },
   { id: 'rain', label: 'Rain', unit: '%', sub: 'Blended daily rain chance for the next 7 days.', bars: true },
   { id: 'wind', label: 'Wind', unit: ' mph', sub: 'Each model\u2019s daily gust call, 7 days out. Dashed violet is WeatherNext AI\u2019s peak wind.' },
 ];
@@ -400,7 +385,7 @@ function fmtRunAt(iso) {
 /* Chart tabs: one engine, four variables */
 function chartLegends(model, varId, range) {
   const w = model.weights;
-  const wp = (id) => `${Math.round((w[id] || 0) * 100)}%`;
+  const wp = (id) => finite(w[id])?`${Math.round(w[id]*1000)/10}%`:'weight unavailable';
   if (range === 'week') {
     switch (varId) {
       case 'lows':
@@ -421,12 +406,12 @@ function chartLegends(model, varId, range) {
   switch (varId) {
     case 'rain':
       return [{ color: '#fff', label: 'Blended chance' },
-        ...MODELS.map((m) => ({ color: m.color, label: `${m.label} ${wp(m.id)}` }))];
+        ...MODELS.map((m) => ({ color: m.color, label: m.label }))];
     case 'dewpoint':
       return [{ color: '#fff', label: 'Blended dew point' }, { color: '#b48cff', label: 'WeatherNext AI', dashed: true }];
     case 'wind':
       return [{ color: '#fff', label: 'Blended gust' },
-        ...MODELS.map((m) => ({ color: m.color, label: `${m.label} ${wp(m.id)}` })),
+        ...MODELS.map((m) => ({ color: m.color, label: m.label })),
         { color: '#b48cff', label: 'WeatherNext AI wind', dashed: true }];
     default:
       return [{ color: '#fff', label: 'House blend' },
@@ -481,7 +466,7 @@ export function render(model) {
   countUp(el('now-temp'), model.hero.temp);
   el('now-cond').textContent = model.hero.condition;
   const w = model.weights;
-  el('blend-line').textContent = `House blend · NWS ${Math.round(w.nws * 100)} · HRRR ${Math.round(w.hrrr * 100)} · NBM ${Math.round(w.nbm * 100)} · ECMWF ${Math.round(w.ecmwf * 100)}`;
+  el('blend-line').textContent = `${model.weightLabel} · ${[...MODELS,{id:'wn',label:'Google WeatherNext'}].filter(m=>finite(w[m.id])).map(m=>`${m.label} ${Math.round(w[m.id]*1000)/10}%`).join(' · ')||'Unavailable'}`;
   el('now-hilo').textContent = model.hero.high != null ? `H ${model.hero.high}°  ·  L ${model.hero.low ?? '--'}°` : '';
   renderChartTabs(model, 'day', 'temp');
 
@@ -497,7 +482,7 @@ export function render(model) {
     mm.textContent = `${m.desc}. ${fmtRunAt(m.runAt)}${m.resolution ? ` · ${m.resolution}` : ''}.`;
     c.appendChild(mm);
     const mw = document.createElement('div'); mw.className = 'mw';
-    mw.textContent = m.ai ? 'Comparison only — not in the blend' : `Weight ${Math.round((m.weight || 0) * 100)}%`;
+    mw.textContent = finite(m.weight)?`Temperature weight ${Math.round(m.weight*1000)/10}%`:m.ai?'Matching contribution unavailable; comparison guidance':'Temperature weight unavailable';
     c.appendChild(mw);
     cards.appendChild(c);
   }
@@ -526,11 +511,10 @@ export function render(model) {
     if (d.band) { const bd = document.createElement('div'); bd.className = 'band'; bd.textContent = d.band; c.appendChild(bd); }
     ad.appendChild(c);
   }
-  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-  el('updated').textContent = 'Updated ' + new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit', timeZone: tz }).format(new Date(model.updatedAt));
+  el('updated').textContent=Number.isFinite(Date.parse(model.updatedAt))?'Forecast updated '+new Intl.DateTimeFormat('en-US',{hour:'numeric',minute:'2-digit',timeZone:model.timeZone}).format(new Date(model.updatedAt)):'Forecast update time unavailable';
 }
 
-let latestRequest=0;
+let latestRequest=0,lastForecast=null,lastWnFeed=null,lastLocation=null;
 async function load(locationId) {
   const request=++latestRequest;
   const err = el('error');
@@ -551,9 +535,10 @@ async function load(locationId) {
     if (wnRes && wnRes.ok) {
       try { wnFeed = await wnRes.json(); } catch { wnFeed = null; }
     }
-    if(request===latestRequest)render(buildBlendModel(forecast, wnFeed, locationId));
+    if(request===latestRequest){lastForecast=forecast;lastWnFeed=wnFeed;lastLocation=locationId;render(buildBlendModel(forecast,wnFeed,locationId));}
   } catch (e) {
     if(request!==latestRequest)return;
+    if(lastForecast)render(buildBlendModel(lastForecast,lastWnFeed,lastLocation));
     err.hidden = false;
     err.textContent = 'Could not load the blend right now. Please retry in a bit.';
   }
@@ -572,6 +557,7 @@ function init() {
   });
   load(select.value);
   installForecastRefresh(()=>load(select.value));
+  setInterval(()=>{if(lastForecast)render(buildBlendModel(lastForecast,lastWnFeed,lastLocation));},60000);
 }
 
 if (typeof document !== 'undefined') {

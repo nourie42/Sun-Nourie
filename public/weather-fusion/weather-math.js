@@ -158,15 +158,15 @@ function estimatedMrtDelta(current,elevation,exposure) {
   const direct=exposure==='outdoors'?130*sun*trans:0;
   return (diffuseLoad*sun+direct)/6.1;
 }
-/** NWS wind chill floor for cold feels-like. UTCI's 10 m wind term runs far
+/** Custom cold-wind floor for feels-like. UTCI's 10 m wind term runs far
  * colder than the U.S. standard index and lived experience in cold wind
  * (about 8°F at 36°F air and 13 mph wind, where NWS wind chill is 27°F).
- * In the cold regime the value is lifted toward the NWS figure: the full
- * NWS wind chill applies at or below 40°F, fading linearly to pure UTCI by
- * 60°F so warm conditions are untouched and no step appears at any
- * boundary. The wind gate fades in from 2 to 4 mph (NWS validity is 3+
- * mph). Solar-warmed UTCI values already above wind chill are never
- * reduced. */
+ * In the cold regime the value is lifted toward the result of the NWS
+ * equation. The standard NWS index is intended for 50°F or below and wind
+ * above 3 mph; this custom transition extends that equation only as a
+ * smoothing target. Full adjustment applies at or below 40°F and fades to
+ * pure UTCI by 60°F. The wind gate fades in from 2 to 4 mph. Solar-warmed
+ * UTCI values already above the equation result are never reduced. */
 function coldWindChillBlend(tF,windMph,utciValue){
   if(!finite(tF)||!finite(windMph)||!finite(utciValue))return utciValue;
   if(tF>=60||windMph<2)return utciValue;
@@ -210,5 +210,5 @@ export function thermalComfort(current, location, now) {
     method:shade.method,humidity:rh,wetBulb:wet,daylight,absorbedRadiation:finite(weather.cover)?(daylight?130*Math.max(0,Math.sin(elevation))**.72*(1-weather.cover/100):0):estimatedAbsorbedRadiation(weather.condition,elevation),
     solarAdjustment:finite(outdoorValue)&&finite(shadeValue)?outdoorValue-shadeValue:null,
     dewpointEffect:dewpointMessage(current.dewpoint),windEffect:windMessage(current.temperature,current.wind),microclimate:localContext,
-    note:`Tier-3 operational fallback from the attached Real-Feel Skin Temperature research: UTCI is the all-season base using air temperature, humidity/dew point and standard wind, with solar elevation and broad sky state used for a generic radiant estimate. The displayed estimate includes a gradual cold-wind adjustment toward NWS wind chill when that figure is warmer than UTCI. The temperature adjustment is full at or below 40°F and fades to zero at 60°F; the wind adjustment fades in from 2 to 4 mph. Warmer conditions use UTCI unchanged. No observation-to-forecast offset is used. Numeric hourly cloud cover is preferred over broad period descriptions. Calm wind uses the UTCI minimum 0.5 m/s; out-of-domain conditions stay unavailable. Cloud attenuation and MRT are estimates, not local radiometer measurements. This is a modeled equivalent temperature, not measured skin temperature or validated EPST. ${dewpointMessage(current.dewpoint)} ${windMessage(current.temperature,current.wind)} ${localContext} Wet bulb is diagnostic only and is not added again to the result.`};
+    note:`Tier-3 operational fallback from the attached Real-Feel Skin Temperature research: UTCI is the all-season base using air temperature, humidity/dew point and standard wind, with solar elevation and broad sky state used for a generic radiant estimate. The displayed estimate includes a gradual custom cold-wind adjustment toward the NWS wind-chill equation when that result is warmer than UTCI. The standard NWS index is intended for 50°F or below with wind above 3 mph; this site extends the equation only as a smoothing target. The temperature adjustment is full at or below 40°F and fades to zero at 60°F; the wind adjustment fades in from 2 to 4 mph. Warmer conditions use UTCI unchanged. No observation-to-forecast offset is used. Numeric hourly cloud cover is preferred over broad period descriptions. Calm wind uses the UTCI minimum 0.5 m/s; out-of-domain conditions stay unavailable. Cloud attenuation and MRT are estimates, not local radiometer measurements. This is a modeled equivalent temperature, not measured skin temperature or validated EPST. ${dewpointMessage(current.dewpoint)} ${windMessage(current.temperature,current.wind)} ${localContext} Wet bulb is diagnostic only and is not added again to the result.`};
 }

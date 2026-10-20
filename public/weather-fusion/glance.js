@@ -2,6 +2,9 @@
  * One API call (/api/weather-fusion/forecast) drives the whole page.
  * Pure builders (feelsLike, skyImage, buildArc, insights, buildGlanceModel)
  * are exported for testing; DOM wiring runs in the browser. */
+import {calendarDayTemperatures,rainWindowPeak} from './calendar-day.js?v=calendar-days-v1';
+import {forecastSnapshotFreshness} from './weather-freshness.js?v=accuracy-20261019-v1';
+import {installForecastRefresh} from './weathernext-data.js';
 import {currentAirQuality} from './air-quality.js?v=mobile-repair-v1';
 import {currentSample,sampleCaption} from './weather-display.js?v=low-rain-display-v1';
 import {hourlyUvValue} from './daily-uv.js?v=weather-art-labels-v10';
@@ -116,6 +119,7 @@ export function insights(hours, timeZone) {
   // Driest window: longest run of pop < 20 within 12h
   let best = null, run = null;
   h12.forEach((h, i) => {
+    if(i&&h.time!==h12[i-1].time+3600000)run=null;
     if (finite(h.pop) && h.pop < 20) {
       run = run || { start: i, len: 0 };
       run.len++;
@@ -137,9 +141,11 @@ export function insights(hours, timeZone) {
   return out.slice(0, 3);
 }
 
-export function rainOutlook(hours, timeZone) {
-  const upcoming = (hours || []).slice(0, 12);
+export function rainOutlook(hours, timeZone, nowMs=hours?.[0]?.time) {
+  const upcoming = (hours || []).filter(h=>h.time+3600000>nowMs&&h.time<nowMs+12*3600000);
+  const coverage=rainWindowPeak(upcoming.map(h=>({...h,time:new Date(h.time).toISOString(),rainLikelihood:{value:h.pop}})),{start:nowMs,end:nowMs+12*3600000});
   const first = upcoming.find((h) => finite(h.pop) && h.pop >= 30);
+  if (!finite(coverage.value)) return {wet:false,text:'Rain outlook unavailable for some upcoming hours.'};
   if (!first) return { wet: false, text: 'No rain expected in the next 12 hours.' };
   const when = hourLabel(first.time, timeZone);
   if (first.pop >= 50) return { wet: true, text: `Rain likely around ${when} (${Math.round(first.pop)}%).` };
@@ -156,10 +162,10 @@ export function buildGlanceModel(data, nowMs = Date.now()) {
   const timeZone = loc.timeZone || 'America/New_York';
   const current=currentSample({...data,location:loc},nowMs),cur=current.inputs;
   const allHours = (data?.hours || [])
-    .map((h) => ({ ...h, time: Date.parse(h.time) }))
+    .map((h) => ({ ...h, pop:h.rainLikelihood&&Object.hasOwn(h.rainLikelihood,'value')?h.rainLikelihood.value:h.pop, time: Date.parse(h.time) }))
     .filter((h) => Number.isFinite(h.time));
   const hours = allHours.filter((h) => h.time + 3600000 > nowMs).slice(0, 24);
-  const days = (data?.days || []).slice(0, 3);
+  const days = (data?.days || []).slice(0, 3).map((day,index)=>({...day,...calendarDayTemperatures(data,index,nowMs)}));
   const feels = round(current.feels);
   const solar = data?.solar || null;
   const sun = (key) => (solar?.[key] ? timeLabel(Date.parse(solar[key]), timeZone) : null);
@@ -170,7 +176,8 @@ export function buildGlanceModel(data, nowMs = Date.now()) {
   }));
   return {
     place: loc.name || 'Knightdale / Raleigh',
-    updatedAt: nowMs,
+    updatedAt: data?.assembledAt || null,
+    timeZone,
     sky: skyImage(allHours, nowMs),
     hero: {
       temp: round(cur.temperature),
@@ -182,7 +189,7 @@ export function buildGlanceModel(data, nowMs = Date.now()) {
       sunrise: sun('sunrise'),
       sunset: sun('sunset'),
     },
-    rain: rainOutlook(hours, timeZone),
+    rain: forecastSnapshotFreshness(data,nowMs).expired ? {wet:false,text:'Rain outlook unavailable until the forecast refreshes.'} : rainOutlook(hours, timeZone,nowMs),
     insightList: insights(hours, timeZone),
     arc: buildArc(hours, solar, timeZone, nowMs),
     days: days.map((d) => ({
@@ -190,7 +197,7 @@ export function buildGlanceModel(data, nowMs = Date.now()) {
       high: round(d.high),
       low: round(d.low),
       condition: d.condition || '',
-      pop: finite(d.pop) ? Math.round(d.pop) : null,
+      pop: finite(d.rainLikelihood&&Object.hasOwn(d.rainLikelihood,'value')?d.rainLikelihood.value:d.pop) ? Math.round(d.rainLikelihood&&Object.hasOwn(d.rainLikelihood,'value')?d.rainLikelihood.value:d.pop) : null,
     })),
     details: [
       ['Humidity', finite(cur.humidity) ? `${Math.round(cur.humidity)}%` : '—'],
@@ -287,8 +294,7 @@ export function render(model) {
     wrap.append(dt, dd);
     dl.appendChild(wrap);
   }
-  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-  el('updated').textContent = 'Updated ' + new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit', timeZone: tz }).format(new Date(model.updatedAt));
+  el('updated').textContent=Number.isFinite(Date.parse(model.updatedAt))?'Forecast updated '+new Intl.DateTimeFormat('en-US',{hour:'numeric',minute:'2-digit',timeZone:model.timeZone}).format(new Date(model.updatedAt)):'Forecast update time unavailable';
   const strip = el('alert-strip');
   strip.innerHTML = '';
   if (!model.alerts.length) { strip.hidden = true; }
@@ -303,7 +309,9 @@ export function render(model) {
   }
 }
 
+let lastForecast=null,latestRequest=0;
 async function load(location) {
+  const request=++latestRequest;
   const err = el('error');
   err.hidden = true;
   try {
@@ -314,8 +322,11 @@ async function load(location) {
     }
     if (!res.ok) throw new Error(`Weather service responded ${res.status}`);
     const data = await res.json();
-    render(buildGlanceModel(data));
+    if(request!==latestRequest)return;
+    lastForecast=data;render(buildGlanceModel(data));
   } catch (e) {
+    if(request!==latestRequest)return;
+    if(lastForecast)render(buildGlanceModel(lastForecast));
     err.hidden = false;
     err.textContent = 'Could not load weather right now. Please retry in a bit.';
   }
@@ -334,6 +345,8 @@ function init() {
     load(select.value);
   });
   load(select.value);
+  installForecastRefresh(()=>load(select.value));
+  setInterval(()=>{if(lastForecast)render(buildGlanceModel(lastForecast));},60000);
 }
 
 if (typeof document !== 'undefined') {

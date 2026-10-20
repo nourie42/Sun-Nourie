@@ -11,7 +11,8 @@ test('humidity raises the same UTCI cloudy estimate without selecting a warmer u
  const moist=thermalComfort(current,location,now),dry=thermalComfort({...current,dewpoint:50},location,now);
  assert.ok(moist.rawOutdoors>dry.rawOutdoors);assert.equal(moist.sun,null);assert.equal(moist.outdoors,moist.shade);
  assert.match(moist.note,/UTCI is the all-season base/);
- assert.match(moist.note,/gradual cold-wind adjustment toward NWS wind chill/);
+ assert.match(moist.note,/custom cold-wind adjustment toward the NWS wind-chill equation/);
+ assert.match(moist.note,/standard NWS index is intended for 50°F or below with wind above 3 mph/);
  assert.match(moist.note,/Warmer conditions use UTCI unchanged/);
 });
 

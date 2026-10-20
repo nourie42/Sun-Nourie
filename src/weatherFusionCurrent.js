@@ -13,6 +13,44 @@ function modelAt(modelRows,id,epoch){
  return finite(row?.temperature_2m)?{id,row}:null;
 }
 
+/** Guidance now and the hourly display share one exact canonical timestamp.
+ * Accepted observations retain their separate measurement and provenance. */
+export function alignGuidanceCurrentWithHourly(out,now=Date.now()){
+ const current=out.current;
+ if(!current||current.type==='observation')return out;
+ const series=out.metricForecasts?.series||{},epoch=Math.floor(now/HOUR)*HOUR;
+ const at=rows=>(rows||[]).find(row=>Date.parse(row.time)===epoch);
+ const temperature=at(series.temperature),feel=at(series.feels),inputs=feel?.inputs||{};
+ // The final feels inputs normally carry the exact sky blend used for
+ // radiation. Older/minimal rows can omit it; only then use this same
+ // timestamp's cloud series. Explicit missing sky must remain missing.
+ const sky=Object.hasOwn(inputs,'skyCover')?{value:inputs.skyCover,source:inputs.skySource,sources:inputs.skySources}:at(series.cloud);
+ const hour=at(out.hours),time=iso(epoch),source='Selected-location current-hour forecast blend';
+ const fields={temperature:finite(temperature?.value)?temperature.value:null,
+  dewpoint:finite(inputs.dewpoint)?inputs.dewpoint:null,wind:finite(inputs.wind)&&inputs.wind>=0?inputs.wind:null,
+  humidity:finite(inputs.humidity)&&inputs.humidity>=0&&inputs.humidity<=100?inputs.humidity:null,
+  skyCover:finite(sky?.value)&&sky.value>=0&&sky.value<=100?sky.value:null};
+ const provenance={temperature:{source:temperature?.source||source,time,sources:temperature?.sources||[]},
+  dewpoint:{source:at(series.dewpoint)?.source||null,time,sources:at(series.dewpoint)?.sources||[]},
+  wind:{source:at(series.wind)?.source||null,time,sources:at(series.wind)?.sources||[]},
+  humidity:{source:at(series.humidity)?.source||null,time},skyCover:{source:sky?.source||null,time,sources:sky?.sources||[]}};
+ out.current={...current,...fields,type:finite(fields.temperature)?'guidance':'unavailable',time,
+  temperatureSource:temperature?.source||source,dewpointSource:provenance.dewpoint.source,windSource:provenance.wind.source,
+  skySource:sky?.source||null,skySources:sky?.sources||[],fieldSources:provenance,
+  thermalTime:time,thermalCondition:feel?.condition||'',
+  gust:round(at(series.gust)?.value),visibility:round(at(series.visibility)?.value),pressure:round(at(series.pressure)?.value,2),pressurePa:null,
+  windDirection:finite(hour?.windDirectionDegrees)?hour.windDirectionDegrees:null,
+  feelsLike:round(feel?.value),feelsLikeShade:round(feel?.shadeValue),feelsLikeSun:round(feel?.sunValue),feelsLikeExposure:'outdoors',
+  apparent:finite(feel?.value)?feel.value:null,apparentSource:finite(feel?.value)?`${feel.source||'Custom outdoor estimate'}; same-hour forecast-blend inputs`:'Unavailable',
+  station:null,stationName:null,stationDistanceKm:null,
+  localEstimate:{...current.localEstimate,source,validAt:time,basis:'canonical-hourly-blend'},
+  modeledNowVersion:'weather-nourie-canonical-now-v1'};
+ if(!finite(fields.temperature)){
+  out.current.condition='Current conditions unavailable';out.current.conditionSource='No timestamp-matched canonical temperature is available.';
+ }
+ return out;
+}
+
 /**
  * A station is used as local only when it is fresh, close enough, and—outside
  * the closest five miles—not sharply inconsistent with selected-point NBM.

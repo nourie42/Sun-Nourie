@@ -44,9 +44,10 @@ test('comparison URLs preserve side-by-side comparison and standalone forecast s
  assert.match(pane,/compare\/app\.js\?source=google&amp;location=knightdale/);
  const paneApp=await (await fetch(base+'/weather-fusion/compare/app.js?source=google&location=knightdale')).text();
  assert.match(paneApp,/"explicitLocation":true/,'comparison panes must load the selected city instead of waiting for device location');
- assert.match(html,/<title>NVIDIA Forecast · Weather Nourie<\/title>/);assert.doesNotMatch(html,/weathernext-heading|weathernext-map-shortcut|Experimental NVIDIA AI Weather|Forecast data: Google/);
- assert.match(html,/id="today-forecast"/);assert.match(html,/id="hourly"/);assert.match(html,/class="weather-jump-card jump-main"/,'The NVIDIA destination keeps the shared main forecast layout and a return path.');
- assert.doesNotMatch(readFileSync('public/weather-fusion/compare.html','utf8').replace(/<[^>]*>/g,' '),/Google/i,'Visible comparison labels use NVIDIA branding.');
+ assert.match(html,/<title>Google WeatherNext Forecast · Weather Nourie<\/title>/);assert.doesNotMatch(html,/weathernext-heading|weathernext-map-shortcut|Experimental NVIDIA AI Weather|Forecast data: Google/);
+ assert.match(html,/id="today-forecast"/);assert.match(html,/id="hourly"/);assert.match(html,/class="weather-jump-card jump-main"/,'The Google WeatherNext destination keeps the shared main forecast layout and a return path.');
+ assert.match(readFileSync('public/weather-fusion/compare.html','utf8').replace(/<[^>]*>/g,' '),/Google WeatherNext/i,'Visible comparison labels identify the model provider.');
+ assert.doesNotMatch(readFileSync('public/weather-fusion/compare.html','utf8'),/NVIDIA/,'Visible comparison labels do not misattribute WeatherNext.');
  assert.match(readFileSync('public/weather-fusion/compare.css','utf8'),/@media\(max-width:850px\)[\s\S]*compare-switch \[data-view=both\]\{display:none\}[\s\S]*compare-differences\{grid-template-columns:repeat\(2/,'Mobile comparison uses forecast tabs and a compact metric grid.');
  const main=readFileSync('public/weather-fusion/index.html','utf8');
  const nav=main.match(/<nav class="weather-jump-nav"[\s\S]*?<\/nav>/)[0];
@@ -57,17 +58,17 @@ test('comparison URLs preserve side-by-side comparison and standalone forecast s
  const nearby=await (await fetch(base+'/weathernext/?latitude=35.7798&longitude=-78.5355')).text();
  assert.match(nearby,/compare\/app\.js\?source=google&amp;location=selected&amp;explicit=1&amp;latitude=35\.7798&amp;longitude=-78\.5355/);
  assert.match(nearby,/name=Selected%20location/);
- assert.match(nearby,/<title>NVIDIA Forecast · Weather Nourie<\/title>/);
+ assert.match(nearby,/<title>Google WeatherNext Forecast · Weather Nourie<\/title>/);
  assert.doesNotMatch(nearby,/Experimental NVIDIA AI Weather/);
- assert.equal((nearby.match(/id="city-search"/g)||[]).length,1,'The NVIDIA page uses the same single location search.');
+ assert.equal((nearby.match(/id="city-search"/g)||[]).length,1,'The Google WeatherNext page uses the same single location search.');
  assert.equal((nearby.match(/id="locate"/g)||[]).length,1,'Device location is an action on that same search control.');
  assert.match(readFileSync('public/weather-fusion/compare-bridge.js','utf8'),/https:\/\/deepmind\.google\.com\/science\/weatherlab/);
 });
-test('an exact-coordinate NVIDIA page does not wait for the published-location feed',async t=>{
+test('an exact-coordinate Google WeatherNext page does not wait for the published-location feed',async t=>{
  let feedCalls=0;const app=express();registerWeatherComparisonRoutes(app,{feedProvider:async()=>{feedCalls++;throw new Error('published point feed unavailable');},now:()=>now});
  const server=app.listen(0,'127.0.0.1');await new Promise(r=>server.once('listening',r));t.after(()=>server.close());
  const response=await fetch(`http://127.0.0.1:${server.address().port}/weathernext/?latitude=43.6532&longitude=-79.3832&name=Toronto`);
- const html=await response.text();assert.equal(response.status,200);assert.equal(feedCalls,0);assert.match(html,/name=Toronto/);assert.match(html,/NVIDIA Forecast/);
+ const html=await response.text();assert.equal(response.status,200);assert.equal(feedCalls,0);assert.match(html,/name=Toronto/);assert.match(html,/Google WeatherNext Forecast/);
 });
 test('an approved published WeatherNext point serves its exact nearby selected coordinates',async t=>{
  const app=express(),server=app.listen(0,'127.0.0.1');await new Promise(r=>server.once('listening',r));t.after(()=>server.close());
@@ -83,7 +84,7 @@ test('device location near Knightdale uses the approved published WeatherNext po
  const response=await fetch(base+'/api/weather-fusion/compare/location',{method:'POST',headers:{Origin:base,'Content-Type':'application/json','x-weathernext-request':'1'},body:JSON.stringify({latitude:35.7798,longitude:-78.5352,name:'Device location'})});
  assert.equal(response.status,200);const data=await response.json();assert.equal(data.comparison.point.id,'knightdale');assert.equal(data.location.name,'Knightdale / Raleigh');assert.ok(Array.isArray(data.hours)&&data.hours.length>0);
 });
-test('the active WeatherNext 3 point feed loads through NVIDIA location lookup',async t=>{
+test('the active WeatherNext 3 point feed loads through Google WeatherNext location lookup',async t=>{
  const activeNow=Date.parse('2026-09-27T08:00:00Z'),feed={schema:'weather-nourie-weathernext3-v1',model:'Google WeatherNext 3',sourceTable:'approved-table',runAt:'2026-09-27T06:00:00Z',generatedAt:'2026-09-27T07:30:00Z',points:[{id:'knightdale',name:'Knightdale / Raleigh',latitude:35.787,longitude:-78.4806,hourly:[{time:'2026-09-27T07:00:00Z',temperatureF:56,dewpointF:51,skyCoverPercent:20,pressureInHg:30.01,solarWm2:0,windDirectionDegrees:180,temperatureP10F:54,temperatureP90F:58,windMph:4,precipitationInches:0},{time:'2026-09-27T08:00:00Z',temperatureF:58,dewpointF:52,skyCoverPercent:75,pressureInHg:30.02,solarWm2:0,windDirectionDegrees:190,temperatureP10F:55,temperatureP90F:61,windMph:5,precipitationInches:.02},{time:'2026-09-27T09:00:00Z',temperatureF:60,dewpointF:53,skyCoverPercent:90,pressureInHg:30.03,solarWm2:0,windDirectionDegrees:200,temperatureP10F:57,temperatureP90F:63,windMph:6,precipitationInches:0}]}]};
  const app=express(),server=app.listen(0,'127.0.0.1');await new Promise(r=>server.once('listening',r));t.after(()=>server.close());
  const base='http://127.0.0.1:'+server.address().port;

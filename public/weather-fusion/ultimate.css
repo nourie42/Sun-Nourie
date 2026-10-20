@@ -44,6 +44,7 @@ body{min-height:100vh;color:var(--ink);background:#0a1628;-webkit-font-smoothing
 .tab-bar button.on{background:rgba(255,255,255,.18);color:#fff}
 .tab-panel{display:none}
 .tab-panel.on{display:grid;gap:12px}
+.tab-panel.on > *{min-width:0}
 
 /* Cards — Apple style: subtle, rounded */
 .glass{background:var(--card);border:1px solid var(--card-edge);border-radius:var(--radius);

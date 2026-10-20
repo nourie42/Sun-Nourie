@@ -36,6 +36,14 @@ const DAY=86400000;
 function availableDayOneRisk(issue,start,end,now){
  return [issue,start,end,now].every(finite)&&issue<=now&&start<=now+DAY&&end>now;
 }
+function currentDayOneWindow(features=[],fields,now=Date.now()){
+ for(const feature of features||[]){
+  const values=fields(feature);
+  const issue=stamp(values.issue),start=stamp(values.start),end=stamp(values.end);
+  if(availableDayOneRisk(issue,start,end,now))return {issuedAt:new Date(issue).toISOString(),validFrom:new Date(start).toISOString(),expires:new Date(end).toISOString()};
+ }
+ return null;
+}
 export function normalizeSpcRisk(attributes,now=Date.now()){
  const level=spcLabel[Number(attributes?.dn)],issue=stamp(attributes?.issue),start=stamp(attributes?.valid),end=stamp(attributes?.expire);
  if(!level||!availableDayOneRisk(issue,start,end,now))return null;
@@ -49,6 +57,18 @@ export function normalizeWpcRisk(feature,longitude,latitude,now=Date.now()){
 const wssiRank={limited:1,minor:2,moderate:3,major:4,extreme:5};
 // WSSI times look like "08Z 10/13/26".
 function wssiStamp(v){const m=/^(\d{2})Z (\d{2})\/(\d{2})\/(\d{2})$/.exec(String(v||'').trim());return m?Date.UTC(2000+Number(m[4]),Number(m[2])-1,Number(m[3]),Number(m[1])):NaN;}
+function wssiIssueStamp(value){
+ const text=String(value||'').trim(),compact=/^(\d{4})-(\d{2})-(\d{2}) (\d{2})(\d{2})Z$/.exec(text);
+ if(compact)return Date.UTC(+compact[1],+compact[2]-1,+compact[3],+compact[4],+compact[5]);
+ return stamp(text);
+}
+function currentWssiWindow(features=[],now=Date.now()){
+ for(const feature of features||[]){
+  const p=feature?.attributes||{},start=wssiStamp(p.start_time),end=wssiStamp(p.end_time),issue=wssiIssueStamp(p.issue_time);
+  if(finite(start)&&finite(end)&&start<=now+3*DAY&&end>now&&(!finite(issue)||issue<=now))return {issuedAt:finite(issue)?new Date(issue).toISOString():finite(start)?new Date(start).toISOString():null,validFrom:new Date(start).toISOString(),expires:new Date(end).toISOString()};
+ }
+ return null;
+}
 export function normalizeWssiRisk(attributes,now=Date.now()){
  const raw=String(attributes?.impact||'').trim().toLowerCase(),rank=wssiRank[raw];
  const start=wssiStamp(attributes?.start_time),end=wssiStamp(attributes?.end_time);
@@ -65,13 +85,23 @@ export function createRiskOutlookService({cached,now=Date.now}){
    const response=await cached(`${SPC_ROOT}?${q}`,120000,{timeout:12000}),features=response.data?.features;
    if(!Array.isArray(features)||response.data?.error)throw new Error('SPC outlook unavailable.');
    const value=features.map(f=>normalizeSpcRisk(f.attributes,now())).filter(Boolean).sort((a,b)=>b.rank-a.rank)[0]||null;
-   return {value,meta:{...spcMeta,status:'ready',fetchedAt:response.fetchedAt,issuedAt:value?.issuedAt||null}};
+   let window=value;
+   if(!window){
+    const productQuery=new URLSearchParams({f:'json',where:'1=1',outFields:'issue,valid,expire',returnGeometry:'false',returnDistinctValues:'true'});
+    const product=await cached(`${SPC_ROOT}?${productQuery}`,120000,{timeout:12000}),productFeatures=product.data?.features;
+    if(!Array.isArray(productFeatures)||product.data?.error)throw new Error('SPC outlook freshness unavailable.');
+    window=currentDayOneWindow(productFeatures,f=>({issue:f?.attributes?.issue,start:f?.attributes?.valid,end:f?.attributes?.expire}),now());
+   }
+   if(!window)throw new Error('SPC outlook data is not current.');
+   return {value,meta:{...spcMeta,status:'ready',fetchedAt:response.fetchedAt,issuedAt:window.issuedAt||null,validFrom:window.validFrom||null,validUntil:window.expires||null}};
   }catch{return {value:null,meta:{...spcMeta,message:'SPC outlook could not be checked.'}};}})();
   const wpc=(async()=>{try{
    const response=await cached(WPC_URL,120000,{timeout:12000}),features=response.data?.features;
    if(!Array.isArray(features))throw new Error('WPC outlook unavailable.');
    const value=features.map(f=>normalizeWpcRisk(f,location.longitude,location.latitude,now())).filter(Boolean).sort((a,b)=>b.rank-a.rank)[0]||null;
-   return {value,meta:{...wpcMeta,status:'ready',fetchedAt:response.fetchedAt,issuedAt:value?.issuedAt||null}};
+   const window=value||currentDayOneWindow(features,f=>({issue:f?.properties?.ISSUE_TIME,start:f?.properties?.START_TIME,end:f?.properties?.END_TIME}),now());
+   if(!window)throw new Error('WPC outlook data is not current.');
+   return {value,meta:{...wpcMeta,status:'ready',fetchedAt:response.fetchedAt,issuedAt:window.issuedAt||null,validFrom:window.validFrom||null,validUntil:window.expires||null}};
   }catch{return {value:null,meta:{...wpcMeta,message:'WPC outlook could not be checked.'}};}})();
   const wssiMeta={id:'wssi-outlook',label:'WPC Winter Storm Severity Index',status:'unavailable',fetchedAt:null,issuedAt:null,url:WSSI_PAGE};
   const wssi=(async()=>{try{
@@ -79,7 +109,15 @@ export function createRiskOutlookService({cached,now=Date.now}){
    const response=await cached(`${WSSI_ROOT}?${q}`,10*60000,{timeout:12000}),features=response.data?.features;
    if(!Array.isArray(features)||response.data?.error)throw new Error('WSSI unavailable.');
    const value=features.map(f=>normalizeWssiRisk(f.attributes,now())).filter(Boolean).sort((a,b)=>b.rank-a.rank)[0]||null;
-   return {value,meta:{...wssiMeta,status:'ready',fetchedAt:response.fetchedAt,issuedAt:value?.issuedAt||null}};
+   let window=value;
+   if(!window){
+    const productQuery=new URLSearchParams({f:'json',where:'1=1',outFields:'start_time,end_time,issue_time',returnGeometry:'false',returnDistinctValues:'true'});
+    const product=await cached(`${WSSI_ROOT}?${productQuery}`,10*60000,{timeout:12000}),productFeatures=product.data?.features;
+    if(!Array.isArray(productFeatures)||product.data?.error)throw new Error('WSSI freshness unavailable.');
+    window=currentWssiWindow(productFeatures,now());
+   }
+   if(!window)throw new Error('WSSI data is not current.');
+   return {value,meta:{...wssiMeta,status:'ready',fetchedAt:response.fetchedAt,issuedAt:window.issuedAt||null,validFrom:window.validFrom||null,validUntil:window.expires||null}};
   }catch{return {value:null,meta:{...wssiMeta,message:'Winter outlook could not be checked.'}};}})();
   const results=await Promise.all([spc,wpc,wssi]);
   return {value:results.map(r=>r.value).filter(Boolean),meta:results.map(r=>r.meta)};

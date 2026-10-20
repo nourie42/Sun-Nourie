@@ -13,7 +13,7 @@ test('confidence evidence separates a 4°F daily-high range from an 8.4°F overn
  assert.match(html,/Daily highs from included sources:.*69\.0–73\.0°F.*4\.0°F apart/);
  assert.match(html,/Largest same-hour gap:.*8\.4°F.*Tue, Oct 20, 10:00 PM EDT.*52\.0–60\.4°F/);
  assert.match(html,/NWS<\/th><td>72\.0°<\/td><td>60\.4°/);
- assert.match(html,/NVIDIA WeatherNext<\/th><td>73\.0°<\/td><td>52\.0°/);
+ assert.match(html,/Google WeatherNext<\/th><td>73\.0°<\/td><td>52\.0°/);
  assert.match(html,/Confidence checks hourly differences, including overnight\. The model chart compares daily highs\./);
  assert.match(html,/Forecast updated Mon, Oct 19, 2:46 PM EDT/);
 });
@@ -47,6 +47,6 @@ test('an hourly-only source is disclosed without inventing a daily high',()=>{
 test('a single published daily high remains visible while its spread is unavailable',()=>{
  const c=confidence();c.temperatureComparison.worstHour=null;c.temperatureComparison.dailyHigh={spread:null,low:{id:'wn',value:67.109},high:{id:'wn',value:67.109},sources:[{id:'wn',value:67.109}]};
  const html=confidenceTemperatureEvidenceHTML(c,options);
- assert.match(html,/Daily-high comparison is unavailable/);assert.match(html,/NVIDIA WeatherNext<\/th><td>67\.1°/);
+ assert.match(html,/Daily-high comparison is unavailable/);assert.match(html,/Google WeatherNext<\/th><td>67\.1°/);
  assert.doesNotMatch(html,/0\.0°F apart|Largest same-hour gap: <strong>/);
 });
