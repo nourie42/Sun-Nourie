@@ -391,12 +391,12 @@ export function buildForecast({ location, point, forecast, hourly, grid, discuss
     current, hours, days, discussion: discussion || null, alerts: alerts || [], specialDiscussions: specialDiscussions || [], precipitationDiscussions: precipitationDiscussions || [], riskOutlooks: riskOutlooks || [], feeds,
     solar: { sunrise: models.ecmwf?.daily?.sunrise?.[solarIndex] ? iso(models.ecmwf.daily.sunrise[solarIndex] * 1000) : null,
       sunset: models.ecmwf?.daily?.sunset?.[solarIndex] ? iso(models.ecmwf.daily.sunset[solarIndex] * 1000) : null },
-    methodology: 'NWS temperatures, conditions and precipitation probabilities are primary. NWS grid precipitation is integrated over local 7 AM–7 AM windows. Model guidance is supplementary and not a verified skill-weighted forecast. Model high/low comparisons use calendar days; the NWS low is overnight. Precipitation includes liquid-equivalent snow/ice. Daily forecast confidence is a relative index, not a probability; it uses lead time, NWS/model high-temperature spread, rainfall-guidance spread, usable guidance coverage, and NWS day/night availability.' };
+    methodology: 'NWS temperatures, conditions and precipitation probabilities are primary. NWS grid precipitation is integrated over local 7 AM–7 AM windows. Model guidance is supplementary and not a verified skill-weighted forecast. Model high/low comparisons use calendar days; the NWS low is overnight. Precipitation includes liquid-equivalent snow/ice. Daily forecast confidence is a relative index, not a probability; temperature confidence uses the average timestamp-matched model gap across today and the maximum same-hour gap on later dates, together with lead time and source coverage. Rainfall guidance and sky/rain agreement are disclosed separately.' };
   enhanceForecast(output, { models, grid, periods: forecast?.periods || [], hourlyPeriods: hourly?.periods || [], now, gridQpf, localTime, nextDate, dateKey });
   output.current=validateCurrentConditions(output.current,output.hours,rows,now);
   Object.assign(output.current,resolveCurrentWeather(output.current,output.hours,now,gridSample(grid,'skyCover',now,'percent')));
   applyObservedSky(output,observation?.skyObservations,now);
-  addExperience(output, {models, grid, periods:forecast?.periods || [], now, solarTimes, nextDate});
+  addExperience(output, {models, grid, periods:forecast?.periods || [], exposureWeather, now, solarTimes, nextDate});
   refreshCalendarConfidence(output,{now});
   addExposureWeather(output,exposureWeather);
   addAirQuality(output,airQuality);

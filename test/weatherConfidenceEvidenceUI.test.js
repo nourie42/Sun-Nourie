@@ -44,6 +44,19 @@ test('an hourly-only source is disclosed without inventing a daily high',()=>{
  assert.match(html,/HRRR<\/th><td>Unavailable<\/td><td>55\.0°/);
 });
 
+test('same-day averaging stays explicit when an hourly outlier is also downweighted',()=>{
+ const c=confidence(),comparison=c.temperatureComparison;
+ comparison.averageHourlySpread=5.5;
+ comparison.confidenceBasis='same-day-average-peer-consensus';
+ comparison.confidenceHour={...comparison.worstHour,spread:3,low:{id:'ecmwf',value:57.4},high:{id:'nws',value:60.4}};
+ comparison.adjustments=[{time:comparison.worstHour.time,sourceId:'wn',baseWeight:.1,weight:.01,transferredWeight:.09}];
+ const html=confidenceTemperatureEvidenceHTML(c,options);
+ assert.match(html,/data-temperature-basis="same-day-average-peer-consensus"/);
+ assert.match(html,/Average same-hour gap used for today’s confidence: <strong>5\.5°F/);
+ assert.match(html,/averages the timestamp-matched peer gaps/);
+ assert.doesNotMatch(html,/Gap used for confidence: <strong>3\.0°F/);
+});
+
 test('a single published daily high remains visible while its spread is unavailable',()=>{
  const c=confidence();c.temperatureComparison.worstHour=null;c.temperatureComparison.dailyHigh={spread:null,low:{id:'wn',value:67.109},high:{id:'wn',value:67.109},sources:[{id:'wn',value:67.109}]};
  const html=confidenceTemperatureEvidenceHTML(c,options);

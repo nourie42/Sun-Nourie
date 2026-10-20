@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {refreshCalendarConfidence} from '../src/weatherFusionDirect.js';
-import {forecastConfidence} from '../public/weather-fusion/forecast-confidence.js';
+import {confidenceTemperatureEvidenceHTML,forecastConfidence} from '../public/weather-fusion/forecast-confidence.js';
 import {calendarDayWindow} from '../public/weather-fusion/calendar-day.js';
 
 const H=3600000,now=Date.parse('2026-10-17T02:20:00Z');
@@ -36,7 +36,7 @@ test('real hourly temperature and rainfall disagreements reduce confidence and s
  f.days[0].qpfBlend.sourceValues.ecmwf=1.02;
  f.days[0].qpfBlend.sources.find(source=>source.id==='ecmwf').value=1.02;
  const c=apply(f);
- assert.notEqual(c.key,'high');assert.equal(c.temperatureSpread,15);
+ assert.equal(c.key,'low');assert.equal(c.temperatureSpread,15);assert.equal(c.sameDayCoverageFloorApplied,false);
  assert.match(c.summary,/15\.0°F/);assert.match(c.summary,/1\.00 inches/);
 });
 
@@ -45,8 +45,36 @@ test('equal daily highs do not conceal disagreement about which hour becomes col
  f.metricForecasts.series.temperature[0].sources.find(source=>source.id==='ecmwf').value=50;
  f.metricForecasts.series.temperature[1].sources.find(source=>source.id==='ecmwf').value=65;
  const c=apply(f);
- assert.equal(f.days[0].highSpread,0);assert.equal(c.temperatureSpread,15);
- assert.match(c.summary,/15\.0°F/);
+ assert.equal(f.days[0].highSpread,0);assert.equal(c.rawTemperatureSpread,15);assert.equal(c.temperatureSpread,8);
+ assert.equal(c.temperatureSpreadBasis,'same-day-average');assert.match(c.summary,/8\.0°F on average/);
+});
+
+test('one large same-day hour is disclosed without making the whole well-covered day Moderate',()=>{
+ const spreads=[9.4,8.9,8.3,5.8,3.7,3.5,2.9,2.5,3,3.6,4.7,4.3,3.6,3.2,7.4,8.4,7.8,8.4];
+ const f=fixture({zone:'UTC',date:'2026-10-20',clock:Date.parse('2026-10-20T06:46:00Z')});
+ assert.equal(f.metricForecasts.series.temperature.length,18);
+ f.metricForecasts.series.temperature.forEach((row,index)=>{row.sources.find(source=>source.id==='ecmwf').value+=spreads[index];});
+ const c=apply(f);
+ assert.equal(c.rawTemperatureSpread,9.4);assert.equal(c.temperatureComparison.worstHour.spread,9.4);
+ assert.equal(c.temperatureSpread,5.5);assert.equal(c.temperatureComparison.averageHourlySpread,5.5);
+ assert.equal(c.temperatureComparison.confidenceBasis,'same-day-average-same-hour');
+ assert.equal(c.key,'high');assert.equal(c.score,90);
+ assert.match(c.factors.join(' '),/5\.5°F average same-hour temperature gap/);
+ const html=confidenceTemperatureEvidenceHTML(c,{timeZone:'UTC',assembledAt:f.assembledAt});
+ assert.match(html,/Largest same-hour gap: <strong>9\.4°F/);
+ assert.match(html,/Average same-hour gap used for today’s confidence: <strong>5\.5°F/);
+ assert.match(html,/one hour does not determine the whole day/);
+});
+
+test('a missing partially elapsed temperature point is excluded from remaining-day coverage',()=>{
+ const f=fixture({zone:'UTC',date:'2026-10-20',clock:Date.parse('2026-10-20T06:46:00Z')});
+ f.metricForecasts.series.temperature.shift();f.rainTimeline.shift();f.days[0].rainLikelihood.coverage.complete=false;
+ const c=apply(f);
+ assert.equal(c.key,'high');assert.equal(c.score,100);
+ assert.equal(c.window.start,'2026-10-20T07:00:00.000Z');
+ assert.equal(c.coverage.temperature.expectedHours,17);assert.equal(c.coverage.temperature.availableHours,17);assert.equal(c.coverage.temperature.complete,true);
+ assert.equal(c.coverage.temperature.currentPartialExcluded,true);assert.equal(c.coverage.rain.currentPartialExcluded,true);assert.equal(c.coverage.rain.complete,true);
+ assert.match(c.factors.join(' '),/partially elapsed current hour.*excluded/);
 });
 
 test('missing rain models keep confidence limited even when the temperature sources agree',()=>{
@@ -69,8 +97,10 @@ test('single-source rain and temperature cannot claim measured model agreement',
 test('a missing temperature hour is disclosed and cannot result in High',()=>{
  const f=fixture();f.metricForecasts.series.temperature.pop();
  const c=apply(f);
- assert.equal(c.coverage.temperature.complete,false);assert.ok(c.score<=65);
+ assert.equal(c.coverage.temperature.complete,false);assert.equal(c.key,'moderate');assert.equal(c.score,70);assert.equal(c.evidenceScore,65);assert.equal(c.sameDayCoverageFloorApplied,true);
+ assert.equal(c.temperature.key,'moderate');assert.equal(c.temperature.score,70);assert.equal(c.temperature.evidenceScore,65);assert.equal(c.temperature.sameDayCoverageFloorApplied,true);
  assert.match(c.summary,/temperature forecast hours are missing/);
+ assert.match(c.factors.join(' '),/missing interval cannot lower.*same-day evidence below Moderate/);
 });
 
 test('confidence for today ends at local midnight, excluding tomorrow’s disagreement',()=>{

@@ -38,7 +38,7 @@ for(const [date,clock,count] of [
   assert.equal(weather.key,'high');
 });
 
-test('the in-progress hour keeps its evidence and is clipped to the exact remaining minutes',()=>{
+test('the in-progress hour keeps available evidence and an absent row yields to the next full forecast hour',()=>{
   const f=fixture({clock:'2026-10-20T09:35:00Z'}),weather=calculate(f),rain=weather.evidence.rain;
   assert.equal(weather.evidence.window.start,'2026-10-20T09:35:00.000Z');
   assert.equal(weather.evidence.window.end,'2026-10-21T04:00:00.000Z');
@@ -50,8 +50,10 @@ test('the in-progress hour keeps its evidence and is clipped to the exact remain
   assert.equal(weather.key,'high');
   f.out.rainTimeline=f.out.rainTimeline.filter(row=>row.time!=='2026-10-20T09:00:00.000Z');
   const missing=calculate(f);
-  assert.notEqual(missing.key,'high','The first future hour cannot replace missing evidence for the current partial hour.');
-  assert.equal(missing.evidence.rain.hours[0].sources.length,0);
+  assert.equal(missing.key,'high','An absent, partially elapsed interval is not missing future forecast evidence.');
+  assert.equal(missing.evidence.rain.hours[0].time,'2026-10-20T10:00:00.000Z');
+  assert.equal(missing.evidence.currentPartialExcluded.rain,true);
+  assert.match(missing.factors.join(' '),/partially elapsed current hour.*excluded/);
 });
 
 test('sky agreement compares remaining daylight while rain includes the remaining night',()=>{

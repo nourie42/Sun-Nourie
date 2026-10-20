@@ -284,10 +284,17 @@ function sample(payload, time, field) {
 export function refreshCalendarConfidence(out,{now=Date.now()}={}) {
   const temperatures=new Map((out.metricForecasts?.series?.temperature||[]).map(row=>[Date.parse(row.time),row]));
   for(const [index,day] of (out.days||[]).entries()) {
-    const window=calendarDayWindow(day,index,now,out.location?.timeZone),expectedHours=(window.end-window.start)/H;
+    const calendarWindow=calendarDayWindow(day,index,now,out.location?.timeZone),currentRow=temperatures.get(calendarWindow.start);
+    const currentSources=(currentRow?.sources||[]).filter(source=>source.weight>0&&finite(source.value));
+    // Hourly temperatures are point forecasts at the top of the hour. Once that
+    // timestamp has passed, an absent/incomparable current point is not missing
+    // future evidence. Start at the next forecast timestamp instead of letting
+    // one partially elapsed interval cap all of today's confidence as Low.
+    const currentPartialExcluded=index===0&&now>calendarWindow.start&&now<calendarWindow.start+H&&(!finite(currentRow?.value)||currentSources.length<2);
+    const window={start:currentPartialExcluded?Math.min(calendarWindow.start+H,calendarWindow.end):calendarWindow.start,end:calendarWindow.end},expectedHours=(window.end-window.start)/H;
     if(!(expectedHours>0))continue;
     const localDayIndex=forecastDayIndex(window.start,now,out.location?.timeZone);
-    const samples={},weights={},counts={},runs={};let availableHours=0,maximumHourlySpread=null,worstHour=null,maximumConfidenceSpread=null,confidenceHour=null;const temperatureAdjustments=[];
+    const samples={},weights={},counts={},runs={};let availableHours=0,maximumHourlySpread=null,worstHour=null,maximumConfidenceSpread=null,confidenceHour=null,hourlySpreadTotal=0,hourlySpreadCount=0;const temperatureAdjustments=[];
     for(let time=window.start;time<window.end;time+=H) {
       const row=temperatures.get(time);
       if(finite(row?.value))availableHours++;
@@ -325,6 +332,7 @@ export function refreshCalendarConfidence(out,{now=Date.now()}={}) {
       if(usePeers)temperatureAdjustments.push({time:iso(time),...adjustment});
       if(confidenceSources.length>1){
         const lo=confidenceSources.reduce((a,b)=>a.value<=b.value?a:b),hi=confidenceSources.reduce((a,b)=>a.value>=b.value?a:b),gap=hi.value-lo.value;
+        hourlySpreadTotal+=gap;hourlySpreadCount++;
         if(maximumConfidenceSpread===null||gap>maximumConfidenceSpread){
           maximumConfidenceSpread=gap;
           confidenceHour={time:iso(time),spread:round(gap,1),low:{id:lo.id,value:lo.value},high:{id:hi.id,value:hi.value},
@@ -346,7 +354,15 @@ export function refreshCalendarConfidence(out,{now=Date.now()}={}) {
     })():null;
     day.highSpread=dailyHigh?.spread??null;
     day.lowSpread=round(spread(low.filter(source=>source.complete).map(source=>source.value)),1);
-    const rawTemperatureSpread=round(maximumHourlySpread,1),temperatureSpread=round(maximumConfidenceSpread,1);
+    const rawTemperatureSpread=round(maximumHourlySpread,1);
+    // A current-day card describes the whole remaining day. Rating that entire
+    // period by the single widest model gap made one pre-dawn/overnight hour
+    // override otherwise close same-day guidance. Keep the maximum in evidence,
+    // but use the average of the timestamp-matched gaps for today's rating.
+    const averageHourlySpread=hourlySpreadCount?round(hourlySpreadTotal/hourlySpreadCount,1):null;
+    const sameDayAverage=index===0&&finite(averageHourlySpread);
+    const temperatureSpread=sameDayAverage?averageHourlySpread:round(maximumConfidenceSpread,1);
+    const temperatureSpreadBasis=sameDayAverage?'same-day-average':temperatureAdjustments.length?'peer-consensus':'same-hour';
     const rain=(day.qpfBlend?.sources||[]).filter(source=>source.weight>0&&finite(source.value)).map(source=>({...source,complete:finite(day.qpfBlend?.sourceValues?.[source.id])}));
     const completeRain=rain.filter(source=>source.complete);
     day.qpfSpread=round(spread(completeRain.map(source=>day.qpfBlend.sourceValues[source.id])),2);
@@ -355,16 +371,20 @@ export function refreshCalendarConfidence(out,{now=Date.now()}={}) {
     const rainRows=(out.rainTimeline||[]).filter(row=>Date.parse(row.time)<window.end&&Date.parse(row.end)>window.start);
     const rainFallback=rainRows.some(row=>row.rainLikelihood?.mode==='nws-fallback');
     const temperatureCoverage=availableHours===expectedHours;
-    const rainCoverage=day.rainLikelihood?.coverage?.complete===true&&finite(day.qpf);
-    day.confidence=forecastConfidence({dayIndex:index,highSpread:temperatureSpread,temperatureSpreadBasis:temperatureAdjustments.length?'peer-consensus':'same-hour',temperatureOutlierHours:temperatureAdjustments.length,qpfSpread:day.qpfSpread,
+    const effectiveRain=summarizeRainTimeline(out.rainTimeline||[],window.start,window.end);
+    const rainCoverage=(currentPartialExcluded?effectiveRain.coverage.complete:day.rainLikelihood?.coverage?.complete===true)&&finite(day.qpf);
+    day.confidence=forecastConfidence({dayIndex:index,highSpread:temperatureSpread,temperatureSpreadBasis,temperatureOutlierHours:temperatureAdjustments.length,qpfSpread:day.qpfSpread,
       guidanceCount:Math.min(completeTemperature.length,completeRain.length),sourceIds,
       officialCoverage:(counts.nws||0)/expectedHours,temperatureCoverage,rainCoverage,
       temperatureSourceCount:completeTemperature.length,rainSourceCount:completeRain.length,rainFallback});
     day.confidence.window={start:iso(window.start),end:iso(window.end)};
+    if(currentPartialExcluded)day.confidence.factors.push('The partially elapsed current hour had no comparable temperature forecast and is excluded from the remaining-day rating.');
     day.confidence.temperatureSpread=temperatureSpread;
     day.confidence.rawTemperatureSpread=rawTemperatureSpread;
-    day.confidence.temperatureComparison={basis:'maximum-same-hour-spread',worstHour,dailyHigh,confidenceHour,confidenceSpread:temperatureSpread,confidenceBasis:temperatureAdjustments.length?'isolated-outlier-peers':'all-contributing-sources',adjustments:temperatureAdjustments,window:{start:iso(window.start),end:iso(window.end)}};
-    day.confidence.coverage={temperature:{expectedHours,availableHours,complete:temperatureCoverage,completeSources:completeTemperature.map(source=>source.id)},rain:{...day.rainLikelihood?.coverage,complete:rainCoverage,completeSources:completeRain.map(source=>source.id),officialFallback:rainFallback}};
+    day.confidence.temperatureComparison={basis:'maximum-same-hour-spread',worstHour,dailyHigh,confidenceHour,averageHourlySpread,confidenceSpread:temperatureSpread,
+      confidenceBasis:sameDayAverage?(temperatureAdjustments.length?'same-day-average-peer-consensus':'same-day-average-same-hour'):temperatureAdjustments.length?'isolated-outlier-peers':'all-contributing-sources',
+      adjustments:temperatureAdjustments,window:{start:iso(window.start),end:iso(window.end)}};
+    day.confidence.coverage={temperature:{expectedHours,availableHours,complete:temperatureCoverage,completeSources:completeTemperature.map(source=>source.id),currentPartialExcluded},rain:{...day.rainLikelihood?.coverage,...(currentPartialExcluded?effectiveRain.coverage:{}),complete:rainCoverage,completeSources:completeRain.map(source=>source.id),officialFallback:rainFallback,currentPartialExcluded}};
     day.confidence.contributions={high,low,rain};
   }
   addConditionConfidence(out,{now});

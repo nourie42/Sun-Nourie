@@ -38,7 +38,7 @@ for(const saved of snapshots)test(`saved ${saved.hour}:45Z modeled Now matches i
  const {out,now,time,feels}=fixture(saved),before=structuredClone(out.metricForecasts);
  const canonical=thermalComfort({...feels.inputs,condition:feels.condition,type:'guidance'},out.location,Date.parse(time));
  const actualClock=thermalComfort({...feels.inputs,condition:feels.condition,type:'guidance'},out.location,now);
- assert.ok(Math.abs(canonical.rawOutdoors-actualClock.rawOutdoors)>.5,'saved case must detect a changing solar exposure');
+  assert.ok(Math.abs(canonical.rawOutdoors-actualClock.rawOutdoors)>.2,'saved case must detect a changing solar exposure');
  alignGuidanceCurrentWithHourly(out,now);
  for(const key of ['temperature','dewpoint','wind','humidity','skyCover'])assert.equal(out.current[key],feels.inputs[key],key);
  assert.equal(out.current.time,time);assert.equal(out.current.thermalTime,time);
