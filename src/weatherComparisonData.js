@@ -14,7 +14,7 @@ const validTime=t=>Number.isFinite(Date.parse(t));
 const allowed=['surface','interimSurface','previousSurface'];
 const stationFor={surface:'station',interimSurface:'interimStation',previousSurface:'previousStation'};
 export function googlePoints(feed){
- if(!feed||!Array.isArray(feed.points)||(!feed.sources&&feed.schema!=='weather-nourie-weathernext3-v1'))throw Error('The published NVIDIA forecast is unavailable or invalid.');
+ if(!feed||!Array.isArray(feed.points)||(!feed.sources&&feed.schema!=='weather-nourie-weathernext3-v1'))throw Error('The published Google WeatherNext forecast is unavailable or invalid.');
  return feed.points.filter(p=>p&&typeof p.id==='string'&&finite(p.latitude)&&finite(p.longitude)&&p.latitude>=24&&p.latitude<=50&&p.longitude>=-125&&p.longitude<=-66).map(p=>({id:p.id,name:p.name||p.id,latitude:p.latitude,longitude:p.longitude,timeZone:p.timeZone||(p.id==='hazen'&&Math.abs(p.latitude-47.2944)<.02&&Math.abs(p.longitude+101.6227)<.02?'America/North_Dakota/Beulah':'America/New_York')}));
 }
 export function skyDescription(cloud,rain){
@@ -24,10 +24,10 @@ export function skyDescription(cloud,rain){
 }
 export function selectGoogleForecast(feed,pointId,now=Date.now()){
  const point=googlePoints(feed).find(p=>p.id===pointId);
- if(!point)throw Object.assign(Error('NVIDIA has no published forecast for that location. Choose a listed comparison location.'),{status:404});
+ if(!point)throw Object.assign(Error('Google WeatherNext has no published forecast for that location. Choose a listed comparison location.'),{status:404});
  if(feed.schema==='weather-nourie-weathernext3-v1'){
   const input=feed.points.find(p=>p.id===pointId),init=Date.parse(feed.runAt),freshness=weatherNextFreshness(feed,now);
-  if(!Number.isFinite(init)||init>now||!Array.isArray(input?.hourly))throw Object.assign(Error('The published NVIDIA forecast is invalid.'),{status:503});
+  if(!Number.isFinite(init)||init>now||!Array.isArray(input?.hourly))throw Object.assign(Error('The published Google WeatherNext forecast is invalid.'),{status:503});
   const rows=input.hourly.flatMap(row=>{
    const epoch=Date.parse(row?.time);
    if(!Number.isFinite(epoch)||epoch<=init||epoch<now-72*HOUR||epoch>now+360*HOUR)return [];
@@ -41,7 +41,7 @@ export function selectGoogleForecast(feed,pointId,now=Date.now()){
     temperatureSource:'WeatherNext 3 ensemble mean',dewpointSource:finite(dewpoint)?'WeatherNext 3 ensemble mean':'Not supplied by WeatherNext 3 point feed',
     temperatureP10:n(row.temperatureP10F),temperatureP90:n(row.temperatureP90F),provenance:meta}];
   }).sort((a,b)=>a.epoch-b.epoch);
-  if(!rows.some(row=>row.epoch>=Math.floor(now/HOUR)*HOUR))throw Object.assign(Error('No NVIDIA forecast covers the current or upcoming hours. Older data is not presented as current.'),{status:503});
+  if(!rows.some(row=>row.epoch>=Math.floor(now/HOUR)*HOUR))throw Object.assign(Error('No Google WeatherNext forecast covers the current or upcoming hours. Older data is not presented as current.'),{status:503});
   const meta={id:'weathernext3',runAt:feed.runAt,fetchedAt:feed.generatedAt||null,status:freshness.status,sourceTable:feed.sourceTable,runAgeHours:freshness.runAgeHours};
   return {point,rows,runs:[meta],fetchedAt:feed.generatedAt||null};
  }
@@ -61,7 +61,7 @@ export function selectGoogleForecast(feed,pointId,now=Date.now()){
    if(!old||init>old.init||(init===old.init&&id==='surface'))chosen.set(time,{id,source,row,init,point:p});
   }
  }
- if(![...chosen.keys()].some(t=>t>=Math.floor(now/HOUR)*HOUR))throw Object.assign(Error('No NVIDIA forecast covers the current or upcoming hours. Older data is not presented as current.'),{status:503});
+ if(![...chosen.keys()].some(t=>t>=Math.floor(now/HOUR)*HOUR))throw Object.assign(Error('No Google WeatherNext forecast covers the current or upcoming hours. Older data is not presented as current.'),{status:503});
  const rows=[...chosen].sort((a,b)=>a[0]-b[0]).map(([time,c])=>{
   const sr=stationMaps.get(c.id)?.get(time);
   const stationTemp=at(sr,'station_head_temperature_2m')??at(sr,'temperature_2m');

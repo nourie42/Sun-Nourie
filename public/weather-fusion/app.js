@@ -144,6 +144,18 @@ function radarObservationLabel(current) {
   const distance=finite(radar.nearestRainMiles)?` about ${Math.round(radar.nearestRainMiles)} mi${direction?` ${direction}`:''}`:'';
   return `NOAA radar shows rain${distance}`;
 }
+function currentSourceDisplay(data,now=Date.now()) {
+  const current=data.current||{},freshness=currentReadingFreshness(data,now),time=Date.parse(current.time);
+  const unavailable=freshness.expired||current.type==='unavailable';
+  const estimated=!unavailable&&current.type!=='observation';
+  const validTime=finite(time)?clock(current.time):'time unavailable';
+  const source=current.localEstimate?.source||current.temperatureSource||'Selected-location hourly guidance';
+  const station=current.stationName||current.station||'Nearby weather station';
+  const sourceLabel=unavailable?freshness.reason||'Current local reading unavailable':estimated
+    ? `${source} · model estimate valid ${validTime}`
+    : `${station} · observed ${validTime}`;
+  return {temperatureLabel:estimated?'Estimated current temperature':'Current temperature',sourceLabel};
+}
 function render(data) {
   data=withLiveAlerts(data,alertSnapshot);
   data.rainTrend=updateRainTrend(data,Date.now());
@@ -162,16 +174,15 @@ function render(data) {
   $('hero-date').textContent = new Intl.DateTimeFormat('en-US', { timeZone: data.location.timeZone, weekday: 'long', month: 'long', day: 'numeric' }).format(new Date()).toUpperCase();
   const currentDay = dailyDisplay(d, 0, Date.now(), data.location.timeZone,data);
   $('temperature').innerHTML = `${number(hero.temperature)}<span>°</span>`;
-  document.querySelector('.current-temp-label').textContent='Current temperature';
+  const currentSource=currentSourceDisplay(data);
+  document.querySelector('.current-temp-label').textContent=currentSource.temperatureLabel;
   if($('hero-uv'))$('hero-uv').innerHTML=dailyUvHTML(data.days[0]?.uvMax,'Peak UV today');
   $('condition').textContent = hero.tonight ? `Tonight · ${hero.condition}` : hero.condition;
   $('high-low').textContent = hero.tonight ? 'Overnight low' : hero.range;
-  const refObs=c.localEstimate?.referenceStation,sourceLabel=c.localEstimate?`Selected-location estimate · ${clock(c.time)} model hour${refObs?.observedAt?` · ${refObs.station||'station'} observed ${clock(refObs.observedAt)}`:''}`:c.type==='observation'?`Nearby weather station · updated ${clock(c.time)}`:c.type==='unavailable'?'Current local reading unavailable':'Estimated current conditions';
   const radarLabel=radarObservationLabel(c);
-  // No model/station provenance at the top; only a live radar note when there is one.
-  $('observation-label').textContent = radarLabel || '';
-  $('observation-label').title = sourceLabel;
-  $('observation-label').hidden = !radarLabel;
+  $('observation-label').textContent = [currentSource.sourceLabel,radarLabel].filter(Boolean).join(' · ');
+  $('observation-label').title = currentSource.sourceLabel;
+  $('observation-label').hidden = false;
   $('hero-scene').innerHTML = icon(hero.condition, hero.isDay, 120);
   renderWeatherChanges(data);
   draw('forecast-window-banners','Upcoming weather windows',()=>renderForecastWindowBanners(data));
@@ -224,10 +235,10 @@ function renderMetrics(data) { renderMetricTiles(data, smallIcon); }
 function renderEvidence(data) {
   const root=$('thermal-input-evidence');
   if(root){
-    const c=currentSample(data).inputs,e=currentSample(data).comfort.inputEvidence||{};
+    const sample=currentSample(data),c=sample.inputs,e=sample.comfort.inputEvidence||{};
     const next=data.metricForecasts?.series?.feels?.find(p=>Date.parse(p.time)>Date.now());
     const n=(v,s='')=>finite(v)?`${Math.round(v*10)/10}${s}`:'Unavailable';
-    root.innerHTML=`<p><strong>Current thermal inputs:</strong> ${esc(c.localEstimate?.source||c.stationName||c.station||'Forecast estimate')}${finite(c.stationDistanceKm)?` · ${Math.round(c.stationDistanceKm/1.609344)} miles away`:''}; ${esc(c.time||'time unavailable')}. Air ${n(c.temperature,'°F')}, dew point ${n(c.dewpoint,'°F')}, wind ${n(c.wind,' mph')}. ${esc(c.localEstimate?.reason||c.comfortSourceNote||'')} Outdoor UTCI ${n(data.comfort?.rawOutdoors,'°F')}.</p>${next?`<p><strong>Next forecast hour — separate inputs:</strong> ${esc(next.time)}. Air ${n(next.inputs.temperature,'°F')}, dew point ${n(next.inputs.dewpoint,'°F')}, wind ${n(next.inputs.wind,' mph')}, cloud cover ${n(next.inputs.skyCover,'%')}. Outdoor UTCI ${n(next.value,'°F')}.</p>`:''}<p>${esc(e.windPolicy||'')} · ${esc(e.radiationBasis||'')}. Station estimates are not copied into future forecasts. The raw thermal/UTCI calculation is retained unchanged. Dew point is a moisture input, not a lower bound on thermal comfort. Sustained wind is used consistently; gust thresholds do not switch the equation.</p>`;
+    root.innerHTML=`<p><strong>Current thermal inputs:</strong> ${esc(c.localEstimate?.source||c.stationName||c.station||'Forecast estimate')}${c.type==='observation'&&finite(c.stationDistanceKm)?` · ${Math.round(c.stationDistanceKm/1.609344)} miles away`:''}; ${esc(c.time||'time unavailable')}. Air ${n(c.temperature,'°F')}, dew point ${n(c.dewpoint,'°F')}, wind ${n(c.wind,' mph')}. ${esc(c.localEstimate?.reason||c.comfortSourceNote||'')} Custom modeled outdoor feels-like ${n(sample.comfort.rawOutdoors,'°F')} before display rounding.</p>${next?`<p><strong>Next forecast hour — separate inputs:</strong> ${esc(next.time)}. Air ${n(next.inputs?.temperature,'°F')}, dew point ${n(next.inputs?.dewpoint,'°F')}, wind ${n(next.inputs?.wind,' mph')}, cloud cover ${n(next.inputs?.skyCover,'%')}. Custom modeled outdoor feels-like ${n(next.value,'°F')}.</p>`:''}<p>${esc(e.windPolicy||'')} · ${esc(e.radiationBasis||'')}. Current station observations are separate from future forecast inputs. The displayed custom estimate starts with UTCI and gradually adjusts colder results toward the NWS wind-chill equation when that result is warmer. The standard NWS index applies at 50°F or below with wind above 3 mph; this site uses the equation outside that range only for its disclosed fade from 40°F to 60°F and 2 to 4 mph. The result is not unmodified UTCI or an official NWS wind-chill value outside the standard range. Dew point is a moisture input, not a lower bound on thermal comfort. Sustained wind is used consistently; gust thresholds do not switch the equation.</p>`;
   }
   const important = ['nws', 'afd', 'hrrr', 'ecmwf', 'nbm', 'air-quality', 'alerts'];
   const labels = { nws: 'NWS', afd: 'Local discussion', hrrr: 'HRRR', ecmwf: 'ECMWF IFS', nbm: 'National Blend', 'air-quality':'Air quality', alerts: 'Alerts' };

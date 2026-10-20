@@ -50,7 +50,7 @@ test('Dan take rejects forecaster-attribution filler and accepts direct wording'
  assert.equal(approveDanTake([{evidenceId:id,summary:'The front could arrive earlier or later than expected.'}],forecast,now).forecastChanges.length,1);
 });
 
-test('requested current comfort heading is exact and daily renderer includes Forecast confidence',()=>{
+test('requested current comfort heading is exact and daily renderer separates sky/rain and temperature confidence',()=>{
  const html=fs.readFileSync(new URL('../public/weather-fusion/index.html',import.meta.url),'utf8');
  const experience=fs.readFileSync(new URL('../public/weather-fusion/experience.js',import.meta.url),'utf8');
  const display=fs.readFileSync(new URL('../public/weather-fusion/weather-display.js',import.meta.url),'utf8');
@@ -58,6 +58,6 @@ test('requested current comfort heading is exact and daily renderer includes For
  assert.match(display,/label='Warmest sun feels like from now'/);
  assert.match(display,/No direct sun in the remaining forecast today/);
  assert.doesNotMatch(display,/Warmest from now on/);
- assert.match(experience,/Forecast confidence/);
- assert.match(html,/Forecast confidence<\/strong>/);
+ assert.match(experience,/forecastConfidenceLabel\(d\.confidence\)/);
+ assert.match(html,/Sky\/rain agreement and temperature confidence<\/strong>/);
 });

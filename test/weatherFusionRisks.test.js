@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {inGeoJson,normalizeSpcRisk,normalizeWpcRisk,parseWpcDiscussion,outlookMapFeatures,excerptOutlookDiscussion,localOutlookFeatures,localOutlookPlain,sanitizeOutlookDetail,createOutlookDetailService} from '../src/weatherFusionRisks.js';
+import {inGeoJson,normalizeSpcRisk,normalizeWpcRisk,parseWpcDiscussion,outlookMapFeatures,excerptOutlookDiscussion,localOutlookFeatures,localOutlookPlain,sanitizeOutlookDetail,createOutlookDetailService,createRiskOutlookService} from '../src/weatherFusionRisks.js';
 import {danCard} from '../public/weather-fusion/dans-summary.js';
 import {activeRiskOutlooks,riskOutlookButtonHTML,outlookDetailHTML} from '../public/weather-fusion/risk-outlooks.js';
 import {registerWeatherFusionRoutes} from '../src/weatherFusion.js';
@@ -24,6 +24,35 @@ test('SPC and WPC include issued Day 1 risks before their valid period begins',(
  assert.equal(normalizeWpcRisk(raleigh,-78.5,35.7,Date.parse('2026-09-13T12:00:00Z')),null,'expired outlook stays hidden');
  const farFuture={...raleigh,properties:{...raleigh.properties,START_TIME:'2026-09-14 12:00:00',END_TIME:'2026-09-15 12:00:00'}};
  assert.equal(normalizeWpcRisk(farFuture,-78.5,35.7,early),null,'far-future outlook stays hidden');
+});
+test('risk feed health distinguishes current no-local-risk products from expired products',async()=>{
+ const check=Date.parse('2026-10-20T09:30:00Z');
+ const spcCurrent={attributes:{issue:'202610200548',valid:'202610201200',expire:'202610211200'}};
+ const wssiCurrent={attributes:{start_time:'08Z 10/20/26',end_time:'06Z 10/23/26',issue_time:'2026-10-20 0815Z'}};
+ const wpcCurrent={properties:{OUTLOOK:'Marginal (At Least 5%)',ISSUE_TIME:'2026-10-20 07:58:00',START_TIME:'2026-10-20 12:00:00',END_TIME:'2026-10-21 12:00:00'},geometry:{type:'Polygon',coordinates:[[[-112,31],[-108,31],[-108,34],[-112,34],[-112,31]]]}};
+ const cached=async url=>{
+  const text=String(url);
+  if(text.includes('Day1_Latest'))return {data:{features:[wpcCurrent]},fetchedAt:'2026-10-20T09:29:00Z'};
+  if(text.includes('SPC_wx_outlks'))return {data:{features:text.includes('returnDistinctValues=true')?[spcCurrent]:[]},fetchedAt:'2026-10-20T09:29:00Z'};
+  return {data:{features:text.includes('returnDistinctValues=true')?[wssiCurrent]:[]},fetchedAt:'2026-10-20T09:29:00Z'};
+ };
+ const current=await createRiskOutlookService({cached,now:()=>check})(location);
+ assert.deepEqual(current.value,[],'a current national product can correctly have no risk at this point');
+ assert.ok(current.meta.every(feed=>feed.status==='ready'));
+ assert.ok(current.meta.every(feed=>feed.validUntil),'current product windows remain inspectable');
+
+ const expiredSpc={attributes:{issue:'202610180548',valid:'202610181200',expire:'202610191200'}};
+ const expiredWssi={attributes:{start_time:'08Z 10/17/26',end_time:'06Z 10/19/26',issue_time:'2026-10-17 0815Z'}};
+ const expiredWpc={...wpcCurrent,properties:{...wpcCurrent.properties,ISSUE_TIME:'2026-10-18 07:58:00',START_TIME:'2026-10-18 12:00:00',END_TIME:'2026-10-19 12:00:00'}};
+ const staleCached=async url=>{
+  const text=String(url);
+  if(text.includes('Day1_Latest'))return {data:{features:[expiredWpc]},fetchedAt:'2026-10-20T09:29:00Z'};
+  if(text.includes('SPC_wx_outlks'))return {data:{features:[expiredSpc]},fetchedAt:'2026-10-20T09:29:00Z'};
+  return {data:{features:[expiredWssi]},fetchedAt:'2026-10-20T09:29:00Z'};
+ };
+ const stale=await createRiskOutlookService({cached:staleCached,now:()=>check})(location);
+ assert.deepEqual(stale.value,[]);
+ assert.ok(stale.meta.every(feed=>feed.status==='unavailable'),'expired payloads do not masquerade as checked current products');
 });
 test('Dan prioritizes local alerts, then point outlooks, then discussion',()=>{
  const risk={...base,riskOutlooks:[{kind:'spc',level:'Marginal',rank:3,title:'Marginal risk of severe storms today',summary:'A few storms could become strong.',expires:'2026-09-12T12:00:00Z'},{kind:'wpc',level:'Marginal',rank:1,title:'Marginal risk of flooding rain today',summary:'Heavy rain could cause flooding in a few spots.',expires:'2026-09-12T12:00:00Z'}]};

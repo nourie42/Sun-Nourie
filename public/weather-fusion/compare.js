@@ -59,7 +59,7 @@ function renderDifferences(){
  const format=(value,unit,digits)=>finite(value)?value.toFixed(digits)+unit:'Not supplied';
  $('compare-differences').innerHTML=fields.map(([name,key,unit,digits])=>{
   const dan=row.fusion[key],nvidia=row.google[key],difference=finite(dan)&&finite(nvidia)?nvidia-dan:null;
-  return `<div class="compare-difference"><h3>${name}</h3><strong>Dan: ${format(dan,unit,digits)}</strong><strong>NVIDIA: ${format(nvidia,unit,digits)}</strong><small>${difference===null?'No paired value':`NVIDIA ${difference>=0?'+':''}${difference.toFixed(digits)}${unit}`}</small></div>`;
+  return `<div class="compare-difference"><h3>${name}</h3><strong>Dan: ${format(dan,unit,digits)}</strong><strong>Google WeatherNext: ${format(nvidia,unit,digits)}</strong><small>${difference===null?'No paired value':`Google WeatherNext ${difference>=0?'+':''}${difference.toFixed(digits)}${unit}`}</small></div>`;
  }).join('');
  document.querySelector('.compare-match').hidden=false;
  status(`Both forecasts loaded for ${point.name}. Rain amounts cover the same hour; probabilities and amounts are not compared as if equivalent.`);
@@ -77,7 +77,7 @@ window.addEventListener('message',event=>{
  }
  if(message.type==='compare:error'){
   delete snapshots[source];document.querySelector('.compare-match').hidden=true;
-  status(`${source==='google'?'NVIDIA':'Dan’s forecast'}: ${message.message}`,true);
+  status(`${source==='google'?'Google WeatherNext':'Dan’s forecast'}: ${message.message}`,true);
   return;
  }
  if(!$('compare-sync').checked)return;
@@ -93,7 +93,7 @@ async function boot(){
  try{
   const response=await fetch('/api/weather-fusion/compare/locations',{cache:'no-store',signal:AbortSignal.timeout(30000)});
   const data=await response.json();
-  if(!response.ok||!Array.isArray(data.points)||!data.points.length)throw Error(data.error||'No NVIDIA forecast locations are available.');
+  if(!response.ok||!Array.isArray(data.points)||!data.points.length)throw Error(data.error||'No Google WeatherNext forecast locations are available.');
   points=data.points;
   $('compare-location').innerHTML=points.map(item=>`<option value="${esc(item.id)}">${esc(item.name)}</option>`).join('');
   $('compare-location').disabled=false;

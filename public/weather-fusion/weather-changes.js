@@ -6,11 +6,22 @@ export function weatherChangeMessages(data,now=Date.now()){
  const zone=data.location?.timeZone||'America/New_York',today=new Intl.DateTimeFormat('en-CA',{timeZone:zone}).format(new Date(now));
  const end=new Date(Date.parse(today+'T12:00:00Z')+5*86400000).toISOString().slice(0,10);
  const days=(data.days||[]).filter(d=>d.date>=today&&d.date<end).sort((a,b)=>a.date.localeCompare(b.date)).slice(0,5),messages=[];
- const average=(key,d)=>{const a=timeAt(d.date,7,zone),b=timeAt(d.date,19,zone),rows=(data.metricForecasts?.series?.[key]||[]).filter(p=>Date.parse(p.time)>=a&&Date.parse(p.time)<b&&finite(p.value));
- return rows.length>=6?rows.reduce((s,p)=>s+p.value,0)/rows.length:null;};
+ const average=(key,d)=>{
+  const start=timeAt(d.date,7,zone),end=timeAt(d.date,19,zone),values=new Map();
+  for(const row of data.metricForecasts?.series?.[key]||[]){
+   const time=Date.parse(row.time);if(!finite(time)||time<start||time>=end)continue;
+   if(values.has(time))return null;
+   values.set(time,row.value);
+  }
+  let total=0,count=0;
+  // Only matching, complete hourly daytime windows establish an average.
+  // Missing mornings cannot be compared with another date's afternoons.
+  for(let time=start;time<end;time+=3600000){if(!finite(values.get(time)))return null;total+=values.get(time);count++;}
+  return count?total/count:null;
+ };
  const label=d=>new Intl.DateTimeFormat('en-US',{timeZone:'UTC',weekday:'long'}).format(new Date(d.date+'T12:00:00Z'));
  const temps=days.map(d=>average('temperature',d)),dew=days.map(d=>average('dewpoint',d));
- // Missing rain data is not a dry day. Use full-day amounts, not remaining rainfall.
+ // These are forecast amounts; today's amount may cover only the hours ahead.
  const dry=d=>finite(d.qpf)&&d.qpf===0&&finite(d.pop)&&d.pop<=20;
  const consecutive=(a,b)=>Date.parse(b.date)-Date.parse(a.date)===86400000;
  for(let j=1;j<days.length;j++){
@@ -22,7 +33,11 @@ export function weatherChangeMessages(data,now=Date.now()){
    }
   }
   const d=days[j],before=days.slice(j-2,j),confidence=displayForecastConfidence(d.confidence);
-  if(j>=2&&before.every(dry)&&consecutive(before[0],before[1])&&consecutive(before[1],d)&&finite(d.pop)&&d.pop>75&&finite(d.qpf)&&d.qpf>.25&&['moderate','high'].includes(confidence?.key)&&!messages.some(m=>m.kind==='rain'))messages.push({kind:'rain',text:`Rain returns ${label(d)} after two dry days: ${d.pop}% chance, with ${Number(d.qpf.toFixed(2))} inches expected and ${confidence.key} ${confidence.scope==='sky-and-rain'?'sky/rain agreement':'confidence'}.`});
+  if(j>=2&&before.every(dry)&&consecutive(before[0],before[1])&&consecutive(before[1],d)&&finite(d.pop)&&d.pop>75&&finite(d.qpf)&&d.qpf>.25&&['moderate','high'].includes(confidence?.key)&&!messages.some(m=>m.kind==='rain')){
+   const includesRemainingToday=before.some(day=>day.date===today&&now>timeAt(day.date,0,zone));
+   const preceding=includesRemainingToday?'two low-rain forecast periods from now':'two dry forecast days';
+   messages.push({kind:'rain',text:`Rain returns ${label(d)} after ${preceding}: ${d.pop}% chance, with ${Number(d.qpf.toFixed(2))} inches expected and ${confidence.key} ${confidence.scope==='sky-and-rain'?'sky/rain agreement':'confidence'}.`});
+  }
  }
  return messages.map(m=>m.text);
 }

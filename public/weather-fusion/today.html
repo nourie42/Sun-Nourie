@@ -91,7 +91,7 @@
 
       <section class="card calc" aria-label="How the weather is calculated">
         <h2>How the weather is calculated</h2>
-        <p class="sec-sub">Every number on this page is my own blend of four models — weighted by trust and freshness. These are my exact percentages.</p>
+        <p class="sec-sub" id="calc-weight-note">Temperature weights depend on the available sources for each forecast hour. Other metrics use their own inputs.</p>
         <div class="weight-bar" id="weight-bar" aria-hidden="true"></div>
         <div id="calc-models" class="calc-models"></div>
         <div class="calc-notes">
@@ -100,8 +100,8 @@
             <p id="rain-blend-note"></p>
           </div>
           <div class="calc-note">
-            <h3>WeatherNext AI watches from the sidelines</h3>
-            <p>Google's WeatherNext AI model runs alongside for comparison — you can see its uncertainty band on the <a href="/weather-fusion/blend.html">Blend page</a>. It never silently replaces the blend.</p>
+            <h3>Google WeatherNext</h3>
+            <p>Verified matching WeatherNext inputs contribute when available. The weights above show its temperature contribution for the selected hour. Compare its guidance on the <a href="/weather-fusion/blend.html">Blend page</a>.</p>
           </div>
         </div>
       </section>

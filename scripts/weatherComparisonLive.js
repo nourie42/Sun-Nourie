@@ -18,7 +18,7 @@ for(let i=0;i<60;i++){
   const html=page.ok?await page.text():'';
   const script=await response('/weather-fusion/compare/app.js?source=google&location=knightdale&deploy-check='+Date.now());
   const js=script.ok?await script.text():'';
-  if(page.status===200&&script.status===200&&html.includes('Experimental NVIDIA AI Weather')&&html.includes('/weather-fusion/compare/app.js?source=google')&&js.includes('compareBridge.requestForecast')&&js.includes('installComparisonPane')){
+  if(page.status===200&&script.status===200&&html.includes('Google WeatherNext Forecast')&&html.includes('/weather-fusion/compare/app.js?source=google')&&js.includes('compareBridge.requestForecast')&&js.includes('installComparisonPane')){
    deployed=true;
    break;
   }

@@ -6,7 +6,7 @@ const WEATHERNEXT_ACCESS = 'https://developers.google.com/weathernext/guides/acc
 const finite = value => typeof value === 'number' && Number.isFinite(value);
 const chance = value => finite(value) && value >= 0 && value <= 100 ? value : null;
 const esc = value => String(value ?? '').replace(/[&<>"']/g, character => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[character]));
-const names = {nws:'NWS',hrrr:'HRRR',ecmwf:'ECMWF',nbm:'NBM',wn:'NVIDIA WeatherNext'};
+const names = {nws:'NWS',hrrr:'HRRR',ecmwf:'ECMWF',nbm:'NBM',wn:'Google WeatherNext'};
 const sourceIds = ['nws','hrrr','ecmwf','nbm','wn'];
 const phaseNames = {overall:'Calendar day',daytime:'NWS daytime',overnight:'NWS overnight (includes next morning)'};
 let latest = null, latestNow = 0, selectedDate = null, selectedPhase = null;
@@ -197,10 +197,10 @@ export function weatherNextParticipation(forecast) {
   const requestedWeight = finite(canonical?.requestedWeight) && canonical.requestedWeight > 0 && canonical.requestedWeight <= 1 ? canonical.requestedWeight : null;
   const share = requestedWeight === null ? '' : `${number(requestedWeight * 100)}% `;
   return {contributes,requestedWeight,runAt:canonical?.runAt || null,
-    badge:contributes ? `${share}forecast share` : 'Not used in this forecast',
+    badge:contributes ? `${share}starting share` : 'Not used in this forecast',
     copy:contributes
-      ? `NVIDIA WeatherNext contributes a ${share}share to the Weather Nourie blend where verified, matching forecast data is available. Missing or stale data is excluded.`
-      : `NVIDIA WeatherNext is excluded from this forecast because verified, matching data is unavailable.${canonical?.message ? ` ${canonical.message}` : ''}`};
+      ? `Google WeatherNext starts with a ${share}share where verified, matching forecast data is available. Its actual share varies by field and hour when inputs are missing or the short-range temperature outlier rule applies; recorded hourly weights are shown in the source evidence. Missing or stale data is excluded.`
+      : `Google WeatherNext is excluded from this forecast because verified, matching data is unavailable.${canonical?.message ? ` ${canonical.message}` : ''}`};
 }
 function weatherNextCard(forecast, view) {
   const state=weatherNextState,key=weatherNextKey(forecast),same=key&&state.key===key,zone=view.zone;
@@ -208,7 +208,7 @@ function weatherNextCard(forecast, view) {
   const participation=weatherNextParticipation(forecast);
   let body='';
   if(!same||state.status==='idle'||state.status==='loading'){
-    body='<div class="graphcast-state">Checking the latest NVIDIA WeatherNext forecast for this location…</div>';
+    body='<div class="graphcast-state">Checking the latest Google WeatherNext forecast for this location…</div>';
   }else if(state.status==='ready'){
     const allHours=weatherNextHours(state.point);
     const hours=allHours.filter(row=>!finite(view.start)||!finite(view.end)||(row.time>=view.start&&row.time<view.end));
@@ -222,9 +222,9 @@ function weatherNextCard(forecast, view) {
   }else if(state.status==='not-covered'){
     body='<div class="graphcast-state">The separate published WeatherNext 3 point feed does not include this selected location. Forecast participation is reported by the Weather Nourie backend.</div>';
   }else{
-    body='<div class="graphcast-state">Separate WeatherNext model details are temporarily unavailable. This details feed does not determine whether NVIDIA participates in the Weather Nourie blend.</div>';
+    body='<div class="graphcast-state">Separate WeatherNext model details are temporarily unavailable. This details feed does not determine whether Google WeatherNext participates in the Weather Nourie blend.</div>';
   }
-  return `<section class="graphcast-card weathernext-card" aria-label="NVIDIA forecast using WeatherNext data"><div class="graphcast-head"><div><h3 class="graphcast-title"><span class="graphcast-orb" aria-hidden="true">W3</span>NVIDIA Forecast</h3><p class="graphcast-copy">${esc(participation.copy)}</p></div><div class="graphcast-badges"><span class="graphcast-badge">${connected?'Model details available':'Model details unavailable'}</span><span class="graphcast-badge safe">${esc(participation.badge)}</span></div></div>${body}<p><a class="graphcast-link" href="${WEATHERNEXT_SOURCE}" target="_blank" rel="noopener noreferrer">About WeatherNext ↗</a> <a class="graphcast-link weathernext-access" href="${WEATHERNEXT_ACCESS}" target="_blank" rel="noopener noreferrer">Access setup ↗</a></p></section>`;
+  return `<section class="graphcast-card weathernext-card" aria-label="Google WeatherNext forecast using WeatherNext data"><div class="graphcast-head"><div><h3 class="graphcast-title"><span class="graphcast-orb" aria-hidden="true">W3</span>Google WeatherNext Forecast</h3><p class="graphcast-copy">${esc(participation.copy)}</p></div><div class="graphcast-badges"><span class="graphcast-badge">${connected?'Model details available':'Model details unavailable'}</span><span class="graphcast-badge safe">${esc(participation.badge)}</span></div></div>${body}<p><a class="graphcast-link" href="${WEATHERNEXT_SOURCE}" target="_blank" rel="noopener noreferrer">About WeatherNext ↗</a> <a class="graphcast-link weathernext-access" href="${WEATHERNEXT_ACCESS}" target="_blank" rel="noopener noreferrer">Access setup ↗</a></p></section>`;
 }
 function syncWeatherNextStatus(forecast) {
   if(typeof document==='undefined'||!experimentalPath())return;

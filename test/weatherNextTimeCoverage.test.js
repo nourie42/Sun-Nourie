@@ -51,9 +51,9 @@ test('Blend drops yesterday from its AI days and aligns model hours exactly',()=
   ]}]};
   const result=buildBlendModel(forecast,compact,point.id,now);
   assert.deepEqual(result.aiDays.map(d=>[d.date,d.label]),[['2026-10-14','Today'],['2026-10-15','Thu']]);
-  assert.equal(result.aiDays[0].high,62);
+  assert.equal(result.aiDays[0].high,null,'A partial model date cannot establish its daily high.');
   assert.equal(result.series[0].wnMean,null,'The 9:30 forecast cannot masquerade as the 9:00 model hour.');
-  assert.equal(result.week[0].wnHigh,62);
+  assert.equal(result.week[0].wnHigh,null,'Comparison daily highs require complete calendar coverage.');
 });
 
 test('Blend labels tomorrow by its date when current-day coverage is missing',()=>{
@@ -81,7 +81,7 @@ function browserContext(source,search=''){
   const get=id=>{if(!elements.has(id))elements.set(id,{textContent:'',innerHTML:'',dataset:{},style:{},classList:{toggle(){}},addEventListener(){},setAttribute(){},querySelector(){return null;},querySelectorAll(){return [];}});return elements.get(id);};
   const context={...display,URLSearchParams,location:{search},forecastRows:rows=>display.forecastRows(rows,now),currentForecastRow:rows=>display.currentForecastRow(rows,now),daysFrom:(rows,zone)=>display.daysFrom(rows,zone,now),Date:class extends Date{static now(){return now;}},document:{getElementById:get,querySelector:get,querySelectorAll:()=>[],body:{dataset:{}}},console};
   vm.createContext(context);
-  vm.runInContext(source.replace(/^import .*;\s*$/mg,'').replace(/\nload\(\);\s*(?:if\(typeof window!==\x27undefined\x27\)installForecastRefresh\(load\);)?\s*$/,''),context);
+  vm.runInContext(source.replace(/^import .*;\s*$/mg,'').replace(/^export /mg,'').replace(/\nload\(\);/g,'\n').replace(/\nload\(\);\s*(?:if\(typeof window!==\x27undefined\x27\)installForecastRefresh\(load\);)?\s*$/,''),context);
   return {context,get};
 }
 

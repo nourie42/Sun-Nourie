@@ -101,9 +101,10 @@ test('a distant airport reading is reference data, not the selected location cur
  const out=buildForecast(input);
  assert.equal(MAX_DIRECT_STATION_DISTANCE_KM,16.1);
  assert.equal(out.current.type,'guidance');
- assert.equal(out.current.temperature,80);
+ assert.equal(out.current.temperature,out.metricForecasts.series.temperature.find(row=>Date.parse(row.time)===Math.floor(now/H)*H).value);
  assert.equal(out.current.station,null);
- assert.equal(out.current.localEstimate.source,'NOAA National Blend · 2.5 km');
+ assert.equal(out.current.localEstimate.source,'Selected-location current-hour forecast blend');
+ assert.equal(out.current.temperatureSource,out.hours.find(row=>Date.parse(row.time)===Math.floor(now/H)*H).temperatureSource);
  assert.deepEqual(out.current.localEstimate.referenceStation,{station:'KJNX',stationName:'Smithfield, Johnston County Airport',distanceKm:28.6,temperature:88,observedAt:input.observation.time});
  assert.equal(out.metricForecasts.comfortAlignment.status,'not-applied');
  assert.notEqual(out.current.feelsLike,thermalComfort(input.observation,input.location,now).outdoors);

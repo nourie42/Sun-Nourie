@@ -267,7 +267,7 @@ export function buildSeries(fx, wn, varId, now = Date.now()) {
 }
 
 const hiddenModels = new Set();
-const NAMES = { nourie: 'Weather Nourie blend', nws: 'NWS', hrrr: 'HRRR', nam: 'NAM', nbm: 'NBM', ecmwf: 'ECMWF', wn: 'NVIDIA WeatherNext', gfs: 'GFS', single: '' };
+const NAMES = { nourie: 'Weather Nourie blend', nws: 'NWS', hrrr: 'HRRR', nam: 'NAM', nbm: 'NBM', ecmwf: 'ECMWF', wn: 'Google WeatherNext', gfs: 'GFS', single: '' };
 export function dailyHighComparison(built,index){
   const published={...built.modelMaps[index]};
   if(!Object.hasOwn(published,'wn')&&finite(built.wnVals[index]))published.wn=built.wnVals[index];

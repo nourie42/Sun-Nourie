@@ -46,7 +46,7 @@ function render(){
  $('download-csv').disabled=!indexedRows(fieldSource(field())).length;
  renderReadout();renderChart();renderTable();renderSources();
  const age=(Date.now()-Date.parse(src.runAt))/HOUR,stale=Date.now()-Date.parse(src.fetchedAt)>6*HOUR||age>36||src.status!=='ready';
- setStatus(!rows.length?'No current or upcoming forecast hours are published for this location and run.':stale?'Showing the last published forecast. Check initialization and collection times below; this run may be old.':`Published NVIDIA WeatherNext forecast loaded · ${src.fields.length} surface fields · ${feed.ensembleMembers} ensemble members represented by six statistics.`,stale||!rows.length);
+ setStatus(!rows.length?'No current or upcoming forecast hours are published for this location and run.':stale?'Showing the last published forecast. Check initialization and collection times below; this run may be old.':`Published Google WeatherNext forecast loaded · ${src.fields.length} surface fields · ${feed.ensembleMembers} ensemble members represented by six statistics.`,stale||!rows.length);
 }
 function renderReadout(){
  const rows=visibleRows(),r=rows[hourIndex];if(!r){

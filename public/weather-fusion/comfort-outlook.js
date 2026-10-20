@@ -20,7 +20,7 @@ export function warmestTodayWindow(forecast,now=Date.now()){
   const epoch=Date.parse(hour.time);if(!finite(epoch)||epoch<start||epoch>=end)continue;expected++;
   const sample=forecastSample(forecast,hour.time);if(!sample)continue;available++;
   const sunny=sample.comfort?.daylight===true&&['clear','partly-cloudy'].includes(weatherState(sample.condition).kind),sun=sample.comfort?.sun;
-  if(sunny&&finite(sun))points.push({time:hour.time,epoch,value:sun,source:'Modeled UTCI in the sun'});
+  if(sunny&&finite(sun))points.push({time:hour.time,epoch,value:sun,source:'Custom modeled feels-like in the sun'});
  }
  if(!points.length)return null;
  const high=points.reduce((a,b)=>a.value>=b.value?a:b);

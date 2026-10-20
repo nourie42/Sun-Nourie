@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { preview } from './weatherFusion.fixtures.js';
+import {calendarDayTemperatures} from '../public/weather-fusion/calendar-day.js';
 import { buildModel, buildSeries, layoutChart, nightBands, solarDays, niceStep, dailySummary, dayPoints, skyPhase, sunProgress, tempColor, discussionExcerpt, story, H } from '../public/weather-fusion/halo.js';
 
 const now = Date.parse(preview.assembledAt);
@@ -10,9 +11,9 @@ const tz = preview.location.timeZone;
 test('Halo shows the same blended values as the main site', () => {
   const m = buildModel(preview, now);
   assert.equal(m.hero.temp, Math.round(preview.current.temperature));
-  assert.equal(m.hero.high, Math.round(preview.days[0].high));
+  assert.equal(m.hero.high, Math.round(calendarDayTemperatures(preview,0,now).high));
   const first = m.strip.find((h) => h.type === 'hour');
-  assert.equal(first.label, 'Now');
+  assert.equal(first.label,new Intl.DateTimeFormat('en-US',{timeZone:tz,hour:'numeric'}).format(new Date(first.time)).replace(' ',''),'Forecast-hour labels must not masquerade as current readings.');
   assert.equal(first.temp, Math.round(preview.hours[0].temperature));
   assert.equal(first.chance, Math.round(preview.hours[0].rainLikelihood.value));
   for (const s of m.blend.today) assert.equal(s.weight, preview.blendPolicy.sameDay[s.id]);
@@ -88,7 +89,7 @@ test('Halo page and assets are served by the password-protected weather routes',
   const src = await readFile(new URL('../src/weatherFusion.js', import.meta.url), 'utf8');
   assert.match(src, /'halo\.html','halo\.css','halo\.js'/);
   const html = await readFile(new URL('../public/weather-fusion/halo.html', import.meta.url), 'utf8');
-  assert.match(html, /src="\/weather-fusion\/halo\.js"/);
+  assert.match(html, /src="\/weather-fusion\/halo\.js(?:\?[^"\s]+)?"/);
   assert.match(html, /id="sheet"/);
   const index = await readFile(new URL('../public/weather-fusion/index.html', import.meta.url), 'utf8');
   assert.match(index, /href="\/weather-fusion\/halo\.html"/);

@@ -349,7 +349,7 @@ function renderHero(){
  const feels=$('feels');
  if(finite(s.feels)){
   const shade=finite(s.shade)&&Math.round(s.shade)!==Math.round(s.feels)?`, ${deg(s.shade)} in the shade`:'';
-  feels.innerHTML=`Feels like <strong>${deg(s.feels)}</strong>${esc(shade)}`+(s.risk?`<br><span class="risk" data-level="${esc(s.risk.level)}" title="Estimated UTCI, not an official alert"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4 2.5 20h19z M12 10v4.5M12 17.5v.01"/></svg>${esc(s.risk.label)}</span>`:'');
+  feels.innerHTML=`Feels like <strong>${deg(s.feels)}</strong>${esc(shade)}`+(s.risk?`<br><span class="risk" data-level="${esc(s.risk.level)}" title="UTCI-derived threshold applied to the custom feels-like estimate; not an official alert"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4 2.5 20h19z M12 10v4.5M12 17.5v.01"/></svg>${esc(s.risk.label)}</span>`:'');
  }else feels.textContent='Feels-like is unavailable for this hour.';
  $('headline').textContent=s.isNow?headlineText():hourHeadline(s);
  $('read-rain').textContent=s.rainNow?'Now':s.rainShown!==null?`${s.rainShown}%`:finite(s.rain)?'<5%':'–';
@@ -736,7 +736,7 @@ function renderFeel(){
   if(finite(out)&&finite(shade)&&s.isDay&&Math.abs(out-shade)>=1)notes.push(`Out in the sun it feels <strong>${Math.round(Math.abs(out-shade))}° ${out>shade?'warmer':'cooler'}</strong> than in the shade.`);
   if(finite(shade)&&finite(air)&&Math.abs(shade-air)>=1)notes.push(`In the shade it feels <strong>${Math.round(Math.abs(shade-air))}° ${shade>air?'warmer':'cooler'}</strong> than the thermometer says, because of the moisture and wind.`);
   if(finite(out)&&finite(air)&&Math.abs(out-air)<1)notes.push('This hour it feels about the same as the thermometer says.');
-  if(s.risk)notes.push(`<strong>${esc(s.risk.label)}</strong> on the UTCI heat and cold scale. An estimate, not an official alert.`);
+  if(s.risk)notes.push(`<strong>${esc(s.risk.label)}</strong> using a UTCI-derived threshold applied to the custom feels-like estimate. Not an official alert.`);
   ladder.innerHTML=`<div class="ladder"><h3>${esc(when)}</h3><p class="sub">Air temperature, how it feels in the shade, and how it feels out in the open, on the same colors as the best-times chart.</p>
    <svg width="${width}" height="52" viewBox="0 0 ${width} 52" role="img" aria-label="Air ${deg(air)}, shade ${deg(shade)}, outdoors ${deg(out)}">${bands}${markers}</svg>
    <dl class="trio"><div><dt>${MARKS.air}Air</dt><dd>${deg(air)}</dd></div><div><dt>${MARKS.shade}Shade</dt><dd>${deg(shade)}</dd></div><div><dt>${MARKS.out}Outdoors</dt><dd>${deg(out)}</dd></div></dl>
@@ -814,7 +814,7 @@ function renderGrid(){
   const cols=24,cellW=(width-label)/cols,height=headerH+grid.length*(rowH+gap);
   const r=PERFECT_RULES;
   $('golden-science').innerHTML=`<p><strong>A perfect hour</strong> has an outdoor feels-like of ${r.band.min}–${r.band.max}°, dew point at most ${r.dewpoint}°, cloud cover at most ${r.cloud}%, rain likelihood at most ${r.rain}%, and less than ${r.precipitation.toFixed(2)} inch of forecast precipitation. It must be daylight without rain, fog or other adverse conditions. Gold uses the main page's exact qualifying hours for the next ${r.horizonDays} local dates.</p>
-   <p><strong>Every other hour</strong> is colored by its feels-like temperature. Comfortable is 65–79°, centered on the ${r.ideal}° ideal. The warm side follows the UTCI heat-stress limits (78.8°, 89.6° and 100.4°F); the cold side steps down through cool, cold and freezing.</p>
+   <p><strong>Every other hour</strong> is colored by its custom feels-like temperature. Comfortable is 65–79°, centered on the ${r.ideal}° ideal. The warm side applies UTCI-derived heat-stress thresholds (78.8°, 89.6° and 100.4°F) to that estimate; the cold side steps down through cool, cold and freezing.</p>
    <p>A dot marks an hour with a rain chance of 50% or more.</p>`;
   const header=[0,6,12,18].map(h=>`<text x="${(label+cellW*h).toFixed(1)}" y="13">${h===0?'12a':h===12?'12p':h<12?`${h}a`:`${h-12}p`}</text>`).join('');
   const rows=grid.map((row,ri)=>{
@@ -985,7 +985,7 @@ function renderSources(){
   const names={nws:'NWS forecast',hourly:'NWS hourly',grid:'NWS grid',afd:'Forecast discussion',observation:'Station observation',hrrr:'HRRR',ecmwf:'ECMWF',nbm:'NBM',alerts:'Alerts',wn:'WeatherNext','air-quality':'Air quality',exposure:'UV and surface weather'};
   const feeds=(forecast.feeds||[]).filter(f=>names[f.id]).map(f=>`<li data-status="${esc(f.status)}"><i></i>${esc(names[f.id])}${f.status==='ready'?'':`: ${esc(String(f.status).replace('-',' '))}`}</li>`).join('');
   $('source-copy').innerHTML=`${runs?`<p><strong>Model runs in this update.</strong> ${esc(runs)}.</p>`:''}
-   <p><strong>The science.</strong> Feels-like follows the UTCI with an estimated sun load and an NWS wind-chill floor in the cold. Wet bulb uses Stull’s approximation. Pavement is a two-layer surface energy balance over the past two days of model weather, not a sidewalk sensor. The perfect-hour rules and the rain score are the same ones the main page uses.</p>
+   <p><strong>The science.</strong> Feels-like starts with UTCI and an estimated sun load, then uses the site’s disclosed custom cold-wind transition. The standard NWS wind-chill index applies at 50°F or below with wind above 3 mph; the site extends its equation only to smooth the fade through 60°F and 2–4 mph. Wet bulb uses Stull’s approximation. Pavement is a two-layer surface energy balance over the past two days of model weather, not a sidewalk sensor. The perfect-hour rules and the rain score are the same ones the main page uses.</p>
    <ul class="feed-list" aria-label="Source status">${feeds}</ul>
    <p>Updated ${esc(clockLabel(Date.parse(forecast.assembledAt),zone()))}. Sources: NOAA and the National Weather Service, NOAA HRRR and NBM, ECMWF Open Data (CC BY 4.0), Open-Meteo and CAMS air quality.</p>`;
  });

@@ -3,7 +3,7 @@ export const SAME_DAY_WEIGHTS = Object.freeze({nws: .4, hrrr: .3, ecmwf: .1, nbm
 export const EXTENDED_RAIN_WEIGHTS = Object.freeze({nws: .15, ecmwf: .6, nbm: .25});
 export const EXTENDED_QPF_WEIGHTS = Object.freeze({nws: .15, ecmwf: .6, nbm: .25});
 export const WEATHERNEXT_WEIGHT = .10;
-/** Keep the existing relative shares and reserve the established NVIDIA share. */
+/** Keep the existing relative shares and reserve the established Google WeatherNext share. */
 export function weatherNextPolicy(policy, available = false) {
   return available ? {...Object.fromEntries(Object.entries(policy).map(([id, weight])=>[id, Number((weight * (1-WEATHERNEXT_WEIGHT)).toFixed(8))])), wn:WEATHERNEXT_WEIGHT} : policy;
 }

@@ -1,4 +1,9 @@
 /** Ultimate Weather — the best of every page, together. */
+import {calendarDayTemperatures,rainWindowPeak} from './calendar-day.js?v=calendar-days-v1';
+import {currentSample,sampleCaption,windDirectionLabel} from './weather-display.js?v=low-rain-display-v1';
+import {currentAirQuality} from './air-quality.js?v=mobile-repair-v1';
+import {hourlyUvValue,uvCategory} from './daily-uv.js?v=weather-art-labels-v10';
+import {forecastSnapshotFreshness} from './weather-freshness.js?v=accuracy-20261019-v1';
 import {forecastRows,matchingForecastRows,installForecastRefresh} from './weathernext-data.js';
 const el = (id) => document.getElementById(id);
 const opt = (id) => document.getElementById(id);
@@ -8,9 +13,27 @@ const finite = (v) => typeof v === 'number' && Number.isFinite(v);
 const WN_FEED = 'https://raw.githubusercontent.com/nourie42/Sun-Nourie/weather-fusion-data/models/weathernext-full.json';
 
 let forecast = null, wnFeed = null, wnCatalog = null;
-let loc = ['knightdale','greenville','hazen'].includes(new URLSearchParams(location.search).get('location'))?new URLSearchParams(location.search).get('location'):'knightdale';
+let loc = ['knightdale','greenville','hazen'].includes(new URLSearchParams(typeof location==='undefined'?'':location.search).get('location'))?new URLSearchParams(typeof location==='undefined'?'':location.search).get('location'):'knightdale';
 let wnField = 'temperature_2m';
 let skyFlip = false;
+
+const reading=value=>finite(value)?Math.round(value):'—';
+const rainValue=row=>row?.rainLikelihood&&Object.hasOwn(row.rainLikelihood,'value')?row.rainLikelihood.value:row?.pop;
+export function buildUltimateCurrent(data,now=Date.now()){
+  data={...data,location:data?.location||{}};
+  const sample=currentSample(data,now),c=sample.inputs,zone=data.location?.timeZone||'America/New_York';
+  const time=value=>Number.isFinite(Date.parse(value))?new Intl.DateTimeFormat('en-US',{timeZone:zone,hour:'numeric',minute:'2-digit'}).format(new Date(value)):'—';
+  const rainHours=(data.hours||[]).filter(row=>Date.parse(row.time)+3600000>now&&Date.parse(row.time)<now+12*3600000);
+  const rainPeak=rainWindowPeak(rainHours.map(row=>({...row,rainLikelihood:{value:rainValue(row)}})),{start:now,end:now+12*3600000});
+  return {sample,inputs:c,feels:sample.feels,condition:sample.condition,caption:sampleCaption(sample,zone),
+    uvNow:hourlyUvValue(data,now),uvPeak:finite(data.uv?.today)?data.uv.today:null,aqi:currentAirQuality(data,now)?.aqi??null,
+    sunrise:time(data.solar?.sunrise),sunset:time(data.solar?.sunset),timeZone:zone,
+    days:(data.days||[]).slice(0,7).map((day,index)=>({...day,...calendarDayTemperatures(data,index,now)})),
+    hours:(data.hours||[]).filter(row=>Date.parse(row.time)+3600000>now).slice(0,12),
+    rainHours,rainPeak:rainPeak.value,
+    stale:forecastSnapshotFreshness(data,now).expired};
+}
+let currentView=null;
 
 const WN_UNITS = { temperature_2m: '°F', dewpoint_temperature_2m: '°F', wind_speed_10m: 'mph', total_precipitation_1hr: 'in', total_cloud_cover: '%' };
 const WN_LABELS = { temperature_2m: 'Air temp', dewpoint_temperature_2m: 'Dew point', wind_speed_10m: 'Wind', total_precipitation_1hr: 'Precip', total_cloud_cover: 'Clouds' };
@@ -34,9 +57,8 @@ function setSky(img) {
 }
 
 function pickSky() {
-  const h = new Date().getHours();
-  if (h < 6 || h >= 20) return 'today-sky-night-v2.webp';
-  const cond = (forecast?.current?.condition || '').toLowerCase();
+  if (currentView?.sample.isDay===false) return 'today-sky-night-v2.webp';
+  const cond = (currentView?.condition || '').toLowerCase();
   if (/thunder|storm|tornado/.test(cond)) return 'today-sky-storm.webp';
   if (/rain|shower|drizzle/.test(cond)) return 'today-sky-rain.webp';
   if (/cloud|overcast|fog/.test(cond)) return 'today-sky-clouds.webp';
@@ -48,25 +70,28 @@ async function load() {
   const request=++latestRequest;
   try {
     const [fRes, wnRes, catRes] = await Promise.all([
-      fetch(`/api/weather-fusion/forecast?location=${loc}`).then((r) => r.json()),
+      fetch(`/api/weather-fusion/forecast?location=${loc}`).then((r) => {if(!r.ok)throw new Error(`Weather service responded ${r.status}`);return r.json();}),
       fetch(WN_FEED, { cache:'no-store', signal: AbortSignal.timeout(30000) }).then((r) => r.json()).catch(() => null),
       fetch('/weather-fusion/weathernext-catalog.json').then((r) => r.json()).catch(() => null),
     ]);
     if(request!==latestRequest)return;
+    if(!fRes?.location||!fRes.current||!Array.isArray(fRes.hours))throw new Error('Weather service returned an incomplete forecast');
     forecast = fRes;
     wnFeed = wnRes;
     wnCatalog = catRes;
-    el('updated').textContent = `Updated ${new Date(forecast.assembledAt).toLocaleTimeString()}`;
+    el('updated').textContent=Number.isFinite(Date.parse(forecast.assembledAt))?`Forecast updated ${new Date(forecast.assembledAt).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',timeZone:forecast.location.timeZone||'America/New_York'})}`:'Forecast update time unavailable';
     renderAll();
   } catch (e) {
     if(request!==latestRequest)return;
     const err = opt('error');
     err.hidden = false;
     err.textContent = `Couldn't load: ${e.message}`;
+    if(forecast)renderAll();
   }
 }
 
 function renderAll() {
+  currentView=buildUltimateCurrent(forecast);
   setSky(pickSky());
   renderHero();
   renderOverview();
@@ -74,6 +99,7 @@ function renderAll() {
   renderAILab();
   renderDetails();
   const alerts = forecast.alerts || [];
+  el('alert-strip').hidden=!alerts.length;
   if (alerts.length) {
     const strip = el('alert-strip');
     strip.hidden = false;
@@ -82,139 +108,89 @@ function renderAll() {
 }
 
 function renderHero() {
-  const c = forecast.current;
-  el('now-temp').textContent = Math.round(c.temperature);
-  el('now-cond').textContent = c.condition;
-  setText('now-feels', `Feels ${Math.round(c.feelsLike || c.apparent || c.temperature)}°`);
-  const d0 = forecast.days?.[0];
-  if (d0) {
-    const hi = finite(d0.high) ? Math.round(d0.high) + '°' : '—';
-    el('hero-loc').textContent = forecast.location?.name || 'Knightdale';
-  el('now-hilo').textContent = `H ${hi} / L ${Math.round(d0.low)}°`;
-  }
-
-  // Insights (best of Glance)
-  const insights = [];
-  const hrs = forecast.hours?.slice(0, 12) || [];
-  const rainHr = hrs.find((h) => (h.pop ?? 0) >= 40);
-  if (rainHr) {
-    const t = new Date(rainHr.time).toLocaleTimeString('en-US', { hour: 'numeric' });
-    insights.push(`🌧 Rain likely by ${t}`);
-  } else {
-    insights.push('☀ No rain expected next 12h');
-  }
-  const warm = hrs.reduce((a, b) => (b.temperature > a.temperature ? b : a), hrs[0] || {});
-  if (warm?.time) {
-    const t = new Date(warm.time).toLocaleTimeString('en-US', { hour: 'numeric' });
-    insights.push(`🌡 Warmest at ${t} (${Math.round(warm.temperature)}°)`);
-  }
-  if (forecast.comfort?.outdoors) insights.push(`🫠 Feels ${Math.round(forecast.comfort.outdoors)}° outside`);
-  setHTML('insight-row', insights.map((i) => `<span class="insight-chip">${i}</span>`).join(''));
+  const v=currentView,c=v.inputs,d0=v.days[0];
+  el('now-temp').textContent=reading(c.temperature);el('now-cond').textContent=v.condition;
+  setText('now-feels',finite(v.feels)?`Feels ${reading(v.feels)}°`:'Feels unavailable');if(opt('now-feels'))el('now-feels').title=v.caption;
+  el('hero-loc').textContent=forecast.location?.name||'Knightdale';
+  el('now-hilo').textContent=d0?`H ${reading(d0.high)}° / L ${reading(d0.low)}°`:'';
+  const insights=[],hrs=v.hours,rainHr=v.rainHours.find(h=>finite(rainValue(h))&&rainValue(h)>=40);
+  const clock=t=>new Intl.DateTimeFormat('en-US',{timeZone:v.timeZone,hour:'numeric'}).format(new Date(t));
+  if(v.stale||!finite(v.rainPeak))insights.push('Rain outlook unavailable until the forecast refreshes.');
+  else if(rainHr)insights.push(`🌧 Rain possible by ${clock(rainHr.time)} (${reading(rainValue(rainHr))}% blended likelihood)`);
+  else insights.push('No significant rain expected next 12h');
+  const warm=hrs.filter(h=>finite(h.temperature)).reduce((a,b)=>!a||b.temperature>a.temperature?b:a,null);
+  if(warm&&!v.stale)insights.push(`🌡 Warmest at ${clock(warm.time)} (${reading(warm.temperature)}°)`);
+  if(finite(v.feels))insights.push(`Feels ${reading(v.feels)}° outside`);
+  setHTML('insight-row',insights.map(i=>`<span class="insight-chip">${i}</span>`).join(''));
 }
 
 function renderOverview() {
-  const hrs = (forecast.hours || []).slice(0, 12);
-  // Hourly description
-  const hr0 = hrs[0];
-  if (hr0) {
-    const maxPop = Math.max(...hrs.map((h) => h.pop || 0));
-    el('hourly-desc').textContent = maxPop < 20
-      ? `Clear conditions expected over the next 12 hours.`
-      : `Rain likely — up to ${Math.round(maxPop)}% chance in the next 12 hours.`;
-  }
-  const nowH = new Date().getHours();
-  el('hourly-strip').innerHTML = hrs.map((h) => {
-    const t = new Date(h.time);
-    const isNow = t.getHours() === nowH && Math.abs(Date.now() - t.getTime()) < 3600000;
-    const label = isNow ? 'Now' : t.toLocaleTimeString('en-US', { hour: 'numeric' }).replace(' ', '');
-    const wd = h.windDirection ? `<div class="wd">${h.windDirection} ${Math.round(h.windMph || 0)}</div>` : '';
-    return `<div class="hour${isNow ? ' now' : ''}"><div class="t">${label}</div><div class="ic">${iconFor(h.condition)}</div><div class="tp">${Math.round(h.temperature)}°</div><div class="pp">${h.pop >= 15 ? Math.round(h.pop) + '%' : ''}</div>${wd}</div>`;
+  const v=currentView,hrs=v.hours,c=v.inputs,days=v.days;
+  const maxPop=v.rainPeak;
+  el('hourly-desc').textContent=v.stale||maxPop===null?'Rain outlook unavailable until the forecast refreshes.':maxPop<20?'No significant rain expected over the next 12 hours.':`Peak blended rain likelihood ${reading(maxPop)}% over the next 12 hours.`;
+  el('hourly-strip').innerHTML=hrs.map(h=>{
+    const label=new Intl.DateTimeFormat('en-US',{timeZone:v.timeZone,hour:'numeric'}).format(new Date(h.time)).replace(' ',''),pop=rainValue(h);
+    const wind=h.windMph??h.wind,direction=windDirectionLabel(h.windDirectionDegrees??h.windDirection);
+    return `<div class="hour"><div class="t">${label}</div><div class="ic">${iconFor(h.condition,h.isDay)}</div><div class="tp">${reading(h.temperature)}°</div><div class="pp">${finite(pop)&&pop>=15?reading(pop)+'%':''}</div><div class="wd">${direction} ${reading(wind)}</div></div>`;
   }).join('');
-
-
-  // 7-day — Apple-style list
-  const days = (forecast.days || []).slice(0, 7);
-  const gHi = Math.max(...days.map((d) => d.high).filter(finite));
-  const gLo = Math.min(...days.map((d) => d.low).filter(finite));
-  if (days[0]) {
-    el('daily-desc').textContent = days[0].detail || `High ${Math.round(days[1]?.high || 0)}°, low ${Math.round(days[0].low || 0)}°.`;
-  }
-  el('day-list').innerHTML = days.map((d, i) => {
-    const dt = new Date(d.date + 'T12:00:00');
-    const name = i === 0 ? 'Today' : dt.toLocaleDateString('en-US', { weekday: 'short' });
-    const hi = finite(d.high) ? d.high : null;
-    const hiTxt = hi != null ? Math.round(hi) : '—';
-    const loTxt = finite(d.low) ? Math.round(d.low) : '—';
-    const l = hi != null && finite(d.low) ? ((d.low - gLo) / Math.max(1, gHi - gLo)) * 100 : 0;
-    const w = hi != null && finite(d.low) ? Math.max(10, ((hi - d.low) / Math.max(1, gHi - gLo)) * 100) : 0;
-    const pop = (d.pop || 0) >= 20 ? `<div class="pp">💧 ${Math.round(d.pop)}%</div>` : '';
-    return `<div><div class="day-row"><div class="d">${name}</div><div class="ic">${iconFor(d.condition)}</div>`
-      + `<div class="lo">${loTxt}°</div><div class="bar"><i style="left:${l.toFixed(0)}%;width:${w.toFixed(0)}%"></i></div>`
-      + `<div class="hi">${hiTxt}°</div></div>${pop}</div>`;
+  const gHi=Math.max(...days.map(d=>d.high).filter(finite)),gLo=Math.min(...days.map(d=>d.low).filter(finite));
+  el('daily-desc').textContent='Today shows the remaining calendar date; later days run midnight to midnight.';
+  el('day-list').innerHTML=days.map((d,i)=>{
+    const name=i===0?'Today':new Intl.DateTimeFormat('en-US',{timeZone:'UTC',weekday:'short'}).format(new Date(d.date+'T12:00:00Z'));
+    const valid=finite(d.high)&&finite(d.low),left=valid?(d.low-gLo)/Math.max(1,gHi-gLo)*100:0,width=valid?Math.max(10,(d.high-d.low)/Math.max(1,gHi-gLo)*100):0,pop=rainValue(d);
+    return `<div><div class="day-row"><div class="d">${name}</div><div class="ic">${iconFor(d.condition,true)}</div><div class="lo">${reading(d.low)}°</div><div class="bar"><i style="left:${left.toFixed(0)}%;width:${width.toFixed(0)}%"></i></div><div class="hi">${reading(d.high)}°</div></div>${finite(pop)&&pop>=20?`<div class="pp">💧 ${reading(pop)}%</div>`:''}</div>`;
   }).join('');
-
-  // Metrics — vibrant with icons (fall back to hour 0 for live values)
-  const mhrs = forecast.hours || [];
-  const h0 = mhrs[0] || {};
-  const c = Object.assign({}, h0, forecast.current);
-  // Prefer non-null current values, else hour 0
-  for (const k of ['wind','windMph','windDirection','humidity','dewpoint','gust','pressure','visibility']) {
-    if (c[k] == null && h0[k] != null) c[k] = h0[k];
-  }
-  const t6 = mhrs[6]?.temperature, t0 = mhrs[0]?.temperature;
-  const tTrend = finite(t6) && finite(t0) ? (t6 > t0 + 1 ? ['↗ Rising', 'up'] : t6 < t0 - 1 ? ['↘ Falling', 'down'] : ['→ Steady', 'flat']) : ['', ''];
-  const metrics = [
-    ['💨 Wind', `${Math.round(c.wind || 0)}<small> mph</small>`, c.gust ? `Gusts ${Math.round(c.gust)}` : (c.windDirection ? windArrow(c.windDirection) : ''), ''],
-    ['💧 Humidity', `${Math.round(c.humidity || 0)}<small>%</small>`, `Dew ${Math.round(c.dewpoint || 0)}°`, ''],
-    ['🌡 Feels like', `${Math.round(c.feelsLike || c.apparent || c.temperature)}<small>°</small>`, `Air ${Math.round(c.temperature)}°`, ''],
-    ['👁 Visibility', `${c.visibility ? Math.round(c.visibility) : '—'}<small> mi</small>`, '', ''],
-    ['☀ UV index', `${forecast.uv?.today != null ? Math.round(forecast.uv.today) : '—'}`, forecast.uv?.today >= 6 ? 'High' : forecast.uv?.today >= 3 ? 'Moderate' : 'Low', ''],
-    ['🌅 Sunrise', forecast.solar?.sunrise ? new Date(forecast.solar.sunrise).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : '—', '', ''],
-    ['🌇 Sunset', forecast.solar?.sunset ? new Date(forecast.solar.sunset).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : '—', '', ''],
+  const metrics=[
+    ['💨 Wind',`${reading(c.wind)}<small> mph</small>`,finite(c.gust)?`Gusts ${reading(c.gust)}`:windDirectionLabel(c.windDirection)],
+    ['💧 Humidity',`${reading(c.humidity)}<small>%</small>`,`Dew ${reading(c.dewpoint)}°`],
+    ['🌡 Feels like',`${reading(v.feels)}<small>°</small>`,`Air ${reading(c.temperature)}°`],
+    ['👁 Visibility',`${reading(c.visibility)}<small> mi</small>`,''],
+    ['☀ UV now',String(reading(v.uvNow)),`Peak today ${reading(v.uvPeak)} · ${uvCategory(v.uvNow).label}`],
+    ['Air quality',String(reading(v.aqi)),'Modeled U.S. AQI'],
+    ['🌅 Sunrise',v.sunrise,''],['🌇 Sunset',v.sunset,'']
   ];
-  el('metric-grid').innerHTML = metrics.map(([k, v, s]) =>
-    `<div class="tile"><div class="k">${k}</div><div class="v">${v}</div>${s ? `<div class="s">${s}</div>` : ''}</div>`
-  ).join('');
+  el('metric-grid').innerHTML=metrics.map(([k,value,sub])=>`<div class="tile"><div class="k">${k}</div><div class="v">${value}</div>${sub?`<div class="s">${sub}</div>`:''}</div>`).join('');
 }
 
 function windArrow(deg) {
   const dirs = ['↑', '↗', '→', '↘', '↓', '↙', '←', '↖'];
   return dirs[Math.round((((deg % 360) + 360) % 360) / 45) % 8];
 }
-function iconFor(cond) {
+function iconFor(cond,isDay=currentView?.sample.isDay) {
   const c = (cond || '').toLowerCase();
   if (/thunder|storm/.test(c)) return '⛈';
   if (/rain|shower|drizzle/.test(c)) return '🌧';
   if (/snow|sleet|flurr/.test(c)) return '🌨';
   if (/cloud|overcast/.test(c)) return '☁';
   if (/fog|mist|haze/.test(c)) return '🌫';
-  if (/clear|sun/.test(c)) return new Date().getHours() >= 6 && new Date().getHours() < 20 ? '☀' : '🌙';
+  if (/clear|sun/.test(c)) return isDay===false?'🌙':'☀';
   return '⛅';
 }
 
 function renderModels() {
-  // Blend weights
-  const bp = forecast.blendPolicy?.temperature || { nws: 0.4, hrrr: 0.3, nbm: 0.2, ecmwf: 0.1 };
-  el('blend-weights').innerHTML = Object.entries(bp).map(([k, v]) => `<span><b>${k.toUpperCase()}</b> ${Math.round(v * 100)}%</span>`).join('');
-
   // Chart: blended line + per-model + WN band (best of Blend)
   const hrs = forecastRows(forecast.hours).slice(0, 48);
-  if (!hrs.length) return;
+  const sources=hrs[0]?.temperatureBlend?.sources||[];
+  const bp=Object.fromEntries(sources.filter(s=>finite(s.weight)).map(s=>[s.id,s.weight]));
+  const modelName=id=>id==='wn'?'Google WeatherNext':id.toUpperCase();
+  el('blend-weights').innerHTML=Object.entries(bp).map(([id,v])=>`<span><b>${modelName(id)}</b> ${Math.round(v*1000)/10}%</span>`).join('')||'Matching-hour weights unavailable';
+  if (!hrs.length){setHTML('blend-chart','<p class="fine">Upcoming model comparison unavailable.</p>');setHTML('model-legend','');setHTML('model-cards','');return;}
   const W = 900, H = 280, PL = 44, PR = 12, PT = 16, PB = 30;
-  const allV = hrs.flatMap((h) => [h.temperature, h.temperatureBlend?.value]).filter(finite);
+  const allV = hrs.flatMap((h) => [h.temperature, h.temperatureBlend?.value,...(h.temperatureBlend?.sources||[]).map(source=>source.value)]).filter(finite);
   let lo = Math.min(...allV), hi = Math.max(...allV);
   const pad = (hi - lo) * 0.15 || 2;
   lo -= pad; hi += pad;
   const X = (i) => PL + (i / Math.max(1, hrs.length - 1)) * (W - PL - PR);
   const Y = (v) => PT + (1 - (v - lo) / (hi - lo)) * (H - PT - PB);
 
-  const models = forecast.modelContributions || [];
-  const colors = { nws: '#7fd4ff', hrrr: '#b48cff', nbm: '#6aa8ff', ecmwf: '#ffd479' };
+  const models=sources.map(source=>({...forecast.modelContributions?.find(model=>model.id===source.id),...source,temperature:source.value}));
+  const colors = { nws: '#7fd4ff', hrrr: '#b48cff', nbm: '#6aa8ff', ecmwf: '#ffd479',wn:'#9ef0c2' };
   let paths = '';
   let legend = '';
-  for (const m of models.slice(0, 4)) {
-    // Per-model temps aren't in hours; use blend as proxy with slight offset for visual
-    legend += `<span><i class="sw" style="background:${colors[m.id] || '#fff'};height:3px"></i>${m.id.toUpperCase()}</span>`;
+  for (const m of models) {
+    // Each line uses the published model values for these exact forecast hours.
+    let started=false,d='';for(const [i,h]of hrs.entries()){const value=h.temperatureBlend?.sources?.find(source=>source.id===m.id)?.value;if(!finite(value)){started=false;continue;}d+=`${started?'L':'M'}${X(i).toFixed(1)},${Y(value).toFixed(1)}`;started=true;}if(d)paths+=`<path d="${d}" fill="none" stroke="${colors[m.id]||'#b48cff'}" stroke-width="1.5"/>`;
+    legend += `<span><i class="sw" style="background:${colors[m.id] || '#fff'};height:3px"></i>${modelName(m.id)}</span>`;
   }
   const line = hrs.map((h, i) => `${i ? 'L' : 'M'}${X(i).toFixed(1)},${Y(h.temperature).toFixed(1)}`).join('');
   // WN band if available
@@ -238,15 +214,15 @@ function renderModels() {
   }
 
   el('blend-chart').innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Model blend chart">
-    ${wnBand}
+    ${wnBand}${paths}
     <path d="${line}" fill="none" stroke="#fff" stroke-width="3" stroke-linejoin="round"/>
   </svg>`;
   setHTML('model-legend', legend);
 
   // Model cards
-  el('model-cards').innerHTML = models.slice(0, 4).map((m) => `
-    <div class="model-card"><div class="n">${m.id.toUpperCase()}</div><div class="w">${Math.round((bp[m.id] || 0) * 100)}% weight</div>
-    <div class="t">${m.temperature ? Math.round(m.temperature) + '°' : '—'}</div><div class="r">${m.runAt ? 'Run ' + new Date(m.runAt).toLocaleTimeString('en-US', { hour: 'numeric' }) : ''}</div></div>
+  el('model-cards').innerHTML = models.map((m) => `
+    <div class="model-card"><div class="n">${modelName(m.id)}</div><div class="w">${finite(m.weight)?`${Math.round(m.weight*1000)/10}% temperature weight`:'Weight unavailable'}</div>
+    <div class="t">${finite(m.temperature) ? Math.round(m.temperature) + '°' : '—'}</div><div class="r">${m.runAt ? 'Run ' + new Date(m.runAt).toLocaleTimeString('en-US', { hour: 'numeric' }) : ''}</div></div>
   `).join('');
 }
 
@@ -310,33 +286,20 @@ function renderAILab() {
 }
 
 function renderDetails() {
-  const c = forecast.current;
-  const details = [
-    ['Feels like', `${Math.round(c.feelsLike || c.apparent || c.temperature)}°`],
-    ['Dew point', `${Math.round(c.dewpoint || 0)}°`],
-    ['Humidity', `${Math.round(c.humidity || 0)}%`],
-    ['Wind', `${Math.round(c.wind || 0)} mph ${c.windDirection || ''}`],
-    ['Gusts', `${c.gust ? Math.round(c.gust) + ' mph' : '—'}`],
-    ['Pressure', `${c.pressure ? c.pressure.toFixed(2) + ' in' : '—'}`],
-    ['Visibility', `${c.visibility ? Math.round(c.visibility) + ' mi' : '—'}`],
-    ['Cloud cover', `${c.cloudCover ? Math.round(c.cloudCover) + '%' : '—'}`],
-    ['UV index', forecast.uv?.index ?? '—'],
-    ['Sunrise', forecast.solar?.sunrise ? new Date(forecast.solar.sunrise).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : '—'],
-    ['Sunset', forecast.solar?.sunset ? new Date(forecast.solar.sunset).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : '—'],
-    ['Air quality', forecast.aqi?.index ?? '—'],
-  ];
-  el('detail-list').innerHTML = details.map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join('');
-
-  const comf = forecast.comfort;
-  el('comfort-box').innerHTML = comf
-    ? `It feels like <b>${Math.round(comf.outdoors)}°</b> outside${comf.shade ? ` and <b>${Math.round(comf.shade)}°</b> in the shade` : ''}. ${comf.note || ''}`
-    : 'Comfort data unavailable.';
-
-  const disc = forecast.discussion;
-  el('discussion').textContent = disc?.text || 'No forecaster discussion available.';
+  const v=currentView,c=v.inputs;
+  const details=[['Feels like',`${reading(v.feels)}°`],['Dew point',`${reading(c.dewpoint)}°`],['Humidity',`${reading(c.humidity)}%`],
+    ['Wind',`${reading(c.wind)} mph ${windDirectionLabel(c.windDirection)}`],['Gusts',`${reading(c.gust)} mph`],
+    ['Pressure',finite(c.pressureInHg??c.pressure)?`${(c.pressureInHg??c.pressure).toFixed(2)} in`:'—'],
+    ['Visibility',`${reading(c.visibility)} mi`],['UV now',reading(v.uvNow)],['Peak UV today',reading(v.uvPeak)],
+    ['Sunrise',v.sunrise],['Sunset',v.sunset],['Air quality',reading(v.aqi)]];
+  el('detail-list').innerHTML=details.map(([key,value])=>`<div><dt>${key}</dt><dd>${value}</dd></div>`).join('');
+  const comfort=v.sample.comfort;
+  el('comfort-box').innerHTML=finite(v.feels)?`It feels like <b>${reading(v.feels)}°</b> outside${finite(comfort.shade)?` and <b>${reading(comfort.shade)}°</b> in the shade`:''}. ${v.caption}`:'Current comfort estimate unavailable.';
+  el('discussion').textContent=forecast.discussion?.text||'No forecaster discussion available.';
 }
 
 // Tabs
+if(typeof document!=='undefined'){
 document.querySelector('.tab-bar').addEventListener('click', (e) => {
   const b = e.target.closest('button');
   if (!b) return;
@@ -351,4 +314,5 @@ el('loc-select').addEventListener('change', (e) => {
 
 el('loc-select').value=loc;
 load();
-if(typeof window!=='undefined')installForecastRefresh(load);
+if(typeof window!=='undefined'){installForecastRefresh(load);setInterval(()=>{if(forecast)renderAll();},60000);}
+}

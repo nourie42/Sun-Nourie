@@ -120,7 +120,7 @@ test('a tiny positive WeatherNext amount is disclosed with zero signal points, n
  for(const row of forecast.rainTimeline)row.rainLikelihood=score;
  Object.assign(forecast.days[0].rainLikelihood,{value:score.value,peak:score});
  const html=modelExplanationHTML(forecast,{now});
- assert.match(html,/<th scope="row">NVIDIA WeatherNext<\/th><td>0\.00000214 in<small>Below 0\.001 in\/hour: zero rain-signal points; amount retained<\/small><\/td><td>0<small>of 10 max<\/small>/);
+ assert.match(html,/<th scope="row">Google WeatherNext<\/th><td>0\.00000214 in<small>Below 0\.001 in\/hour: zero rain-signal points; amount retained<\/small><\/td><td>0<small>of 10 max<\/small>/);
 });
 
 test('missing hourly data remains unavailable instead of becoming a zero or a reassuring match',()=>{
@@ -183,22 +183,23 @@ test('temperatures disclose only the recorded source values and applied weights'
   assert.doesNotMatch(modelExplanationHTML(forecast,{now}),/Temperature calculations/);
 });
 
-test('NVIDIA participation and evidence reflect recorded backend contribution, not a separately connected feed',()=>{
+test('Google WeatherNext participation and evidence reflect recorded backend contribution, not a separately connected feed',()=>{
   const forecast=fixture();
-  forecast.google={status:'ready',contributes:true,label:'NVIDIA WeatherNext',requestedWeight:.1,runAt:at(-4)};
+  forecast.google={status:'ready',contributes:true,label:'Google WeatherNext',requestedWeight:.1,runAt:at(-4)};
   const peak=forecast.days[0].rainLikelihood.peak;
   peak.sources.push({id:'wn',value:100,weight:.1,points:10,runAt:at(-4)});
   peak.sourceValues.wn=100;peak.sourceAmounts.wn=.04;peak.sourcePoints.wn=10;
   forecast.days[0].highBlend.sources.push({id:'wn',value:82,weight:.1});
   forecast.feeds.push({id:'wn',status:'ready',issuedAt:at(-4),fetchedAt:at(0)});
   const html=modelExplanationHTML(forecast,{now});
-  assert.match(html,/<th scope="row">NVIDIA WeatherNext<\/th><td>0\.04 in<small>Rain forecast: Yes<\/small><\/td><td>10<small>of 10 max<\/small>/);
-  assert.match(html,/<th scope="row">NVIDIA WeatherNext<\/th><td>82°F<\/td><td>10%<\/td>/);
-  assert.match(html,/NVIDIA WeatherNext contributes a 10% share to the Weather Nourie blend/);
+  assert.match(html,/<th scope="row">Google WeatherNext<\/th><td>0\.04 in<small>Rain forecast: Yes<\/small><\/td><td>10<small>of 10 max<\/small>/);
+  assert.match(html,/<th scope="row">Google WeatherNext<\/th><td>82°F<\/td><td>10%<\/td>/);
+  assert.match(html,/Google WeatherNext starts with a 10% share/);
+  assert.match(html,/actual share varies by field and hour/);
   assert.match(html,/Missing or stale data is excluded/);
-  assert.match(html,/NVIDIA WeatherNext <span>Used at peak/);
+  assert.match(html,/Google WeatherNext <span>Used at peak/);
   assert.doesNotMatch(html,/comparison-only|Comparison only|not connected yet|40-point share/);
-  assert.equal(weatherNextParticipation(forecast).badge,'10% forecast share');
+  assert.equal(weatherNextParticipation(forecast).badge,'10% starting share');
 
   const separateOnly={google:{status:'unavailable',contributes:false,requestedWeight:.1,message:'Matching forecast data is stale.'},feeds:[{id:'wn',status:'ready'}]};
   assert.equal(weatherNextParticipation(separateOnly).contributes,false);

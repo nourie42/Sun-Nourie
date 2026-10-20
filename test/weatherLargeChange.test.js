@@ -11,7 +11,7 @@ function input(values=[60,60,60,60,60]){
 const rain=d=>weatherChangeMessages(d,now).filter(s=>s.startsWith('Rain returns'));
 test('approved title and no banner for unchanged weather',()=>{assert.equal(WEATHER_CHANGE_TITLE,'Large weather change alert');assert.deepEqual(weatherChangeMessages(input(),now),[]);});
 test('continued rain never counts as a dry-to-wet change',()=>{const d=input();d.days.forEach(x=>Object.assign(x,{pop:90,qpf:.4}));assert.deepEqual(rain(d),[]);});
-test('two dry days followed by qualifying rain gives exact forecast values',()=>{const d=input();Object.assign(d.days[2],{pop:85,qpf:.4});assert.deepEqual(rain(d),['Rain returns Sunday after two dry days: 85% chance, with 0.4 inches expected and moderate confidence.']);});
+test('two low-rain forecast periods followed by qualifying rain give exact forecast values',()=>{const d=input();Object.assign(d.days[2],{pop:85,qpf:.4});assert.deepEqual(rain(d),['Rain returns Sunday after two low-rain forecast periods from now: 85% chance, with 0.4 inches expected and moderate confidence.']);});
 test('rain threshold boundaries, missing data and low confidence do not alert',()=>{
  for(const change of [{pop:75},{qpf:.25},{pop:null},{qpf:null},{confidence:{key:'low'}}]){const d=input();Object.assign(d.days[2],{pop:85,qpf:.4},change);assert.deepEqual(rain(d),[]);}
  for(const change of [{qpf:null},{qpf:.01},{pop:null},{pop:80}]){const d=input();Object.assign(d.days[2],{pop:85,qpf:.4});Object.assign(d.days[0],change);assert.deepEqual(rain(d),[]);}

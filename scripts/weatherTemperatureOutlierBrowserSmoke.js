@@ -120,7 +120,7 @@ try{
  assert.equal(await section.locator('.confidence-rating-values').count(),0,'raw/rating maxima share the unadjusted hour');
  await section.locator('.confidence-weight-changes summary').click();
  const disclosure=await section.locator('.confidence-weight-changes').innerText();report.mixedHourDisclosure=disclosure;
- assert.match(disclosure,/1:00 AM EDT.*NVIDIA WeatherNext:\s*13\.7% → 1\.4%/s);
+ assert.match(disclosure,/1:00 AM EDT.*Google WeatherNext:\s*13\.7% → 1\.4%/s);
  assert.match(disclosure,/12\.3 percentage points transferred to ECMWF/);
  assert.equal(await section.locator('.confidence-weight-changes p').count(),1);
  checks.push('an adjusted hour remains disclosed when the largest confidence gap occurs at an unadjusted hour');

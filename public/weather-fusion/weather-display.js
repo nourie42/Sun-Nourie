@@ -69,14 +69,26 @@ function sampleRainChance(sample){
 }
 export function currentSample(forecast, now = Date.now()) {
   const current = currentComfortInputs(forecast,now), assembled = Date.parse(forecast?.assembledAt);
-  const comfort = thermalComfort(current, forecast.location, finite(assembled) ? assembled : now);
+  // Modeled Now uses the same inputs, exposure clock and displayed values as
+  // its canonical forecast hour. Accepted station readings keep their existing
+  // current-snapshot calculation instead of borrowing that forecast clock.
+  const thermalTime=Date.parse(current.thermalTime||current.time);
+  const canonicalGuidance=current.type==='guidance'&&current.localEstimate?.basis==='canonical-hourly-blend'
+    &&finite(thermalTime)&&thermalTime===Date.parse(current.time);
+  const thermalInputs=canonicalGuidance?{...current,condition:current.thermalCondition||current.condition}:current;
+  const comfort = thermalComfort(thermalInputs, forecast.location, canonicalGuidance?thermalTime:finite(assembled)?assembled:now);
+  if(canonicalGuidance){
+    for(const [key,field]of [['outdoors','feelsLike'],['shade','feelsLikeShade'],['sun','feelsLikeSun']]){
+      if(Object.hasOwn(current,field))comfort[key]=finite(current[field])?current[field]:null;
+    }
+  }
   comfort.inputEvidence.estimatedFields=current.comfortEstimatedFields;
   comfort.inputEvidence.fallbackSources=current.comfortInputSources;
   const state=currentWeatherDisplay(forecast,now);
   const {currentHour,currentLikelihood,currentPrecipitation,rainExpected,radarThreat,rainAround}=state;
   const displayCondition=state.condition;
   const displayComfort={...comfort,weatherKind:weatherState(displayCondition).kind,radiantCondition:displayCondition,condition:displayCondition};
-  const currentGust=finite(current.gust)?current.gust:(currentHour?forecastValue(forecast,'gust',currentHour.time):null);
+  const currentGust=current.type==='unavailable'?null:finite(current.gust)?current.gust:(currentHour?forecastValue(forecast,'gust',currentHour.time):null);
   const exposure=outdoorExposure(displayComfort),shownInputs={...current,gust:currentGust};
   return {windDirection:current.windDirection,pop:rainChanceValue(currentLikelihood),officialPop:currentHour?.officialPop??currentHour?.pop,rainLikelihood:currentLikelihood,currentPrecipitation,rainExpected,rainAround,radarThreat,precipitation:state.precipitation,precipitationBlend:currentHour?.precipitationBlend,uvIndex:hourlyUvValue(forecast,now),id:'now', now:true, time:current.time, temperature:finite(current.temperature) ? current.temperature : null,
     feels:exposure.value, exposure, comfort:displayComfort, condition:displayCondition || 'Sky conditions unavailable',
@@ -164,5 +176,5 @@ export function sampleCaption(sample, zone = 'America/New_York') {
 export function heroFeelsHTML(sample,{sunExposure=false}={}) {
   if(sample.source==='Unavailable')return 'Feels like <strong>—</strong><small>Current estimate unavailable</small>';
   const source = sample.source === 'Station observation' ? 'based on the current station reading'+(sample.inputs.comfortSourceNote?' · '+sample.inputs.comfortSourceNote:'') : 'estimated from forecast data';
-  return `${sunExposure?'UTCI feels like':'Feels like'} <strong>${degrees(sample.feels)}</strong><small>${esc(sample.exposure.label)} · ${source}</small>`;
+  return `${sunExposure?'Feels like in sun':'Feels like'} <strong>${degrees(sample.feels)}</strong><small>${esc(sample.exposure.label)} · ${source}</small>`;
 }

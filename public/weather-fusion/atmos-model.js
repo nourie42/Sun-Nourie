@@ -216,9 +216,10 @@ export function rainBreakdown(likelihood){
 }
 
 /* Comfort classes centred on the 72° ideal used by the perfect-hour rules. The
- * warm side follows the UTCI heat-stress categories (78.8°, 89.6°, 100.4°F); the
- * cold side mirrors the comfortable band, then UTCI slight cold stress (48.2°F)
- * and freezing. Feels-like values are the site's outdoor UTCI estimates. */
+ * warm side applies UTCI-derived heat-stress thresholds (78.8°, 89.6°, 100.4°F)
+ * to the site's custom feels-like estimate; the cold side mirrors the
+ * comfortable band, then uses the 48.2°F UTCI slight-cold threshold and
+ * freezing. */
 export const COMFORT_BINS=[
  {key:'c3',label:'Freezing',range:'Under 32°',min:-Infinity},
  {key:'c2',label:'Cold',range:'32–48°',min:32},

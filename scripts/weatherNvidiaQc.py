@@ -43,7 +43,7 @@ def backend_check(forecast, available, now):
     models = [source for source in forecast.get('modelContributions', []) if source.get('id') == 'wn']
     check(google.get('contributes') is available, 'NVIDIA contribution flag must match actual point coverage', google)
     check(abs(google.get('requestedWeight', -1) - .1) < 1e-9, 'Established NVIDIA starting share must remain ten percent', google)
-    check(google.get('label') == 'NVIDIA WeatherNext', 'Backend must name the contributing model clearly', google)
+    check(google.get('label') == 'Google WeatherNext', 'Backend must name the contributing model clearly', google)
     series = forecast.get('metricForecasts', {}).get('series', {})
     report = {'google': google, 'feed': feed, 'model': models, 'fields': {}, 'hourlyRain': []}
     if available:
@@ -201,7 +201,7 @@ def main():
                     nvidia_chips = [chip for chip in chips if chip['id'] == 'wn']
                     check(len(nvidia_chips) == (1 if available else 0), 'NVIDIA chart line must match actual canonical coverage', chips)
                     if available:
-                        check(nvidia_chips[0]['label'] == 'NVIDIA WeatherNext', 'Comparison must name NVIDIA clearly', nvidia_chips)
+                        check(nvidia_chips[0]['label'] == 'Google WeatherNext', 'Comparison must name Google WeatherNext clearly', nvidia_chips)
                         primary = page.locator('circle[data-series="nourie"][data-value]').evaluate_all('points=>points.map(point=>point.dataset.value)')
                         page.locator('.wn-chip[data-model="wn"]').click()
                         check(page.locator('path[data-series="wn"]').count() == 0, 'NVIDIA model line must disappear when hidden')
