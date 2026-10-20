@@ -53,3 +53,17 @@
 @media(max-width:360px){.confidence-temperature-evidence table{font-size:11px}.confidence-temperature-evidence th,.confidence-temperature-evidence td{padding:7px 3px}}
 
 .confidence-temperature-weight{white-space:nowrap}.confidence-temperature-evidence .confidence-temperature-weight small{font-size:10px}.confidence-rating-values summary{font-size:12px;cursor:pointer}.confidence-temperature-evidence[data-temperature-basis="peer-consensus"] th:first-child{max-width:92px}.confidence-temperature-evidence[data-temperature-basis="peer-consensus"] thead th{white-space:normal}
+
+.dialog-confidence>.confidence-weather-evidence{margin:12px 0}
+.confidence-weather-evidence h3,.dialog-temperature-confidence>h3{font-size:14px;line-height:1.4;margin:10px 0 7px}
+.confidence-weather-evidence ul{padding-left:18px;margin:8px 0;font-size:12px;line-height:1.5;color:#d3e0f0}
+.confidence-weather-evidence li+li{margin-top:6px}
+.confidence-weather-readings summary{font-size:12px;cursor:pointer}
+.confidence-weather-source-table{max-width:100%;overflow-x:auto;margin:10px 0}
+.confidence-weather-source-table table{width:100%;border-collapse:collapse;font-size:12px;color:#e8f3ff}
+.confidence-weather-source-table caption{text-align:left;font-size:11px;line-height:1.5;color:#c8d9eb}
+.confidence-weather-source-table th,.confidence-weather-source-table td{padding:7px 4px;border-bottom:1px solid #d8e8ff20;text-align:right;overflow-wrap:anywhere}
+.confidence-weather-source-table th:first-child{text-align:left;font-weight:500}
+.dialog-temperature-confidence{margin-top:16px;padding-top:12px;border-top:1px solid #d8e8ff30}
+.dialog-temperature-confidence>h3{color:var(--confidence-color,#d3e0f0)}
+.daily-panel .forecast-confidence>span{white-space:normal!important;font-size:12px!important}

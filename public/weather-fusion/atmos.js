@@ -1,3 +1,4 @@
+import {displayForecastConfidence} from './forecast-confidence.js?v=sky-rain-agreement-v1';
 import {createWeatherPortrait} from './weather-portraits.js?v=weather-portraits-v1';
 /* Atmos — Weather Nourie drawn as a living sky.
  * One forecast request (/api/weather-fusion/forecast) drives the page. The sky,
@@ -893,11 +894,11 @@ function renderDays(){
   const lo=Math.min(...values),hi=Math.max(...values),pos=v=>((v-lo)/(hi-lo||1)*100).toFixed(2);
   const current=forecast.current?.temperature;
   list.innerHTML=days.map((d,i)=>{
-   const confidence=d.confidence?.key||'unknown',lowConfidence=confidence==='low'||confidence==='very-low';
+   const shownConfidence=displayForecastConfidence(d.confidence),confidence=shownConfidence?.key||'unknown',lowConfidence=confidence==='low'||confidence==='very-low';
    const span=finite(d.low)&&finite(d.high)?`<span class="span" style="left:calc(${pos(d.low)}% - 5px);width:calc(${(pos(d.high)-pos(d.low)).toFixed(2)}% + 10px);background:linear-gradient(90deg,${binColor(comfortBin(d.low))},${binColor(comfortBin(d.high))})"></span>`:'';
    const whiskers=d.spread?[d.spread.low,d.spread.high].filter(([a,b])=>finite(a)&&finite(b)&&b-a>=1).map(([a,b])=>`<span class="whisker" style="left:${pos(a)}%;width:${(pos(b)-pos(a)).toString()}%"></span>`).join(''):'';
    const nowMark=i===0&&finite(current)&&current>=lo&&current<=hi?`<span class="now-mark" style="left:${pos(current)}%" title="Now ${deg(current)}"></span>`:'';
-   const label=`${d.label}, ${d.dateLabel}. ${d.condition}. Low ${deg(d.low)}, high ${deg(d.high)}.${d.rainShown!==null?` Rain chance ${d.rainShown}%.`:''} Confidence ${d.confidence?.label||'unavailable'}.`;
+   const label=`${d.label}, ${d.dateLabel}. ${d.condition}. Low ${deg(d.low)}, high ${deg(d.high)}.${d.rainShown!==null?` Rain chance ${d.rainShown}%.`:''} Sky/rain agreement ${shownConfidence?.label||'unavailable'}.`;
    return `<li><button class="day-row" type="button" aria-expanded="${openDay===d.date}" aria-controls="day-more-${i}" aria-label="${esc(label)}">
      <span class="day-name">${esc(d.label)}<small>${esc(d.dateLabel)}</small><span class="conf" data-level="${esc(confidence)}" aria-hidden="true"><i></i><i></i><i></i></span></span>
      ${wxIcon(d.kind,d.isDay)}
@@ -905,7 +906,7 @@ function renderDays(){
      <span class="day-low">${deg(d.low)}</span>
      <span class="range"><span class="track"></span>${whiskers}${span}${nowMark}</span>
      <span class="day-high">${deg(d.high)}</span>
-    </button>${lowConfidence?'<span class="day-flag">Lower confidence than usual. Tap to see why.</span>':''}
+    </button>${lowConfidence?'<span class="day-flag">Lower sky/rain agreement. Tap to see why.</span>':''}
     <div class="day-more" id="day-more-${i}" ${openDay===d.date?'':'hidden'}>${dayDetail(d)}</div></li>`;
   }).join('');
   list.querySelectorAll('.day-row').forEach((button,i)=>button.addEventListener('click',()=>{
@@ -920,7 +921,8 @@ function dayDetail(d){
  if(d.official&&(finite(d.official.high)||finite(d.official.low)))facts.push(`<li>NWS alone says <b>${deg(d.official.high)} / ${deg(d.official.low)}</b></li>`);
  if(finite(d.uvMax))facts.push(`<li>Peak UV <b>${Math.round(d.uvMax)}, ${esc(uvCategory(d.uvMax).label.toLowerCase())}</b></li>`);
  const spread=d.spread?`<div><strong>What each forecast says for the high</strong><ul class="spread-list">${d.spread.highs.map(s=>`<li><i style="--c:${sourceColor(s.id)}"></i>${esc(sourceLabel(s.id))} ${deg(s.value)}</li>`).join('')}</ul></div>`:'';
- const conf=d.confidence?`<p><strong>${esc(d.confidence.label)} confidence.</strong> ${esc(d.confidence.summary||'')} <span>${esc(d.confidence.note||'')}</span></p>`:'';
+ const shownConfidence=displayForecastConfidence(d.confidence);
+ const conf=shownConfidence?`<p><strong>Sky/rain agreement: ${esc(shownConfidence.label)}.</strong> ${esc(shownConfidence.summary||'')} <span>${esc(shownConfidence.note||'')}</span></p>`:'';
  return `${d.detail?`<p>${esc(d.detail)}</p>`:''}<ul class="day-facts">${facts.join('')}</ul>${spread}${conf}`;
 }
 
