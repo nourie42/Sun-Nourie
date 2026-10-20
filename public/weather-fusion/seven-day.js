@@ -4,7 +4,7 @@ import {hideLowRainChance,displayedRainChance,rainAwareCondition,dailySkyCover} 
 import {forecastPeriodSummary} from './forecast-story.js?v=low-rain-display-v1';
 import {shortForecastCondition} from './today-card.js?v=low-rain-display-v1';
 import {weatherIcon,weatherMetricIcon} from './weather-display.js?v=low-rain-display-v1';
-import {confidenceMeterPosition} from './forecast-confidence.js?v=audit-20261017-v1';
+import {confidenceMeterPosition,displayForecastConfidence,forecastConfidenceLabel} from './forecast-confidence.js?v=sky-rain-confidence-v6';
 import {winterAmountText,winterDayAmount} from './snow-outlook.js?v=snow-readable-v1';
 
 const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -43,14 +43,16 @@ function artHTML(day) {
 }
 
 function confidenceHTML(confidence) {
+  const label=forecastConfidenceLabel(confidence,true);
+  confidence=displayForecastConfidence(confidence);
   const score=finite(confidence?.score)?Math.max(0,Math.min(100,confidence.score)):null;
   const position=confidenceMeterPosition(confidence);
   const title=[confidence?.summary,...(confidence?.factors||[]),confidence?.note].filter(Boolean).join(' \u00b7 ');
-  return `<span class="seven-day-confidence" data-confidence="${esc(confidence?.key||'unavailable')}" title="${esc(title)}"><span class="seven-day-confidence-label"><span>Confidence</span><strong>${esc(confidence?.label||'Unavailable')}</strong></span>${position===null?'<span class="seven-day-confidence-missing">\u2014</span>':`<span class="seven-day-meter" data-confidence-score="${score}" role="meter" aria-label="Forecast confidence category" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${position}" aria-valuetext="${esc(confidence.label)}"><span style="--confidence:${position}%"></span></span>`}</span>`;
+  return `<span class="seven-day-confidence" data-confidence="${esc(confidence?.key||'unavailable')}" title="${esc(title)}"><span class="seven-day-confidence-label"><span>${label}</span><strong>${esc(confidence?.label||'Unavailable')}</strong></span>${position===null?'<span class="seven-day-confidence-missing">\u2014</span>':`<span class="seven-day-meter" data-confidence-score="${score}" role="meter" aria-label="${label} category" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${position}" aria-valuetext="${esc(confidence.label)}"><span style="--confidence:${position}%"></span></span>`}</span>`;
 }
 
 export function sevenDayCardHTML(day,selected=false) {
-  const description=`${day.label}, ${day.dateLabel}, ${day.condition}. High ${reading(day.high)} degrees, low ${reading(day.low)} degrees. ${hideLowRainChance(day.pop)?'':`Rain chance ${reading(day.pop,'%')}.`} Total precipitation ${reading(day.amount,' inches',2)}. Wind ${reading(day.wind,' mph')}. Forecast confidence ${day.confidence?.label||'unavailable'}.`;
+  const description=`${day.label}, ${day.dateLabel}, ${day.condition}. High ${reading(day.high)} degrees, low ${reading(day.low)} degrees. ${hideLowRainChance(day.pop)?'':`Rain chance ${reading(day.pop,'%')}.`} Total precipitation ${reading(day.amount,' inches',2)}. Wind ${reading(day.wind,' mph')}. ${forecastConfidenceLabel(day.confidence)} ${displayForecastConfidence(day.confidence)?.label||'unavailable'}.`;
   const metric=(kind,label,value,compact=false,suffix='')=>`<span class="seven-day-metric" title="${esc(label)}: ${esc(value)}">${weatherMetricIcon(kind)}<span>${label}</span><strong${compact?' style="font-size:10px"':''}>${value}</strong>${suffix?`<small class="seven-day-rain-peak" title="Peak ${esc(suffix)}">${esc(suffix.replace(/^\w{3}\s+/,'').replace(/\s+/g,''))}</small>`:''}</span>`;
   const temp=value=>`<strong style="--narrow-temp-size:${finite(value)&&(value<0||value>=100)?14:17}px">${reading(value,'\u00b0')}</strong>`;
   const snowText=finite(day.snowfall)&&day.snowfall>0||day.snowRange?winterAmountText(day.snowfall,day.snowRange):'Snow possible';

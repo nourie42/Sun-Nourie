@@ -65,7 +65,7 @@ const report={scenario:'Same snapshot: daily highs69–73°F, hourly disagreemen
 try{
  await page.goto(base+'/weather-fusion/',{waitUntil:'domcontentloaded'});
  await page.waitForSelector('[data-week-day="1"]');await page.waitForSelector('#wn-compare-chart svg',{state:'attached'});
- await page.locator('[data-week-day="1"]').click();await page.locator('#day-dialog .dialog-confidence summary').click();
+ await page.locator('[data-week-day="1"]').click();await page.locator('#day-dialog .dialog-confidence > summary').click();
  let evidence=await page.locator('#day-dialog .confidence-temperature-evidence').innerText();
  assert.match(evidence,/69\.0–73\.0°F.*4\.0°F apart/);assert.match(evidence,/8\.4°F.*Tue, Oct 20, 10:00 PM EDT/s);
  assert.match(await page.locator('[data-confidence-source="nws"]').innerText(),/72\.0°.*60\.4°/s);

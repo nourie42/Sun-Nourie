@@ -6,6 +6,7 @@ import {shadeFeelsLike} from '../public/weather-fusion/weather-math.js';
 import {forecastConfidence} from '../public/weather-fusion/forecast-confidence.js';
 import {calendarDayWindow} from '../public/weather-fusion/calendar-day.js';
 import {adjustTemperaturePolicy,TEMPERATURE_OUTLIER_VERSION} from './weatherFusionTemperatureOutliers.js';
+import {addConditionConfidence} from './weatherFusionConditionConfidence.js';
 export const DATA_ROOT = 'https://raw.githubusercontent.com/nourie42/Sun-Nourie/weather-fusion-data/';
 export const DIRECT_SCHEMA = 'weather-fusion-direct-v2';
 const H = 3600000;
@@ -366,6 +367,7 @@ export function refreshCalendarConfidence(out,{now=Date.now()}={}) {
     day.confidence.coverage={temperature:{expectedHours,availableHours,complete:temperatureCoverage,completeSources:completeTemperature.map(source=>source.id)},rain:{...day.rainLikelihood?.coverage,complete:rainCoverage,completeSources:completeRain.map(source=>source.id),officialFallback:rainFallback}};
     day.confidence.contributions={high,low,rain};
   }
+  addConditionConfidence(out,{now});
   return out;
 }
 /** Astronomical sunrise/sunset, independent of model availability. */

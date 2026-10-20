@@ -75,7 +75,7 @@ try{
  await page.locator('#day-dialog .dialog-confidence > summary').click();
  const section=page.locator('#day-dialog .confidence-temperature-evidence'),primary=section.locator('.confidence-temperature-primary table');
  const initial=await section.innerText();report.initialEvidence=initial;
- assert.match(initial,/Full model gap:\s*20\.0°F/);assert.match(initial,/Gap used for confidence:\s*2\.0°F/);
+ assert.match(initial,/Full model gap:\s*20\.0°F/);assert.match(initial,/Gap used for temperature rating:\s*2\.0°F/);
  assert.match(initial,/keeps 10%.*other 90% goes to ECMWF/);
  assert.deepEqual(await primary.locator('thead th').allTextContents(),['Source','Daily high','At that hour','Weight']);
  assert.equal(await primary.locator('tbody tr').count(),4);
@@ -96,7 +96,7 @@ try{
  assert.ok(await page.locator('#day-dialog').evaluate(el=>el.open));
  assert.ok(await page.locator('#day-dialog .dialog-confidence').evaluate(el=>el.open));
  const updated=await section.innerText();report.differentHourEvidence=updated;
- assert.match(updated,/Full model gap:\s*20\.0°F/);assert.match(updated,/Gap used for confidence:\s*2\.0°F/);
+ assert.match(updated,/Full model gap:\s*20\.0°F/);assert.match(updated,/Gap used for temperature rating:\s*2\.0°F/);
  assert.match(await primary.locator('caption').innerText(),/12:00 AM EDT/);
  await section.locator('.confidence-rating-values summary').click();
  const rating=section.locator('.confidence-temperature-rating table');
@@ -113,7 +113,7 @@ try{
  mixedHours=true;await page.locator('#refresh').evaluate(el=>el.click());
  await page.waitForFunction(()=>document.querySelector('.confidence-weight-changes summary')?.textContent.includes('(1 hour)'));
  const mixedEvidence=await section.innerText();report.mixedHourEvidence=mixedEvidence;
- assert.match(mixedEvidence,/Full model gap:\s*20\.0°F/);assert.match(mixedEvidence,/Gap used for confidence:\s*20\.0°F/);
+ assert.match(mixedEvidence,/Full model gap:\s*20\.0°F/);assert.match(mixedEvidence,/Gap used for temperature rating:\s*20\.0°F/);
  assert.match(await primary.locator('caption').innerText(),/12:00 AM EDT/);
  const unadjustedRow=await primary.locator('[data-confidence-source="wn"]').innerText();
  assert.match(unadjustedRow,/80\.0°.*80\.0°.*13\.7%/s);assert.doesNotMatch(unadjustedRow,/reduced weight|was/);

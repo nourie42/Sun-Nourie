@@ -1,7 +1,14 @@
-export const FORECAST_CONFIDENCE_VERSION='weather-nourie-confidence-outlier-consensus-v5';
+export const FORECAST_CONFIDENCE_VERSION='weather-nourie-confidence-split-v6';
 const finite=v=>typeof v==='number'&&Number.isFinite(v);
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const MODERATE_SCORE=70,HIGH_SCORE=85;
+/** Main weather labels describe agreement about sky and rain. Retain legacy
+ * snapshots as-is instead of relabeling a temperature score as sky agreement. */
+export const displayForecastConfidence=confidence=>confidence?.weather??confidence;
+export const displayTemperatureConfidence=confidence=>confidence?.temperature??confidence;
+export function forecastConfidenceLabel(confidence,compact=false){
+ return displayForecastConfidence(confidence)?.scope==='sky-and-rain'?'Sky/rain agreement':compact?'Confidence':'Forecast confidence';
+}
 // The marker shows the labeled category, not a probability or the raw index.
 export function confidenceMeterPosition(confidence){
  if(!finite(confidence?.score))return null;
@@ -67,7 +74,7 @@ export function temperatureRangePrecision(range){
 }
 function validEvidenceRange(range){return range&&finite(range.spread)&&range.spread>=0&&finite(range.low?.value)&&finite(range.high?.value)&&range.high.value>=range.low.value&&Math.abs(Number((range.high.value-range.low.value).toFixed(1))-range.spread)<0.00001;}
 /** The confidence gap and the chart's daily highs share this forecast snapshot. */
-export function confidenceTemperatureEvidenceHTML(confidence,{timeZone='America/New_York',assembledAt=null}={}){
+export function confidenceTemperatureEvidenceHTML(confidence,{timeZone='America/New_York',assembledAt=null,temperatureRating=false}={}){
  const comparison=confidence?.temperatureComparison;if(comparison?.basis!=='maximum-same-hour-spread')return '';
  const worst=comparison.worstHour,daily=comparison.dailyHigh,rating=comparison.confidenceHour;
  const stamp=worst&&evidenceTime(worst.time,timeZone),updated=evidenceTime(assembledAt,timeZone);
@@ -88,9 +95,42 @@ export function confidenceTemperatureEvidenceHTML(confidence,{timeZone='America/
   const time=hour&&evidenceTime(hour.time,timeZone);
   return rows?`<div class="confidence-temperature-scroll ${primary?'confidence-temperature-primary':'confidence-temperature-rating'}"><table><caption>${time?`Model readings at ${escapeEvidence(time)}`:'Model daily highs'}</caption><thead><tr><th scope="col">Source</th><th scope="col">Daily high</th><th scope="col">${time?'At that hour':'Hourly'}</th>${adjusted?'<th scope="col">Weight</th>':''}</tr></thead><tbody>${rows}</tbody></table></div>`:'';
  };
- const ratingText=hasRating?`<p data-confidence-used-gap>Gap used for confidence: <strong>${rating.spread.toFixed(1)}°F</strong> at <strong>${escapeEvidence(hasRating)}</strong> (${describe(rating,temperatureRangePrecision(rating))}).</p>`:'';
- const explanation=adjusted?'An isolated temperature forecast keeps 10% of its original weight; the other 90% goes to ECMWF. For each affected hour, confidence compares the agreeing group. All original model readings remain visible.':'Confidence checks hourly differences, including overnight. The model chart compares daily highs.';
+ const ratingText=hasRating?`<p data-confidence-used-gap>Gap used for ${temperatureRating?'temperature rating':'confidence'}: <strong>${rating.spread.toFixed(1)}°F</strong> at <strong>${escapeEvidence(hasRating)}</strong> (${describe(rating,temperatureRangePrecision(rating))}).</p>`:'';
+ const explanation=adjusted?`An isolated temperature forecast keeps 10% of its original weight; the other 90% goes to ECMWF. For each affected hour, ${temperatureRating?'temperature confidence':'confidence'} compares the agreeing group. All original model readings remain visible.`:`${temperatureRating?'Temperature confidence':'Confidence'} checks hourly differences, including overnight. The model chart compares daily highs.`;
  const weightChanges=adjusted?`<details class="confidence-weight-changes"><summary>Reduced temperature weights (${comparison.adjustments.length} hour${comparison.adjustments.length===1?'':'s'})</summary>${comparison.adjustments.map(row=>`<p>${escapeEvidence(evidenceTime(row.time,timeZone)||row.time)} · ${escapeEvidence(evidenceNames[row.sourceId]||row.sourceId)}: <strong>${(row.baseWeight*100).toFixed(1)}% → ${(row.weight*100).toFixed(1)}%</strong><small>${(row.transferredWeight*100).toFixed(1)} percentage points transferred to ECMWF.</small></p>`).join('')}</details>`:'';
  const ratingTable=hasRating&&rating.time!==worst?.time?`<details class="confidence-rating-values"><summary>Readings used for confidence</summary>${sourceTable(rating,{primary:false})}</details>`:'';
  return `<section class="confidence-temperature-evidence" data-temperature-basis="${adjusted?'peer-consensus':'same-hour'}"><h3>Temperature agreement</h3><p data-confidence-daily-high>${hasHigh?`Daily highs from included sources: <strong>${describe(daily,highPrecision)}</strong> · ${daily.spread.toFixed(1)}°F apart.`:'Daily-high comparison is unavailable.'}</p><p data-confidence-hourly-gap>${hasHour?`${adjusted?'Full model gap':'Largest same-hour gap'}: <strong>${worst.spread.toFixed(1)}°F</strong> at <strong>${escapeEvidence(stamp)}</strong> (${describe(worst,hourPrecision)}).`:'Same-hour comparison is unavailable.'}</p>${ratingText}<p>${explanation}</p>${sourceTable(worst)}${ratingTable}${weightChanges}${updated?`<small>Forecast updated ${escapeEvidence(updated)}.</small>`:''}</section>`;
+}
+
+export function confidenceWeatherEvidenceHTML(confidence,{timeZone='America/New_York'}={}){
+ const weather=displayForecastConfidence(confidence),evidence=weather?.evidence;
+ if(weather?.scope!=='sky-and-rain'||!evidence)return '';
+ const names=ids=>(ids||[]).map(id=>evidenceNames[id]||id).join(', ');
+ const coverage=(kind,label)=>{
+  const item=evidence[kind];if(!item)return `<li>${label}: comparison unavailable.</li>`;
+  const count=item.completeSources?.length||0,scope=kind==='sky'?(item.scope==='remaining-night'?'remaining night hours':'daylight hours'):'hours through local midnight';
+  const compared=finite(item.comparedHours)?item.comparedHours:item.coveredHours;
+  const hours=finite(compared)&&finite(item.expectedHours)?`${compared} of ${item.expectedHours} ${scope} have comparisons`:'hourly coverage unavailable';
+  return `<li><strong>${label}:</strong> ${escapeEvidence(hours)}. ${count} source${count===1?'':'s'} cover every hour${count?` (${escapeEvidence(names(item.completeSources))})`:''}.</li>`;
+ };
+ const category=value=>({clear:'Clear / mostly clear',mixed:'Mixed cloud',cloudy:'Mostly cloudy / overcast',dry:'Dry',trace:'Trace',wet:'Wet',split:'Models differ'}[value]||'Unavailable');
+ const table=(kind,label)=>{
+  const hour=evidence[kind]?.worstHour,time=evidenceTime(hour?.time,timeZone);
+  if(!time||!hour.sources?.length)return '';
+  const reading=value=>!finite(value)?'Unavailable':kind==='sky'?`${value.toFixed(1)}%`:value>0&&value<.001?'under 0.001':value.toFixed(3);
+  const rows=hour.sources.map(row=>`<tr data-weather-source="${escapeEvidence(row.id)}"><th scope="row">${escapeEvidence(evidenceNames[row.id]||row.id)}</th><td>${escapeEvidence(reading(row.value))}</td><td>${escapeEvidence(category(row.category))}</td></tr>`).join('');
+  return `<div class="confidence-weather-source-table"><table><caption>${label} comparison · ${escapeEvidence(time)}</caption><thead><tr><th scope="col">Source</th><th scope="col">${kind==='sky'?'Cloud cover':'Rain (in/hr)'}</th><th scope="col">Category</th></tr></thead><tbody>${rows}</tbody></table>${kind==='rain'&&hour.probabilityConflict?'<p>The official rain chance conflicts with the model wet/dry signals at this hour.</p>':''}</div>`;
+ };
+ const sourceTables=table('sky','Sky')+table('rain','Rain');
+ return `<section class="confidence-weather-evidence"><h3>What the models agree on</h3><ul>${coverage('sky','Sky')}${coverage('rain','Rain')}</ul><p>These comparisons describe sky and precipitation. Temperature disagreement is rated separately below.</p>${sourceTables?`<details class="confidence-weather-readings"><summary>Compare sky and rain readings</summary>${sourceTables}</details>`:''}</section>`;
+}
+
+export function confidenceDetailsHTML(confidence,options={}){
+ if(!confidence)return '';
+ const primary=displayForecastConfidence(confidence),temperature=displayTemperatureConfidence(confidence),split=primary?.scope==='sky-and-rain';
+ const factors=c=>Array.isArray(c?.factors)&&c.factors.length?`<p>${escapeEvidence(c.factors.join(' · '))}</p>`:'';
+ const summary=c=>c?.summary?`<p>${escapeEvidence(c.summary)}</p>`:'';
+ const note=c=>c?.note?`<small>${escapeEvidence(c.note)}</small>`:'';
+ const temperatureSection=split?`<section class="dialog-temperature-confidence" data-confidence="${escapeEvidence(temperature?.key||'unavailable')}"><h3>Temperature confidence: ${escapeEvidence(temperature?.label||'Unavailable')}</h3>${summary(temperature)}${confidenceTemperatureEvidenceHTML(temperature,{...options,temperatureRating:true})}${factors(temperature)}${note(temperature)}</section>`:confidenceTemperatureEvidenceHTML(confidence,options);
+ return `<details class="dialog-confidence" data-confidence="${escapeEvidence(primary?.key||'unavailable')}" data-confidence-scope="${split?'sky-and-rain':'legacy'}"><summary>${forecastConfidenceLabel(confidence)}: ${escapeEvidence(primary?.label||'Unavailable')} · ${primary?.sourceCount??'?'} source${primary?.sourceCount===1?'':'s'}</summary>${summary(primary)}${split?confidenceWeatherEvidenceHTML(primary,options):''}${factors(primary)}${note(primary)}${temperatureSection}</details>`;
 }

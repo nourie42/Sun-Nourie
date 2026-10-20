@@ -1,3 +1,4 @@
+import {displayForecastConfidence} from './forecast-confidence.js?v=sky-rain-agreement-v1';
 import {timeAt} from './hourly-feels.js?v=current-rain-20261017-v3';
 const finite=n=>typeof n==='number'&&Number.isFinite(n);
 export const WEATHER_CHANGE_TITLE='Large weather change alert';
@@ -20,8 +21,8 @@ export function weatherChangeMessages(data,now=Date.now()){
     messages.push({kind:'dewpoint',text:`The air will feel ${rising?'more':'less'} humid from ${label(days[i])} to ${label(days[j])} as average daytime dew points ${rising?'rise':'fall'} more than 20°F.${!rising&&rain?' Rain is still possible during that period.':''}`});
    }
   }
-  const d=days[j],before=days.slice(j-2,j);
-  if(j>=2&&before.every(dry)&&consecutive(before[0],before[1])&&consecutive(before[1],d)&&finite(d.pop)&&d.pop>75&&finite(d.qpf)&&d.qpf>.25&&['moderate','high'].includes(d.confidence?.key)&&!messages.some(m=>m.kind==='rain'))messages.push({kind:'rain',text:`Rain returns ${label(d)} after two dry days: ${d.pop}% chance, with ${Number(d.qpf.toFixed(2))} inches expected and ${d.confidence.key} confidence.`});
+  const d=days[j],before=days.slice(j-2,j),confidence=displayForecastConfidence(d.confidence);
+  if(j>=2&&before.every(dry)&&consecutive(before[0],before[1])&&consecutive(before[1],d)&&finite(d.pop)&&d.pop>75&&finite(d.qpf)&&d.qpf>.25&&['moderate','high'].includes(confidence?.key)&&!messages.some(m=>m.kind==='rain'))messages.push({kind:'rain',text:`Rain returns ${label(d)} after two dry days: ${d.pop}% chance, with ${Number(d.qpf.toFixed(2))} inches expected and ${confidence.key} ${confidence.scope==='sky-and-rain'?'sky/rain agreement':'confidence'}.`});
  }
  return messages.map(m=>m.text);
 }

@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {runInNewContext} from 'node:vm';
-import {confidenceTemperatureEvidenceHTML} from '../public/weather-fusion/forecast-confidence.js';
+import {confidenceDetailsHTML} from '../public/weather-fusion/forecast-confidence.js';
 
 const app=readFileSync(new URL('../public/weather-fusion/app.js',import.meta.url),'utf8');
 const section=app.slice(app.indexOf('function refreshOpenDay()'),app.indexOf('\nfunction setBasemap()'));
@@ -26,7 +26,7 @@ function harness() {
     $:id=>id==='day-graph-hour'?root.input:elements[id],document:{activeElement:null},forecast:{location:{timeZone:'UTC'},days:[day('2026-09-12'),day('2026-09-13')]},activeDayDetail:null,
     Date,Event:class {constructor(type){this.type=type;}},finite:Number.isFinite,esc:String,temperature:value=>`${value}°`,percent:value=>`${value}%`,inches:value=>`${value} in`,
     dailyDisplay:d=>({label:d.label,condition:d.condition,tonight:false,primary:d.high,secondary:d.low,primaryLabel:'High'}),
-    dailyConfidenceNoticeHTML:()=>'',confidenceTemperatureEvidenceHTML,
+    dailyConfidenceNoticeHTML:()=>'',confidenceDetailsHTML,
     rainAwareCondition:condition=>condition,dailySkyCover:()=>null,hideLowRainChance:()=>false,rainTiming:()=>({}),rainTimingHTML:()=>'',
     forecastPeriodSummary:(f,index)=>({chance:f.days[index].chance,amount:.1,summary:`Updated chance ${f.days[index].chance}%.`}),
     displayedRainChance:(_forecast,chance)=>({value:chance,forecastValue:chance,observed:false}),
@@ -90,6 +90,20 @@ test('periodic dialog refresh preserves keyboard focus on the graph and confiden
   context.refresh();assert.equal(context.document.activeElement,root.summary);assert.equal(root.summary.focusOptions.preventScroll,true);
   const outside={id:'close-day'};context.document.activeElement=outside;
   context.refresh();assert.equal(context.document.activeElement,outside,'Refreshing content must not steal focus from another control.');
+});
+
+test('refresh replaces separate sky/rain and temperature grades without closing confidence details',()=>{
+  const {context,dialog,root}=harness(),original=context.forecast.days[1].confidence;
+  original.weather={scope:'sky-and-rain',key:'high',label:'High',score:95,sourceCount:4,summary:'Clear and dry sources agree.',factors:[]};
+  original.temperature={key:'low',label:'Low',score:55,summary:'Temperature sources disagree.',factors:[]};
+  context.show(1);root.confidence.open=true;context.document.activeElement=root.summary;
+  assert.match(root.innerHTML,/Sky\/rain agreement: High/);assert.match(root.innerHTML,/Temperature confidence: Low/);
+  original.weather={...original.weather,key:'low',label:'Low',score:55,summary:'Rain timing now differs.'};
+  original.temperature={...original.temperature,key:'high',label:'High',score:95};
+  context.refresh();
+  assert.match(root.innerHTML,/Sky\/rain agreement: Low/);assert.match(root.innerHTML,/Temperature confidence: High/);
+  assert.match(root.innerHTML,/Rain timing now differs/);assert.doesNotMatch(root.innerHTML,/Clear and dry sources agree/);
+  assert.equal(root.confidence.open,true);assert.equal(dialog.shown,1);assert.equal(context.document.activeElement,root.summary);
 });
 
 test('forecast details omit the user-rejected hour-by-hour explanatory comment',()=>{

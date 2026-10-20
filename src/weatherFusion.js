@@ -34,6 +34,7 @@ import {createModelSnowMapService} from './weatherFusionModelSnowMap.js';
 import {retainOfficialFeed,criticalOfficialUrl,validateOfficialPayload} from './weatherFusionOfficialRecovery.js';
 import {COMFORT_SCENE_ASSETS} from '../public/weather-fusion/exposure-scene.js';
 import {recoverForecastHours,recoverDailyConditions} from './weatherFusionFallback.js';
+import {addConditionConfidence} from './weatherFusionConditionConfidence.js';
 
 export const PRESETS = [
   { id: 'knightdale', name: 'Knightdale / Raleigh', latitude: 35.787, longitude: -78.4806 },
@@ -400,6 +401,8 @@ export function buildForecast({ location, point, forecast, hourly, grid, discuss
   addExposureWeather(output,exposureWeather);
   addAirQuality(output,airQuality);
   try{addSnowOutlook(output,{grid,periods:forecast?.periods||[],snowModels,winterModels,wpcWinter,now});}catch{output.snow={version:'snow-outlook-v2',possible:false,status:'unavailable',coverageStatus:'unavailable',days:[],error:'Snow outlook could not be built.'};}
+  addConditionConfidence(output,{now});
+  output.methodology+=' The main Sky/rain agreement indicator compares timestamp-matched cloud-cover categories and precipitation timing across available named forecast sources. It is separate from temperature confidence, which retains temperature disagreement, lead time and source-coverage evidence. Neither indicator is a calibrated accuracy percentage; missing source values are not clear skies or zero rain.';
   output.danTakeVersion=DAN_TAKE_VERSION;
   output.forecastConfidenceVersion=FORECAST_CONFIDENCE_VERSION;
   output.weatherDisplayVersion='weather-nourie-sky-consistency-v1';

@@ -56,3 +56,9 @@ html[data-weather-page="experimental"] .hero .today-panel #today-uncertainty .to
 #experimental-week .seven-day-metric .seven-day-rain-peak{font-size:9px;line-height:1;margin-left:2px;white-space:nowrap;color:#d5f0ff}
 
 #experimental-week .seven-day-metric:has(.seven-day-rain-peak)>svg{display:none}
+
+/* Name the agreement being graded; keep both words readable on narrow cards. */
+.seven-day-card{grid-template-rows:32px minmax(44px,1fr) 40px var(--week-metrics-height,60px) 56px}
+.seven-day-confidence-label>span{font-size:12px;line-height:1.1;white-space:normal;max-width:100%;overflow-wrap:normal}
+.seven-day-confidence-label strong{font-size:12px;line-height:1.2}
+@media(max-width:760px){.seven-day-card{grid-template-rows:28px minmax(31px,1fr) 36px var(--week-metrics-height,51px) 56px}.seven-day-confidence-label>span,.seven-day-confidence-label strong{font-size:12px}.seven-day-confidence-label{min-height:40px}.seven-day-meter{margin-top:5px}}
