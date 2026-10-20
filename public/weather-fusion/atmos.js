@@ -491,7 +491,7 @@ function renderBlendChart(){
   el.dataset.lo=lo;el.dataset.hi=hi;el.dataset.top=top;el.dataset.plot=plot;el.dataset.left=left;el.dataset.right=right;
   const policy=forecast.blendPolicy||{};
   $('blend-science').innerHTML=`<p><strong>Starting shares.</strong> ${esc(shareList(policy.sameDay))||'Not published in this update'}. Temperature uses these shares every hour. When a forecast does not cover an hour, the others split its share.</p>
-   <p>The shares are Weather Nourie’s chosen starting weights, not a measured accuracy ranking. ${forecast.google?.contributes?'WeatherNext holds its 10% share only while its data is fresh for this place.':'WeatherNext is not contributing for this place right now.'}</p>
+   <p>The shares are Weather Nourie’s chosen starting weights, not a measured accuracy ranking. ${forecast.google?.contributes?'WeatherNext starts at 10% while its data is fresh for this place; its applied share can vary by field and hour.':'WeatherNext is not contributing for this place right now.'}</p>
    <p>Want to see what different shares would do? Try <a href="#lab">Make your own forecast</a>.</p>`;
  });
 }
