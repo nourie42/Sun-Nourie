@@ -30,7 +30,7 @@
  * the left; family radar, map and inside air on the right). Its options are listed further down.
  */
 
-export const VERSION = '1.0.6';
+export const VERSION = '1.0.7';
 
 const FONTS_CSS = 'https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Figtree:wght@400;500;600;700&display=swap';
 const HLS_JS = 'https://cdn.jsdelivr.net/npm/hls.js@1.7.3/dist/hls.min.js';
@@ -2399,6 +2399,7 @@ export class NourieCamerasCard extends Base {
 //   connection_diagnostics: false           opt in to bounded failure metrics in HA system_log (no raw errors/URLs)
 //   camera_priority: false                  maximize the camera grid; side panel uses space only while visible
 //   air_visible: true                       false hides the Inside air panel
+//   air_visibility: always                  always or family (show air only with the family panel)
 //   cameras: [camera.driveway, camera.front_door, camera.hallway, camera.living_room]
 //   people: [person.dan, person.alicia]      optional; default is every person with a tracker
 //   location_sources:                       optional; use these trackers for location/status, keeping person names/photos
@@ -3044,6 +3045,7 @@ export class NourieWallCard extends Base {
     if (config.connection_diagnostics !== undefined && typeof config.connection_diagnostics !== 'boolean') throw new Error('connection_diagnostics must be true or false');
     if (config.family_visibility !== undefined && !['always', 'driving'].includes(config.family_visibility)) throw new Error('family_visibility must be always or driving');
     if (config.family_view !== undefined && !['radar_map', 'map'].includes(config.family_view)) throw new Error('family_view must be radar_map or map');
+    if (config.air_visibility !== undefined && !['always', 'family'].includes(config.air_visibility)) throw new Error('air_visibility must be always or family');
     for (const key of ['camera_priority', 'air_visible']) {
       if (config[key] !== undefined && typeof config[key] !== 'boolean') throw new Error(`${key} must be true or false`);
     }
@@ -3154,6 +3156,7 @@ export class NourieWallCard extends Base {
       map: q('.map'), mapCanvas: q('.map-canvas'), mapMsg: q('.map-msg'), rooms: q('.rooms'),
     };
     this.$.family.hidden = this.config.family_visibility === 'driving';
+    this.$.air.hidden = this.config.air_visible === false || (this.config.air_visibility === 'family' && this.$.family.hidden);
     this.$.radar.hidden = this.config.family_view === 'map';
     this.$.cams.addEventListener('click', (ev) => {
       const reconnect = ev.target.closest('.reconnect');
@@ -3378,7 +3381,7 @@ export class NourieWallCard extends Base {
     }
 
     $.wall.classList.toggle('camera-priority', this.config.camera_priority === true);
-    $.air.hidden = this.config.air_visible === false;
+    $.air.hidden = this.config.air_visible === false || (this.config.air_visibility === 'family' && !presentation.visible);
     $.side.hidden = $.air.hidden && $.family.hidden;
     $.wall.classList.toggle('side-visible', !$.side.hidden);
     if ($.air.hidden) {
