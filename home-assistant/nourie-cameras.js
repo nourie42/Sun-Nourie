@@ -2572,7 +2572,7 @@ export function radarHtml(fam) {
       ${marks.filter((m) => m.away).map((m) => `<path class="radar-leader" style="--pc:${m.p.color}" d="M${m.x.toFixed(3)} ${m.y.toFixed(3)} L${m.labelX.toFixed(3)} ${m.labelY.toFixed(3)}"/>`).join('')}
       <text class="rl" x="0" y="98" text-anchor="middle">Linear scale · dots show location</text>
     </svg>`;
-  const points = `<svg class="radar-svg radar-points" viewBox="-100 -100 200 200" aria-hidden="true">${marks.filter((m) => m.away).map((m) => `<circle class="radar-location" data-person="${esc(m.p.id)}" style="--pc:${m.p.color}" cx="${m.x.toFixed(3)}" cy="${m.y.toFixed(3)}" r="2.4"/>`).join('')}</svg>`;
+  const points = `<svg class="radar-svg radar-points" viewBox="-100 -100 200 200" aria-hidden="true">${marks.filter((m) => m.away).map((m) => `<circle class="radar-location" data-person="${esc(m.p.id)}" style="--pc:${m.p.color}" cx="${m.x.toFixed(3)}" cy="${m.y.toFixed(3)}" r="2.4" opacity="${Math.hypot(m.labelX - m.x, m.labelY - m.y) < 12 ? 0 : 1}"/>`).join('')}</svg>`;
   const pins = marks
     .map(({ p, labelX, labelY, away: isAway }) => `<span class="rm ${isAway ? '' : 'home'}" style="left:${(50 + labelX / 2).toFixed(2)}%;top:${(50 + labelY / 2).toFixed(2)}%;--pc:${p.color}" title="${esc(p.name)}${isAway ? ` · ${esc(fmtDistance(p.distKm, fam.metric))}` : ' · Home'}">${avatarHtml(p, 'sm')}${isAway ? `<span class="rm-l">${esc(p.first)} · ${esc(fmtDistance(p.distKm, fam.metric))}</span>` : ''}</span>`)
     .join('');
