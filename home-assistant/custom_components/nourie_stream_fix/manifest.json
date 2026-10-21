@@ -1,0 +1,8 @@
+{
+  "domain": "nourie_stream_fix",
+  "name": "Nest stream name compatibility",
+  "version": "1.0.0",
+  "dependencies": ["go2rtc"],
+  "iot_class": "local_push",
+  "integration_type": "system"
+}
