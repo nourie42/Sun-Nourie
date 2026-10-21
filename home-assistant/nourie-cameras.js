@@ -30,7 +30,7 @@
  * the left; family radar, map and inside air on the right). Its options are listed further down.
  */
 
-export const VERSION = '1.0.2';
+export const VERSION = '1.0.3';
 
 const FONTS_CSS = 'https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Figtree:wght@400;500;600;700&display=swap';
 const HLS_JS = 'https://cdn.jsdelivr.net/npm/hls.js@1.7.3/dist/hls.min.js';
@@ -215,6 +215,69 @@ export function pickCameras(hass, config = {}) {
 
 // ------------------------------------------------------------ sessions
 
+// Receiver rates are interval measurements, not a claim about the age of the scene.
+export function connectionTraffic(report, previous, observedAt) {
+  const stamp = Number.isFinite(report.timestamp) ? report.timestamp : observedAt;
+  const same = previous && previous.id === report.id;
+  const elapsed = same ? stamp - previous.stamp : 0;
+  const rate = (key, multiplier) => same && elapsed >= 50 && elapsed <= 5000
+    && Number.isFinite(report[key]) && Number.isFinite(previous[key]) && report[key] >= previous[key]
+    ? multiplier * (report[key] - previous[key]) / elapsed : null;
+  return {
+    incomingBps: rate('bytesReceived', 8000),
+    decodedFps: rate('framesDecoded', 1000),
+    previous: { id: report.id, stamp, bytesReceived: report.bytesReceived, framesDecoded: report.framesDecoded },
+  };
+}
+
+export function connectionGraphSample(player, t) {
+  const session = player.session;
+  const kind = session?.kind || player.protocol || '';
+  const stats = session?.stats || {};
+  const fresh = !!session && !session.closed && Number.isFinite(stats.sampleAt) && t - stats.sampleAt >= 0 && t - stats.sampleAt <= 3500;
+  const metric = kind === 'webrtc' ? 'traffic' : kind === 'hls' ? 'buffer' : 'none';
+  const raw = metric === 'traffic' ? stats.incomingBps : metric === 'buffer' ? stats.behind : null;
+  const value = fresh && Number.isFinite(raw) && raw >= 0 ? raw : null;
+  const frameAt = player.rtcPresentation?.lastAt;
+  return { at: t, kind, metric, value, state: player.status || 'idle',
+    fps: fresh && Number.isFinite(stats.decodedFps) ? stats.decodedFps : null,
+    frameAgeMs: frameAt ? Math.max(0, t - frameAt) : null };
+}
+
+export function connectionGraphHtml(player, t) {
+  const sample = connectionGraphSample(player, t);
+  const history = player.connectionHistory || (player.connectionHistory = []);
+  if (!history.length || t - history[history.length - 1].at >= 1000) history.push(sample);
+  while (history.length && t - history[0].at > 60000) history.shift();
+  const values = history.filter((point) => point.metric === sample.metric && point.kind === sample.kind && point.value != null).map((point) => point.value);
+  const ceiling = Math.max(sample.metric === 'buffer' ? 5 : 1, ...values);
+  let drawing = false;
+  let previousAt = null;
+  const path = history.map((point) => {
+    if (point.metric !== sample.metric || point.kind !== sample.kind || point.value == null) { drawing = false; return ''; }
+    if (previousAt != null && point.at - previousAt > 3500) drawing = false;
+    previousAt = point.at;
+    const x = 1 + 158 * Math.max(0, Math.min(1, (point.at - (t - 60000)) / 60000));
+    const y = 17 - 15 * Math.min(1, point.value / ceiling);
+    const command = drawing ? 'L' : 'M'; drawing = true;
+    return `${command}${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(' ');
+  const point = history[history.length - 1];
+  const lastY = point?.value == null || point.metric !== sample.metric || point.kind !== sample.kind ? null : 17 - 15 * Math.min(1, point.value / ceiling);
+  const lastX = point ? 1 + 158 * Math.max(0, Math.min(1, (point.at - (t - 60000)) / 60000)) : 159;
+  const measured = sample.value == null ? '—' : sample.metric === 'buffer' ? `${sample.value.toFixed(1)} s buffer`
+    : sample.value >= 1000000 ? `${(sample.value / 1000000).toFixed(1)} Mb/s` : `${Math.round(sample.value / 1000)} kb/s`;
+  const protocol = sample.kind === 'webrtc' ? 'RTC' : sample.kind === 'hls' ? 'HLS' : sample.kind === 'mjpeg' ? 'MJPEG' : 'No stream';
+  const state = sample.state === 'live' ? '' : ` · ${sample.state === 'waiting' ? 'retrying' : sample.state}`;
+  const playback = sample.metric === 'traffic'
+    ? sample.fps == null ? 'decode —' : `${Math.round(sample.fps)} fps decoded`
+    : sample.metric === 'buffer' ? 'buffer behind live edge' : 'waiting for receiver data';
+  const frame = sample.frameAgeMs == null ? 'frame progress timing unavailable' : `last frame progress ${(sample.frameAgeMs / 1000).toFixed(1)} s ago`;
+  const label = `Last 60 seconds: ${sample.metric === 'buffer' ? 'HLS buffer seconds' : 'incoming video bitrate'}. ${protocol}${state}. ${measured}. ${playback}. ${frame}. Gaps mean no measurement.`;
+  const warning = sample.state !== 'live' || (sample.fps === 0 && sample.value > 0) || sample.frameAgeMs > 5000;
+  return `<div class="connection ${warning ? 'connection-wait' : ''}" role="img" aria-label="${esc(label)}" title="${esc(label)}"><div class="connection-label"><span>${esc(protocol + state)}</span><b>${esc(measured)}</b></div><svg viewBox="0 0 160 20" aria-hidden="true"><path class="connection-base" d="M1,18 H159"></path><path class="connection-line" d="${path}"></path>${lastY == null ? '' : `<circle cx="${lastX.toFixed(1)}" cy="${lastY.toFixed(1)}" r="1.5"></circle>`}</svg><div class="connection-caption"><span>${esc(playback)}</span><span>60s</span></div></div>`;
+}
+
 // WebRTC through Home Assistant's camera/webrtc/offer subscription, mirroring the built-in player.
 export class RtcSession {
   constructor(player) {
@@ -236,6 +299,7 @@ export class RtcSession {
     this.lastBytes = 0;
     this.decodedFrames = null;
     this.previousReport = null;
+    this.trafficPrevious = null;
     this.stats = {};
   }
 
@@ -387,12 +451,15 @@ export class RtcSession {
     const emitted = delta('jitterBufferEmittedCount');
     const decodeTime = delta('totalDecodeTime');
     const jitterTime = delta('jitterBufferDelay');
+    const traffic = connectionTraffic(video, this.trafficPrevious, t);
     this.stats = {
       width: video.frameWidth || 0, height: video.frameHeight || 0, fps: Math.round(video.framesPerSecond || 0),
       decodedFramesDelta: decoded,
       decodeMs: decoded > 0 && decodeTime != null ? 1000 * decodeTime / decoded : null,
       jitterBufferMs: emitted > 0 && jitterTime != null ? 1000 * jitterTime / emitted : null,
+      sampleAt: t, incomingBps: traffic.incomingBps, decodedFps: traffic.decodedFps,
     };
+    this.trafficPrevious = traffic.previous;
     this.previousReport = Object.fromEntries(['id', 'framesDecoded', 'totalDecodeTime', 'jitterBufferDelay', 'jitterBufferEmittedCount'].map((key) => [key, video[key]]));
   }
 
@@ -574,6 +641,7 @@ class HlsSession {
     const behind = position?.behind ?? (Number.isFinite(this.hls?.latency) ? this.hls.latency : null);
     this.stats = {
       width: video.videoWidth || 0, height: video.videoHeight || 0, behind,
+      sampleAt: t,
       delayed: !!this.catchUp || !!(position && position.excess > HLS_EXCESS_LAG_S),
       catchingUp: !!this.catchUp,
     };
@@ -1005,7 +1073,12 @@ export class Player {
       p.firstAt = 0;
       p.lastAt = 0;
       p.boundary = globalThis.performance?.now() ?? 0;
-      p.lastCount = p.source === 'playback-quality' ? this.presentedCount() : p.session.decodedFrames;
+      p.lastCount = this.presentedCount();
+      p.lastDecodedCount = p.session.decodedFrames;
+      p.lastDecodedReport = p.session.previousReport?.id;
+      p.callbackSeen = false;
+      p.observable = false;
+      p.evidence = null;
       if (this.status === 'live') this.setStatus('reconnecting');
     }
     return true;
@@ -1017,7 +1090,7 @@ export class Player {
     const callbacks = typeof video.requestVideoFrameCallback === 'function';
     const source = callbacks ? 'presented' : this.presentedCount() != null ? 'playback-quality' : 'decoded';
     const p = this.rtcPresentation = { session, generation, source, watching: false, watchSince: 0,
-      firstAt: 0, lastAt: 0, lastCount: null, boundary: globalThis.performance?.now() ?? 0 };
+      firstAt: 0, lastAt: 0, lastCount: null, lastDecodedCount: null, callbackSeen: false, observable: false, evidence: null, boundary: globalThis.performance?.now() ?? 0 };
     if (!callbacks) return;
     const onFrame = (_time, metadata = {}) => {
       if (this.rtcPresentation !== p || generation !== this.attachmentGeneration
@@ -1028,6 +1101,8 @@ export class Player {
         && (!Number.isFinite(metadata.presentationTime) || metadata.presentationTime >= p.boundary)) {
         p.firstAt = p.firstAt || t;
         p.lastAt = t;
+        p.callbackSeen = true;
+        p.evidence = 'presented';
       }
       this.frameCallbackId = video.requestVideoFrameCallback(onFrame);
     };
@@ -1037,15 +1112,28 @@ export class Player {
   pollRtcPresentation(session, t) {
     const p = this.rtcPresentation;
     if (!p || p.session !== session || !this.watchRtcPresentation(t)) return null;
-    if (p.source !== 'presented') {
-      const count = p.source === 'playback-quality' ? this.presentedCount() : session.decodedFrames;
-      // Counters survive source changes in some browsers: baseline first, and reset on decreases.
-      if (count != null && p.lastCount != null && count > p.lastCount && this.video.readyState >= 2) {
-        p.firstAt = p.firstAt || t;
-        p.lastAt = t;
-      }
-      p.lastCount = count;
+    // Frame callbacks are optional browser evidence, not a prerequisite for working video.
+    // Independently check frame counters so an exposed but silent callback API cannot keep
+    // a playing stream behind the still or repeatedly restart it. MediaStream currentTime
+    // is deliberately excluded: it can advance while every video frame is frozen.
+    const count = this.presentedCount();
+    const decoded = session.decodedFrames;
+    const renderedMoved = count != null && p.lastCount != null && count > p.lastCount;
+    const reportId = session.previousReport?.id;
+    const decodedMoved = decoded != null && p.lastDecodedCount != null && decoded > p.lastDecodedCount
+      && reportId === p.lastDecodedReport;
+    const wasObservable = p.observable;
+    p.observable = count != null || decoded != null || p.callbackSeen;
+    if (p.observable && !wasObservable && !p.firstAt) p.watchSince = t;
+    if ((renderedMoved || decodedMoved) && this.video.readyState >= 2) {
+      p.firstAt = p.firstAt || t;
+      p.lastAt = t;
+      p.evidence = renderedMoved ? 'playback-quality' : 'decoded';
     }
+    // Establish fresh baselines per attachment/resume; decreases are resets, not progress.
+    p.lastCount = count;
+    p.lastDecodedCount = decoded;
+    p.lastDecodedReport = reportId;
     return p;
   }
 
@@ -1216,7 +1304,11 @@ export class Player {
       this.shadow.close();
       this.shadow = null;
     }
-    const readyAt = rtc ? presentation?.firstAt : session.firstMediaAt;
+    // If the browser supplies no usable frame measurement, preserve its normal ready-state
+    // behavior instead of waiting forever for unsupported metrics. Known zero/frozen counters
+    // do not take this fallback and still require frame progress.
+    const readyAt = rtc ? (presentation?.firstAt || (presentation && !presentation.observable
+      && this.video.readyState >= 2 ? session.firstMediaAt : 0)) : session.firstMediaAt;
     if (readyAt && this.status !== 'live' && (!this.mount || this.protocol === 'mjpeg' || this.video.readyState >= 2)) {
       this.readyMs = Math.max(0, readyAt - (this.requestAt || session.startedAt));
       this.everLive = true;
@@ -1227,7 +1319,7 @@ export class Player {
     }
     // Packet flow does not prove a mounted video is decoding/presenting. Do not charge time
     // spent paused, hidden or unmounted, and allow a newly attached shadow its own startup grace.
-    if (presentation && (presentation.source !== 'decoded' || session.decodedFrames != null)) {
+    if (presentation?.observable) {
       const deadline = presentation.firstAt ? presentation.lastAt + this.card.stallMs
         : presentation.watchSince + CONNECT_TIMEOUT_MS;
       if (t > deadline) {
@@ -1316,7 +1408,8 @@ export class Player {
   capture(force = false) {
     const t = now();
     if (!this.mount || (!force && t - this.lastCapture < 1000)) return;
-    if (this.session?.kind === 'webrtc' && !this.rtcPresentation?.firstAt) return;
+    if (this.session?.kind === 'webrtc' && !this.rtcPresentation?.firstAt
+      && !(this.status === 'live' && this.rtcPresentation?.observable === false)) return;
     const source = this.protocol === 'mjpeg' ? this.img : this.video;
     const w = source?.videoWidth || source?.naturalWidth || 0;
     const h = source?.videoHeight || source?.naturalHeight || 0;
@@ -1356,7 +1449,7 @@ export class Player {
       protocol: this.protocol,
       // Local snapshot only; presentation/receiver metrics cannot establish scene freshness.
       build: VERSION,
-      presentationSource: this.rtcPresentation?.source || null,
+      presentationSource: this.rtcPresentation?.evidence || null,
       frameAgeMs: this.rtcPresentation?.lastAt ? Math.max(0, now() - this.rtcPresentation.lastAt) : null,
       packetAgeMs: this.session?.lastMediaAt ? Math.max(0, now() - this.session.lastMediaAt) : null,
       decodedFramesDelta: stats.decodedFramesDelta ?? null,
@@ -2391,7 +2484,7 @@ function avatarHtml(p, cls = '') {
   return `<span class="ava ${cls}" style="--pc:${p.color}">${p.picture ? `<img src="${esc(p.picture)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : esc(initials)}${p.driving ? `<i class="ava-b">${ic('car')}</i>` : ''}</span>`;
 }
 
-// Pushes radar markers apart until avatar-plus-label blocks stop overlapping (units are a 200-wide box).
+// Spaces callouts, never geographic positions (units are a 200-wide box).
 export function spreadMarks(marks, w = 54, h = 36) {
   for (let round = 0; round < 40; round += 1) {
     let moved = false;
@@ -2427,38 +2520,63 @@ export function spreadMarks(marks, w = 54, h = 36) {
   return marks;
 }
 
-// Distance rings on a log scale (1, 10 and 100 miles or km), north up, home in the middle.
-function radarHtml(fam) {
+// One linear scale for every location and ring. Only the avatar/name callouts
+// may move to avoid overlap; their colored location dots keep the true bearing
+// and distance from home. Home avatars are a presence group around the center.
+export function radarGeometry(fam) {
   const metric = fam.metric;
   const unit = metric ? 'km' : 'mi';
   const toUnit = (km) => (metric ? km : km * 0.621371);
-  const R0 = 24;
-  const R1 = 92;
-  const MAX = 300;
-  const rOf = (d) => R0 + (Math.log10(1 + d) / Math.log10(1 + MAX)) * (R1 - R0);
-  const rings = [1, 10, 100].map((d) => ({ d, r: rOf(d) }));
-  const athome = fam.people.filter((p) => p.isHome || (p.distKm !== null && toUnit(p.distKm) < 0.1));
-  const away = fam.people.filter((p) => !athome.includes(p) && p.bearing !== null);
+  const radius = 92;
+  const athome = fam.people.filter((p) => p.isHome);
+  const away = fam.people.filter((p) => !p.isHome && Number.isFinite(p.distKm) && p.distKm >= 0).map((p) => {
+    // familyOf suppresses bearings inside 50 m; valid nearby coordinates still
+    // deserve a measured point instead of disappearing or being marked Home.
+    const hasCoords = [fam.home?.lat, fam.home?.lon, p.lat, p.lon].every(Number.isFinite);
+    const bearing = Number.isFinite(p.bearing) ? p.bearing : p.distKm === 0 ? 0 : hasCoords ? bearingDeg(fam.home.lat, fam.home.lon, p.lat, p.lon) : null;
+    return { p, bearing };
+  }).filter((m) => Number.isFinite(m.bearing));
+  const farthest = Math.max(1, ...away.map(({ p }) => toUnit(p.distKm)));
+  const magnitude = 10 ** Math.floor(Math.log10(farthest));
+  const maxDistance = [1, 2, 5, 10].find((n) => n * magnitude >= farthest * (1 - Number.EPSILON * 4)) * magnitude;
+  const rOf = (d) => (d / maxDistance) * radius;
+  const rings = [0.25, 0.5, 0.75, 1].map((fraction) => ({ d: fraction * maxDistance, r: fraction * radius }));
   const marks = [];
   athome.forEach((p, i) => {
     const ang = (i / athome.length) * 2 * Math.PI - Math.PI / 2;
     marks.push({ p, x: Math.cos(ang) * 24, y: Math.sin(ang) * 24, fixed: true });
   });
-  for (const p of away) {
-    const r = Math.min(R1, rOf(toUnit(p.distKm)));
-    const b = (p.bearing * Math.PI) / 180;
+  for (const { p, bearing } of away) {
+    const r = rOf(toUnit(p.distKm));
+    const b = (bearing * Math.PI) / 180;
     marks.push({ p, x: Math.sin(b) * r, y: -Math.cos(b) * r, away: true });
   }
-  spreadMarks([{ x: 0, y: 0, fixed: true }, ...marks]);
+  // The callout box includes the label below its avatar. Keep that box inside
+  // the radar, but never clamp or nudge the actual location coordinates.
+  const callouts = marks.map((m) => ({ x: m.x, y: m.y + (m.away ? 12 : 0), fixed: m.fixed }));
+  spreadMarks([{ x: 0, y: 0, fixed: true }, ...callouts], 54, 40);
+  marks.forEach((m, i) => {
+    m.labelX = callouts[i].x;
+    m.labelY = callouts[i].y - (m.away ? 12 : 0);
+  });
+  return { unit, radius, maxDistance, rings, marks };
+}
+
+export function radarHtml(fam) {
+  const { unit, radius, maxDistance, rings, marks } = radarGeometry(fam);
+  const ringLabel = (d) => d.toLocaleString(undefined, { maximumFractionDigits: 2 });
   const svg = `<svg class="radar-svg" viewBox="-100 -100 200 200" aria-hidden="true">
-      <circle class="rr" r="${R1}"/>${rings.map((g) => `<circle class="rr dash" r="${g.r.toFixed(1)}"/><text class="rl" x="2" y="${(-g.r + 7).toFixed(1)}">${g.d} ${unit}</text>`).join('')}
-      <path class="rx" d="M0 -${R1} V${R1} M-${R1} 0 H${R1}"/>
-      <text class="rl n" x="0" y="-${R1 + 3}" text-anchor="middle">N</text>
+      ${rings.map((g, i) => `<circle class="rr${i < rings.length - 1 ? ' dash' : ''}" r="${g.r.toFixed(1)}"/><text class="rl" x="2" y="${(-g.r + 7).toFixed(1)}">${ringLabel(g.d)} ${unit}</text>`).join('')}
+      <path class="rx" d="M0 -${radius} V${radius} M-${radius} 0 H${radius}"/>
+      <text class="rl n" x="0" y="-${radius + 3}" text-anchor="middle">N</text>
+      ${marks.filter((m) => m.away).map((m) => `<path class="radar-leader" style="--pc:${m.p.color}" d="M${m.x.toFixed(3)} ${m.y.toFixed(3)} L${m.labelX.toFixed(3)} ${m.labelY.toFixed(3)}"/>`).join('')}
+      <text class="rl" x="0" y="98" text-anchor="middle">Linear scale · dots show location</text>
     </svg>`;
+  const points = `<svg class="radar-svg radar-points" viewBox="-100 -100 200 200" aria-hidden="true">${marks.filter((m) => m.away).map((m) => `<circle class="radar-location" data-person="${esc(m.p.id)}" style="--pc:${m.p.color}" cx="${m.x.toFixed(3)}" cy="${m.y.toFixed(3)}" r="2.4"/>`).join('')}</svg>`;
   const pins = marks
-    .map(({ p, x, y, away: isAway }) => `<span class="rm ${isAway ? '' : 'home'}" style="left:${(50 + x / 2).toFixed(2)}%;top:${(50 + y / 2).toFixed(2)}%;--pc:${p.color}" title="${esc(p.name)}">${avatarHtml(p, 'sm')}${isAway ? `<span class="rm-l">${esc(p.first)} · ${esc(fmtDistance(p.distKm, metric))}</span>` : ''}</span>`)
+    .map(({ p, labelX, labelY, away: isAway }) => `<span class="rm ${isAway ? '' : 'home'}" style="left:${(50 + labelX / 2).toFixed(2)}%;top:${(50 + labelY / 2).toFixed(2)}%;--pc:${p.color}" title="${esc(p.name)}${isAway ? ` · ${esc(fmtDistance(p.distKm, fam.metric))}` : ' · Home'}">${avatarHtml(p, 'sm')}${isAway ? `<span class="rm-l">${esc(p.first)} · ${esc(fmtDistance(p.distKm, fam.metric))}</span>` : ''}</span>`)
     .join('');
-  return `<div class="radar-box"><div class="sweep"></div>${svg}<span class="rm-home">${ic('home')}</span>${pins}</div>`;
+  return `<div class="radar-box" title="Distance from home; outer ring ${ringLabel(maxDistance)} ${unit}"><div class="sweep"></div>${svg}<span class="rm-home">${ic('home')}</span>${pins}${points}</div>`;
 }
 
 function peopleHtml(fam) {
@@ -2619,6 +2737,19 @@ button:focus-visible { outline: 2px solid var(--nc-cyan); outline-offset: 2px; }
 .scrim { position: absolute; left: 0; right: 0; display: flex; align-items: center; justify-content: space-between; gap: 8px; pointer-events: none; }
 .scrim.top { top: 0; padding: 12px 12px 28px; background: linear-gradient(rgba(2, 7, 14, .7), rgba(2, 7, 14, 0)); }
 .scrim.bot { bottom: 0; padding: 26px 10px 10px; background: linear-gradient(rgba(2, 7, 14, 0), rgba(2, 7, 14, .6)); }
+/* The connection plot overlays the feed; it never takes grid or video space. */
+.connection-slot { position: absolute; z-index: 3; right: 10px; bottom: 10px; width: 170px; pointer-events: auto; }
+.connection { padding: 5px 7px 4px; border-radius: 8px; background: rgba(3, 12, 21, .76); color: var(--nc-cyan); border: 1px solid var(--nc-line-2); backdrop-filter: blur(5px); font: 500 10px/1.15 var(--nc-display); font-variant-numeric: tabular-nums; }
+.connection-label, .connection-caption { display: flex; align-items: center; justify-content: space-between; gap: 6px; white-space: nowrap; }
+.connection-label > span { overflow: hidden; text-overflow: ellipsis; }
+.connection-label b { flex: none; font-weight: 600; }
+.connection svg { display: block; width: 100%; height: 19px; overflow: visible; }
+.connection-line { fill: none; stroke: currentColor; stroke-width: 1.5; vector-effect: non-scaling-stroke; }
+.connection-base { fill: none; stroke: currentColor; opacity: .24; stroke-width: .7; }
+.connection circle { fill: currentColor; }
+.connection-caption { font-size: 9px; color: var(--nc-dim); }
+.connection-wait { color: var(--nc-amber); }
+.cell .connection-slot ~ .tool { bottom: 66px; }
 .camera-actions { display: flex; align-items: center; gap: 6px; flex: none; }
 .reconnect { position: relative; z-index: 3; pointer-events: auto; display: grid; place-items: center; width: 28px; height: 28px; flex: none; border-radius: 8px; color: var(--nc-cyan); background: var(--nc-veil); border: 1px solid var(--nc-line-2); }
 .reconnect:disabled { opacity: .4; cursor: default; }
@@ -2668,6 +2799,9 @@ button:focus-visible { outline: 2px solid var(--nc-cyan); outline-offset: 2px; }
 .radar { position: relative; flex: 0 0 auto; height: clamp(170px, 30vh, 340px); container-type: size; display: grid; place-items: center; margin: 4px 12px 0; }
 .radar-box { position: relative; width: min(100cqw, 100cqh); height: min(100cqw, 100cqh); }
 .radar-svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.radar-leader { fill: none; stroke: var(--pc); stroke-width: .65; opacity: .65; }
+.radar-points { z-index: 3; pointer-events: none; }
+.radar-location { fill: var(--pc); stroke: #06101c; stroke-width: 1; }
 .rr { fill: none; stroke: rgba(124, 214, 255, .2); stroke-width: .6; }
 .rr.dash { stroke-dasharray: 1.5 3; stroke: rgba(124, 214, 255, .16); }
 .rx { stroke: rgba(124, 214, 255, .07); stroke-width: .5; }
@@ -2676,6 +2810,8 @@ button:focus-visible { outline: 2px solid var(--nc-cyan); outline-offset: 2px; }
 .sweep { position: absolute; inset: 4%; border-radius: 50%; background: conic-gradient(from 0deg, rgba(77, 227, 255, .2), rgba(77, 227, 255, 0) 24%, transparent); animation: turn 8s linear infinite; }
 .rm-home { position: absolute; left: 50%; top: 50%; width: 40px; height: 40px; transform: translate(-50%, -50%); display: grid; place-items: center; border-radius: 50%; font-size: 19px; color: var(--nc-cyan); background: radial-gradient(circle, rgba(77, 227, 255, .25), rgba(5, 13, 24, .92) 70%); box-shadow: 0 0 0 1.5px rgba(77, 227, 255, .6), 0 0 26px rgba(77, 227, 255, .45); }
 .rm { position: absolute; z-index: 2; transform: translate(-50%, -50%); display: grid; justify-items: center; gap: 4px; }
+.rm:not(.home) { display: block; width: 32px; height: 32px; }
+.rm:not(.home) .rm-l { position: absolute; left: 50%; top: 36px; transform: translateX(-50%); }
 .rm-l { padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; white-space: nowrap; background: rgba(5, 13, 24, .88); border: 1px solid var(--nc-line); }
 .ava { position: relative; display: grid; place-items: center; flex: none; width: 38px; height: 38px; border-radius: 50%; font: 600 14px/1 var(--nc-display); color: #06101c; background: var(--pc); box-shadow: 0 0 0 2px #06101c, 0 0 0 3.5px var(--pc), 0 0 16px -2px var(--pc); }
 .ava img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
@@ -2971,11 +3107,12 @@ export class NourieWallCard extends Base {
       const cell = document.createElement('div');
       cell.className = 'cell';
       cell.dataset.id = id;
-      cell.innerHTML = `<img class="backdrop" alt="" aria-hidden="true"><div class="vid"></div><img class="still" alt=""><div class="cmsg" hidden><span class="cmsg-ic"></span><span class="cmsg-t"></span></div><div class="scrim top"><span class="cname"></span><span class="camera-actions"><span class="pill"></span><button type="button" class="reconnect" aria-label="Reconnect camera">${ic('retry')}</button></span></div><div class="scrim bot"><span class="chip" hidden></span></div><button type="button" class="hit"></button><button type="button" class="tool" aria-label="Camera details">${ic('info')}</button>`;
+      cell.innerHTML = `<img class="backdrop" alt="" aria-hidden="true"><div class="vid"></div><img class="still" alt=""><div class="cmsg" hidden><span class="cmsg-ic"></span><span class="cmsg-t"></span></div><div class="scrim top"><span class="cname"></span><span class="camera-actions"><span class="pill"></span><button type="button" class="reconnect" aria-label="Reconnect camera">${ic('retry')}</button></span></div><div class="scrim bot"><span class="chip" hidden></span></div><div class="connection-slot"></div><button type="button" class="hit"></button><button type="button" class="tool" aria-label="Camera details">${ic('info')}</button>`;
       $.cams.append(cell);
       this.cells.set(id, {
         node: cell, vid: cell.querySelector('.vid'), still: cell.querySelector('.still'), backdrop: cell.querySelector('.backdrop'),
         name: cell.querySelector('.cname'), pill: cell.querySelector('.pill'), reconnect: cell.querySelector('.reconnect'), chip: cell.querySelector('.chip'), hit: cell.querySelector('.hit'),
+        connection: cell.querySelector('.connection-slot'),
         msg: cell.querySelector('.cmsg'), msgIc: cell.querySelector('.cmsg-ic'), msgT: cell.querySelector('.cmsg-t'),
       });
     }
@@ -3070,6 +3207,7 @@ export class NourieWallCard extends Base {
       cell.reconnect.setAttribute('aria-label', `Reconnect ${name}`);
       cell.reconnect.title = `Reconnect ${name}`;
       cell.reconnect.disabled = !p.canReconnect(t);
+      setHTML(cell.connection, connectionGraphHtml(p, t));
       setPill(cell.pill, pillFor(p, t));
       setSrc(cell.still, p.still);
       setSrc(cell.backdrop, p.still);
