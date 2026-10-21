@@ -1,5 +1,5 @@
 import {finite} from './weather-math.js?v=current-rain-20261017-v3';
-export const OUTDOOR_FEELS_VERSION = 'weather-nourie-outdoor-v1';
+export const OUTDOOR_FEELS_VERSION = 'weather-nourie-outdoor-high-sun-v2';
 /** One exposure contract for every primary feels-like reading. The existing
  * thermal model is unchanged; shade is a separately named comparison, never
  * silently substituted for a valid outdoor result. Explicit missing stays missing.

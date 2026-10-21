@@ -11,7 +11,7 @@ const night=Date.parse('2026-10-16T10:00:00Z');
 
 import {utciF} from '../public/weather-fusion/utci.js';
 
-test('the reported sunny 65 F afternoon uses the correct hour, wind units and independent UTCI values',()=>{
+test('the reported sunny 65 F afternoon keeps correct inputs and raises the high-sun radiant estimate',()=>{
  const place={latitude:35.787,longitude:-78.4806,timeZone:'America/New_York'};
  const time=Date.parse('2026-10-19T19:00:00Z'); // Monday 3 PM EDT, not UTC 3 PM.
  const input={temperature:65,dewpoint:43.8,wind:12,skyCover:10.6716,condition:'Sunny'};
@@ -29,7 +29,8 @@ test('the reported sunny 65 F afternoon uses the correct hour, wind units and in
   assert.equal(estimate.windChillFloor,false,'NWS wind chill is not extrapolated into this 65 F case');
  }
  assert.ok(Math.abs(shade.value-reference.shade)<1e-8);
- assert.ok(Math.abs(outdoor.value-reference.outdoor)<1e-8);
+ assert.ok(Math.abs(outdoor.value-utciF(input.temperature,outdoor.tr,input.wind,outdoor.rh))<1e-8,'the UTCI equation stays unchanged at the revised estimated MRT');
+ assert.ok(outdoor.value>reference.outdoor+2&&outdoor.value<reference.outdoor+5,'the requested midday solar adjustment raises this example moderately');
  assert.ok(outdoor.tr>shade.tr,'direct sunlight increases the estimated radiant temperature');
  assert.ok(outdoor.value>shade.value+7,'sunlight is included rather than silently using shade');
  assert.ok(tier3FeelsLike({...input,wind:6},place,time,'outdoors').value>65,'a lighter breeze can feel warmer than air');
