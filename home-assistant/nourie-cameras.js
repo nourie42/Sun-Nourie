@@ -30,7 +30,7 @@
  * the left; family radar, map and inside air on the right). Its options are listed further down.
  */
 
-export const VERSION = '1.0.0';
+export const VERSION = '1.1.0';
 
 const FONTS_CSS = 'https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Figtree:wght@400;500;600;700&display=swap';
 const HLS_JS = 'https://cdn.jsdelivr.net/npm/hls.js@1.7.3/dist/hls.min.js';
@@ -1983,7 +1983,8 @@ export class NourieCamerasCard extends Base {
 //
 //   type: custom:nourie-wall-card
 //   cameras: [camera.driveway, camera.front_door, camera.hallway, camera.living_room]
-//   people: [person.dan, person.alicia]      optional; default is every person with a tracker
+//   people: [device_tracker.life360_dan]     optional; default is everyone in Life360 (or people with a tracker)
+//                                            an entry can rename: {entity: device_tracker.life360_dan, name: Dan}
 //   air: [{device: Angelroom, name: Angel}]  optional; only these air monitors, in this order, with these names
 //   air_exclude: [Master blue]               optional; device names to leave out of Inside air
 //   fit: contain                             contain (whole picture) or cover (fill each tile)
@@ -2077,55 +2078,101 @@ function zonesOf(hass) {
     .filter((z) => z.lat !== null && z.lon !== null && !z.passive);
 }
 
-function personOf(hass, id, index, home) {
+function shortAddress(address) {
+  return String(address || '').split(',').map((x) => x.trim()).filter(Boolean).slice(0, 2).join(', ');
+}
+
+// Life360 names its members "Life360 First Last"; drop that prefix and any family surname they share.
+function cleanNames(names) {
+  const base = names.map((n) => String(n || '').replace(/^life360\s+/i, '').replace(/\s+/g, ' ').trim());
+  const lastCount = new Map();
+  for (const n of base) {
+    const w = n.split(' ');
+    if (w.length > 1) lastCount.set(w[w.length - 1].toLowerCase(), (lastCount.get(w[w.length - 1].toLowerCase()) || 0) + 1);
+  }
+  return base.map((n) => {
+    const w = n.split(' ');
+    return w.length > 1 && (lastCount.get(w[w.length - 1].toLowerCase()) || 0) >= 2 ? w.slice(0, -1).join(' ') : n;
+  });
+}
+
+function personOf(hass, id, index, home, displayName) {
   const st = hass.states[id];
   const a = st.attributes || {};
-  const trackers = Array.isArray(a.device_trackers) ? a.device_trackers : [];
-  const trackerId = trackers.find((t) => hass.entities?.[t]?.platform === 'life360') || a.source || trackers[0] || null;
-  const t = (trackerId && hass.states[trackerId]?.attributes) || {};
+  let t = a;
+  if (id.startsWith('person.')) {
+    const trackers = Array.isArray(a.device_trackers) ? a.device_trackers : [];
+    const trackerId = trackers.find((x) => hass.entities?.[x]?.platform === 'life360') || a.source || trackers[0] || null;
+    t = (trackerId && hass.states[trackerId]?.attributes) || {};
+  }
   const lat = toNum(a.latitude ?? t.latitude);
   const lon = toNum(a.longitude ?? t.longitude);
   const isHome = st.state === 'home';
-  const name = String(a.friendly_name || id.split('.')[1].replace(/_/g, ' ')).replace(/\s+/g, ' ').trim();
+  const name = String(displayName || a.friendly_name || id.split('.')[1].replace(/_/g, ' ')).replace(/\s+/g, ' ').trim();
   const speed = toNum(t.speed);
   const distKm = home && lat !== null && lon !== null ? distanceKm(home.lat, home.lon, lat, lon) : null;
   return {
     id,
     name,
-    first: name.split(' ')[0],
-    picture: a.entity_picture || '',
+    short: name.length <= 12 ? name : name.split(' ')[0],
+    picture: a.entity_picture || t.entity_picture || '',
     color: PERSON_COLORS[index % PERSON_COLORS.length],
     state: st.state,
     isHome,
     zone: !isHome && !['not_home', 'unknown', 'unavailable'].includes(st.state) ? st.state : '',
+    place: String(t.place || '').trim(),
+    address: shortAddress(t.address),
     lat,
     lon,
-    accuracy: toNum(a.gps_accuracy ?? t.gps_accuracy),
     distKm,
     bearing: distKm !== null && distKm > 0.05 ? bearingDeg(home.lat, home.lon, lat, lon) : null,
     driving: !!t.driving || (!isHome && speed !== null && speed > 6),
   };
 }
 
-// People are person entities that have a tracker, so service accounts stay out.
+// Family comes from Life360 when it is set up, since that is where the live locations are;
+// otherwise from person entities that have a tracker. people: in the card config picks and renames.
 export function familyOf(hass, config = {}) {
   const states = hass?.states || {};
+  const ents = hass?.entities || {};
   const home = homeOf(hass);
-  const ids = Array.isArray(config.people)
-    ? config.people.filter((id) => states[id])
-    : Object.keys(states).filter((id) => id.startsWith('person.') && (states[id].attributes?.device_trackers || []).length).sort();
-  const people = ids.map((id, i) => personOf(hass, id, i, home));
-  people.sort((a, b) => Number(b.isHome) - Number(a.isHome) || a.name.localeCompare(b.name));
+  let entries;
+  if (Array.isArray(config.people) && config.people.length) {
+    entries = config.people
+      .map((x) => (typeof x === 'string' ? { entity: x } : x))
+      .filter((x) => x && typeof x.entity === 'string' && states[x.entity]);
+  } else {
+    const life = Object.keys(states)
+      .filter((id) => id.startsWith('device_tracker.') && ents[id]?.platform === 'life360' && !ents[id]?.hidden && states[id].state !== 'unavailable')
+      .sort();
+    const fallback = Object.keys(states).filter((id) => id.startsWith('person.') && (states[id].attributes?.device_trackers || []).length).sort();
+    entries = (life.length ? life : fallback).map((entity) => ({ entity }));
+  }
+  const names = cleanNames(entries.map((e) => states[e.entity].attributes?.friendly_name || e.entity.split('.')[1].replace(/_/g, ' ')));
+  const people = entries.map((e, i) => personOf(hass, e.entity, i, home, e.name || names[i]));
+  people.sort((a, b) => Number(b.isHome) - Number(a.isHome) || (a.distKm ?? Infinity) - (b.distKm ?? Infinity) || a.name.localeCompare(b.name));
   return { home, zones: zonesOf(hass), people, metric: hass?.config?.unit_system?.length === 'km' };
 }
 
-function personStatus(p, metric) {
-  if (p.driving) return 'Driving';
+// Where someone is, in words: Home, a zone, Life360's place name, or the first part of the street address.
+function whereText(p) {
   if (p.isHome) return 'Home';
   if (p.zone) return p.zone;
-  if (p.distKm !== null) return `${fmtDistance(p.distKm, metric)} away`;
-  if (p.state === 'not_home') return 'Away';
-  return 'No location';
+  if (p.place) return p.place;
+  if (p.address) return p.address;
+  return p.lat !== null ? 'Away' : 'No location';
+}
+
+// People within about 80 m of each other share one marker on the map, so nobody hides behind someone else.
+function groupPeople(people) {
+  const groups = [];
+  for (const p of people) {
+    const g = groups.find((x) => distanceKm(x.lat, x.lon, p.lat, p.lon) < 0.08);
+    if (g) g.people.push(p);
+    else groups.push({ lat: p.lat, lon: p.lon, people: [p] });
+  }
+  for (const g of groups) g.key = g.people.map((p) => p.id).join('|');
+  return groups;
 }
 
 function avatarHtml(p, cls = '') {
@@ -2198,20 +2245,9 @@ function radarHtml(fam) {
       <text class="rl n" x="0" y="-${R1 + 3}" text-anchor="middle">N</text>
     </svg>`;
   const pins = marks
-    .map(({ p, x, y, away: isAway }) => `<span class="rm ${isAway ? '' : 'home'}" style="left:${(50 + x / 2).toFixed(2)}%;top:${(50 + y / 2).toFixed(2)}%;--pc:${p.color}" title="${esc(p.name)}">${avatarHtml(p, 'sm')}${isAway ? `<span class="rm-l">${esc(p.first)} · ${esc(fmtDistance(p.distKm, metric))}</span>` : ''}</span>`)
+    .map(({ p, x, y, away: isAway }) => `<span class="rm ${isAway ? '' : 'home'}" style="left:${(50 + x / 2).toFixed(2)}%;top:${(50 + y / 2).toFixed(2)}%;--pc:${p.color}" title="${esc(p.name)}">${avatarHtml(p, 'sm')}${isAway ? `<span class="rm-l">${esc(p.short)} · ${esc(fmtDistance(p.distKm, metric))}</span>` : ''}</span>`)
     .join('');
   return `<div class="radar-box"><div class="sweep"></div>${svg}<span class="rm-home">${ic('home')}</span>${pins}</div>`;
-}
-
-function peopleHtml(fam) {
-  if (!fam.people.length) return '<span class="none">Add a person with a phone tracker in Home Assistant and they show up here.</span>';
-  return fam.people
-    .map((p) => {
-      const status = personStatus(p, fam.metric);
-      const tone = p.isHome ? 'home' : p.lat !== null ? 'away' : 'unknown';
-      return `<span class="who-chip ${tone}" style="--pc:${p.color}">${avatarHtml(p, 'xs')}<b>${esc(p.first)}</b><small>${esc(status)}</small></span>`;
-    })
-    .join('');
 }
 
 function tileLayers() {
@@ -2390,21 +2426,14 @@ button:focus-visible { outline: 2px solid var(--nc-cyan); outline-offset: 2px; }
 
 .side { display: flex; flex-direction: column; gap: 10px; min-height: 0; min-width: 0; }
 .panel { position: relative; border-radius: 18px; background: linear-gradient(180deg, rgba(20, 44, 70, .5), rgba(9, 23, 39, .72)); border: 1px solid var(--nc-line); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .04); }
-.sec { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 14px 0; }
+.sec { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 11px 14px 0; }
 .kicker { display: inline-flex; align-items: center; gap: 8px; font: 600 12.5px/1 var(--nc-display); letter-spacing: .16em; text-transform: uppercase; }
 .kicker .ic { font-size: 16px; color: var(--nc-cyan); }
 .sec small { font-size: 11.5px; color: var(--nc-faint); font-variant-numeric: tabular-nums; white-space: nowrap; }
 
 .fam { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
-.people { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 14px 0; }
-.people .none, .radar .none { font-size: 12px; color: var(--nc-faint); text-align: center; }
-.who-chip { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px 0 3px; border-radius: 999px; background: rgba(4, 12, 22, .55); border: 1px solid var(--nc-line); white-space: nowrap; }
-.who-chip b { font-size: 12.5px; font-weight: 600; }
-.who-chip small { font-size: 11.5px; color: var(--nc-dim); }
-.who-chip.home small { color: var(--nc-cyan); }
-.who-chip.unknown { opacity: .7; }
-.who-chip.unknown small { color: var(--nc-faint); }
-.radar { position: relative; flex: 0 0 auto; height: clamp(170px, 30vh, 340px); container-type: size; display: grid; place-items: center; margin: 4px 12px 0; }
+.radar .none { font-size: 12px; color: var(--nc-faint); text-align: center; }
+.radar { position: relative; flex: 0 0 auto; height: clamp(140px, calc(44vh - 160px), 330px); container-type: size; display: grid; place-items: center; margin: 8px 12px 0; }
 .radar-box { position: relative; width: min(100cqw, 100cqh); height: min(100cqw, 100cqh); }
 .radar-svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
 .rr { fill: none; stroke: rgba(124, 214, 255, .2); stroke-width: .6; }
@@ -2415,39 +2444,50 @@ button:focus-visible { outline: 2px solid var(--nc-cyan); outline-offset: 2px; }
 .sweep { position: absolute; inset: 4%; border-radius: 50%; background: conic-gradient(from 0deg, rgba(77, 227, 255, .2), rgba(77, 227, 255, 0) 24%, transparent); animation: turn 8s linear infinite; }
 .rm-home { position: absolute; left: 50%; top: 50%; width: 40px; height: 40px; transform: translate(-50%, -50%); display: grid; place-items: center; border-radius: 50%; font-size: 19px; color: var(--nc-cyan); background: radial-gradient(circle, rgba(77, 227, 255, .25), rgba(5, 13, 24, .92) 70%); box-shadow: 0 0 0 1.5px rgba(77, 227, 255, .6), 0 0 26px rgba(77, 227, 255, .45); }
 .rm { position: absolute; z-index: 2; transform: translate(-50%, -50%); display: grid; justify-items: center; gap: 4px; }
-.rm-l { padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; white-space: nowrap; background: rgba(5, 13, 24, .88); border: 1px solid var(--nc-line); }
+.radar .ava.sm { width: clamp(24px, 11cqmin, 32px); height: clamp(24px, 11cqmin, 32px); font-size: clamp(9.5px, 4cqmin, 12px); }
+.rm-l { padding: 2px 8px; border-radius: 999px; font-size: clamp(10px, 3.6cqmin, 11px); font-weight: 600; white-space: nowrap; background: rgba(5, 13, 24, .88); border: 1px solid var(--nc-line); }
 .ava { position: relative; display: grid; place-items: center; flex: none; width: 38px; height: 38px; border-radius: 50%; font: 600 14px/1 var(--nc-display); color: #06101c; background: var(--pc); box-shadow: 0 0 0 2px #06101c, 0 0 0 3.5px var(--pc), 0 0 16px -2px var(--pc); }
 .ava img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
 .ava.sm { width: 32px; height: 32px; font-size: 12px; }
 .ava.xs { width: 22px; height: 22px; font-size: 9.5px; box-shadow: 0 0 0 1.5px #06101c, 0 0 0 2.5px var(--pc); }
 .ava-b { position: absolute; right: -6px; bottom: -6px; width: 18px; height: 18px; display: grid; place-items: center; border-radius: 50%; font-size: 11px; font-style: normal; color: var(--nc-amber); background: #0b1c2f; border: 1px solid var(--nc-line-2); }
-.map { position: relative; flex: 1 1 0; min-height: 140px; margin: 10px 12px 12px; border-radius: 14px; overflow: hidden; border: 1px solid var(--nc-line); background: #07121f; }
+.map { position: relative; flex: 1 1 0; min-height: 160px; margin: 10px 12px 12px; border-radius: 14px; overflow: hidden; border: 1px solid var(--nc-line); background: #07121f; }
 .map-canvas { position: absolute; inset: 0; }
 .map-msg { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: 6px; padding: 16px; text-align: center; font-size: 12.5px; color: var(--nc-dim); }
 .map-msg .ic { font-size: 22px; color: var(--nc-faint); }
 .nc-marker { background: none; border: 0; }
 .mk { position: relative; width: 40px; height: 40px; }
 .mk .ava { width: 40px; height: 40px; font-size: 14px; }
+.mk-tag { position: absolute; left: 50%; top: calc(100% + 5px); transform: translateX(-50%); display: grid; justify-items: center; gap: 1px; padding: 3px 8px; border-radius: 9px; white-space: nowrap; background: rgba(5, 13, 24, .9); border: 1px solid var(--nc-line-2); pointer-events: none; }
+.mk-tag b { font: 600 11.5px/1.15 var(--nc-body); color: var(--nc-ink); }
+.mk-tag b em { font-style: normal; color: var(--nc-cyan); }
+.mk-tag small { max-width: 190px; overflow: hidden; text-overflow: ellipsis; font-size: 10.5px; line-height: 1.2; color: var(--nc-dim); }
+.mk-tag.up { top: auto; bottom: calc(100% + 5px); }
+.mk.many { display: flex; }
+.mk.many .ava + .ava { margin-left: -16px; }
+.mk-tag.at-home { top: 19px; }
+.mk-tag.at-home.up { top: auto; bottom: 19px; }
+.mk-tag.at-home b { color: var(--nc-cyan); }
 .mk-home { width: 30px; height: 30px; display: grid; place-items: center; border-radius: 50%; font-size: 15px; color: var(--nc-cyan); background: rgba(5, 13, 24, .9); box-shadow: 0 0 0 1.5px rgba(77, 227, 255, .7), 0 0 18px rgba(77, 227, 255, .5); }
 .mk-zone { display: inline-block; transform: translate(-50%, -50%); padding: 2px 8px; border-radius: 999px; font: 600 10.5px var(--nc-body); white-space: nowrap; color: var(--nc-dim); background: rgba(5, 13, 24, .8); border: 1px solid var(--nc-line); }
 
-.air { flex: 0 1 auto; min-height: 0; max-height: 46%; display: flex; flex-direction: column; }
-.rooms { display: grid; gap: 6px; padding: 10px 10px 12px; overflow-y: auto; min-height: 0; scrollbar-width: thin; }
-.room { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 12px; background: rgba(4, 12, 22, .45); border: 1px solid var(--nc-line); }
+.air { flex: none; display: flex; flex-direction: column; }
+.rooms { display: grid; gap: 5px; padding: 8px 10px 10px; }
+.room { display: grid; grid-template-columns: minmax(max-content, 1fr) minmax(64px, 112px) auto; align-items: center; gap: 12px; padding: 6px 10px; border-radius: 12px; background: rgba(4, 12, 22, .45); border: 1px solid var(--nc-line); }
 .room:hover { border-color: var(--nc-line-2); }
 .room.off { opacity: .55; }
 .rname { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .rname > span { display: grid; min-width: 0; }
-.rname b { font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rname b { max-width: 11em; font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rname small { font-size: 11px; color: var(--nc-faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rdot { flex: none; width: 9px; height: 9px; border-radius: 50%; background: var(--tone); box-shadow: 0 0 8px var(--tone); }
 .pm { display: grid; gap: 4px; min-width: 0; }
 .pm-v { display: flex; align-items: baseline; gap: 3px; }
-.pm-v b { font: 600 18px/1 var(--nc-display); font-variant-numeric: tabular-nums; }
+.pm-v b { font: 600 16px/1 var(--nc-display); font-variant-numeric: tabular-nums; }
 .pm small { font-size: 11px; color: var(--nc-faint); }
 .bar { position: relative; height: 4px; border-radius: 2px; background: rgba(124, 214, 255, .12); overflow: hidden; }
 .bar i { position: absolute; inset: 0 auto 0 0; border-radius: 2px; background: linear-gradient(90deg, rgba(77, 227, 255, .55), var(--nc-cyan)); }
-.rvals { display: grid; justify-items: end; gap: 3px; font-variant-numeric: tabular-nums; }
+.rvals { display: flex; align-items: baseline; justify-content: flex-end; gap: 10px; font-variant-numeric: tabular-nums; }
 .rv { font-size: 11.5px; color: var(--nc-faint); white-space: nowrap; }
 .rv b { font-weight: 600; color: var(--tone); }
 .rvals small { font-size: 11.5px; color: var(--nc-faint); }
@@ -2538,6 +2578,9 @@ export class NourieWallCard extends Base {
     this._markers = new Map();
     this._zoneSig = '';
     this._fitSig = null;
+    this._fitPts = [];
+    this._declutterRaf = 0;
+    this._mapTouchedAt = 0;
     this._onVisibility = () => this.onVisibility();
     this.applyConfig({});
   }
@@ -2620,7 +2663,6 @@ export class NourieWallCard extends Base {
   <aside class="side">
     <section class="fam panel" aria-label="Family">
       <header class="sec"><span class="kicker">${ic('family')}Family</span><small class="fam-sum"></small></header>
-      <div class="people"></div>
       <div class="radar"></div>
       <div class="map"><div class="map-canvas"></div><div class="map-msg" hidden></div></div>
     </section>
@@ -2632,7 +2674,7 @@ export class NourieWallCard extends Base {
 </div>`;
     const q = (s) => root.querySelector(s);
     this.$ = {
-      wall: q('.wall'), cams: q('.cams'), famSum: q('.fam-sum'), people: q('.people'), radar: q('.radar'),
+      wall: q('.wall'), cams: q('.cams'), famSum: q('.fam-sum'), radar: q('.radar'),
       map: q('.map'), mapCanvas: q('.map-canvas'), mapMsg: q('.map-msg'), rooms: q('.rooms'),
     };
     this.$.cams.addEventListener('click', (ev) => {
@@ -2820,8 +2862,7 @@ export class NourieWallCard extends Base {
     const fam = familyOf(hass, this.config);
     this._fam = fam;
     const home = fam.people.filter((p) => p.isHome).length;
-    setText($.famSum, fam.people.length ? `${home} of ${fam.people.length} home` : '');
-    setHTML($.people, peopleHtml(fam));
+    setText($.famSum, fam.people.length ? `${home} of ${fam.people.length} home` : 'Add Life360 to see the family');
     setHTML($.radar, fam.home ? radarHtml(fam) : '<span class="none">Set your home location in Home Assistant to see the radar.</span>');
     this.syncMap(fam);
 
@@ -2843,6 +2884,9 @@ export class NourieWallCard extends Base {
         for (const layer of tileLayers()) L.tileLayer(layer.url, layer.options).addTo(this._map);
         this._zoneLayer = L.layerGroup().addTo(this._map);
         this._peopleLayer = L.layerGroup().addTo(this._map);
+        this._map.on('zoomend moveend resize', () => this.declutterSoon());
+        this._map.on('dragstart', () => { this._mapTouchedAt = now(); });
+        $.mapCanvas.addEventListener('pointerdown', () => { this._mapTouchedAt = now(); }, { passive: true });
         $.mapMsg.hidden = true;
       } catch {
         this._mapFailed = true;
@@ -2867,40 +2911,134 @@ export class NourieWallCard extends Base {
     }
     const placed = fam.people.filter((p) => p.lat !== null && p.lon !== null && !(p.isHome && fam.home));
     const seen = new Set();
-    for (const p of placed) {
-      seen.add(p.id);
-      const html = `<div class="mk">${avatarHtml(p)}</div>`;
-      let mk = this._markers.get(p.id);
+    for (const g of groupPeople(placed)) {
+      seen.add(g.key);
+      const lead = g.people[0];
+      const place = whereText(lead);
+      const where = g.people.some((p) => p.driving) ? (place === 'Away' ? 'Driving' : `Driving · ${place}`) : place;
+      const dist = fmtDistance(lead.distKm, fam.metric);
+      const n = g.people.length;
+      const w = 40 + (n - 1) * 24;
+      const names = n === 1 ? lead.name : g.people.map((p) => p.short).join(', ');
+      const html = `<div class="mk${n > 1 ? ' many' : ''}" style="width:${w}px">${g.people.map((p) => avatarHtml(p)).join('')}<span class="mk-tag"><b>${esc(names)}${dist ? ` <em>${esc(dist)}</em>` : ''}</b><small>${esc(where)}</small></span></div>`;
+      const icon = () => L.divIcon({ className: 'nc-marker', html, iconSize: [w, 40], iconAnchor: [w / 2, 20] });
+      let mk = this._markers.get(g.key);
       if (!mk) {
-        const marker = L.marker([p.lat, p.lon], { icon: L.divIcon({ className: 'nc-marker', html, iconSize: [40, 40], iconAnchor: [20, 20] }), keyboard: false, riseOnHover: true }).addTo(this._peopleLayer);
-        marker.on('click', () => this.moreInfo(p.id));
+        const marker = L.marker([g.lat, g.lon], { icon: icon(), keyboard: false, riseOnHover: true }).addTo(this._peopleLayer);
+        marker.on('click', () => this.moreInfo(lead.id));
         mk = { marker, html };
-        this._markers.set(p.id, mk);
+        this._markers.set(g.key, mk);
       } else {
-        mk.marker.setLatLng([p.lat, p.lon]);
+        mk.marker.setLatLng([g.lat, g.lon]);
         if (mk.html !== html) {
-          mk.marker.setIcon(L.divIcon({ className: 'nc-marker', html, iconSize: [40, 40], iconAnchor: [20, 20] }));
+          mk.marker.setIcon(icon());
           mk.html = html;
         }
       }
     }
-    for (const [id, mk] of this._markers) {
-      if (seen.has(id)) continue;
+    for (const [key, mk] of this._markers) {
+      if (seen.has(key)) continue;
       this._peopleLayer.removeLayer(mk.marker);
-      this._markers.delete(id);
+      this._markers.delete(key);
     }
-    // Fit everyone (and home) when who is on the map changes; otherwise leave the view alone.
+    // Who is home, under the home marker.
+    const homeNames = fam.home ? fam.people.filter((p) => p.isHome).map((p) => p.name).join(', ') : '';
+    const homeHtml = homeNames ? `<span class="mk-tag at-home"><b>Home</b><small>${esc(homeNames)}</small></span>` : '';
+    if (homeHtml !== this._homeTagHtml) {
+      this._homeTagHtml = homeHtml;
+      if (this._homeTag) this._peopleLayer.removeLayer(this._homeTag);
+      this._homeTag = homeHtml
+        ? L.marker([fam.home.lat, fam.home.lon], { icon: L.divIcon({ className: 'nc-marker', html: homeHtml, iconSize: [0, 0], iconAnchor: [0, 0] }), interactive: false, keyboard: false }).addTo(this._peopleLayer)
+        : null;
+    }
+    this._fitPts = placed.map((p) => [p.lat, p.lon]);
+    if (fam.home) this._fitPts.push([fam.home.lat, fam.home.lon]);
+    // Fit everyone (and home) when who is on the map changes, or when someone has moved out of view.
     const fitSig = `${fam.home ? 'home|' : ''}${placed.map((p) => p.id).sort().join('|')}`;
-    if (fitSig !== this._fitSig) {
-      this._fitSig = fitSig;
-      requestAnimationFrame(() => {
-        map.invalidateSize();
-        const pts = placed.map((p) => [p.lat, p.lon]);
-        if (fam.home) pts.push([fam.home.lat, fam.home.lon]);
-        if (!pts.length) map.setView([20, 0], 2);
-        else if (pts.length === 1) map.setView(pts[0], 15);
-        else map.fitBounds(pts, { padding: [36, 36], maxZoom: 15 });
-      });
+    const changed = fitSig !== this._fitSig;
+    this._fitSig = fitSig;
+    requestAnimationFrame(() => {
+      if (changed || this.mapNeedsFit()) this.fitMap();
+      this.declutterSoon();
+    });
+  }
+
+  // Room left at the edges so the name tags under and beside each marker stay on the map.
+  mapPadding() {
+    const size = this._map.getSize();
+    const x = Math.round(Math.min(100, size.x * 0.22));
+    return { x, top: 34, bottom: Math.round(Math.min(64, size.y * 0.2)) };
+  }
+
+  fitMap() {
+    const map = this._map;
+    const pts = this._fitPts || [];
+    map.invalidateSize();
+    if (!pts.length) map.setView([20, 0], 2);
+    else if (pts.length === 1) map.setView(pts[0], 15);
+    else {
+      const pad = this.mapPadding();
+      map.fitBounds(pts, { paddingTopLeft: [pad.x, pad.top], paddingBottomRight: [pad.x, pad.bottom], maxZoom: 15 });
+    }
+  }
+
+  // True when someone is off the edge of the map or the map is zoomed far wider than it needs to be.
+  // Left alone for two minutes after someone pans or zooms it by hand.
+  mapNeedsFit() {
+    const map = this._map;
+    const L = this._L;
+    const pts = this._fitPts || [];
+    if (!map || pts.length < 2 || now() - (this._mapTouchedAt || 0) < 120000) return false;
+    const size = map.getSize();
+    if (!size.x || !size.y) return false;
+    const pad = this.mapPadding();
+    const view = L.bounds([pad.x - 30, pad.top - 20], [size.x - pad.x + 30, size.y - pad.bottom + 20]);
+    if (pts.some((pt) => !view.contains(map.latLngToContainerPoint(pt)))) return true;
+    const best = Math.min(15, map.getBoundsZoom(L.latLngBounds(pts), false, L.point(pad.x * 2, pad.top + pad.bottom)));
+    return best - map.getZoom() >= 2;
+  }
+
+  declutterSoon() {
+    if (this._declutterRaf) return;
+    this._declutterRaf = requestAnimationFrame(() => {
+      this._declutterRaf = 0;
+      this.declutter();
+    });
+  }
+
+  // Each name tag hangs under its marker unless that would cover another tag or marker, or run off the map; then it goes above.
+  declutter() {
+    const map = this._map;
+    if (!map) return;
+    const root = map.getContainer();
+    const box = root.getBoundingClientRect();
+    if (!box.width || !box.height) return;
+    const overlap = (a, b) => Math.max(0, Math.min(a.right, b.right) - Math.max(a.left, b.left)) * Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top));
+    const blocks = [...root.querySelectorAll('.mk, .mk-home')].map((n) => n.getBoundingClientRect());
+    const taken = [];
+    const cost = (r) => {
+      let c = (r.width * r.height - overlap(r, box)) * 2;
+      for (const o of taken) c += overlap(r, o);
+      for (const o of blocks) c += overlap(r, o);
+      return c;
+    };
+    const tags = [...root.querySelectorAll('.mk-tag')]
+      .map((el) => ({ el, y: el.parentElement.getBoundingClientRect().top }))
+      .sort((a, b) => a.y - b.y);
+    for (const { el } of tags) {
+      el.classList.remove('up');
+      const below = el.getBoundingClientRect();
+      const costBelow = cost(below);
+      if (costBelow > 0) {
+        el.classList.add('up');
+        const above = el.getBoundingClientRect();
+        if (cost(above) < costBelow) {
+          taken.push(above);
+          continue;
+        }
+        el.classList.remove('up');
+      }
+      taken.push(below);
     }
   }
 }
