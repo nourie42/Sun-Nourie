@@ -47,6 +47,9 @@ const STILL_WIDTH = 480;
 const LIFETIME_WINDOW_S = [240, 420];
 const HANDOFF_LEAD_S = 35;
 const SHADOW_TIMEOUT_MS = 25000;
+// Home Assistant's go2rtc can sit on the first offer for a camera whose stream is cold while a
+// second offer is answered at once, so an unanswered offer gets a parallel one after this long.
+const HEDGE_AFTER_MS = 6000;
 const GRID_STAGGER_MS = 600;
 const CAMERA_STREAM_FEATURE = 2;
 const DAY_MS = 86400000;
@@ -324,6 +327,10 @@ export class RtcSession {
       return;
     }
     if (msg.type === 'error') this.fail(msg.message || 'The camera refused to stream', msg.code || 'error');
+  }
+
+  awaitingAnswer() {
+    return !!this.pc && !this.closed && this.pc.signalingState === 'have-local-offer';
   }
 
   addRemote(c) {
@@ -614,6 +621,7 @@ export class Player {
     this.renewals = 0;
     this.coverUntil = 0;
     this.handoffBroken = false;
+    this.shadowFor = '';
     this.pollBusy = false;
     this.shadowBusy = false;
 
@@ -862,7 +870,7 @@ export class Player {
     if (session === this.shadow) {
       session.close();
       this.shadow = null;
-      this.handoffBroken = true;
+      if (this.shadowFor === 'renew') this.handoffBroken = true;
       return;
     }
     if (session !== this.session) return;
@@ -973,8 +981,16 @@ export class Player {
     if (session !== this.session || session.closed) return;
     const watched = session.kind === 'webrtc' || (this.mount && !this.video.paused);
     if (!session.firstMediaAt) {
-      if (watched && t - session.startedAt > CONNECT_TIMEOUT_MS) session.fail('The camera took too long to start', 'timeout');
+      if (watched && t - session.startedAt > CONNECT_TIMEOUT_MS) {
+        session.fail('The camera took too long to start', 'timeout');
+        return;
+      }
+      if (session.kind === 'webrtc' && !this.shadow && session.awaitingAnswer() && t - session.startedAt > HEDGE_AFTER_MS) this.startShadow('hedge');
       return;
+    }
+    if (this.shadow && this.shadowFor === 'hedge') {
+      this.shadow.close();
+      this.shadow = null;
     }
     if (this.status !== 'live' && (!this.mount || this.protocol === 'mjpeg' || this.video.readyState >= 2)) {
       this.readyMs = Math.max(0, session.firstMediaAt - (this.requestAt || session.startedAt));
@@ -994,7 +1010,7 @@ export class Player {
     // Seamless renewal for cameras whose sessions end on a fixed clock.
     const lead = this.card.handoffLeadS;
     if (session.kind === 'webrtc' && this.lifetimeS && this.wanted && !this.shadow && !this.handoffBroken && this.lifetimeS - lead >= Math.min(20, this.lifetimeS / 2)) {
-      if (t >= session.startedAt + (this.lifetimeS - lead) * 1000) this.startShadow();
+      if (t >= session.startedAt + (this.lifetimeS - lead) * 1000) this.startShadow('renew');
     }
   }
 
@@ -1024,7 +1040,8 @@ export class Player {
     this.start(true);
   }
 
-  startShadow() {
+  startShadow(purpose) {
+    this.shadowFor = purpose;
     const shadow = new RtcSession(this);
     shadow.onfail = (err) => this.onFail(shadow, err);
     this.shadow = shadow;
@@ -1040,7 +1057,7 @@ export class Player {
     if (t - shadow.startedAt > SHADOW_TIMEOUT_MS) {
       shadow.close();
       this.shadow = null;
-      this.handoffBroken = true;
+      if (this.shadowFor === 'renew') this.handoffBroken = true;
     }
   }
 
@@ -1053,7 +1070,7 @@ export class Player {
     this.session = shadow;
     this.attach(shadow);
     old?.close();
-    this.renewals += 1;
+    if (this.shadowFor === 'renew') this.renewals += 1;
     this.liveSince = now();
     this.changed();
   }
