@@ -2537,7 +2537,7 @@ export class NourieWallCard extends Base {
     this._mapFailed = false;
     this._markers = new Map();
     this._zoneSig = '';
-    this._fitSig = '';
+    this._fitSig = null;
     this._onVisibility = () => this.onVisibility();
     this.applyConfig({});
   }
@@ -2890,7 +2890,7 @@ export class NourieWallCard extends Base {
       this._markers.delete(id);
     }
     // Fit everyone (and home) when who is on the map changes; otherwise leave the view alone.
-    const fitSig = placed.map((p) => p.id).sort().join('|');
+    const fitSig = `${fam.home ? 'home|' : ''}${placed.map((p) => p.id).sort().join('|')}`;
     if (fitSig !== this._fitSig) {
       this._fitSig = fitSig;
       requestAnimationFrame(() => {
