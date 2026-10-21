@@ -11,24 +11,22 @@ const night=Date.parse('2026-10-16T10:00:00Z');
 
 import {utciF} from '../public/weather-fusion/utci.js';
 
-// Above 60°F the NWS wind chill blend is inactive, so the value must match
-// the independent pythermalcomfort 4.4.2 UTCI polynomial exactly.
-// Ta = Tr = 15.55555556 C (60°F+); wind is sustained at 10 m, mph * 0.44704 m/s.
-// https://pythermalcomfort.readthedocs.io/en/stable/_modules/pythermalcomfort/models/utci.html
+// At 86°F, outside the revised mild band, the original independently
+// verified UTCI polynomial and standard 10 m wind input remain unchanged.
 test('warm windy overcast-night equivalent temperatures agree with an independent UTCI reference',()=>{
  for(const humidity of [90,100])for(const wind of [7,10,12,14]){
-  const input={temperature:61,humidity,wind,skyCover:100,condition:'Thunderstorms'};
+  const input={temperature:86,humidity,wind,skyCover:100,condition:'Thunderstorms'};
   const estimate=tier3FeelsLike(input,location,night,'outdoors');
   assert.equal(estimate.deltaMrtC,0,'night has no invented clear-sky radiation penalty');
-  assert.equal(estimate.tr,61,'mean radiant temperature is explicitly assumed equal to air at night');
+  assert.equal(estimate.tr,86,'mean radiant temperature is explicitly assumed equal to air at night');
   assert.equal(estimate.windUsedMps,wind*.44704,'sustained 10 m wind is converted exactly once');
   assert.equal(estimate.windChillFloor,false,'no wind chill floor above 60°F');
-  assert.ok(Math.abs(estimate.value-utciF(61,61,wind,humidity))<1e-6);
+  assert.ok(Math.abs(estimate.value-utciF(86,86,wind,humidity))<1e-6);
   assert.equal(thermalComfort(input,location,night).weatherKind,'cloudy','cloud is radiation input; thunder remains the displayed weather');
  }
 });
 
-test('warm direct sun projects solar gain onto a standing body without changing shade UTCI',()=>{
+test('warm direct sun projects solar gain onto a standing body while sharing the mild-weather shade baseline',()=>{
  // Captured Knightdale inputs at 2 PM EDT on 2026-10-20: the old horizontal
  // solar projection made the direct-sun result colder than the reported feel.
  const place={latitude:35.787,longitude:-78.4806,timeZone:'America/New_York'};
@@ -36,9 +34,9 @@ test('warm direct sun projects solar gain onto a standing body without changing 
  const input={temperature:71,dewpoint:39.6,wind:11,skyCover:1.0931,condition:'Sunny'};
  const comfort=thermalComfort(input,place,time);
  const shade=tier3FeelsLike(input,place,time,'shade');
- assert.equal(comfort.sun,74);
- assert.ok(comfort.rawOutdoors>=73.5&&comfort.rawOutdoors<74.5,comfort.rawOutdoors);
- assert.ok(Math.abs(comfort.rawShade-59.516562899543516)<1e-9,'shade retains the standard 10 m UTCI input');
+ assert.equal(comfort.sun,78);
+ assert.ok(comfort.rawOutdoors>=77.5&&comfort.rawOutdoors<78.5,comfort.rawOutdoors);
+ assert.ok(comfort.rawShade>63&&comfort.rawShade<65,'shade uses the revised apparent-temperature baseline');
   assert.equal(shade.windUsedMps,11*.44704);
   assert.equal(comfort.inputEvidence.windUsedMps,11*.44704);
   assert.match(comfort.inputEvidence.windPolicy,/Source 10 m wind/);
@@ -77,7 +75,7 @@ test('hourly rebuild carries timestamp-matched model radiation into the canonica
  assert.equal(feel.inputs.solarSource,'test shortwave');
  assert.equal(feel.inputEvidence.solarRadiationWm2,703.1);
  assert.match(feel.inputEvidence.radiationBasis,/Same-hour model shortwave radiation/);
- assert.equal(Math.round(feel.value),74);
+ assert.equal(Math.round(feel.value),78);
 });
 
 const nwsWindChill=(tF,windMph)=>{const p=Math.pow(windMph,.16);return 35.74+.6215*tF-35.75*p+.4275*tF*p;};
@@ -92,9 +90,9 @@ test('cold wind feels-like never falls below the NWS wind chill figure',()=>{
   assert.ok(estimate.value>=nwsWindChill(temp,wind)-.6,`floor holds at ${temp}°F/${wind}mph`);
  }
  // Warm conditions are untouched.
- const warm=tier3FeelsLike({temperature:75,humidity:60,wind:14,skyCover:20},location,night,'outdoors');
+ const warm=tier3FeelsLike({temperature:86,humidity:60,wind:14,skyCover:20},location,night,'outdoors');
  assert.equal(warm.windChillFloor,false);
- assert.ok(Math.abs(warm.value-utciF(75,75,14,60))<1e-6);
+ assert.ok(Math.abs(warm.value-utciF(86,86,14,60))<1e-6);
 });
 
 test('the wind chill blend has no step at its temperature or wind boundaries',()=>{
