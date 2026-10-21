@@ -30,7 +30,7 @@
  * the left; family radar, map and inside air on the right). Its options are listed further down.
  */
 
-export const VERSION = '1.0.4';
+export const VERSION = '1.0.5';
 
 const FONTS_CSS = 'https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Figtree:wght@400;500;600;700&display=swap';
 const HLS_JS = 'https://cdn.jsdelivr.net/npm/hls.js@1.7.3/dist/hls.min.js';
@@ -475,6 +475,9 @@ export class RtcSession {
       decodeMs: decoded > 0 && decodeTime != null ? 1000 * decodeTime / decoded : null,
       jitterBufferMs: emitted > 0 && jitterTime != null ? 1000 * jitterTime / emitted : null,
       sampleAt: t, incomingBps: traffic.incomingBps, decodedFps: traffic.decodedFps,
+      packetsReceived: Number.isFinite(video.packetsReceived) ? video.packetsReceived : null,
+      packetsLost: Number.isFinite(video.packetsLost) ? video.packetsLost : null,
+      pliCount: Number.isFinite(video.pliCount) ? video.pliCount : null,
     };
     this.trafficPrevious = traffic.previous;
     this.previousReport = Object.fromEntries(['id', 'framesReceived', 'bytesReceived', 'framesDecoded', 'totalDecodeTime', 'jitterBufferDelay', 'jitterBufferEmittedCount'].map((key) => [key, video[key]]));
@@ -1161,6 +1164,44 @@ export class Player {
     return p;
   }
 
+  // Temporary, opt-in troubleshooting in Home Assistant's own log. Never include raw
+  // errors, stream URLs, credentials, SDP, candidates or signaling session identifiers.
+  logConnectionFailure(session, cause) {
+    if (this.card.connectionDiagnostics !== true || !session || session !== this.session) return;
+    const hass = this.hass;
+    if (typeof hass?.callService !== 'function' || !/^camera\.[a-z0-9_]{1,120}$/.test(this.id)) return;
+    const t = now();
+    const recent = this.card.connectionDiagnosticTimes ||= new Map();
+    if (recent.has(this.id) && t - recent.get(this.id) < 30000) return;
+    recent.set(this.id, t);
+    if (recent.size > 64) recent.delete(recent.keys().next().value);
+    const number = (value) => Number.isFinite(value) && value >= 0 ? Math.round(value * 1000) / 1000 : null;
+    const age = (value) => value ? number(Math.max(0, t - value)) : null;
+    const choice = (value, allowed) => allowed.includes(value) ? value : 'unknown';
+    const stats = session.stats || {};
+    const presentation = this.rtcPresentation;
+    const snapshot = {
+      build: VERSION, camera: this.id,
+      cause: choice(cause, ['entity_unavailable', 'no_frames', 'no_packets', 'config', 'support', 'offer', 'answer', 'ice', 'nostream', 'stream', 'lib', 'hls', 'mjpeg', 'error']),
+      protocol: choice(session.kind, ['webrtc', 'hls', 'mjpeg']),
+      phase: session.firstMediaAt ? 'active' : 'startup',
+      connection: choice(session.pc?.connectionState, ['new', 'connecting', 'connected', 'disconnected', 'failed', 'closed']),
+      ice: choice(session.pc?.iceConnectionState, ['new', 'checking', 'connected', 'completed', 'disconnected', 'failed', 'closed']),
+      packetAgeMs: age(session.lastMediaAt), frameAgeMs: age(presentation?.lastAt),
+      statsAgeMs: age(stats.sampleAt), sessionAgeMs: age(session.startedAt),
+      incomingBps: number(stats.incomingBps), decodedFps: number(stats.decodedFps),
+      decodeMs: number(stats.decodeMs), jitterBufferMs: number(stats.jitterBufferMs),
+      packetsReceived: number(stats.packetsReceived), packetsLost: number(stats.packetsLost), pliCount: number(stats.pliCount),
+      frameEvidence: choice(presentation?.evidence, ['presented', 'playback-quality', 'decoded']),
+      framesObservable: !!presentation?.observable, readyState: number(this.video.readyState),
+      paused: !!this.video.paused, hidden: !!globalThis.document?.hidden, wanted: !!this.wanted,
+    };
+    // Do not await logging or let unavailable/unauthorized services affect video recovery.
+    Promise.resolve().then(() => hass.callService('system_log', 'write', {
+      logger: 'nourie.wall.camera', level: 'warning', message: JSON.stringify(snapshot),
+    })).catch(() => {});
+  }
+
   onFail(session, err) {
     if (session === this.shadow) {
       session.close();
@@ -1169,6 +1210,7 @@ export class Player {
       return;
     }
     if (session !== this.session) return;
+    this.logConnectionFailure(session, err?.code === 'timeout' ? 'no_packets' : err?.code);
     this.capture(true);
     this.clearRtcPresentation();
     session.close();
@@ -1271,6 +1313,7 @@ export class Player {
   tick(t) {
     if (this.offline) {
       if (this.status !== 'offline') {
+        this.logConnectionFailure(this.session, 'entity_unavailable');
         clearTimeout(this.retryTimer);
         this.retryTimer = 0;
         this.retryAt = 0;
@@ -1366,6 +1409,7 @@ export class Player {
   }
 
   onStall(session, reason = 'media') {
+    this.logConnectionFailure(session, reason === 'presentation' ? 'no_frames' : 'no_packets');
     const ranFor = (session.lastMediaAt - session.startedAt) / 1000;
     const [lo, hi] = this.card.lifetimeWindow;
     if (session.kind === 'webrtc' && this.canUseShadow() && reason === 'media' && ranFor >= lo && ranFor <= hi) {
@@ -2352,6 +2396,7 @@ export class NourieCamerasCard extends Base {
 //   type: custom:nourie-wall-card
 //   audio: false                            default; request video only and reduce Wall browser work
 //                                           true restores audio negotiation, frame callbacks and periodic previews
+//   connection_diagnostics: false           opt in to bounded failure metrics in HA system_log (no raw errors/URLs)
 //   cameras: [camera.driveway, camera.front_door, camera.hallway, camera.living_room]
 //   people: [person.dan, person.alicia]      optional; default is every person with a tracker
 //   location_sources:                       optional; use these trackers for location/status, keeping person names/photos
@@ -2543,6 +2588,13 @@ export function radarGeometry(fam) {
   return { unit, radius, maxDistance, rings, marks };
 }
 
+// Nearby people are easier to pick out; distant people stay readable. Size
+// depends on distance from home, while each marker's center stays in place.
+export function radarPinRadius(distKm) {
+  if (!Number.isFinite(distKm) || distKm < 0) return 7;
+  return clampNum(7 + 4 / (1 + distKm / 32), 7, 11);
+}
+
 export function radarHtml(fam) {
   const { unit, radius, maxDistance, rings, marks } = radarGeometry(fam);
   const ringLabel = (d) => d.toLocaleString(undefined, { maximumFractionDigits: 2 });
@@ -2555,7 +2607,8 @@ export function radarHtml(fam) {
   const pins = marks.map(({ p, x, y, bearing }) => {
     const label = `${p.name} · ${fmtDistance(p.distKm, fam.metric)} ${compassLabel(bearing)} from home`;
     const initial = (p.first || p.name || '?').slice(0, 1).toUpperCase();
-    return `<g class="radar-pin" data-person="${esc(p.id)}" style="--pc:${p.color}" transform="translate(${x.toFixed(3)} ${y.toFixed(3)})" role="img" aria-label="${esc(label)}"><title>${esc(label)}</title><circle class="radar-location" r="5"/><text class="radar-initial" text-anchor="middle" dominant-baseline="central">${esc(initial)}</text></g>`;
+    const pinRadius = radarPinRadius(p.distKm);
+    return `<g class="radar-pin" data-person="${esc(p.id)}" style="--pc:${p.color}" transform="translate(${x.toFixed(3)} ${y.toFixed(3)})" role="img" aria-label="${esc(label)}"><title>${esc(label)}</title><circle class="radar-location" r="${pinRadius.toFixed(2)}"/><text class="radar-initial" style="font-size:${(pinRadius * 1.25).toFixed(2)}px" text-anchor="middle" dominant-baseline="central">${esc(initial)}</text></g>`;
   }).join('');
   const points = `<svg class="radar-svg radar-points" viewBox="-100 -100 200 200" role="group" aria-label="Family locations">${pins}</svg>`;
   return `<div class="radar-box" title="Distance from home; outer ring ${ringLabel(maxDistance)} ${unit}"><div class="sweep"></div>${svg}<span class="rm-home" title="Home">${ic('home')}</span>${points}</div>`;
@@ -2582,7 +2635,7 @@ function tileLayers() {
 
 // ------------------------------------------------------------------- air
 
-// One row per indoor air monitor: its PM0.3 particle count, plus PM2.5 and CO2 rated against common guidance.
+// One row per indoor air monitor: PM0.3 particles and PM2.5 (or PM10); CO2 is not displayed.
 // With air: set, only those monitors show, in that order, under the names given.
 export function airRoomsOf(hass, config = {}) {
   const S = hass?.states || {};
@@ -2628,8 +2681,9 @@ export function airRoomsOf(hass, config = {}) {
     room.values[metric] = toNum(st.state);
   }
   const list = [...rooms.values()].map((r) => {
-    const levels = ['co2', 'pm25', 'pm10'].map((k) => levelOf(k, r.values[k])).filter((l) => l !== null);
-    return { ...r, offline: Object.values(r.values).every((v) => v === null), level: levels.length ? Math.max(...levels) : null };
+    const levels = ['pm25', 'pm10'].map((k) => levelOf(k, r.values[k])).filter((l) => l !== null);
+    const offline = ['pm03', 'pm25', 'pm10'].every((k) => r.values[k] == null);
+    return { ...r, offline, level: levels.length ? Math.max(...levels) : null };
   });
   if (pins) {
     const order = pins.map((x) => x.device.trim().toLowerCase());
@@ -2654,12 +2708,12 @@ function airRowHtml(r, maxPm03) {
   const values = [];
   if (r.ids.pm25) values.push(airValue('PM2.5', 'pm25', r.values.pm25));
   else if (r.ids.pm10) values.push(airValue('PM10', 'pm10', r.values.pm10));
-  if (r.ids.co2) values.push(airValue('CO₂', 'co2', r.values.co2));
-  const target = r.ids.pm03 || r.ids.pm25 || r.ids.co2 || r.ids.pm10;
-  return `<button type="button" class="room t-${tone}${r.offline ? ' off' : ''}" data-entity="${esc(target)}" aria-label="${esc(r.name)} air history">
+  const secondary = r.offline ? '<small>Offline</small>' : values.join('');
+  const target = r.ids.pm03 || r.ids.pm25 || r.ids.pm10;
+  return `<button type="button" class="room t-${tone}${r.offline ? ' off' : ''}${secondary ? '' : ' no-secondary'}" data-entity="${esc(target || '')}" ${target ? '' : 'disabled '}aria-label="${esc(r.name)} ${target ? 'air history' : 'particulate measurements unavailable'}">
       <span class="rname"><i class="rdot"></i><span><b>${esc(r.name)}</b>${r.area ? `<small>${esc(r.area)}</small>` : ''}</span></span>
       ${pmCell}
-      <span class="rvals">${r.offline ? '<small>Offline</small>' : values.join('')}</span>
+      ${secondary ? `<span class="rvals">${secondary}</span>` : ''}
     </button>`;
 }
 
@@ -2810,6 +2864,7 @@ button:focus-visible { outline: 2px solid var(--nc-cyan); outline-offset: 2px; }
 .air { flex: 0 1 auto; min-height: 0; max-height: 46%; display: flex; flex-direction: column; }
 .rooms { display: grid; gap: 6px; padding: 10px 10px 12px; overflow-y: auto; min-height: 0; scrollbar-width: thin; }
 .room { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 12px; background: rgba(4, 12, 22, .45); border: 1px solid var(--nc-line); }
+.room.no-secondary { grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); }
 .room:hover { border-color: var(--nc-line-2); }
 .room.off { opacity: .55; }
 .rname { display: flex; align-items: center; gap: 8px; min-width: 0; }
@@ -2923,6 +2978,7 @@ export class NourieWallCard extends Base {
     this.remember = config.remember_frames !== false;
     this.audioEnabled = config.audio === true;
     this.lowOverhead = !this.audioEnabled;
+    this.connectionDiagnostics = config.connection_diagnostics === true;
     this.stallMs = Number(config._stall_ms) || STALL_MS;
     this.lifetimeWindow = Array.isArray(config._lifetime_window) ? config._lifetime_window : LIFETIME_WINDOW_S;
     this.handoffLeadS = Number(config._handoff_lead_s) || HANDOFF_LEAD_S;
@@ -2931,6 +2987,7 @@ export class NourieWallCard extends Base {
   setConfig(config) {
     if (!config || typeof config !== 'object') throw new Error('Invalid configuration');
     if (config.audio !== undefined && typeof config.audio !== 'boolean') throw new Error('audio must be true or false');
+    if (config.connection_diagnostics !== undefined && typeof config.connection_diagnostics !== 'boolean') throw new Error('connection_diagnostics must be true or false');
     for (const key of ['cameras', 'people', 'air', 'air_exclude']) {
       if (config[key] !== undefined && !Array.isArray(config[key])) throw new Error(`${key} must be a list`);
     }
