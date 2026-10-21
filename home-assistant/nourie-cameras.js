@@ -30,7 +30,7 @@
  * the left; family radar, map and inside air on the right). Its options are listed further down.
  */
 
-export const VERSION = '1.0.7';
+export const VERSION = '1.0.8';
 
 const FONTS_CSS = 'https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Figtree:wght@400;500;600;700&display=swap';
 const HLS_JS = 'https://cdn.jsdelivr.net/npm/hls.js@1.7.3/dist/hls.min.js';
@@ -223,10 +223,58 @@ export function connectionTraffic(report, previous, observedAt) {
   const rate = (key, multiplier) => same && elapsed >= 50 && elapsed <= 5000
     && Number.isFinite(report[key]) && Number.isFinite(previous[key]) && report[key] >= previous[key]
     ? multiplier * (report[key] - previous[key]) / elapsed : null;
+  const packetCounter = (value, signed = false) => Number.isSafeInteger(value) && (signed || value >= 0);
+  const packetDelta = (key, signed = false) => {
+    if (!same || !(elapsed >= 50 && elapsed <= 5000) || !packetCounter(report[key], signed)
+      || !packetCounter(previous[key], signed) || (!signed && report[key] < previous[key])) return null;
+    const delta = report[key] - previous[key];
+    return Number.isSafeInteger(delta) ? delta : null;
+  };
+  const received = packetDelta('packetsReceived');
+  // Lost packets may decrease when late packets arrive. Preserve that correction,
+  // but do not turn it into a negative loss percentage or a fabricated zero.
+  const lost = packetDelta('packetsLost', true);
+  const total = received != null && lost != null ? received + lost : null;
   return {
     incomingBps: rate('bytesReceived', 8000),
     decodedFps: rate('framesDecoded', 1000),
-    previous: { id: report.id, stamp, bytesReceived: report.bytesReceived, framesDecoded: report.framesDecoded },
+    packetsReceivedDelta: received, packetsLostDelta: lost,
+    lossPct: received != null && lost != null && lost >= 0 && Number.isFinite(total) && total > 0 ? 100 * lost / total : null,
+    previous: { id: report.id, stamp, bytesReceived: report.bytesReceived, framesDecoded: report.framesDecoded,
+      packetsReceived: report.packetsReceived, packetsLost: report.packetsLost },
+  };
+}
+
+// Only a transport's selected pair identifies the active path. Nominated or
+// succeeded pairs alone may be old alternatives. Never retain addresses or ids.
+export function connectionPath(report, video) {
+  const records = new Map();
+  const transports = [];
+  report.forEach((r) => {
+    records.set(r.id, r);
+    if (r.type === 'transport' && r.selectedCandidatePairId) transports.push(r);
+  });
+  const linked = video?.transportId ? records.get(video.transportId)
+    : transports.length === 1 ? transports[0] : null;
+  const transport = linked?.type === 'transport' ? linked : null;
+  const selected = records.get(transport?.selectedCandidatePairId);
+  const pair = selected?.type === 'candidate-pair' ? selected : null;
+  const localRecord = records.get(pair?.localCandidateId);
+  const remoteRecord = records.get(pair?.remoteCandidateId);
+  const local = localRecord?.type === 'local-candidate' ? localRecord : null;
+  const remote = remoteRecord?.type === 'remote-candidate' ? remoteRecord : null;
+  const choice = (value, allowed) => allowed.includes(value) ? value : null;
+  const type = (value) => choice(value, ['host', 'srflx', 'prflx', 'relay']);
+  const protocol = (value) => choice(value, ['udp', 'tcp']);
+  return {
+    pathSelected: !!pair,
+    dtlsState: choice(transport?.dtlsState, ['new', 'connecting', 'connected', 'closed', 'failed']),
+    pairState: choice(pair?.state, ['frozen', 'waiting', 'in-progress', 'failed', 'succeeded']),
+    localCandidateType: type(local?.candidateType), remoteCandidateType: type(remote?.candidateType),
+    localProtocol: protocol(local?.protocol), remoteProtocol: protocol(remote?.protocol),
+    relayProtocol: local?.candidateType === 'relay' ? choice(local.relayProtocol, ['udp', 'tcp', 'tls']) : null,
+    roundTripMs: Number.isFinite(pair?.currentRoundTripTime) && Number.isFinite(pair.currentRoundTripTime * 1000) && pair.currentRoundTripTime >= 0
+      ? pair.currentRoundTripTime * 1000 : null,
   };
 }
 
@@ -439,16 +487,24 @@ export class RtcSession {
     const pc = this.pc;
     if (!pc || this.closed) return;
     let video = null;
+    let report;
     try {
-      const report = await pc.getStats();
+      report = await pc.getStats();
       report.forEach((r) => {
         if (r.type === 'inbound-rtp' && (r.kind || r.mediaType) === 'video') video = r;
       });
     } catch {
       return;
     }
-    if (!video || this.closed) return;
+    if (this.closed) return;
     const t = now();
+    const pathStats = { ...connectionPath(report, video), transportSampleAt: t };
+    if (!video) {
+      // Preserve the age of the last RTP sample; path measurements cannot make
+      // old media rates fresh or count as a packet/frame heartbeat.
+      this.stats = { ...this.stats, ...pathStats };
+      return;
+    }
     // These are inbound media counters, not transport keepalives. Even a small byte
     // increase is a heartbeat; either frame counter may work when the other stays zero.
     // A replacement stats report establishes a baseline rather than apparent progress.
@@ -470,6 +526,7 @@ export class RtcSession {
     const jitterTime = delta('jitterBufferDelay');
     const traffic = connectionTraffic(video, this.trafficPrevious, t);
     this.stats = {
+      ...pathStats,
       width: video.frameWidth || 0, height: video.frameHeight || 0, fps: Math.round(video.framesPerSecond || 0),
       decodedFramesDelta: decoded,
       decodeMs: decoded > 0 && decodeTime != null ? 1000 * decodeTime / decoded : null,
@@ -478,6 +535,9 @@ export class RtcSession {
       packetsReceived: Number.isFinite(video.packetsReceived) ? video.packetsReceived : null,
       packetsLost: Number.isFinite(video.packetsLost) ? video.packetsLost : null,
       pliCount: Number.isFinite(video.pliCount) ? video.pliCount : null,
+      packetsReceivedDelta: traffic.packetsReceivedDelta, packetsLostDelta: traffic.packetsLostDelta,
+      lossPct: traffic.lossPct,
+      jitterMs: Number.isFinite(video.jitter) && Number.isFinite(video.jitter * 1000) && video.jitter >= 0 ? video.jitter * 1000 : null,
     };
     this.trafficPrevious = traffic.previous;
     this.previousReport = Object.fromEntries(['id', 'framesReceived', 'bytesReceived', 'framesDecoded', 'totalDecodeTime', 'jitterBufferDelay', 'jitterBufferEmittedCount'].map((key) => [key, video[key]]));
@@ -1176,6 +1236,7 @@ export class Player {
     recent.set(this.id, t);
     if (recent.size > 64) recent.delete(recent.keys().next().value);
     const number = (value) => Number.isFinite(value) && value >= 0 ? Math.round(value * 1000) / 1000 : null;
+    const signedNumber = (value) => Number.isSafeInteger(value) ? value : null;
     const age = (value) => value ? number(Math.max(0, t - value)) : null;
     const choice = (value, allowed) => allowed.includes(value) ? value : 'unknown';
     const stats = session.stats || {};
@@ -1192,6 +1253,16 @@ export class Player {
       incomingBps: number(stats.incomingBps), decodedFps: number(stats.decodedFps),
       decodeMs: number(stats.decodeMs), jitterBufferMs: number(stats.jitterBufferMs),
       packetsReceived: number(stats.packetsReceived), packetsLost: number(stats.packetsLost), pliCount: number(stats.pliCount),
+      transportAgeMs: age(stats.transportSampleAt), pathSelected: stats.pathSelected === true,
+      dtls: choice(stats.dtlsState, ['new', 'connecting', 'connected', 'closed', 'failed']),
+      pairState: choice(stats.pairState, ['frozen', 'waiting', 'in-progress', 'failed', 'succeeded']),
+      localCandidateType: choice(stats.localCandidateType, ['host', 'srflx', 'prflx', 'relay']),
+      remoteCandidateType: choice(stats.remoteCandidateType, ['host', 'srflx', 'prflx', 'relay']),
+      localProtocol: choice(stats.localProtocol, ['udp', 'tcp']), remoteProtocol: choice(stats.remoteProtocol, ['udp', 'tcp']),
+      relayProtocol: choice(stats.relayProtocol, ['udp', 'tcp', 'tls']),
+      roundTripMs: number(stats.roundTripMs), jitterMs: number(stats.jitterMs),
+      packetsReceivedDelta: number(stats.packetsReceivedDelta), packetsLostDelta: signedNumber(stats.packetsLostDelta),
+      lossPct: Number.isFinite(stats.lossPct) && stats.lossPct >= 0 && stats.lossPct <= 100 ? number(stats.lossPct) : null,
       frameEvidence: choice(presentation?.evidence, ['presented', 'playback-quality', 'decoded']),
       framesObservable: !!presentation?.observable, readyState: number(this.video.readyState),
       paused: !!this.video.paused, hidden: !!globalThis.document?.hidden, wanted: !!this.wanted,
