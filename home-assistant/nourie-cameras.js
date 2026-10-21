@@ -30,7 +30,7 @@
  * the left; family radar, map and inside air on the right). Its options are listed further down.
  */
 
-export const VERSION = '1.0.3';
+export const VERSION = '1.0.4';
 
 const FONTS_CSS = 'https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Figtree:wght@400;500;600;700&display=swap';
 const HLS_JS = 'https://cdn.jsdelivr.net/npm/hls.js@1.7.3/dist/hls.min.js';
@@ -245,6 +245,16 @@ export function connectionGraphSample(player, t) {
 }
 
 export function connectionGraphHtml(player, t) {
+  // HA can update unrelated entities many times per second. Keep this sampled plot
+  // at 1 Hz while making a new session or connection state visible immediately.
+  const bucket = Math.floor(t / 1000);
+  const session = player.session || null;
+  const kind = session?.kind || player.protocol || '';
+  const connectionState = player.status || 'idle';
+  const closed = !!session?.closed;
+  const cache = player.connectionGraphCache;
+  if (cache && cache.bucket === bucket && cache.session === session && cache.kind === kind
+    && cache.state === connectionState && cache.closed === closed) return cache.html;
   const sample = connectionGraphSample(player, t);
   const history = player.connectionHistory || (player.connectionHistory = []);
   if (!history.length || t - history[history.length - 1].at >= 1000) history.push(sample);
@@ -275,7 +285,9 @@ export function connectionGraphHtml(player, t) {
   const frame = sample.frameAgeMs == null ? 'frame progress timing unavailable' : `last frame progress ${(sample.frameAgeMs / 1000).toFixed(1)} s ago`;
   const label = `Last 60 seconds: ${sample.metric === 'buffer' ? 'HLS buffer seconds' : 'incoming video bitrate'}. ${protocol}${state}. ${measured}. ${playback}. ${frame}. Gaps mean no measurement.`;
   const warning = sample.state !== 'live' || (sample.fps === 0 && sample.value > 0) || sample.frameAgeMs > 5000;
-  return `<div class="connection ${warning ? 'connection-wait' : ''}" role="img" aria-label="${esc(label)}" title="${esc(label)}"><div class="connection-label"><span>${esc(protocol + state)}</span><b>${esc(measured)}</b></div><svg viewBox="0 0 160 20" aria-hidden="true"><path class="connection-base" d="M1,18 H159"></path><path class="connection-line" d="${path}"></path>${lastY == null ? '' : `<circle cx="${lastX.toFixed(1)}" cy="${lastY.toFixed(1)}" r="1.5"></circle>`}</svg><div class="connection-caption"><span>${esc(playback)}</span><span>60s</span></div></div>`;
+  const html = `<div class="connection ${warning ? 'connection-wait' : ''}" role="img" aria-label="${esc(label)}" title="${esc(label)}"><div class="connection-label"><span>${esc(protocol + state)}</span><b>${esc(measured)}</b></div><svg viewBox="0 0 160 20" aria-hidden="true"><path class="connection-base" d="M1,18 H159"></path><path class="connection-line" d="${path}"></path>${lastY == null ? '' : `<circle cx="${lastX.toFixed(1)}" cy="${lastY.toFixed(1)}" r="1.5"></circle>`}</svg><div class="connection-caption"><span>${esc(playback)}</span><span>60s</span></div></div>`;
+  player.connectionGraphCache = { bucket, session, kind, state: connectionState, closed, html };
+  return html;
 }
 
 // WebRTC through Home Assistant's camera/webrtc/offer subscription, mirroring the built-in player.
@@ -283,6 +295,7 @@ export class RtcSession {
   constructor(player) {
     this.player = player;
     this.kind = 'webrtc';
+    this.audioEnabled = player.card?.audioEnabled !== false;
     this.stream = new MediaStream();
     this.pc = null;
     this.unsub = null;
@@ -295,8 +308,6 @@ export class RtcSession {
     this.startedAt = now();
     this.firstMediaAt = 0;
     this.lastMediaAt = 0;
-    this.lastFrames = 0;
-    this.lastBytes = 0;
     this.decodedFrames = null;
     this.previousReport = null;
     this.trafficPrevious = null;
@@ -332,6 +343,10 @@ export class RtcSession {
     }
     pc.ontrack = (ev) => {
       if (this.closed) return;
+      if (!this.audioEnabled && ev.track.kind === 'audio') {
+        try { ev.track.stop(); } catch { /* Never attach unexpected audio to a video-only stream. */ }
+        return;
+      }
       if (!this.stream.getTracks().includes(ev.track)) this.stream.addTrack(ev.track);
       this.player.onTrack(this);
     };
@@ -344,7 +359,8 @@ export class RtcSession {
     pc.onconnectionstatechange = () => {
       if (!this.closed && pc.connectionState === 'failed') this.fail('The video connection failed', 'ice');
     };
-    for (const kind of ['audio', 'video']) {
+    // Omitting the audio transceiver removes m=audio from the offer, rather than only muting playback.
+    for (const kind of this.audioEnabled ? ['audio', 'video'] : ['video']) {
       const receiver = pc.addTransceiver(kind, { direction: 'recvonly' }).receiver;
       try {
         if (receiver && 'jitterBufferTarget' in receiver) receiver.jitterBufferTarget = 0;
@@ -433,18 +449,19 @@ export class RtcSession {
     }
     if (!video || this.closed) return;
     const t = now();
-    // Browsers differ in which counters they report, so either frames or a steady flow of bytes counts.
-    const frames = video.framesReceived ?? video.framesDecoded ?? 0;
-    const bytes = video.bytesReceived ?? 0;
-    const moved = frames > this.lastFrames || bytes > this.lastBytes + 2000;
+    // These are inbound media counters, not transport keepalives. Even a small byte
+    // increase is a heartbeat; either frame counter may work when the other stays zero.
+    // A replacement stats report establishes a baseline rather than apparent progress.
+    const previous = this.previousReport;
+    const keys = ['framesReceived', 'framesDecoded', 'bytesReceived'];
+    const moved = keys.some((key) => Number.isFinite(video[key]) && (previous
+      ? previous.id === video.id && Number.isFinite(previous[key]) && video[key] > previous[key]
+      : video[key] > 0));
     if (moved) {
-      if (!this.firstMediaAt && (frames > 0 || bytes > 20000)) this.firstMediaAt = t;
+      if (!this.firstMediaAt) this.firstMediaAt = t;
       this.lastMediaAt = t;
     }
-    this.lastFrames = frames;
-    this.lastBytes = bytes;
     this.decodedFrames = Number.isFinite(video.framesDecoded) ? video.framesDecoded : null;
-    const previous = this.previousReport;
     const delta = (key) => previous && previous.id === video.id && Number.isFinite(video[key])
       && Number.isFinite(previous[key]) && video[key] >= previous[key] ? video[key] - previous[key] : null;
     const decoded = delta('framesDecoded');
@@ -460,7 +477,7 @@ export class RtcSession {
       sampleAt: t, incomingBps: traffic.incomingBps, decodedFps: traffic.decodedFps,
     };
     this.trafficPrevious = traffic.previous;
-    this.previousReport = Object.fromEntries(['id', 'framesDecoded', 'totalDecodeTime', 'jitterBufferDelay', 'jitterBufferEmittedCount'].map((key) => [key, video[key]]));
+    this.previousReport = Object.fromEntries(['id', 'framesReceived', 'bytesReceived', 'framesDecoded', 'totalDecodeTime', 'jitterBufferDelay', 'jitterBufferEmittedCount'].map((key) => [key, video[key]]));
   }
 
   close() {
@@ -1087,7 +1104,7 @@ export class Player {
   beginRtcPresentation(session) {
     const video = this.video;
     const generation = this.attachmentGeneration;
-    const callbacks = typeof video.requestVideoFrameCallback === 'function';
+    const callbacks = !this.card.lowOverhead && typeof video.requestVideoFrameCallback === 'function';
     const source = callbacks ? 'presented' : this.presentedCount() != null ? 'playback-quality' : 'decoded';
     const p = this.rtcPresentation = { session, generation, source, watching: false, watchSince: 0,
       firstAt: 0, lastAt: 0, lastCount: null, lastDecodedCount: null, callbackSeen: false, observable: false, evidence: null, boundary: globalThis.performance?.now() ?? 0 };
@@ -1124,6 +1141,13 @@ export class Player {
       && reportId === p.lastDecodedReport;
     const wasObservable = p.observable;
     p.observable = count != null || decoded != null || p.callbackSeen;
+    if (!p.observable) {
+      // A gap in optional measurements is not a frozen frame. Do not reuse pre-gap proof
+      // or an expired deadline when counters become available again.
+      p.firstAt = 0;
+      p.lastAt = 0;
+      p.evidence = null;
+    }
     if (p.observable && !wasObservable && !p.firstAt) p.watchSince = t;
     if ((renderedMoved || decodedMoved) && this.video.readyState >= 2) {
       p.firstAt = p.firstAt || t;
@@ -1332,7 +1356,7 @@ export class Player {
       return;
     }
     if (this.status === 'live' && t - this.liveSince > 120000) this.attempt = 0;
-    if (this.mount && this.status === 'live' && t - this.lastCapture >= STILL_EVERY_MS) this.capture();
+    if (!this.card.lowOverhead && this.mount && this.status === 'live' && t - this.lastCapture >= STILL_EVERY_MS) this.capture();
 
     // Seamless renewal for cameras whose sessions end on a fixed clock.
     const lead = this.card.handoffLeadS;
@@ -2326,6 +2350,8 @@ export class NourieCamerasCard extends Base {
 // the family radar, the family map and inside air on the right.
 //
 //   type: custom:nourie-wall-card
+//   audio: false                            default; request video only and reduce Wall browser work
+//                                           true restores audio negotiation, frame callbacks and periodic previews
 //   cameras: [camera.driveway, camera.front_door, camera.hallway, camera.living_room]
 //   people: [person.dan, person.alicia]      optional; default is every person with a tracker
 //   location_sources:                       optional; use these trackers for location/status, keeping person names/photos
@@ -2470,11 +2496,16 @@ export function familyOf(hass, config = {}) {
   return { home, zones: zonesOf(hass), people, metric: hass?.config?.unit_system?.length === 'km' };
 }
 
+export function compassLabel(bearing) {
+  if (!Number.isFinite(bearing)) return '';
+  return ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'][Math.round(((bearing % 360) + 360) % 360 / 22.5) % 16];
+}
+
 function personStatus(p, metric) {
   if (p.driving) return 'Driving';
   if (p.isHome) return 'Home';
   if (p.zone) return p.zone;
-  if (p.distKm !== null) return `${fmtDistance(p.distKm, metric)} away`;
+  if (p.distKm !== null) return `${fmtDistance(p.distKm, metric)}${compassLabel(p.bearing) ? ` ${compassLabel(p.bearing)}` : ''}`;
   if (p.state === 'not_home') return 'Away';
   return 'No location';
 }
@@ -2484,51 +2515,13 @@ function avatarHtml(p, cls = '') {
   return `<span class="ava ${cls}" style="--pc:${p.color}">${p.picture ? `<img src="${esc(p.picture)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : esc(initials)}${p.driving ? `<i class="ava-b">${ic('car')}</i>` : ''}</span>`;
 }
 
-// Spaces callouts, never geographic positions (units are a 200-wide box).
-export function spreadMarks(marks, w = 54, h = 36) {
-  for (let round = 0; round < 40; round += 1) {
-    let moved = false;
-    for (let i = 0; i < marks.length; i += 1) {
-      for (let j = i + 1; j < marks.length; j += 1) {
-        const a = marks[i];
-        const b = marks[j];
-        if (a.fixed && b.fixed) continue;
-        const dx = (b.x - a.x) / w;
-        const dy = (b.y - a.y) / h;
-        const dist = Math.hypot(dx, dy);
-        if (dist >= 1) continue;
-        const ux = dist ? dx / dist : 1;
-        const uy = dist ? dy / dist : 0;
-        const push = (1 - dist) * (a.fixed || b.fixed ? 1 : 0.5) + 0.01;
-        if (!a.fixed) {
-          a.x -= ux * push * w;
-          a.y -= uy * push * h;
-        }
-        if (!b.fixed) {
-          b.x += ux * push * w;
-          b.y += uy * push * h;
-        }
-        moved = true;
-      }
-    }
-    for (const mk of marks) {
-      mk.x = clampNum(mk.x, -88, 88);
-      mk.y = clampNum(mk.y, -90, 86);
-    }
-    if (!moved) break;
-  }
-  return marks;
-}
-
-// One linear scale for every location and ring. Only the avatar/name callouts
-// may move to avoid overlap; their colored location dots keep the true bearing
-// and distance from home. Home avatars are a presence group around the center.
+// Every visible person pin is centered on their true position. Never displace
+// pins for overlap: the family chips above supply names and presence separately.
 export function radarGeometry(fam) {
   const metric = fam.metric;
   const unit = metric ? 'km' : 'mi';
   const toUnit = (km) => (metric ? km : km * 0.621371);
   const radius = 92;
-  const athome = fam.people.filter((p) => p.isHome);
   const away = fam.people.filter((p) => !p.isHome && Number.isFinite(p.distKm) && p.distKm >= 0).map((p) => {
     // familyOf suppresses bearings inside 50 m; valid nearby coordinates still
     // deserve a measured point instead of disappearing or being marked Home.
@@ -2542,23 +2535,11 @@ export function radarGeometry(fam) {
   const rOf = (d) => (d / maxDistance) * radius;
   const rings = [0.25, 0.5, 0.75, 1].map((fraction) => ({ d: fraction * maxDistance, r: fraction * radius }));
   const marks = [];
-  athome.forEach((p, i) => {
-    const ang = (i / athome.length) * 2 * Math.PI - Math.PI / 2;
-    marks.push({ p, x: Math.cos(ang) * 24, y: Math.sin(ang) * 24, fixed: true });
-  });
   for (const { p, bearing } of away) {
     const r = rOf(toUnit(p.distKm));
     const b = (bearing * Math.PI) / 180;
-    marks.push({ p, x: Math.sin(b) * r, y: -Math.cos(b) * r, away: true });
+    marks.push({ p, x: Math.sin(b) * r, y: -Math.cos(b) * r, bearing, away: true });
   }
-  // The callout box includes the label below its avatar. Keep that box inside
-  // the radar, but never clamp or nudge the actual location coordinates.
-  const callouts = marks.map((m) => ({ x: m.x, y: m.y + (m.away ? 12 : 0), fixed: m.fixed }));
-  spreadMarks([{ x: 0, y: 0, fixed: true }, ...callouts], 54, 40);
-  marks.forEach((m, i) => {
-    m.labelX = callouts[i].x;
-    m.labelY = callouts[i].y - (m.away ? 12 : 0);
-  });
   return { unit, radius, maxDistance, rings, marks };
 }
 
@@ -2569,14 +2550,15 @@ export function radarHtml(fam) {
       ${rings.map((g, i) => `<circle class="rr${i < rings.length - 1 ? ' dash' : ''}" r="${g.r.toFixed(1)}"/><text class="rl" x="2" y="${(-g.r + 7).toFixed(1)}">${ringLabel(g.d)} ${unit}</text>`).join('')}
       <path class="rx" d="M0 -${radius} V${radius} M-${radius} 0 H${radius}"/>
       <text class="rl n" x="0" y="-${radius + 3}" text-anchor="middle">N</text>
-      ${marks.filter((m) => m.away).map((m) => `<path class="radar-leader" style="--pc:${m.p.color}" d="M${m.x.toFixed(3)} ${m.y.toFixed(3)} L${m.labelX.toFixed(3)} ${m.labelY.toFixed(3)}"/>`).join('')}
-      <text class="rl" x="0" y="98" text-anchor="middle">Linear scale · dots show location</text>
+      <text class="rl" x="0" y="98" text-anchor="middle">Linear distance from home</text>
     </svg>`;
-  const points = `<svg class="radar-svg radar-points" viewBox="-100 -100 200 200" aria-hidden="true">${marks.filter((m) => m.away).map((m) => `<circle class="radar-location" data-person="${esc(m.p.id)}" style="--pc:${m.p.color}" cx="${m.x.toFixed(3)}" cy="${m.y.toFixed(3)}" r="2.4" opacity="${Math.hypot(m.labelX - m.x, m.labelY - m.y) < 12 ? 0 : 1}"/>`).join('')}</svg>`;
-  const pins = marks
-    .map(({ p, labelX, labelY, away: isAway }) => `<span class="rm ${isAway ? '' : 'home'}" style="left:${(50 + labelX / 2).toFixed(2)}%;top:${(50 + labelY / 2).toFixed(2)}%;--pc:${p.color}" title="${esc(p.name)}${isAway ? ` · ${esc(fmtDistance(p.distKm, fam.metric))}` : ' · Home'}">${avatarHtml(p, 'sm')}${isAway ? `<span class="rm-l">${esc(p.first)} · ${esc(fmtDistance(p.distKm, fam.metric))}</span>` : ''}</span>`)
-    .join('');
-  return `<div class="radar-box" title="Distance from home; outer ring ${ringLabel(maxDistance)} ${unit}"><div class="sweep"></div>${svg}<span class="rm-home">${ic('home')}</span>${pins}${points}</div>`;
+  const pins = marks.map(({ p, x, y, bearing }) => {
+    const label = `${p.name} · ${fmtDistance(p.distKm, fam.metric)} ${compassLabel(bearing)} from home`;
+    const initial = (p.first || p.name || '?').slice(0, 1).toUpperCase();
+    return `<g class="radar-pin" data-person="${esc(p.id)}" style="--pc:${p.color}" transform="translate(${x.toFixed(3)} ${y.toFixed(3)})" role="img" aria-label="${esc(label)}"><title>${esc(label)}</title><circle class="radar-location" r="5"/><text class="radar-initial" text-anchor="middle" dominant-baseline="central">${esc(initial)}</text></g>`;
+  }).join('');
+  const points = `<svg class="radar-svg radar-points" viewBox="-100 -100 200 200" role="group" aria-label="Family locations">${pins}</svg>`;
+  return `<div class="radar-box" title="Distance from home; outer ring ${ringLabel(maxDistance)} ${unit}"><div class="sweep"></div>${svg}<span class="rm-home" title="Home">${ic('home')}</span>${points}</div>`;
 }
 
 function peopleHtml(fam) {
@@ -2799,20 +2781,17 @@ button:focus-visible { outline: 2px solid var(--nc-cyan); outline-offset: 2px; }
 .radar { position: relative; flex: 0 0 auto; height: clamp(170px, 30vh, 340px); container-type: size; display: grid; place-items: center; margin: 4px 12px 0; }
 .radar-box { position: relative; width: min(100cqw, 100cqh); height: min(100cqw, 100cqh); }
 .radar-svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
-.radar-leader { fill: none; stroke: var(--pc); stroke-width: .65; opacity: .65; }
 .radar-points { z-index: 3; pointer-events: none; }
+.radar-pin { pointer-events: all; }
 .radar-location { fill: var(--pc); stroke: #06101c; stroke-width: 1; }
+.radar-initial { fill: #06101c; font: 700 7px var(--nc-display); }
 .rr { fill: none; stroke: rgba(124, 214, 255, .2); stroke-width: .6; }
 .rr.dash { stroke-dasharray: 1.5 3; stroke: rgba(124, 214, 255, .16); }
 .rx { stroke: rgba(124, 214, 255, .07); stroke-width: .5; }
 .rl { fill: #637d97; font: 600 5.5px var(--nc-display); letter-spacing: .08em; }
 .rl.n { fill: #93abc4; }
 .sweep { position: absolute; inset: 4%; border-radius: 50%; background: conic-gradient(from 0deg, rgba(77, 227, 255, .2), rgba(77, 227, 255, 0) 24%, transparent); animation: turn 8s linear infinite; }
-.rm-home { position: absolute; left: 50%; top: 50%; width: 40px; height: 40px; transform: translate(-50%, -50%); display: grid; place-items: center; border-radius: 50%; font-size: 19px; color: var(--nc-cyan); background: radial-gradient(circle, rgba(77, 227, 255, .25), rgba(5, 13, 24, .92) 70%); box-shadow: 0 0 0 1.5px rgba(77, 227, 255, .6), 0 0 26px rgba(77, 227, 255, .45); }
-.rm { position: absolute; z-index: 2; transform: translate(-50%, -50%); display: grid; justify-items: center; gap: 4px; }
-.rm:not(.home) { display: block; width: 32px; height: 32px; }
-.rm:not(.home) .rm-l { position: absolute; left: 50%; top: 36px; transform: translateX(-50%); }
-.rm-l { padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; white-space: nowrap; background: rgba(5, 13, 24, .88); border: 1px solid var(--nc-line); }
+.rm-home { position: absolute; z-index: 1; left: 50%; top: 50%; width: 20px; height: 20px; transform: translate(-50%, -50%); display: grid; place-items: center; font-size: 14px; color: var(--nc-cyan); }
 .ava { position: relative; display: grid; place-items: center; flex: none; width: 38px; height: 38px; border-radius: 50%; font: 600 14px/1 var(--nc-display); color: #06101c; background: var(--pc); box-shadow: 0 0 0 2px #06101c, 0 0 0 3.5px var(--pc), 0 0 16px -2px var(--pc); }
 .ava img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
 .ava.sm { width: 32px; height: 32px; font-size: 12px; }
@@ -2942,6 +2921,8 @@ export class NourieWallCard extends Base {
   applyConfig(config) {
     this.config = { ...config };
     this.remember = config.remember_frames !== false;
+    this.audioEnabled = config.audio === true;
+    this.lowOverhead = !this.audioEnabled;
     this.stallMs = Number(config._stall_ms) || STALL_MS;
     this.lifetimeWindow = Array.isArray(config._lifetime_window) ? config._lifetime_window : LIFETIME_WINDOW_S;
     this.handoffLeadS = Number(config._handoff_lead_s) || HANDOFF_LEAD_S;
@@ -2949,6 +2930,7 @@ export class NourieWallCard extends Base {
 
   setConfig(config) {
     if (!config || typeof config !== 'object') throw new Error('Invalid configuration');
+    if (config.audio !== undefined && typeof config.audio !== 'boolean') throw new Error('audio must be true or false');
     for (const key of ['cameras', 'people', 'air', 'air_exclude']) {
       if (config[key] !== undefined && !Array.isArray(config[key])) throw new Error(`${key} must be a list`);
     }
@@ -3103,11 +3085,12 @@ export class NourieWallCard extends Base {
     this.cells.clear();
     $.cams.dataset.n = String(this.ids.length);
     $.cams.style.setProperty('--nc-fit', this.config.fit === 'cover' ? 'cover' : 'contain');
+    const backdrop = this.lowOverhead && this.config.fit === 'cover' ? '' : '<img class="backdrop" alt="" aria-hidden="true">';
     for (const id of this.ids) {
       const cell = document.createElement('div');
       cell.className = 'cell';
       cell.dataset.id = id;
-      cell.innerHTML = `<img class="backdrop" alt="" aria-hidden="true"><div class="vid"></div><img class="still" alt=""><div class="cmsg" hidden><span class="cmsg-ic"></span><span class="cmsg-t"></span></div><div class="scrim top"><span class="cname"></span><span class="camera-actions"><span class="pill"></span><button type="button" class="reconnect" aria-label="Reconnect camera">${ic('retry')}</button></span></div><div class="scrim bot"><span class="chip" hidden></span></div><div class="connection-slot"></div><button type="button" class="hit"></button><button type="button" class="tool" aria-label="Camera details">${ic('info')}</button>`;
+      cell.innerHTML = `${backdrop}<div class="vid"></div><img class="still" alt=""><div class="cmsg" hidden><span class="cmsg-ic"></span><span class="cmsg-t"></span></div><div class="scrim top"><span class="cname"></span><span class="camera-actions"><span class="pill"></span><button type="button" class="reconnect" aria-label="Reconnect camera">${ic('retry')}</button></span></div><div class="scrim bot"><span class="chip" hidden></span></div><div class="connection-slot"></div><button type="button" class="hit"></button><button type="button" class="tool" aria-label="Camera details">${ic('info')}</button>`;
       $.cams.append(cell);
       this.cells.set(id, {
         node: cell, vid: cell.querySelector('.vid'), still: cell.querySelector('.still'), backdrop: cell.querySelector('.backdrop'),
@@ -3210,8 +3193,10 @@ export class NourieWallCard extends Base {
       setHTML(cell.connection, connectionGraphHtml(p, t));
       setPill(cell.pill, pillFor(p, t));
       setSrc(cell.still, p.still);
-      setSrc(cell.backdrop, p.still);
-      cell.backdrop.hidden = !p.still;
+      if (cell.backdrop) {
+        setSrc(cell.backdrop, p.still);
+        cell.backdrop.hidden = !p.still;
+      }
       cell.still.classList.toggle('show', !!p.still && (p.status !== 'live' || p.coverUntil > t));
       const m = stageMessage(p, t, !!p.still, isNest(hass, id));
       cell.msg.hidden = !m;
