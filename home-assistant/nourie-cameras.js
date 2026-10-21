@@ -30,7 +30,7 @@
  * the left; family radar, map and inside air on the right). Its options are listed further down.
  */
 
-export const VERSION = '1.0.0';
+export const VERSION = '1.0.2';
 
 const FONTS_CSS = 'https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Figtree:wght@400;500;600;700&display=swap';
 const HLS_JS = 'https://cdn.jsdelivr.net/npm/hls.js@1.7.3/dist/hls.min.js';
@@ -234,6 +234,8 @@ export class RtcSession {
     this.lastMediaAt = 0;
     this.lastFrames = 0;
     this.lastBytes = 0;
+    this.decodedFrames = null;
+    this.previousReport = null;
     this.stats = {};
   }
 
@@ -352,7 +354,7 @@ export class RtcSession {
       .catch(() => {});
   }
 
-  // Frames still arriving is the heartbeat; Nest simply stops sending when a session ends.
+  // Packet health also works for unattached shadows. The mounted player separately verifies playback.
   async poll() {
     const pc = this.pc;
     if (!pc || this.closed) return;
@@ -377,7 +379,21 @@ export class RtcSession {
     }
     this.lastFrames = frames;
     this.lastBytes = bytes;
-    this.stats = { width: video.frameWidth || 0, height: video.frameHeight || 0, fps: Math.round(video.framesPerSecond || 0) };
+    this.decodedFrames = Number.isFinite(video.framesDecoded) ? video.framesDecoded : null;
+    const previous = this.previousReport;
+    const delta = (key) => previous && previous.id === video.id && Number.isFinite(video[key])
+      && Number.isFinite(previous[key]) && video[key] >= previous[key] ? video[key] - previous[key] : null;
+    const decoded = delta('framesDecoded');
+    const emitted = delta('jitterBufferEmittedCount');
+    const decodeTime = delta('totalDecodeTime');
+    const jitterTime = delta('jitterBufferDelay');
+    this.stats = {
+      width: video.frameWidth || 0, height: video.frameHeight || 0, fps: Math.round(video.framesPerSecond || 0),
+      decodedFramesDelta: decoded,
+      decodeMs: decoded > 0 && decodeTime != null ? 1000 * decodeTime / decoded : null,
+      jitterBufferMs: emitted > 0 && jitterTime != null ? 1000 * jitterTime / emitted : null,
+    };
+    this.previousReport = Object.fromEntries(['id', 'framesDecoded', 'totalDecodeTime', 'jitterBufferDelay', 'jitterBufferEmittedCount'].map((key) => [key, video[key]]));
   }
 
   close() {
@@ -654,6 +670,7 @@ export class Player {
     video.setAttribute('muted', '');
     video.setAttribute('disablepictureinpicture', '');
     video.addEventListener('loadeddata', () => this.changed());
+    video.addEventListener('pause', () => this.pauseRtcWatch());
     this.video = video;
     this.img = null;
     this.canvas = null;
@@ -689,6 +706,9 @@ export class Player {
     this.shadowFor = '';
     this.pollBusy = false;
     this.shadowBusy = false;
+    this.rtcPresentation = null;
+    this.attachmentGeneration = 0;
+    this.frameCallbackId = null;
 
     const saved = card.remember ? store.get(`still:${id}`) : null;
     this.still = typeof saved?.u === 'string' ? saved.u : '';
@@ -744,6 +764,7 @@ export class Player {
   }
 
   unmount() {
+    this.pauseRtcWatch();
     for (const node of [this.video, this.img]) {
       if (node && node.parentNode === this.mount) node.remove();
     }
@@ -783,6 +804,7 @@ export class Player {
   release(warmMs) {
     if (!this.wanted) return;
     this.wanted = false;
+    this.pauseRtcWatch();
     clearTimeout(this.startTimer);
     this.startTimer = 0;
     this.video.muted = true;
@@ -828,6 +850,7 @@ export class Player {
   }
 
   closeSessions() {
+    this.clearRtcPresentation();
     this.startGeneration += 1;
     this.shadow?.close();
     this.shadow = null;
@@ -917,10 +940,12 @@ export class Player {
   }
 
   attach(session) {
+    this.clearRtcPresentation();
     const video = this.video;
     if (session.kind === 'webrtc') {
       video.removeAttribute('src');
       video.srcObject = session.stream;
+      this.beginRtcPresentation(session);
     } else if (session.kind === 'hls') {
       video.srcObject = null;
     }
@@ -930,8 +955,98 @@ export class Player {
 
   onTrack(session) {
     if (session !== this.session) return;
-    this.video.srcObject = session.stream;
+    if (this.video.srcObject !== session.stream) this.attach(session);
     this.playIfMounted();
+  }
+
+  // Only native WebRTC cameras need parallel Nest offers/renewal. Provider-backed RTSP
+  // (advertised with HLS) uses a named go2rtc stream whose registration must not race.
+  canUseShadow() {
+    return !!this.caps?.includes('web_rtc') && !this.caps.includes('hls');
+  }
+
+  clearRtcPresentation() {
+    this.attachmentGeneration += 1;
+    if (this.frameCallbackId != null) {
+      try { this.video.cancelVideoFrameCallback?.(this.frameCallbackId); } catch { /* Already delivered. */ }
+    }
+    this.frameCallbackId = null;
+    this.rtcPresentation = null;
+  }
+
+  pauseRtcWatch() {
+    if (this.rtcPresentation) this.rtcPresentation.watching = false;
+  }
+
+  rtcWatchable(session) {
+    return session === this.session && !session.closed && this.wanted && !!this.mount
+      && this.video.parentNode === this.mount && this.video.isConnected !== false
+      && (!this.video.getClientRects || this.video.getClientRects().length > 0)
+      && !globalThis.document?.hidden && !this.video.paused && this.video.srcObject === session.stream;
+  }
+
+  presentedCount() {
+    try {
+      const q = this.video.getVideoPlaybackQuality?.();
+      return Number.isFinite(q?.totalVideoFrames) && Number.isFinite(q?.droppedVideoFrames)
+        ? Math.max(0, q.totalVideoFrames - q.droppedVideoFrames) : null;
+    } catch { return null; }
+  }
+
+  watchRtcPresentation(t) {
+    const p = this.rtcPresentation;
+    if (!p || !this.rtcWatchable(p.session)) {
+      this.pauseRtcWatch();
+      return false;
+    }
+    if (!p.watching) {
+      p.watching = true;
+      p.watchSince = t;
+      p.firstAt = 0;
+      p.lastAt = 0;
+      p.boundary = globalThis.performance?.now() ?? 0;
+      p.lastCount = p.source === 'playback-quality' ? this.presentedCount() : p.session.decodedFrames;
+      if (this.status === 'live') this.setStatus('reconnecting');
+    }
+    return true;
+  }
+
+  beginRtcPresentation(session) {
+    const video = this.video;
+    const generation = this.attachmentGeneration;
+    const callbacks = typeof video.requestVideoFrameCallback === 'function';
+    const source = callbacks ? 'presented' : this.presentedCount() != null ? 'playback-quality' : 'decoded';
+    const p = this.rtcPresentation = { session, generation, source, watching: false, watchSince: 0,
+      firstAt: 0, lastAt: 0, lastCount: null, boundary: globalThis.performance?.now() ?? 0 };
+    if (!callbacks) return;
+    const onFrame = (_time, metadata = {}) => {
+      if (this.rtcPresentation !== p || generation !== this.attachmentGeneration
+        || session !== this.session || session.closed || video.srcObject !== session.stream) return;
+      this.frameCallbackId = null;
+      const t = now();
+      if (this.watchRtcPresentation(t) && video.readyState >= 2
+        && (!Number.isFinite(metadata.presentationTime) || metadata.presentationTime >= p.boundary)) {
+        p.firstAt = p.firstAt || t;
+        p.lastAt = t;
+      }
+      this.frameCallbackId = video.requestVideoFrameCallback(onFrame);
+    };
+    this.frameCallbackId = video.requestVideoFrameCallback(onFrame);
+  }
+
+  pollRtcPresentation(session, t) {
+    const p = this.rtcPresentation;
+    if (!p || p.session !== session || !this.watchRtcPresentation(t)) return null;
+    if (p.source !== 'presented') {
+      const count = p.source === 'playback-quality' ? this.presentedCount() : session.decodedFrames;
+      // Counters survive source changes in some browsers: baseline first, and reset on decreases.
+      if (count != null && p.lastCount != null && count > p.lastCount && this.video.readyState >= 2) {
+        p.firstAt = p.firstAt || t;
+        p.lastAt = t;
+      }
+      p.lastCount = count;
+    }
+    return p;
   }
 
   onFail(session, err) {
@@ -943,6 +1058,7 @@ export class Player {
     }
     if (session !== this.session) return;
     this.capture(true);
+    this.clearRtcPresentation();
     session.close();
     this.session = null;
     this.shadow?.close();
@@ -1085,9 +1201,11 @@ export class Player {
 
   afterPoll(session, t) {
     if (session !== this.session || session.closed) return;
-    const watched = session.kind === 'webrtc' || (this.mount && !this.video.paused);
+    const rtc = session.kind === 'webrtc';
+    const presentation = rtc ? this.pollRtcPresentation(session, t) : null;
+    const watched = rtc ? this.rtcWatchable(session) : (this.mount && !this.video.paused);
     if (!session.firstMediaAt) {
-      if (watched && t - session.startedAt > CONNECT_TIMEOUT_MS) {
+      if (watched && t - (presentation?.watchSince || session.startedAt) > CONNECT_TIMEOUT_MS) {
         session.fail('The camera took too long to start', 'timeout');
         return;
       }
@@ -1098,15 +1216,26 @@ export class Player {
       this.shadow.close();
       this.shadow = null;
     }
-    if (this.status !== 'live' && (!this.mount || this.protocol === 'mjpeg' || this.video.readyState >= 2)) {
-      this.readyMs = Math.max(0, session.firstMediaAt - (this.requestAt || session.startedAt));
+    const readyAt = rtc ? presentation?.firstAt : session.firstMediaAt;
+    if (readyAt && this.status !== 'live' && (!this.mount || this.protocol === 'mjpeg' || this.video.readyState >= 2)) {
+      this.readyMs = Math.max(0, readyAt - (this.requestAt || session.startedAt));
       this.everLive = true;
       this.liveSince = t;
       this.problem = null;
       this.requestAt = 0;
       this.setStatus('live');
     }
-    if (watched && session.lastMediaAt && t - session.lastMediaAt > this.card.stallMs) {
+    // Packet flow does not prove a mounted video is decoding/presenting. Do not charge time
+    // spent paused, hidden or unmounted, and allow a newly attached shadow its own startup grace.
+    if (presentation && (presentation.source !== 'decoded' || session.decodedFrames != null)) {
+      const deadline = presentation.firstAt ? presentation.lastAt + this.card.stallMs
+        : presentation.watchSince + CONNECT_TIMEOUT_MS;
+      if (t > deadline) {
+        this.onStall(session, 'presentation');
+        return;
+      }
+    }
+    if (watched && session.lastMediaAt && t - Math.max(session.lastMediaAt, presentation?.watchSince || 0) > this.card.stallMs) {
       this.onStall(session);
       return;
     }
@@ -1120,15 +1249,16 @@ export class Player {
     }
   }
 
-  onStall(session) {
+  onStall(session, reason = 'media') {
     const ranFor = (session.lastMediaAt - session.startedAt) / 1000;
     const [lo, hi] = this.card.lifetimeWindow;
-    if (session.kind === 'webrtc' && ranFor >= lo && ranFor <= hi) {
+    if (session.kind === 'webrtc' && this.canUseShadow() && reason === 'media' && ranFor >= lo && ranFor <= hi) {
       this.lifetimeS = Math.round(ranFor);
       store.set(`life:${this.id}`, this.lifetimeS);
       this.handoffBroken = false;
     }
     this.capture(true);
+    this.clearRtcPresentation();
     session.close();
     if (this.session === session) this.session = null;
     this.shadow?.close();
@@ -1140,13 +1270,14 @@ export class Player {
     }
     this.restarts += 1;
     if (ranFor < 20) {
-      this.scheduleRetry({ title: 'The stream keeps stopping', detail: 'The camera stopped sending video.', wait: 0 });
+      this.scheduleRetry({ title: 'The stream keeps stopping', detail: reason === 'presentation' ? 'Video playback stopped advancing.' : 'The camera stopped sending video.', wait: 0 });
       return;
     }
     this.start(true);
   }
 
   startShadow(purpose) {
+    if (!this.canUseShadow() || this.shadow || !this.session || !this.rtcWatchable(this.session)) return;
     this.shadowFor = purpose;
     const shadow = new RtcSession(this);
     shadow.onfail = (err) => this.onFail(shadow, err);
@@ -1172,7 +1303,8 @@ export class Player {
     const shadow = this.shadow;
     this.shadow = null;
     this.capture(true);
-    this.coverUntil = now() + 900;
+    this.coverUntil = 0;
+    this.setStatus('reconnecting');
     this.session = shadow;
     this.attach(shadow);
     old?.close();
@@ -1184,6 +1316,7 @@ export class Player {
   capture(force = false) {
     const t = now();
     if (!this.mount || (!force && t - this.lastCapture < 1000)) return;
+    if (this.session?.kind === 'webrtc' && !this.rtcPresentation?.firstAt) return;
     const source = this.protocol === 'mjpeg' ? this.img : this.video;
     const w = source?.videoWidth || source?.naturalWidth || 0;
     const h = source?.videoHeight || source?.naturalHeight || 0;
@@ -1221,6 +1354,14 @@ export class Player {
     const stats = this.session?.stats || {};
     return {
       protocol: this.protocol,
+      // Local snapshot only; presentation/receiver metrics cannot establish scene freshness.
+      build: VERSION,
+      presentationSource: this.rtcPresentation?.source || null,
+      frameAgeMs: this.rtcPresentation?.lastAt ? Math.max(0, now() - this.rtcPresentation.lastAt) : null,
+      packetAgeMs: this.session?.lastMediaAt ? Math.max(0, now() - this.session.lastMediaAt) : null,
+      decodedFramesDelta: stats.decodedFramesDelta ?? null,
+      decodeMs: stats.decodeMs ?? null,
+      jitterBufferMs: stats.jitterBufferMs ?? null,
       width: stats.width || this.video.videoWidth || 0,
       height: stats.height || this.video.videoHeight || 0,
       fps: stats.fps || 0,
@@ -1945,6 +2086,7 @@ export class NourieCamerasCard extends Base {
   }
 
   onVisibility() {
+    for (const p of this.players.values()) p.pauseRtcWatch();
     if (document.hidden) {
       clearTimeout(this._hiddenTimer);
       this._hiddenTimer = setTimeout(() => {
@@ -2873,6 +3015,7 @@ export class NourieWallCard extends Base {
   }
 
   onVisibility() {
+    for (const p of this.players.values()) p.pauseRtcWatch();
     if (document.hidden) {
       clearTimeout(this._hiddenTimer);
       this._hiddenTimer = setTimeout(() => {
