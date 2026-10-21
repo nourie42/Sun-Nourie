@@ -30,7 +30,7 @@
  * the left; family radar, map and inside air on the right). Its options are listed further down.
  */
 
-export const VERSION = '1.0.8';
+export const VERSION = '1.0.9';
 
 const FONTS_CSS = 'https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Figtree:wght@400;500;600;700&display=swap';
 const HLS_JS = 'https://cdn.jsdelivr.net/npm/hls.js@1.7.3/dist/hls.min.js';
@@ -1034,6 +1034,7 @@ export class Player {
 
   pickProtocol(caps) {
     const rtc = typeof RTCPeerConnection !== 'undefined';
+    if (this.card.preferredProtocol === 'hls' && caps.includes('hls')) return 'hls';
     if (caps.includes('web_rtc') && rtc && !(this.rtcFails >= 2 && caps.includes('hls'))) return 'webrtc';
     if (caps.includes('hls')) return 'hls';
     if (caps.includes('web_rtc') && rtc) return 'webrtc';
@@ -1469,7 +1470,10 @@ export class Player {
       this.onStall(session);
       return;
     }
-    if (this.status === 'live' && t - this.liveSince > 120000) this.attempt = 0;
+    if (this.status === 'live' && t - this.liveSince > 120000) {
+      this.attempt = 0;
+      if (rtc && watched && this.card.rtcStallFallback === true) this.rtcFails = 0;
+    }
     if (!this.card.lowOverhead && this.mount && this.status === 'live' && t - this.lastCapture >= STILL_EVERY_MS) this.capture();
 
     // Seamless renewal for cameras whose sessions end on a fixed clock.
@@ -1481,6 +1485,9 @@ export class Player {
 
   onStall(session, reason = 'media') {
     this.logConnectionFailure(session, reason === 'presentation' ? 'no_frames' : 'no_packets');
+    // A connection that repeatedly starts and freezes also needs the existing HLS
+    // fallback. Close this camera's RTC/shadow below before opening its replacement.
+    if (session.kind === 'webrtc' && this.card.rtcStallFallback === true) this.rtcFails += 1;
     const ranFor = (session.lastMediaAt - session.startedAt) / 1000;
     const [lo, hi] = this.card.lifetimeWindow;
     if (session.kind === 'webrtc' && this.canUseShadow() && reason === 'media' && ranFor >= lo && ranFor <= hi) {
@@ -2468,6 +2475,7 @@ export class NourieCamerasCard extends Base {
 //   audio: false                            default; request video only and reduce Wall browser work
 //                                           true restores audio negotiation, frame callbacks and periodic previews
 //   connection_diagnostics: false           opt in to bounded failure metrics in HA system_log (no raw errors/URLs)
+//   preferred_protocol: auto                auto or hls; HLS uses HA's low latency HTTP stream when supported
 //   camera_priority: false                  maximize the camera grid; side panel uses space only while visible
 //   air_visible: true                       false hides the Inside air panel
 //   air_visibility: always                  always or family (show air only with the family panel)
@@ -3104,6 +3112,8 @@ export class NourieWallCard extends Base {
     this.remember = config.remember_frames !== false;
     this.audioEnabled = config.audio === true;
     this.lowOverhead = !this.audioEnabled;
+    this.rtcStallFallback = true;
+    this.preferredProtocol = config.preferred_protocol ?? 'auto';
     this.connectionDiagnostics = config.connection_diagnostics === true;
     this.stallMs = Number(config._stall_ms) || STALL_MS;
     this.lifetimeWindow = Array.isArray(config._lifetime_window) ? config._lifetime_window : LIFETIME_WINDOW_S;
@@ -3114,6 +3124,7 @@ export class NourieWallCard extends Base {
     if (!config || typeof config !== 'object') throw new Error('Invalid configuration');
     if (config.audio !== undefined && typeof config.audio !== 'boolean') throw new Error('audio must be true or false');
     if (config.connection_diagnostics !== undefined && typeof config.connection_diagnostics !== 'boolean') throw new Error('connection_diagnostics must be true or false');
+    if (config.preferred_protocol !== undefined && !['auto', 'hls'].includes(config.preferred_protocol)) throw new Error('preferred_protocol must be auto or hls');
     if (config.family_visibility !== undefined && !['always', 'driving'].includes(config.family_visibility)) throw new Error('family_visibility must be always or driving');
     if (config.family_view !== undefined && !['radar_map', 'map'].includes(config.family_view)) throw new Error('family_view must be radar_map or map');
     if (config.air_visibility !== undefined && !['always', 'family'].includes(config.air_visibility)) throw new Error('air_visibility must be always or family');
