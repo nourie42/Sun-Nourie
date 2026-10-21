@@ -30,7 +30,7 @@
  * the left; family radar, map and inside air on the right). Its options are listed further down.
  */
 
-export const VERSION = '1.0.5';
+export const VERSION = '1.0.6';
 
 const FONTS_CSS = 'https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Figtree:wght@400;500;600;700&display=swap';
 const HLS_JS = 'https://cdn.jsdelivr.net/npm/hls.js@1.7.3/dist/hls.min.js';
@@ -2397,6 +2397,8 @@ export class NourieCamerasCard extends Base {
 //   audio: false                            default; request video only and reduce Wall browser work
 //                                           true restores audio negotiation, frame callbacks and periodic previews
 //   connection_diagnostics: false           opt in to bounded failure metrics in HA system_log (no raw errors/URLs)
+//   camera_priority: false                  maximize the camera grid; side panel uses space only while visible
+//   air_visible: true                       false hides the Inside air panel
 //   cameras: [camera.driveway, camera.front_door, camera.hallway, camera.living_room]
 //   people: [person.dan, person.alicia]      optional; default is every person with a tracker
 //   location_sources:                       optional; use these trackers for location/status, keeping person names/photos
@@ -2404,6 +2406,8 @@ export class NourieCamerasCard extends Base {
 //   air: [{device: Angelroom, name: Angel}]  optional; only these air monitors, in this order, with these names
 //   air_exclude: [Master blue]               optional; device names to leave out of Inside air
 //   fit: contain                             contain (whole picture) or cover (fill each tile)
+//   family_visibility: always                always or driving (only current drivers)
+//   family_view: radar_map                   radar_map or map
 
 const LEAFLET_JS = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js';
 const ESRI = 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas';
@@ -2494,6 +2498,27 @@ function zonesOf(hass) {
     .filter((z) => z.lat !== null && z.lon !== null && !z.passive);
 }
 
+export function trackerDriving(tracker, isHome = false) {
+  if (!tracker || typeof tracker.state !== 'string' || ['unknown', 'unavailable'].includes(tracker.state.toLowerCase())) return false;
+  const a = tracker.attributes || {};
+  const raw = a.driving;
+  if (typeof raw === 'boolean') return raw;
+  if (raw === 1 || raw === 0) return raw === 1;
+  if (typeof raw === 'string') {
+    const value = raw.trim().toLowerCase();
+    if (['true', 'on', 'yes', '1'].includes(value)) return true;
+    if (['false', 'off', 'no', '0'].includes(value)) return false;
+  }
+  if (tracker.state.toLowerCase() === 'driving') return true;
+  // Life360 supplies an explicit driving flag. Only use another tracker's speed
+  // when its units are supplied; an unlabeled number is not evidence of driving.
+  if (isHome) return false;
+  const speed = toNum(a.speed);
+  const unit = String(a.speed_unit || a.speed_units || a.speed_unit_of_measurement || a.unit_of_measurement || '').trim().toLowerCase();
+  const factor = { 'm/s': 1, 'km/h': 1 / 3.6, kph: 1 / 3.6, kmh: 1 / 3.6, mph: 0.44704, 'mi/h': 0.44704 }[unit];
+  return speed !== null && factor !== undefined && speed * factor > 6;
+}
+
 function personOf(hass, id, index, home, locationId) {
   const st = hass.states[id];
   const a = st.attributes || {};
@@ -2509,7 +2534,6 @@ function personOf(hass, id, index, home, locationId) {
   const lon = toNum(explicitSource ? t.longitude : a.longitude ?? t.longitude);
   const isHome = state === 'home';
   const name = String(a.friendly_name || id.split('.')[1].replace(/_/g, ' ')).replace(/\s+/g, ' ').trim();
-  const speed = toNum(t.speed);
   const distKm = home && lat !== null && lon !== null ? distanceKm(home.lat, home.lon, lat, lon) : null;
   return {
     id,
@@ -2525,7 +2549,7 @@ function personOf(hass, id, index, home, locationId) {
     accuracy: toNum(explicitSource ? t.gps_accuracy : a.gps_accuracy ?? t.gps_accuracy),
     distKm,
     bearing: distKm !== null && distKm > 0.05 ? bearingDeg(home.lat, home.lon, lat, lon) : null,
-    driving: !!t.driving || (!isHome && speed !== null && speed > 6),
+    driving: trackerDriving(tracker, isHome),
   };
 }
 
@@ -2539,6 +2563,17 @@ export function familyOf(hass, config = {}) {
   const people = ids.map((id, i) => personOf(hass, id, i, home, config.location_sources?.[id]));
   people.sort((a, b) => Number(b.isHome) - Number(a.isHome) || a.name.localeCompare(b.name));
   return { home, zones: zonesOf(hass), people, metric: hass?.config?.unit_system?.length === 'km' };
+}
+
+export function familyPresentation(fam, config = {}) {
+  const drivingOnly = config.family_visibility === 'driving';
+  const people = drivingOnly ? fam.people.filter((p) => p.driving) : fam.people;
+  return {
+    visible: !drivingOnly || people.length > 0,
+    drivingOnly,
+    mapOnly: config.family_view === 'map',
+    family: drivingOnly ? { ...fam, people, zones: fam.zones.filter((z) => z.home) } : fam,
+  };
 }
 
 export function compassLabel(bearing) {
@@ -2614,11 +2649,11 @@ export function radarHtml(fam) {
   return `<div class="radar-box" title="Distance from home; outer ring ${ringLabel(maxDistance)} ${unit}"><div class="sweep"></div>${svg}<span class="rm-home" title="Home">${ic('home')}</span>${points}</div>`;
 }
 
-function peopleHtml(fam) {
+function peopleHtml(fam, drivingOnly = false) {
   if (!fam.people.length) return '<span class="none">Add a person with a phone tracker in Home Assistant and they show up here.</span>';
   return fam.people
     .map((p) => {
-      const status = personStatus(p, fam.metric);
+      const status = drivingOnly ? (p.distKm === null ? 'Location unavailable' : `${fmtDistance(p.distKm, fam.metric)} ${compassLabel(p.bearing)}`.trim()) : personStatus(p, fam.metric);
       const tone = p.isHome ? 'home' : p.lat !== null ? 'away' : 'unknown';
       return `<span class="who-chip ${tone}" style="--pc:${p.color}">${avatarHtml(p, 'xs')}<b>${esc(p.first)}</b><small>${esc(status)}</small></span>`;
     })
@@ -2935,6 +2970,21 @@ button:focus-visible { outline: 2px solid var(--nc-cyan); outline-offset: 2px; }
   .map { flex: none; height: 260px; }
   .air { max-height: none; }
 }
+/* Camera priority is opt-in: no permanent sidebar, no tile borders or reserved headings. */
+.wall.camera-priority { height: var(--nc-wall-height, calc(100vh - var(--header-height, 56px))); min-height: 0; grid-template-columns: minmax(0, 1fr); gap: 4px; padding: 4px; }
+.wall.camera-priority.side-visible { grid-template-columns: minmax(0, 1fr) clamp(240px, 22%, 320px); }
+.camera-priority .cams { gap: 4px; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: repeat(2, minmax(0, 1fr)); }
+.camera-priority .cams[data-n="1"] { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); }
+.camera-priority .cams[data-n="2"] { grid-template-rows: minmax(0, 1fr); }
+.camera-priority .cams[data-n="5"], .camera-priority .cams[data-n="6"] { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.camera-priority .cell { aspect-ratio: auto; border: 0; border-radius: 6px; }
+.camera-priority .cams.solo .cell.on { grid-row: 1 / -1; }
+.camera-priority .side { min-width: 0; min-height: 0; }
+.camera-priority .fam { min-height: 0; }
+.camera-priority .map { flex: 1 1 0; height: auto; min-height: 0; margin: 8px; border-radius: 8px; }
+.camera-priority .sec { padding: 10px 10px 0; }
+.camera-priority .people { padding: 8px 10px 0; }
+
 @media (prefers-reduced-motion: reduce) {
   .p-live::before, .p-wait::before, .spin, .sweep { animation: none; }
   .still, .cell .tool { transition: none; }
@@ -2966,6 +3016,10 @@ export class NourieWallCard extends Base {
     this._L = null;
     this._mapLoading = false;
     this._mapFailed = false;
+    this._familyVisible = false;
+    this._familyDriverIds = '';
+    this._mapEpoch = 0;
+    this._mapFitFrame = 0;
     this._markers = new Map();
     this._zoneSig = '';
     this._fitSig = null;
@@ -2988,6 +3042,11 @@ export class NourieWallCard extends Base {
     if (!config || typeof config !== 'object') throw new Error('Invalid configuration');
     if (config.audio !== undefined && typeof config.audio !== 'boolean') throw new Error('audio must be true or false');
     if (config.connection_diagnostics !== undefined && typeof config.connection_diagnostics !== 'boolean') throw new Error('connection_diagnostics must be true or false');
+    if (config.family_visibility !== undefined && !['always', 'driving'].includes(config.family_visibility)) throw new Error('family_visibility must be always or driving');
+    if (config.family_view !== undefined && !['radar_map', 'map'].includes(config.family_view)) throw new Error('family_view must be radar_map or map');
+    for (const key of ['camera_priority', 'air_visible']) {
+      if (config[key] !== undefined && typeof config[key] !== 'boolean') throw new Error(`${key} must be true or false`);
+    }
     for (const key of ['cameras', 'people', 'air', 'air_exclude']) {
       if (config[key] !== undefined && !Array.isArray(config[key])) throw new Error(`${key} must be a list`);
     }
@@ -2998,7 +3057,12 @@ export class NourieWallCard extends Base {
     this.applyConfig(config);
     this.listKey = '';
     this._sideDirty = true;
-    if (this._hass) this.sync();
+    if (this._hass) {
+      this.sync();
+      this.refreshSide();
+      this._sideDirty = false;
+      this._sideAt = now();
+    }
   }
 
   set hass(hass) {
@@ -3007,6 +3071,17 @@ export class NourieWallCard extends Base {
     this.sync();
     this.events.update(hass);
     this._sideDirty = true;
+    if (this.config.family_visibility === 'driving') {
+      const fam = familyOf(hass, this.config);
+      const presentation = familyPresentation(fam, this.config);
+      const driverIds = presentation.family.people.map((p) => p.id).sort().join('|');
+      if (presentation.visible !== this._familyVisible || driverIds !== this._familyDriverIds) {
+        // Visibility changes must also cancel a pending map load immediately.
+        this.refreshSide(fam);
+        this._sideDirty = false;
+        this._sideAt = now();
+      }
+    }
     this.queueRefresh();
   }
 
@@ -3034,12 +3109,15 @@ export class NourieWallCard extends Base {
     if (!this.built) this.build();
     document.addEventListener('visibilitychange', this._onVisibility);
     if (!this._tick) this._tick = setInterval(() => this.tick(), 1000);
+    this._sideDirty = true;
+    this._sideAt = 0;
     this.applyStreams();
-    this._map?.invalidateSize();
+    if (this.familyMapActive()) this._map?.invalidateSize();
   }
 
   disconnectedCallback() {
     this.attached = false;
+    this.stopFamilyMap();
     document.removeEventListener('visibilitychange', this._onVisibility);
     clearTimeout(this._detachTimer);
     this._detachTimer = setTimeout(() => {
@@ -3059,7 +3137,7 @@ export class NourieWallCard extends Base {
   <section class="cams" aria-label="Cameras"></section>
   <aside class="side">
     <section class="fam panel" aria-label="Family">
-      <header class="sec"><span class="kicker">${ic('family')}Family</span><small class="fam-sum"></small></header>
+      <header class="sec"><span class="kicker">${ic('family')}<span class="family-title">Family</span></span><small class="fam-sum"></small></header>
       <div class="people"></div>
       <div class="radar"></div>
       <div class="map"><div class="map-canvas"></div><div class="map-msg" hidden></div></div>
@@ -3072,9 +3150,11 @@ export class NourieWallCard extends Base {
 </div>`;
     const q = (s) => root.querySelector(s);
     this.$ = {
-      wall: q('.wall'), cams: q('.cams'), famSum: q('.fam-sum'), people: q('.people'), radar: q('.radar'),
+      wall: q('.wall'), side: q('.side'), air: q('.air'), cams: q('.cams'), family: q('.fam'), familyTitle: q('.family-title'), famSum: q('.fam-sum'), people: q('.people'), radar: q('.radar'),
       map: q('.map'), mapCanvas: q('.map-canvas'), mapMsg: q('.map-msg'), rooms: q('.rooms'),
     };
+    this.$.family.hidden = this.config.family_visibility === 'driving';
+    this.$.radar.hidden = this.config.family_view === 'map';
     this.$.cams.addEventListener('click', (ev) => {
       const reconnect = ev.target.closest('.reconnect');
       const tool = ev.target.closest('.tool');
@@ -3094,7 +3174,7 @@ export class NourieWallCard extends Base {
       if (row?.dataset.entity) this.moreInfo(row.dataset.entity);
     });
     if (globalThis.ResizeObserver) {
-      this._resize = new ResizeObserver(() => this._map?.invalidateSize());
+      this._resize = new ResizeObserver(() => { if (this.familyMapActive()) this._map?.invalidateSize(); });
       this._resize.observe(this.$.map);
     }
   }
@@ -3192,6 +3272,8 @@ export class NourieWallCard extends Base {
   }
 
   onVisibility() {
+    if (document.hidden) this.stopFamilyMap();
+    else { this._sideDirty = true; this._sideAt = 0; }
     for (const p of this.players.values()) p.pauseRtcWatch();
     if (document.hidden) {
       clearTimeout(this._hiddenTimer);
@@ -3270,29 +3352,78 @@ export class NourieWallCard extends Base {
     }
   }
 
-  refreshSide() {
+  refreshSide(sourceFamily = familyOf(this._hass, this.config)) {
     const hass = this._hass;
     const $ = this.$;
-    const fam = familyOf(hass, this.config);
+    const presentation = familyPresentation(sourceFamily, this.config);
+    const fam = presentation.family;
     this._fam = fam;
+    this._familyVisible = presentation.visible;
+    this._familyDriverIds = presentation.drivingOnly ? fam.people.map((p) => p.id).sort().join('|') : '';
+    $.family.hidden = !presentation.visible;
+    $.wall.classList.toggle('family-visible', presentation.visible);
+    $.radar.hidden = presentation.mapOnly;
+    setText($.familyTitle, presentation.drivingOnly ? 'Driving' : 'Family');
     const home = fam.people.filter((p) => p.isHome).length;
-    setText($.famSum, fam.people.length ? `${home} of ${fam.people.length} home` : '');
-    setHTML($.people, peopleHtml(fam));
-    setHTML($.radar, fam.home ? radarHtml(fam) : '<span class="none">Set your home location in Home Assistant to see the radar.</span>');
-    this.syncMap(fam);
+    setText($.famSum, presentation.drivingOnly ? `${fam.people.length} driving` : fam.people.length ? `${home} of ${fam.people.length} home` : '');
+    if (presentation.visible) {
+      setHTML($.people, peopleHtml(fam, presentation.drivingOnly));
+      if (!presentation.mapOnly) setHTML($.radar, fam.home ? radarHtml(fam) : '<span class="none">Set your home location in Home Assistant to see the radar.</span>');
+      else setHTML($.radar, '');
+      this.syncMap(fam);
+    } else {
+      this.stopFamilyMap();
+      setHTML($.people, '');
+      setHTML($.radar, '');
+    }
 
+    $.wall.classList.toggle('camera-priority', this.config.camera_priority === true);
+    $.air.hidden = this.config.air_visible === false;
+    $.side.hidden = $.air.hidden && $.family.hidden;
+    $.wall.classList.toggle('side-visible', !$.side.hidden);
+    if ($.air.hidden) {
+      setHTML($.rooms, '');
+      return;
+    }
     const rooms = airRoomsOf(hass, this.config);
     const maxPm = Math.max(0, ...rooms.map((r) => toNum(r.values.pm03) || 0));
     setHTML($.rooms, rooms.length ? rooms.map((r) => airRowHtml(r, maxPm)).join('') : '<span class="air-note">No indoor air sensors found.</span>');
   }
 
+  familyMapActive() {
+    return this.attached && this._familyVisible && !globalThis.document?.hidden;
+  }
+
+  stopFamilyMap() {
+    this._mapEpoch += 1;
+    if (this._mapFitFrame) globalThis.cancelAnimationFrame?.(this._mapFitFrame);
+    this._mapFitFrame = 0;
+    this._map?.stop?.();
+    this._map?.remove();
+    this._map = null;
+    this._L = null;
+    this._mapLoading = false;
+    this._mapFailed = false;
+    this._zoneLayer = null;
+    this._peopleLayer = null;
+    this._markers.clear();
+    this._zoneSig = '';
+    this._fitSig = null;
+    if (this.$?.mapMsg) this.$.mapMsg.hidden = true;
+  }
+
   async syncMap(fam) {
+    if (!this.familyMapActive()) return;
     const $ = this.$;
+    const epoch = this._mapEpoch;
     if (!this._map) {
       if (this._mapLoading || this._mapFailed) return;
       this._mapLoading = true;
+      $.mapMsg.hidden = false;
+      setHTML($.mapMsg, `${ic('pin')}<span>Loading map…</span>`);
       try {
         const L = await loadLeaflet();
+        if (epoch !== this._mapEpoch || !this.familyMapActive()) return;
         this._L = L;
         this._map = L.map($.mapCanvas, { zoomControl: false, attributionControl: false, worldCopyJump: true, zoomSnap: 0.5, scrollWheelZoom: false });
         L.control.attribution({ position: 'bottomleft', prefix: false }).addTo(this._map);
@@ -3301,16 +3432,23 @@ export class NourieWallCard extends Base {
         this._peopleLayer = L.layerGroup().addTo(this._map);
         $.mapMsg.hidden = true;
       } catch {
+        if (epoch !== this._mapEpoch || !this.familyMapActive()) return;
+        this.stopFamilyMap();
         this._mapFailed = true;
-        this._mapLoading = false;
         $.mapMsg.hidden = false;
         $.mapMsg.innerHTML = `${ic('pin')}<span>The map could not load. Check the internet connection.</span>`;
         return;
+      } finally {
+        if (epoch === this._mapEpoch) this._mapLoading = false;
       }
-      this._mapLoading = false;
     }
+    if (epoch !== this._mapEpoch || !this.familyMapActive()) return;
+    // Loading Leaflet may span several HA updates; plot the current drivers.
+    fam = familyPresentation(familyOf(this._hass, this.config), this.config).family;
+    this._fam = fam;
     const L = this._L;
     const map = this._map;
+    const drivingOnly = this.config.family_visibility === 'driving';
     const zoneSig = JSON.stringify(fam.zones.map((z) => [z.id, z.lat, z.lon, z.radius]));
     if (zoneSig !== this._zoneSig) {
       this._zoneSig = zoneSig;
@@ -3321,7 +3459,7 @@ export class NourieWallCard extends Base {
         L.marker([z.lat, z.lon], { icon: L.divIcon({ className: 'nc-marker', html, iconSize: z.home ? [30, 30] : [0, 0], iconAnchor: z.home ? [15, 15] : [0, 0] }), interactive: false, keyboard: false, zIndexOffset: -500 }).addTo(this._zoneLayer);
       }
     }
-    const placed = fam.people.filter((p) => p.lat !== null && p.lon !== null && !(p.isHome && fam.home));
+    const placed = fam.people.filter((p) => p.lat !== null && p.lon !== null && (drivingOnly || !(p.isHome && fam.home)));
     const seen = new Set();
     for (const p of placed) {
       seen.add(p.id);
@@ -3346,16 +3484,20 @@ export class NourieWallCard extends Base {
       this._markers.delete(id);
     }
     // Fit everyone (and home) when who is on the map changes; otherwise leave the view alone.
-    const fitSig = `${fam.home ? 'home|' : ''}${placed.map((p) => p.id).sort().join('|')}`;
+    const fitSig = drivingOnly ? JSON.stringify([fam.home && [fam.home.lat, fam.home.lon], placed.map((p) => [p.id, p.lat, p.lon])])
+      : `${fam.home ? 'home|' : ''}${placed.map((p) => p.id).sort().join('|')}`;
     if (fitSig !== this._fitSig) {
       this._fitSig = fitSig;
-      requestAnimationFrame(() => {
+      if (this._mapFitFrame) globalThis.cancelAnimationFrame?.(this._mapFitFrame);
+      this._mapFitFrame = requestAnimationFrame(() => {
+        this._mapFitFrame = 0;
+        if (epoch !== this._mapEpoch || map !== this._map || !this.familyMapActive()) return;
         map.invalidateSize();
         const pts = placed.map((p) => [p.lat, p.lon]);
         if (fam.home) pts.push([fam.home.lat, fam.home.lon]);
-        if (!pts.length) map.setView([20, 0], 2);
-        else if (pts.length === 1) map.setView(pts[0], 15);
-        else map.fitBounds(pts, { padding: [36, 36], maxZoom: 15 });
+        if (!pts.length) map.setView([20, 0], 2, drivingOnly ? { animate: false } : undefined);
+        else if (pts.length === 1) map.setView(pts[0], 15, drivingOnly ? { animate: false } : undefined);
+        else map.fitBounds(pts, { padding: [36, 36], maxZoom: 15, ...(drivingOnly ? { animate: false } : {}) });
       });
     }
   }
