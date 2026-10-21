@@ -148,7 +148,7 @@ export function describeError(message, code) {
   if (code === 'timeout') return { title: 'The camera took too long to start', detail: 'Battery cameras can be slow to wake up.', wait: 0 };
   if (/RESOURCE_EXHAUSTED|rate.?limit|\b429\b/i.test(raw)) return { title: 'Google is limiting stream requests', detail: 'Too many streams were opened in a short time.', wait: 60 };
   if (/UNAUTHENTICATED|PERMISSION_DENIED|\b401\b|\b403\b|invalid_grant|re-?auth/i.test(raw)) return { title: 'Home Assistant lost access to this camera', detail: 'Re-authorize the Nest integration in Home Assistant.', wait: 120 };
-  if (/NOT_FOUND|\b404\b/i.test(raw)) return { title: "Google couldn't find this camera", detail: 'It may have been removed from Google Home.', wait: 120 };
+  if (/NOT_FOUND|\b404\b/i.test(raw)) return { title: 'The camera stream could not be opened', detail: 'Trying a fresh connection.', wait: 5 };
   if (/FAILED_PRECONDITION|UNAVAILABLE|offline|not available/i.test(raw)) return { title: "The camera didn't start its stream", detail: 'It may be off, asleep or offline in the Google Home app.', wait: 20 };
   if (code === 'nostream' || code === 'support' || /not supported|does not support/i.test(raw)) {
     return { title: "This camera can't stream here", detail: raw || 'Home Assistant reports no live stream for it.', fatal: true };
@@ -278,8 +278,14 @@ export class RtcSession {
     pc.onconnectionstatechange = () => {
       if (!this.closed && pc.connectionState === 'failed') this.fail('The video connection failed', 'ice');
     };
-    pc.addTransceiver('audio', { direction: 'recvonly' });
-    pc.addTransceiver('video', { direction: 'recvonly' });
+    for (const kind of ['audio', 'video']) {
+      const receiver = pc.addTransceiver(kind, { direction: 'recvonly' }).receiver;
+      try {
+        if (receiver && 'jitterBufferTarget' in receiver) receiver.jitterBufferTarget = 0;
+      } catch {
+        // Browsers may expose the property without allowing it to be changed.
+      }
+    }
 
     let offer;
     try {
@@ -414,6 +420,35 @@ export class RtcSession {
 }
 
 // HLS through camera/stream, for cameras Home Assistant can't hand over as WebRTC.
+const HLS_EXCESS_LAG_S = 10;
+const HLS_EDGE_OFFSET_S = 3;
+const HLS_CATCH_UP_COOLDOWN_MS = 15000;
+
+function hlsLivePosition(video, hls) {
+  if (!Number.isFinite(video.currentTime)) return null;
+  let start;
+  let end;
+  try {
+    const ranges = video.seekable;
+    if (!ranges?.length) return null;
+    start = ranges.start(ranges.length - 1);
+    end = ranges.end(ranges.length - 1);
+  } catch {
+    return null;
+  }
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end - start <= 0.25) return null;
+  const margin = Math.min(0.25, (end - start) / 4);
+  const fallback = end - Math.min(HLS_EDGE_OFFSET_S, (end - start) / 2);
+  const liveSync = hls?.liveSyncPosition;
+  const sync = Number.isFinite(liveSync) && liveSync > start && liveSync < end ? liveSync : fallback;
+  const target = Math.max(start + margin, Math.min(end - margin, sync));
+  return {
+    target,
+    excess: Math.max(0, target - video.currentTime),
+    behind: Number.isFinite(hls?.latency) ? Math.max(0, hls.latency) : Math.max(0, end - video.currentTime),
+  };
+}
+
 class HlsSession {
   constructor(player) {
     this.player = player;
@@ -428,6 +463,8 @@ class HlsSession {
     this.lastTime = 0;
     this.hls = null;
     this.stats = {};
+    this.lastCatchUpAt = -Infinity;
+    this.catchUp = null;
   }
 
   async open() {
@@ -487,18 +524,43 @@ class HlsSession {
 
   poll() {
     const video = this.player.video;
+    const t = now();
     const quality = video.getVideoPlaybackQuality?.();
-    const frames = quality ? quality.totalVideoFrames : 0;
-    const moved = frames > this.lastFrames || video.currentTime > this.lastTime + 0.05;
+    const hasFrameCount = Number.isFinite(quality?.totalVideoFrames) && Number.isFinite(quality?.droppedVideoFrames);
+    const frames = hasFrameCount ? Math.max(0, quality.totalVideoFrames - quality.droppedVideoFrames) : 0;
+    const position = hlsLivePosition(video, this.hls);
+    // Seeking changes currentTime immediately; wait for later decoded/playback progress
+    // near the live target before treating the recovery as complete.
+    const pending = this.catchUp;
+    if (pending && t > pending.at && position && position.excess <= HLS_EXCESS_LAG_S
+      && video.readyState >= 2 && !video.paused && !video.seeking
+      && (hasFrameCount ? frames > pending.frames : video.currentTime > pending.position + 0.05)) {
+      this.catchUp = null;
+    }
+    const moved = frames > this.lastFrames || (!hasFrameCount && !this.catchUp && !video.seeking && video.currentTime > this.lastTime + 0.05);
     if (moved && video.readyState >= 2) {
-      const t = now();
       if (!this.firstMediaAt) this.firstMediaAt = t;
       this.lastMediaAt = t;
     }
     this.lastFrames = frames;
     this.lastTime = video.currentTime;
-    const behind = this.hls && Number.isFinite(this.hls.latency) ? this.hls.latency : null;
-    this.stats = { width: video.videoWidth || 0, height: video.videoHeight || 0, behind };
+    if (position && position.excess > HLS_EXCESS_LAG_S && this.player.mount && this.player.wanted
+      && !this.closed && !globalThis.document?.hidden && video.readyState >= 2 && !video.paused && !video.seeking
+      && t - this.lastCatchUpAt >= HLS_CATCH_UP_COOLDOWN_MS) {
+      this.lastCatchUpAt = t;
+      try {
+        video.currentTime = position.target;
+        this.catchUp = { at: t, frames, position: position.target };
+      } catch {
+        // Keep the delayed status and retry after the cooldown if seeking is rejected.
+      }
+    }
+    const behind = position?.behind ?? (Number.isFinite(this.hls?.latency) ? this.hls.latency : null);
+    this.stats = {
+      width: video.videoWidth || 0, height: video.videoHeight || 0, behind,
+      delayed: !!this.catchUp || !!(position && position.excess > HLS_EXCESS_LAG_S),
+      catchingUp: !!this.catchUp,
+    };
   }
 
   close() {
@@ -609,9 +671,12 @@ export class Player {
     this.warmUntil = 0;
     this.mount = null;
     this.starting = false;
+    this.startGeneration = 0;
+    this.lastReconnectAt = -Infinity;
     this.startTimer = 0;
     this.retryTimer = 0;
     this.retryAt = 0;
+    this.providerWaitUntil = 0;
     this.attempt = 0;
     this.requestAt = 0;
     this.everLive = false;
@@ -688,14 +753,6 @@ export class Player {
   playIfMounted() {
     if (!this.mount || this.protocol === 'mjpeg') return;
     const video = this.video;
-    const hls = this.session?.hls;
-    if (hls && Number.isFinite(hls.liveSyncPosition) && video.currentTime < hls.liveSyncPosition - 3) {
-      try {
-        video.currentTime = hls.liveSyncPosition;
-      } catch {
-        // Seeking can fail before the first segment; playback catches up on its own.
-      }
-    }
     const playing = video.play();
     if (playing?.catch) playing.catch(() => {});
   }
@@ -758,9 +815,11 @@ export class Player {
   // The page has been in the background for a while: free the stream but keep wanting it.
   suspend() {
     clearTimeout(this.retryTimer);
+    clearTimeout(this.startTimer);
     this.retryTimer = 0;
+    this.startTimer = 0;
     this.retryAt = 0;
-    if (this.session || this.shadow) {
+    if (this.session || this.shadow || this.starting) {
       this.capture(true);
       this.closeSessions();
     }
@@ -769,6 +828,7 @@ export class Player {
   }
 
   closeSessions() {
+    this.startGeneration += 1;
     this.shadow?.close();
     this.shadow = null;
     if (this.session) {
@@ -811,10 +871,16 @@ export class Player {
   }
 
   async start(isRestart) {
+    const generation = ++this.startGeneration;
     this.starting = true;
     clearTimeout(this.retryTimer);
     this.retryTimer = 0;
     this.retryAt = 0;
+    if (this.providerWaitUntil > now()) {
+      this.starting = false;
+      this.scheduleRetryAt(this.providerWaitUntil);
+      return;
+    }
     if (!this.requestAt || this.status === 'live' || this.status === 'idle' || this.status === 'waiting') this.requestAt = now();
     this.setStatus(isRestart ? 'reconnecting' : 'connecting');
 
@@ -822,11 +888,13 @@ export class Player {
     try {
       caps = await this.capabilities();
     } catch (err) {
+      if (generation !== this.startGeneration) return;
       this.starting = false;
       if (this.wanted) this.scheduleRetry(describeError(errText(err)));
       else this.setStatus('idle');
       return;
     }
+    if (generation !== this.startGeneration) return;
     if (!this.wanted) {
       this.starting = false;
       this.setStatus('idle');
@@ -877,12 +945,15 @@ export class Player {
     this.capture(true);
     session.close();
     this.session = null;
+    this.shadow?.close();
+    this.shadow = null;
     try {
       this.video.srcObject = null;
     } catch {
       // Nothing attached.
     }
-    if (session.kind === 'webrtc' && ['ice', 'answer', 'offer'].includes(err?.code)) this.rtcFails += 1;
+    if (session.kind === 'webrtc' && (['ice', 'answer', 'offer'].includes(err?.code)
+      || (err?.code === 'timeout' && !session.firstMediaAt))) this.rtcFails += 1;
     const info = describeError(err?.message, err?.code);
     if (info.fatal) {
       this.fatal(info);
@@ -898,10 +969,16 @@ export class Player {
 
   scheduleRetry(info) {
     this.problem = info;
-    const wait = Math.max(BACKOFF_S[Math.min(this.attempt, BACKOFF_S.length - 1)], info.wait || 0);
+    const t = now();
+    if ((info.wait || 0) >= 60) this.providerWaitUntil = Math.max(this.providerWaitUntil, t + info.wait * 1000);
+    const wait = Math.max(BACKOFF_S[Math.min(this.attempt, BACKOFF_S.length - 1)], info.wait || 0, (this.providerWaitUntil - t) / 1000);
     this.attempt += 1;
+    this.scheduleRetryAt(t + wait * 1000);
+  }
+
+  scheduleRetryAt(deadline) {
     clearTimeout(this.retryTimer);
-    this.retryAt = now() + wait * 1000;
+    this.retryAt = deadline;
     this.status = 'waiting';
     this.changed();
     this.retryTimer = setTimeout(() => {
@@ -909,10 +986,11 @@ export class Player {
       this.retryAt = 0;
       if (this.wanted) this.start(true);
       else this.setStatus('idle');
-    }, wait * 1000);
+    }, Math.max(0, deadline - now()));
   }
 
   retryNow() {
+    if (this.providerWaitUntil > now()) return;
     this.attempt = 0;
     this.problem = null;
     this.caps = null;
@@ -923,6 +1001,34 @@ export class Player {
     this.status = 'idle';
     this.wanted = true;
     if (!this.session && !this.starting) this.start(true);
+  }
+
+  canReconnect(t = now()) {
+    return this.wanted && !!this.mount && !this.offline && !globalThis.document?.hidden
+      && t >= this.providerWaitUntil
+      && !(this.retryAt > t && (this.problem?.wait || 0) >= 60)
+      && t - this.lastReconnectAt >= 5000;
+  }
+
+  reconnect() {
+    const t = now();
+    if (!this.canReconnect(t)) return false;
+    this.lastReconnectAt = t;
+    this.capture(true);
+    clearTimeout(this.startTimer);
+    clearTimeout(this.retryTimer);
+    this.startTimer = 0;
+    this.retryTimer = 0;
+    this.retryAt = 0;
+    this.warmUntil = 0;
+    this.attempt = 0;
+    this.problem = null;
+    this.requestAt = t;
+    // Preserve capabilities and fallback history; reconnect only this camera.
+    this.closeSessions();
+    this.restarts += 1;
+    this.start(true);
+    return true;
   }
 
   fatal(info) {
@@ -1266,6 +1372,9 @@ function pillFor(p, t) {
   if (p.offline) return ['bad', 'Offline', ''];
   switch (p.status) {
     case 'live':
+      if (p.session?.kind === 'hls' && p.session.stats.delayed) {
+        return ['wait', p.session.stats.catchingUp ? 'Catching up' : 'Delayed', ''];
+      }
       return ['live', 'Live', ''];
     case 'connecting': {
       const s = p.requestAt ? Math.round((t - p.requestAt) / 1000) : 0;
@@ -2368,6 +2477,9 @@ button:focus-visible { outline: 2px solid var(--nc-cyan); outline-offset: 2px; }
 .scrim { position: absolute; left: 0; right: 0; display: flex; align-items: center; justify-content: space-between; gap: 8px; pointer-events: none; }
 .scrim.top { top: 0; padding: 12px 12px 28px; background: linear-gradient(rgba(2, 7, 14, .7), rgba(2, 7, 14, 0)); }
 .scrim.bot { bottom: 0; padding: 26px 10px 10px; background: linear-gradient(rgba(2, 7, 14, 0), rgba(2, 7, 14, .6)); }
+.camera-actions { display: flex; align-items: center; gap: 6px; flex: none; }
+.reconnect { position: relative; z-index: 3; pointer-events: auto; display: grid; place-items: center; width: 28px; height: 28px; flex: none; border-radius: 8px; color: var(--nc-cyan); background: var(--nc-veil); border: 1px solid var(--nc-line-2); }
+.reconnect:disabled { opacity: .4; cursor: default; }
 .cname { font: 600 16px/1.1 var(--nc-display); letter-spacing: .01em; text-shadow: 0 1px 8px rgba(0, 0, 0, .6); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .hit { position: absolute; inset: 0; z-index: 2; }
 .cell .tool { position: absolute; right: 10px; bottom: 10px; z-index: 3; width: 34px; height: 34px; display: grid; place-items: center; border-radius: 10px; font-size: 17px; color: var(--nc-ink); background: var(--nc-veil); border: 1px solid var(--nc-line-2); opacity: 0; transition: opacity .2s; }
@@ -2647,9 +2759,16 @@ export class NourieWallCard extends Base {
       map: q('.map'), mapCanvas: q('.map-canvas'), mapMsg: q('.map-msg'), rooms: q('.rooms'),
     };
     this.$.cams.addEventListener('click', (ev) => {
+      const reconnect = ev.target.closest('.reconnect');
       const tool = ev.target.closest('.tool');
       const cell = ev.target.closest('.cell');
       if (!cell) return;
+      if (reconnect) {
+        ev.stopPropagation();
+        this.players.get(cell.dataset.id)?.reconnect();
+        this.queueRefresh();
+        return;
+      }
       if (tool) this.moreInfo(cell.dataset.id);
       else this.toggleSolo(cell.dataset.id);
     });
@@ -2710,11 +2829,11 @@ export class NourieWallCard extends Base {
       const cell = document.createElement('div');
       cell.className = 'cell';
       cell.dataset.id = id;
-      cell.innerHTML = `<img class="backdrop" alt="" aria-hidden="true"><div class="vid"></div><img class="still" alt=""><div class="cmsg" hidden><span class="cmsg-ic"></span><span class="cmsg-t"></span></div><div class="scrim top"><span class="cname"></span><span class="pill"></span></div><div class="scrim bot"><span class="chip" hidden></span></div><button type="button" class="hit"></button><button type="button" class="tool" aria-label="Camera details">${ic('info')}</button>`;
+      cell.innerHTML = `<img class="backdrop" alt="" aria-hidden="true"><div class="vid"></div><img class="still" alt=""><div class="cmsg" hidden><span class="cmsg-ic"></span><span class="cmsg-t"></span></div><div class="scrim top"><span class="cname"></span><span class="camera-actions"><span class="pill"></span><button type="button" class="reconnect" aria-label="Reconnect camera">${ic('retry')}</button></span></div><div class="scrim bot"><span class="chip" hidden></span></div><button type="button" class="hit"></button><button type="button" class="tool" aria-label="Camera details">${ic('info')}</button>`;
       $.cams.append(cell);
       this.cells.set(id, {
         node: cell, vid: cell.querySelector('.vid'), still: cell.querySelector('.still'), backdrop: cell.querySelector('.backdrop'),
-        name: cell.querySelector('.cname'), pill: cell.querySelector('.pill'), chip: cell.querySelector('.chip'), hit: cell.querySelector('.hit'),
+        name: cell.querySelector('.cname'), pill: cell.querySelector('.pill'), reconnect: cell.querySelector('.reconnect'), chip: cell.querySelector('.chip'), hit: cell.querySelector('.hit'),
         msg: cell.querySelector('.cmsg'), msgIc: cell.querySelector('.cmsg-ic'), msgT: cell.querySelector('.cmsg-t'),
       });
     }
@@ -2805,6 +2924,9 @@ export class NourieWallCard extends Base {
       cell.node.classList.toggle('on', this.solo === id);
       cell.node.classList.toggle('ring', (this.ringUntil.get(id) || 0) > t);
       cell.hit.setAttribute('aria-label', this.solo === id ? `Show all cameras` : `Show ${name} large`);
+      cell.reconnect.setAttribute('aria-label', `Reconnect ${name}`);
+      cell.reconnect.title = `Reconnect ${name}`;
+      cell.reconnect.disabled = !p.canReconnect(t);
       setPill(cell.pill, pillFor(p, t));
       setSrc(cell.still, p.still);
       setSrc(cell.backdrop, p.still);
