@@ -1984,6 +1984,8 @@ export class NourieCamerasCard extends Base {
 //   type: custom:nourie-wall-card
 //   cameras: [camera.driveway, camera.front_door, camera.hallway, camera.living_room]
 //   people: [person.dan, person.alicia]      optional; default is every person with a tracker
+//   location_sources:                       optional; use these trackers for location/status, keeping person names/photos
+//     person.dan: device_tracker.life360_dan
 //   air: [{device: Angelroom, name: Angel}]  optional; only these air monitors, in this order, with these names
 //   air_exclude: [Master blue]               optional; device names to leave out of Inside air
 //   fit: contain                             contain (whole picture) or cover (fill each tile)
@@ -2077,15 +2079,20 @@ function zonesOf(hass) {
     .filter((z) => z.lat !== null && z.lon !== null && !z.passive);
 }
 
-function personOf(hass, id, index, home) {
+function personOf(hass, id, index, home, locationId) {
   const st = hass.states[id];
   const a = st.attributes || {};
   const trackers = Array.isArray(a.device_trackers) ? a.device_trackers : [];
-  const trackerId = trackers.find((t) => hass.entities?.[t]?.platform === 'life360') || a.source || trackers[0] || null;
-  const t = (trackerId && hass.states[trackerId]?.attributes) || {};
-  const lat = toNum(a.latitude ?? t.latitude);
-  const lon = toNum(a.longitude ?? t.longitude);
-  const isHome = st.state === 'home';
+  const explicitSource = locationId !== undefined;
+  const trackerId = explicitSource ? locationId : trackers.find((t) => hass.entities?.[t]?.platform === 'life360') || a.source || trackers[0] || null;
+  const tracker = trackerId && hass.states[trackerId];
+  // An explicit source must never fall back to a different phone or a wall tablet.
+  const unavailable = explicitSource && (!tracker || ['unknown', 'unavailable'].includes(tracker.state));
+  const t = (!unavailable && tracker?.attributes) || {};
+  const state = explicitSource ? (unavailable ? 'unavailable' : tracker.state) : st.state;
+  const lat = toNum(explicitSource ? t.latitude : a.latitude ?? t.latitude);
+  const lon = toNum(explicitSource ? t.longitude : a.longitude ?? t.longitude);
+  const isHome = state === 'home';
   const name = String(a.friendly_name || id.split('.')[1].replace(/_/g, ' ')).replace(/\s+/g, ' ').trim();
   const speed = toNum(t.speed);
   const distKm = home && lat !== null && lon !== null ? distanceKm(home.lat, home.lon, lat, lon) : null;
@@ -2095,12 +2102,12 @@ function personOf(hass, id, index, home) {
     first: name.split(' ')[0],
     picture: a.entity_picture || '',
     color: PERSON_COLORS[index % PERSON_COLORS.length],
-    state: st.state,
+    state,
     isHome,
-    zone: !isHome && !['not_home', 'unknown', 'unavailable'].includes(st.state) ? st.state : '',
+    zone: !isHome && !['not_home', 'unknown', 'unavailable'].includes(state) ? state : '',
     lat,
     lon,
-    accuracy: toNum(a.gps_accuracy ?? t.gps_accuracy),
+    accuracy: toNum(explicitSource ? t.gps_accuracy : a.gps_accuracy ?? t.gps_accuracy),
     distKm,
     bearing: distKm !== null && distKm > 0.05 ? bearingDeg(home.lat, home.lon, lat, lon) : null,
     driving: !!t.driving || (!isHome && speed !== null && speed > 6),
@@ -2114,7 +2121,7 @@ export function familyOf(hass, config = {}) {
   const ids = Array.isArray(config.people)
     ? config.people.filter((id) => states[id])
     : Object.keys(states).filter((id) => id.startsWith('person.') && (states[id].attributes?.device_trackers || []).length).sort();
-  const people = ids.map((id, i) => personOf(hass, id, i, home));
+  const people = ids.map((id, i) => personOf(hass, id, i, home, config.location_sources?.[id]));
   people.sort((a, b) => Number(b.isHome) - Number(a.isHome) || a.name.localeCompare(b.name));
   return { home, zones: zonesOf(hass), people, metric: hass?.config?.unit_system?.length === 'km' };
 }
@@ -2555,6 +2562,10 @@ export class NourieWallCard extends Base {
     for (const key of ['cameras', 'people', 'air', 'air_exclude']) {
       if (config[key] !== undefined && !Array.isArray(config[key])) throw new Error(`${key} must be a list`);
     }
+    if (config.location_sources !== undefined && (
+      !config.location_sources || typeof config.location_sources !== 'object' || Array.isArray(config.location_sources)
+      || Object.values(config.location_sources).some((id) => typeof id !== 'string' || !id.trim())
+    )) throw new Error('location_sources must map person entity IDs to tracker entity IDs');
     this.applyConfig(config);
     this.listKey = '';
     this._sideDirty = true;
