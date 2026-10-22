@@ -31,7 +31,7 @@
  * the left; family radar, map and inside air on the right). Its options are listed further down.
  */
 
-export const VERSION = '1.3.2';
+export const VERSION = '1.3.3';
 
 const FONTS_CSS = 'https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Figtree:wght@400;500;600;700&display=swap';
 const HLS_JS = 'https://cdn.jsdelivr.net/npm/hls.js@1.7.3/dist/hls.min.js';
@@ -453,7 +453,8 @@ export class RtcSession {
     this.sawTcp = false;
     this.heldUdp = [];
     this.tcpTimer = 0;
-    this.typicalFps = 0;
+    // Start from what this camera usually manages, so a camera that is slow from the start still reads as choppy.
+    this.typicalFps = Number(store.get(`fps:${player.id}`)) * 0.9 || 0;
     this.stats = {};
   }
 
@@ -675,7 +676,13 @@ export class RtcSession {
       while (this.decodeHistory.length > 2 && t - this.decodeHistory[0].t > 6000) this.decodeHistory.shift();
       const first = this.decodeHistory[0];
       if (t - first.t >= 3000) recentFps = (1000 * (video.framesDecoded - first.n)) / (t - first.t);
-      if (recentFps != null) this.typicalFps = Math.max(recentFps, this.typicalFps * 0.995);
+      if (recentFps != null) {
+        this.typicalFps = Math.max(recentFps, this.typicalFps * 0.9995);
+        if (!this.savedFpsAt || t - this.savedFpsAt > 60000) {
+          this.savedFpsAt = t;
+          store.set(`fps:${this.player.id}`, Math.round(this.typicalFps * 10) / 10);
+        }
+      }
     }
     this.stats = {
       recentFps,
@@ -1869,7 +1876,8 @@ export class Player {
         this.frozenMs = 0;
         if (this.healthState === 'frozen') this.frozenSince = t;
       }
-      this.choppySince = health.state === 'choppy' ? this.choppySince || t : 0;
+      // A fresh connection can't make a camera send more frames, so only near-stalls get one.
+      this.choppySince = health.state === 'choppy' && Number.isFinite(health.fps) && health.fps < 2 ? this.choppySince || t : 0;
       if (this.choppySince && t - this.choppySince > CHOPPY_RESTART_MS && t - (this.choppyRestartAt || 0) > CHOPPY_RESTART_GAP_MS) {
         this.choppyRestartAt = t;
         this.choppySince = 0;
