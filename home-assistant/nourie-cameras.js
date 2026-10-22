@@ -12,6 +12,7 @@
  *   focus_on_ring: true                             switch to the doorbell when it rings
  *   keep_warm: 60                                   seconds the camera you left keeps streaming, so switching back is instant
  *   remember_frames: true                           keep each camera's last frame on this device for instant previews
+ *   transport: tcp                                  video over go2rtc's TCP port, falling back to UDP; auto = browser picks
  *
  * What it does differently from the stock camera cards, because of how Nest streams work:
  *  - Newer Nest cameras give Home Assistant no snapshots, so the card keeps its own last frame
@@ -30,7 +31,7 @@
  * the left; family radar, map and inside air on the right). Its options are listed further down.
  */
 
-export const VERSION = '1.1.0';
+export const VERSION = '1.2.0';
 
 const FONTS_CSS = 'https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Figtree:wght@400;500;600;700&display=swap';
 const HLS_JS = 'https://cdn.jsdelivr.net/npm/hls.js@1.7.3/dist/hls.min.js';
@@ -42,6 +43,11 @@ const STALL_MS = 8000;
 // it decodes under 40% of the frame rate that camera managed earlier in the session.
 const FROZEN_MS = 2500;
 const CHOPPY_RATIO = 0.4;
+// Video goes over go2rtc's TCP port when it offers one. Measured on the Home Assistant Pi's Wi-Fi, UDP lost
+// 26-31% of the Driveway's packets and no frame could be rebuilt (go2rtc cannot resend them and Nest cannot
+// send a fresh keyframe on request); the same stream over TCP lost none. If no TCP candidate arrives within
+// this long, or the TCP connection fails, the camera falls back to UDP.
+const TCP_WAIT_MS = 3000;
 // A camera that stays choppy this long gets a fresh connection. When the Wall is its only viewer, go2rtc
 // then drops its stalled link to Google and dials a new one, which is what cleared the doorbell in testing.
 const CHOPPY_RESTART_MS = 12000;
@@ -433,6 +439,10 @@ export class RtcSession {
     this.trafficPrevious = null;
     this.lastDecodeAt = 0;
     this.decodeHistory = [];
+    this.tcpOnly = player.card?.transport !== 'auto' && !player.tcpFailed;
+    this.sawTcp = false;
+    this.heldUdp = [];
+    this.tcpTimer = 0;
     this.typicalFps = 0;
     this.stats = {};
   }
@@ -480,7 +490,13 @@ export class RtcSession {
       else this.localPending.push(c);
     };
     pc.onconnectionstatechange = () => {
-      if (!this.closed && pc.connectionState === 'failed') this.fail('The video connection failed', 'ice');
+      if (!this.closed && pc.connectionState === 'failed') {
+        if (this.tcpOnly) {
+          this.player.tcpFailed = true;
+          camLog.add('transport', { camera: this.player.id, change: 'tcp_failed_use_udp' });
+        }
+        this.fail('The video connection failed', 'ice');
+      }
     };
     // Omitting the audio transceiver removes m=audio from the offer, rather than only muting playback.
     for (const kind of this.audioEnabled ? ['audio', 'video'] : ['video']) {
@@ -522,7 +538,22 @@ export class RtcSession {
     }
     if (msg.type === 'answer') {
       if (!pc || pc.signalingState !== 'have-local-offer') return;
-      pc.setRemoteDescription({ type: 'answer', sdp: msg.answer })
+      let sdp = msg.answer;
+      if (this.tcpOnly) {
+        let mid = '0';
+        sdp = sdp.split('\r\n').filter((line) => {
+          if (line.startsWith('a=mid:') && mid === '0') mid = line.slice(6);
+          if (!line.startsWith('a=candidate')) return true;
+          if (/ tcp /i.test(line)) {
+            this.sawTcp = true;
+            return true;
+          }
+          this.heldUdp.push({ candidate: line.slice(2), sdpMid: mid });
+          return false;
+        }).join('\r\n');
+        this.armTcpWait();
+      }
+      pc.setRemoteDescription({ type: 'answer', sdp })
         .then(() => {
           for (const c of this.remotePending.splice(0)) this.addRemote(c);
         })
@@ -541,8 +572,27 @@ export class RtcSession {
     return !!this.pc && !this.closed && this.pc.signalingState === 'have-local-offer';
   }
 
+  // Gives TCP a moment to turn up, then lets UDP candidates through if it hasn't.
+  armTcpWait() {
+    if (this.tcpTimer || !this.tcpOnly) return;
+    this.tcpTimer = setTimeout(() => {
+      if (this.closed || this.sawTcp || !this.tcpOnly) return;
+      this.tcpOnly = false;
+      camLog.add('transport', { camera: this.player.id, change: 'no_tcp_offered_use_udp' });
+      for (const c of this.heldUdp.splice(0)) this.addRemote(c);
+    }, TCP_WAIT_MS);
+  }
+
   addRemote(c) {
     if (!c || !this.pc || this.closed) return;
+    if (this.tcpOnly && c.candidate) {
+      if (/ tcp /i.test(c.candidate)) this.sawTcp = true;
+      else {
+        this.heldUdp.push(c);
+        this.armTcpWait();
+        return;
+      }
+    }
     const init = c.sdpMid || c.sdpMLineIndex != null ? c : { candidate: c.candidate, sdpMid: '0' };
     this.pc.addIceCandidate(init).catch(() => {});
   }
@@ -632,6 +682,7 @@ export class RtcSession {
   close() {
     if (this.closed) return;
     this.closed = true;
+    clearTimeout(this.tcpTimer);
     const unsub = this.unsub;
     this.unsub = null;
     if (unsub) {
@@ -1581,7 +1632,7 @@ export class Player {
           avgFps: frames != null && this.summaryFrames != null && frames >= this.summaryFrames ? Math.round(10000 * (frames - this.summaryFrames) / (t - this.summaryAt)) / 10 : null,
           frozenS: Math.round(((this.frozenMs || 0) + frozenNow) / 1000), restarts: this.restarts - (this.summaryRestarts || 0),
           kbps: session.stats?.incomingBps != null ? Math.round(session.stats.incomingBps / 1000) : null, lossPct: session.stats?.lossPct != null ? Math.round(session.stats.lossPct * 10) / 10 : null,
-          res: session.stats?.width ? `${session.stats.width}x${session.stats.height}` : null });
+          res: session.stats?.width ? `${session.stats.width}x${session.stats.height}` : null, path: session.stats?.localProtocol || null });
         this.summaryAt = t;
         this.summaryFrames = frames;
         this.summaryRestarts = this.restarts;
@@ -2157,6 +2208,7 @@ export class NourieCamerasCard extends Base {
     this.config = { ...config };
     this.remember = config.remember_frames !== false;
     this.keepWarmMs = Math.max(0, Number(config.keep_warm ?? 60) || 0) * 1000;
+    this.transport = config.transport === 'auto' ? 'auto' : 'tcp';
     this.stallMs = Number(config._stall_ms) || STALL_MS;
     this.lifetimeWindow = Array.isArray(config._lifetime_window) ? config._lifetime_window : LIFETIME_WINDOW_S;
     this.handoffLeadS = Number(config._handoff_lead_s) || HANDOFF_LEAD_S;
@@ -2614,6 +2666,8 @@ export class NourieCamerasCard extends Base {
 //   preferred_protocol: auto                auto or hls; HLS uses HA's low latency HTTP stream when supported
 //                                           (HLS opens a second Nest stream per camera; WebRTC shares go2rtc's)
 //   hls_fallback: false                     true switches a camera to HLS after repeated WebRTC stalls
+//   transport: tcp                          tcp = video over go2rtc's TCP port (lossless; falls back to UDP
+//                                           on its own when TCP isn't offered or fails); auto = browser picks
 //   camera_priority: false                  maximize the camera grid; side panel uses space only while visible
 //   air_visible: true                       false hides the Inside air panel
 //   air_visibility: always                  always or family (show air only with the family panel)
@@ -3253,6 +3307,7 @@ export class NourieWallCard extends Base {
     // HLS makes Home Assistant open a second Nest stream per camera next to go2rtc's, so it is opt-in only.
     this.rtcStallFallback = config.hls_fallback === true;
     this.preferredProtocol = config.preferred_protocol ?? 'auto';
+    this.transport = config.transport === 'auto' ? 'auto' : 'tcp';
     this.connectionDiagnostics = config.connection_diagnostics === true;
     this.stallMs = Number(config._stall_ms) || STALL_MS;
     this.lifetimeWindow = Array.isArray(config._lifetime_window) ? config._lifetime_window : LIFETIME_WINDOW_S;
@@ -3265,6 +3320,7 @@ export class NourieWallCard extends Base {
     if (config.connection_diagnostics !== undefined && typeof config.connection_diagnostics !== 'boolean') throw new Error('connection_diagnostics must be true or false');
     if (config.preferred_protocol !== undefined && !['auto', 'hls'].includes(config.preferred_protocol)) throw new Error('preferred_protocol must be auto or hls');
     if (config.hls_fallback !== undefined && typeof config.hls_fallback !== 'boolean') throw new Error('hls_fallback must be true or false');
+    if (config.transport !== undefined && !['tcp', 'auto'].includes(config.transport)) throw new Error('transport must be tcp or auto');
     if (config.family_visibility !== undefined && !['always', 'driving'].includes(config.family_visibility)) throw new Error('family_visibility must be always or driving');
     if (config.family_view !== undefined && !['radar_map', 'map'].includes(config.family_view)) throw new Error('family_view must be radar_map or map');
     if (config.air_visibility !== undefined && !['always', 'family'].includes(config.air_visibility)) throw new Error('air_visibility must be always or family');
