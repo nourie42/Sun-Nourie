@@ -1,7 +1,7 @@
 {
   "domain": "nourie_stream_fix",
   "name": "Nest stream fixes and camera log",
-  "version": "2.0.1",
+  "version": "2.0.2",
   "dependencies": [
     "go2rtc",
     "websocket_api"
