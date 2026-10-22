@@ -97,6 +97,9 @@ def _base(url: str) -> str:
 FLOWING_WINDOW = 1.5  # seconds between two looks when there is no recent one
 RECENT = 10.0  # a look this recent can serve as the first of the two
 HLS_PART_RECENT = 15.0  # seconds since an actual HLS media part was published
+WALL_VIDEO_ONLY_CAMERAS = frozenset({
+    "camera.driveway", "camera.front_door", "camera.hallway", "camera.living_room",
+})
 
 
 class VideoSample(NamedTuple):
@@ -282,11 +285,29 @@ def _bind_hls_output(output: Any, stream: Any) -> None:
     output._nourie_hls_part_watch = True
 
 
+def _configure_wall_video_only(camera: Any, stream: Any) -> None:
+    """Request video only before the selected Nest stream's first input opens."""
+    if _camera_id(camera) not in WALL_VIDEO_ONLY_CAMERAS or camera.stream is not stream:
+        return
+    # Do not silently change the next retry of an already-started shared stream.
+    # A newly created Stream has no thread and no start_worker diagnostic yet.
+    if getattr(stream, "_thread", None) is not None:
+        return
+    if _counter(stream.get_diagnostics().get("start_worker", 0)) != 0:
+        return
+    options = getattr(stream, "pyav_options", None)
+    if isinstance(options, dict):
+        # FFmpeg's RTSP demuxer filters SDP tracks before SETUP. HA's standard
+        # remuxer then receives video without adding a second upstream reader.
+        options["allowed_media_types"] = "video"
+
+
 def _bind_nest_hls(camera: Any, stream: Any, log: CameraLog) -> None:
     """Retain a proven flowing Nest HLS connection across auth-only renewal."""
     stream._nourie_hls_log = log
     if getattr(stream, "_nourie_nest_hls", False):
         return
+    _configure_wall_video_only(camera, stream)
     owner = weakref.ref(camera)
     original_add = stream.add_provider
     original_update = stream.update_source
@@ -474,6 +495,15 @@ def _hls_status(camera: Any) -> dict[str, Any]:
     result["published_part_age_s"] = round(age, 3) if age is not None else None
     result["available"] = bool(stream.available)
     diagnostics = stream.get_diagnostics()
+    result["video_only_requested"] = (
+        getattr(stream, "pyav_options", {}).get("allowed_media_types") == "video"
+    )
+    for key, known in (
+        ("video_codec", {"h264", "hevc", "vp8", "vp9", "av1", "mjpeg", "mpeg4", "mpeg2video"}),
+        ("audio_codec", {"aac", "opus", "pcm_mulaw", "pcm_alaw", "mp3", "mp2", "flac", "vorbis", "ac3", "eac3"}),
+    ):
+        value = diagnostics.get(key)
+        result[key] = (value if value in known else "other") if isinstance(value, str) and value else None
     result["diagnostics"] = {
         key: value for key in ("start_worker", "worker_error", "update_source", "retry_timeout", "nourie_hls_renewal_kept")
         if (value := _counter(diagnostics.get(key))) is not None
