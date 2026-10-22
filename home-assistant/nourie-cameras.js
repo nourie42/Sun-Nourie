@@ -31,7 +31,7 @@
  * the left; family radar, map and inside air on the right). Its options are listed further down.
  */
 
-export const VERSION = '1.3.3';
+export const VERSION = '1.3.4';
 
 const FONTS_CSS = 'https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Figtree:wght@400;500;600;700&display=swap';
 const HLS_JS = 'https://cdn.jsdelivr.net/npm/hls.js@1.7.3/dist/hls.min.js';
@@ -346,12 +346,14 @@ export function connectionPath(report, video) {
 // What the viewer actually sees on a live WebRTC stream: ok, choppy or frozen.
 export function playbackHealth(player, t) {
   const s = player.session;
-  if (player.status !== 'live' || s?.kind !== 'webrtc' || s.closed || !s.lastDecodeAt) return { state: 'ok', fps: null };
-  const shown = Math.max(s.lastDecodeAt, player.rtcPresentation?.lastAt || 0);
-  const age = t - shown;
-  if (age >= FROZEN_MS) return { state: 'frozen', age, fps: 0 };
+  if (player.status !== 'live' || s?.kind !== 'webrtc' || s.closed) return { state: 'ok', fps: null };
   const painted = player.smoother?.recent();
-  if (painted && painted.gapMs >= FROZEN_MS) return { state: 'frozen', age: painted.gapMs, fps: 0 };
+  const shown = Math.max(s.lastDecodeAt || 0, player.rtcPresentation?.lastAt || 0);
+  // The canvas owns the visible picture while active. A past pause describes uneven
+  // playback; only the age of its latest paint means that it is currently frozen.
+  const age = painted ? painted.ageMs : shown ? Math.max(0, t - shown) : null;
+  if (age != null && age >= FROZEN_MS) return { state: 'frozen', age, fps: 0 };
+  if (!painted && !shown) return { state: 'ok', fps: null };
   const fps = painted ? painted.fps : s.stats?.recentFps;
   const ratio = player.healthState === 'choppy' ? CHOPPY_CLEAR_RATIO : CHOPPY_RATIO;
   if (Number.isFinite(fps) && s.typicalFps >= 6 && fps < Math.max(2, s.typicalFps * ratio)) return { state: 'choppy', fps };
@@ -986,6 +988,8 @@ export class FrameSmoother {
     this.canvas.hidden = true;
     this.ctx = null;
     this.track = null;
+    this.processorTrack = null;
+    this.failedTrack = null;
     this.reader = null;
     this.queue = [];
     this.lags = [];
@@ -1004,17 +1008,23 @@ export class FrameSmoother {
   }
 
   start(track) {
-    if (!track || track === this.track) return;
+    if (!track || track === this.track || track === this.failedTrack) return;
     this.stop();
+    this.failedTrack = null;
     this.track = track;
     let reader;
+    let clone;
     try {
       // Clumps of up to seven frames arrive at once; the default one-frame buffer would drop most of them.
-      reader = new MediaStreamTrackProcessor({ track: track.clone(), maxBufferSize: 30 }).readable.getReader();
+      clone = track.clone();
+      reader = new MediaStreamTrackProcessor({ track: clone, maxBufferSize: 30 }).readable.getReader();
     } catch {
+      try { clone?.stop(); } catch { /* Already ended. */ }
+      this.failedTrack = track;
       this.track = null;
       return;
     }
+    this.processorTrack = clone;
     this.reader = reader;
     this.active = true;
     this.startedAt = performance.now();
@@ -1041,8 +1051,12 @@ export class FrameSmoother {
     this.active = false;
     clearTimeout(this.timer);
     this.timer = 0;
-    try { this.reader?.cancel(); } catch { /* Already done. */ }
+    const reader = this.reader;
+    const clone = this.processorTrack;
     this.reader = null;
+    this.processorTrack = null;
+    try { Promise.resolve(reader?.cancel()).catch(() => {}); } catch { /* Already done. */ }
+    try { clone?.stop(); } catch { /* Already ended. */ }
     this.track = null;
     for (const f of this.queue) f.bitmap?.close?.();
     this.queue = [];
@@ -1051,7 +1065,15 @@ export class FrameSmoother {
     this.lastRaw = null;
     this.lastDrawnM = -Infinity;
     this.drawn = [];
+    this.delay = 200;
     this.canvas.hidden = true;
+  }
+
+  fail() {
+    const track = this.track;
+    this.stop();
+    // Keep native video visible for this track; a new session may try smoothing again.
+    this.failedTrack = track;
   }
 
   mediaMs(frame) {
@@ -1088,7 +1110,9 @@ export class FrameSmoother {
       try {
         bitmap = await createImageBitmap(frame);
       } catch {
-        bitmap = null;
+        frame.close();
+        if (reader === this.reader) this.fail();
+        return;
       }
       frame.close();
       if (!bitmap || !this.active || reader !== this.reader) {
@@ -1097,10 +1121,15 @@ export class FrameSmoother {
       }
       this.accept(m, arrival, bitmap);
     }
-    if (reader === this.reader) this.stop();
+    if (reader === this.reader) this.fail();
   }
 
   accept(m, arrival, bitmap) {
+    if (!Number.isFinite(m) || !Number.isFinite(arrival)) {
+      bitmap.close();
+      this.fail();
+      return;
+    }
     // A big jump means a new stream behind the same track: start the timeline again.
     const last = this.lags[this.lags.length - 1];
     if (last && Math.abs((arrival - m) - last.lag) > 10000) {
@@ -1108,10 +1137,6 @@ export class FrameSmoother {
       this.queue = [];
       this.lags = [];
       this.lastDrawnM = -Infinity;
-    }
-    if (m <= this.lastDrawnM) {
-      bitmap.close();
-      return;
     }
     // go2rtc hands a new viewer its cached frames all at once; those say nothing about the network.
     this.lags.push({ at: arrival, lag: arrival - m, warm: arrival - this.startedAt < 2500 });
@@ -1125,6 +1150,13 @@ export class FrameSmoother {
     // Grow at once so frames are not skipped; shrink slowly so playback speed barely changes.
     this.delay = want > this.delay ? want : Math.max(want, this.delay - 2);
     this.base = base;
+    // Frames that missed their display deadline still teach the delay estimator
+    // how much reordering is needed. Never paint them over a newer frame.
+    if (m <= this.lastDrawnM) {
+      bitmap.close();
+      this.schedule();
+      return;
+    }
     let i = this.queue.length;
     while (i > 0 && this.queue[i - 1].m > m) i -= 1;
     this.queue.splice(i, 0, { m, bitmap });
@@ -1142,14 +1174,21 @@ export class FrameSmoother {
     if (!show) return;
     const { bitmap } = show;
     const c = this.canvas;
-    if (c.width !== bitmap.width || c.height !== bitmap.height) {
-      c.width = bitmap.width;
-      c.height = bitmap.height;
-      this.ctx = null;
+    try {
+      if (c.width !== bitmap.width || c.height !== bitmap.height) {
+        c.width = bitmap.width;
+        c.height = bitmap.height;
+        this.ctx = null;
+      }
+      this.ctx = this.ctx || c.getContext('2d', { alpha: false, desynchronized: true });
+      if (!this.ctx) throw new Error('Canvas context unavailable');
+      this.ctx.drawImage(bitmap, 0, 0);
+    } catch {
+      this.fail();
+      return;
+    } finally {
+      bitmap.close();
     }
-    this.ctx = this.ctx || c.getContext('2d', { alpha: false, desynchronized: true });
-    this.ctx.drawImage(bitmap, 0, 0);
-    bitmap.close();
     this.lastDrawnM = show.m;
     this.drawn.push(now);
     while (this.drawn.length && now - this.drawn[0] > 6000) this.drawn.shift();
@@ -1160,9 +1199,10 @@ export class FrameSmoother {
   recent(now = performance.now()) {
     const shown = this.drawn.filter((t) => now - t <= 3000);
     if (!this.active || this.canvas.hidden || !this.drawn.length) return null;
-    let gap = now - this.drawn[this.drawn.length - 1];
+    const age = Math.max(0, now - this.drawn[this.drawn.length - 1]);
+    let gap = age;
     for (let i = 1; i < shown.length; i++) gap = Math.max(gap, shown[i] - shown[i - 1]);
-    return { fps: shown.length / 3, gapMs: gap, delayMs: Math.round(this.delay) };
+    return { fps: shown.length / 3, ageMs: age, gapMs: gap, delayMs: Math.round(this.delay) };
   }
 }
 
@@ -1276,11 +1316,13 @@ export class Player {
     const nodes = this.protocol !== 'mjpeg' && this.smoother ? [this.video, this.smoother.canvas] : [this.element()];
     this.mount = container;
     if (container.childNodes.length !== nodes.length || nodes.some((n, i) => container.childNodes[i] !== n)) container.replaceChildren(...nodes);
+    this.startSmoothing(this.session);
     this.playIfMounted();
   }
 
   unmount() {
     this.pauseRtcWatch();
+    this.smoother?.stop();
     for (const node of [this.video, this.img, this.smoother?.canvas]) {
       if (node && node.parentNode === this.mount) node.remove();
     }
@@ -1459,6 +1501,7 @@ export class Player {
 
   attach(session) {
     this.clearRtcPresentation();
+    this.smoother?.stop();
     const video = this.video;
     if (session.kind === 'webrtc') {
       video.removeAttribute('src');
@@ -1480,7 +1523,7 @@ export class Player {
   }
 
   startSmoothing(session) {
-    if (!this.smoother || session?.kind !== 'webrtc' || session !== this.session) return;
+    if (!this.mount || !this.smoother || session?.kind !== 'webrtc' || session !== this.session) return;
     const track = session.stream.getVideoTracks()[0];
     if (track) this.smoother.start(track);
   }
@@ -1662,6 +1705,7 @@ export class Player {
     this.logConnectionFailure(session, err?.code === 'timeout' ? 'no_packets' : err?.code);
     this.capture(true);
     this.clearRtcPresentation();
+    this.smoother?.stop();
     session.close();
     this.session = null;
     this.shadow?.close();
@@ -1809,6 +1853,13 @@ export class Player {
     const rtc = session.kind === 'webrtc';
     const presentation = rtc ? this.pollRtcPresentation(session, t) : null;
     const watched = rtc ? this.rtcWatchable(session) : (this.mount && !this.video.paused);
+    const painted = rtc && watched ? this.smoother?.recent() : null;
+    if (painted && painted.ageMs > this.card.stallMs && presentation?.lastAt
+      && t - presentation.lastAt <= this.card.stallMs) {
+      // A stopped canvas must not cover working native playback indefinitely.
+      // Drop only the optional display layer; the camera connection stays open.
+      this.smoother.fail();
+    }
     if (!session.firstMediaAt) {
       if (watched && t - (presentation?.watchSince || session.startedAt) > CONNECT_TIMEOUT_MS) {
         session.fail('The camera took too long to start', 'timeout');
@@ -1914,6 +1965,7 @@ export class Player {
     }
     this.capture(true);
     this.clearRtcPresentation();
+    this.smoother?.stop();
     session.close();
     if (this.session === session) this.session = null;
     this.shadow?.close();
