@@ -30,7 +30,7 @@
  * the left; family radar, map and inside air on the right). Its options are listed further down.
  */
 
-export const VERSION = '1.0.9';
+export const VERSION = '1.0.10';
 
 const FONTS_CSS = 'https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Figtree:wght@400;500;600;700&display=swap';
 const HLS_JS = 'https://cdn.jsdelivr.net/npm/hls.js@1.7.3/dist/hls.min.js';
@@ -409,12 +409,9 @@ export class RtcSession {
     };
     // Omitting the audio transceiver removes m=audio from the offer, rather than only muting playback.
     for (const kind of this.audioEnabled ? ['audio', 'video'] : ['video']) {
-      const receiver = pc.addTransceiver(kind, { direction: 'recvonly' }).receiver;
-      try {
-        if (receiver && 'jitterBufferTarget' in receiver) receiver.jitterBufferTarget = 0;
-      } catch {
-        // Browsers may expose the property without allowing it to be changed.
-      }
+      // The browser's adaptive jitter buffer is left alone: forcing it to 0 or raising it both measured worse
+      // on the bursty Nest streams (a high target made Chrome drop a third of the frames).
+      pc.addTransceiver(kind, { direction: 'recvonly' });
     }
 
     let offer;
@@ -2476,6 +2473,8 @@ export class NourieCamerasCard extends Base {
 //                                           true restores audio negotiation, frame callbacks and periodic previews
 //   connection_diagnostics: false           opt in to bounded failure metrics in HA system_log (no raw errors/URLs)
 //   preferred_protocol: auto                auto or hls; HLS uses HA's low latency HTTP stream when supported
+//                                           (HLS opens a second Nest stream per camera; WebRTC shares go2rtc's)
+//   hls_fallback: false                     true switches a camera to HLS after repeated WebRTC stalls
 //   camera_priority: false                  maximize the camera grid; side panel uses space only while visible
 //   air_visible: true                       false hides the Inside air panel
 //   air_visibility: always                  always or family (show air only with the family panel)
@@ -3112,7 +3111,8 @@ export class NourieWallCard extends Base {
     this.remember = config.remember_frames !== false;
     this.audioEnabled = config.audio === true;
     this.lowOverhead = !this.audioEnabled;
-    this.rtcStallFallback = true;
+    // HLS makes Home Assistant open a second Nest stream per camera next to go2rtc's, so it is opt-in only.
+    this.rtcStallFallback = config.hls_fallback === true;
     this.preferredProtocol = config.preferred_protocol ?? 'auto';
     this.connectionDiagnostics = config.connection_diagnostics === true;
     this.stallMs = Number(config._stall_ms) || STALL_MS;
@@ -3125,6 +3125,7 @@ export class NourieWallCard extends Base {
     if (config.audio !== undefined && typeof config.audio !== 'boolean') throw new Error('audio must be true or false');
     if (config.connection_diagnostics !== undefined && typeof config.connection_diagnostics !== 'boolean') throw new Error('connection_diagnostics must be true or false');
     if (config.preferred_protocol !== undefined && !['auto', 'hls'].includes(config.preferred_protocol)) throw new Error('preferred_protocol must be auto or hls');
+    if (config.hls_fallback !== undefined && typeof config.hls_fallback !== 'boolean') throw new Error('hls_fallback must be true or false');
     if (config.family_visibility !== undefined && !['always', 'driving'].includes(config.family_visibility)) throw new Error('family_visibility must be always or driving');
     if (config.family_view !== undefined && !['radar_map', 'map'].includes(config.family_view)) throw new Error('family_view must be radar_map or map');
     if (config.air_visibility !== undefined && !['always', 'family'].includes(config.air_visibility)) throw new Error('air_visibility must be always or family');
