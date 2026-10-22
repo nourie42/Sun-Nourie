@@ -30,7 +30,7 @@
  * the left; family radar, map and inside air on the right). Its options are listed further down.
  */
 
-export const VERSION = '1.0.11';
+export const VERSION = '1.1.0';
 
 const FONTS_CSS = 'https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Figtree:wght@400;500;600;700&display=swap';
 const HLS_JS = 'https://cdn.jsdelivr.net/npm/hls.js@1.7.3/dist/hls.min.js';
@@ -81,6 +81,55 @@ const store = {
     } catch {
       // Storage can be full or blocked; the card works without it.
     }
+  },
+};
+
+// Troubleshooting log. Events are kept in memory and sent to Home Assistant's nourie_stream_fix
+// integration in one small batch every 30 s, which writes them to nourie_cameras_log.jsonl in the
+// background. Nothing on the video path waits for it, and it switches itself off if that
+// integration isn't installed.
+const CAMLOG_FLUSH_MS = 30000;
+const CAMLOG_SUMMARY_MS = 300000;
+const camLog = {
+  queue: [],
+  timer: 0,
+  disabled: false,
+  hass: null,
+  client: '',
+  label() {
+    if (this.client) return this.client;
+    let id = store.get('client-id');
+    if (!id) {
+      id = Math.random().toString(36).slice(2, 8);
+      store.set('client-id', id);
+    }
+    const ua = globalThis.navigator?.userAgent || '';
+    const browser = /SamsungBrowser|Tizen/.test(ua) ? 'Samsung' : /Edg\//.test(ua) ? 'Edge' : /Chrome\//.test(ua) ? 'Chrome' : /Firefox\//.test(ua) ? 'Firefox' : /Safari\//.test(ua) ? 'Safari' : 'browser';
+    const os = /Android/.test(ua) ? 'Android' : /iPhone|iPad/.test(ua) ? 'iOS' : /Windows/.test(ua) ? 'Windows' : /Mac OS/.test(ua) ? 'Mac' : /Linux/.test(ua) ? 'Linux' : '';
+    this.client = `${id} ${browser} ${os} ${globalThis.innerWidth || 0}x${globalThis.innerHeight || 0}`.replace(/\s+/g, ' ');
+    return this.client;
+  },
+  add(event, fields = {}) {
+    if (this.disabled) return;
+    this.queue.push({ event, at: Date.now(), ...fields });
+    if (this.queue.length > 300) this.queue.splice(0, this.queue.length - 300);
+    if (!this.timer) this.timer = setTimeout(() => this.flush(), CAMLOG_FLUSH_MS);
+  },
+  async flush() {
+    this.timer = 0;
+    const hass = this.hass;
+    if (this.disabled || !hass?.callWS || !this.queue.length) return;
+    const events = this.queue.splice(0, 100);
+    try {
+      await hass.callWS({ type: 'nourie_stream_fix/log', events, client: this.label() });
+    } catch (err) {
+      if (err?.code === 'unknown_command') {
+        this.disabled = true;
+        this.queue = [];
+        return;
+      }
+    }
+    if (this.queue.length && !this.timer) this.timer = setTimeout(() => this.flush(), CAMLOG_FLUSH_MS);
   },
 };
 
@@ -923,7 +972,10 @@ export class Player {
 
   setStatus(status) {
     if (this.status === status) return;
+    const from = this.status;
     this.status = status;
+    camLog.add('status', { camera: this.id, from, to: status, protocol: this.session?.kind || this.protocol || null,
+      readyMs: status === 'live' ? this.readyMs : undefined, problem: status === 'live' ? undefined : this.problem?.detail || this.problem?.title });
     this.changed();
   }
 
@@ -1348,6 +1400,7 @@ export class Player {
 
   scheduleRetry(info) {
     this.problem = info;
+    camLog.add('retry', { camera: this.id, problem: info?.detail || info?.title, attempt: this.attempt });
     const t = now();
     if ((info.wait || 0) >= 60) this.providerWaitUntil = Math.max(this.providerWaitUntil, t + info.wait * 1000);
     const wait = Math.max(BACKOFF_S[Math.min(this.attempt, BACKOFF_S.length - 1)], info.wait || 0, (this.providerWaitUntil - t) / 1000);
@@ -1509,6 +1562,32 @@ export class Player {
     }
     if (rtc && watched) {
       const health = playbackHealth(this, t);
+      if (health.state !== (this.healthState || 'ok')) {
+        camLog.add('health', { camera: this.id, from: this.healthState || 'ok', to: health.state,
+          fps: health.fps != null ? Math.round(health.fps * 10) / 10 : null, typicalFps: Math.round((session.typicalFps || 0) * 10) / 10 });
+        if (this.healthState === 'frozen') this.frozenMs = (this.frozenMs || 0) + (t - (this.frozenSince || t));
+        if (health.state === 'frozen') this.frozenSince = t - health.age;
+        this.healthState = health.state;
+      }
+      const frames = session.decodedFrames;
+      if (!this.summaryAt) {
+        this.summaryAt = t;
+        this.summaryFrames = frames;
+        this.summaryRestarts = this.restarts;
+        this.frozenMs = 0;
+      } else if (t - this.summaryAt >= CAMLOG_SUMMARY_MS) {
+        const frozenNow = this.healthState === 'frozen' ? t - (this.frozenSince || t) : 0;
+        camLog.add('summary', { camera: this.id, minutes: Math.round((t - this.summaryAt) / 6000) / 10,
+          avgFps: frames != null && this.summaryFrames != null && frames >= this.summaryFrames ? Math.round(10000 * (frames - this.summaryFrames) / (t - this.summaryAt)) / 10 : null,
+          frozenS: Math.round(((this.frozenMs || 0) + frozenNow) / 1000), restarts: this.restarts - (this.summaryRestarts || 0),
+          kbps: session.stats?.incomingBps != null ? Math.round(session.stats.incomingBps / 1000) : null, lossPct: session.stats?.lossPct != null ? Math.round(session.stats.lossPct * 10) / 10 : null,
+          res: session.stats?.width ? `${session.stats.width}x${session.stats.height}` : null });
+        this.summaryAt = t;
+        this.summaryFrames = frames;
+        this.summaryRestarts = this.restarts;
+        this.frozenMs = 0;
+        if (this.healthState === 'frozen') this.frozenSince = t;
+      }
       this.choppySince = health.state === 'choppy' ? this.choppySince || t : 0;
       if (this.choppySince && t - this.choppySince > CHOPPY_RESTART_MS && t - (this.choppyRestartAt || 0) > CHOPPY_RESTART_GAP_MS) {
         this.choppyRestartAt = t;
@@ -1531,6 +1610,8 @@ export class Player {
   }
 
   onStall(session, reason = 'media') {
+    camLog.add('restart', { camera: this.id, reason: this.choppyRestartAt && now() - this.choppyRestartAt < 1000 ? 'choppy' : reason === 'presentation' ? 'frozen' : 'no_video',
+      ranForS: Math.round((now() - session.startedAt) / 1000), fps: session.stats?.recentFps != null ? Math.round(session.stats.recentFps * 10) / 10 : null });
     this.logConnectionFailure(session, reason === 'presentation' ? 'no_frames' : 'no_packets');
     // A connection that repeatedly starts and freezes also needs the existing HLS
     // fallback. Close this camera's RTC/shadow below before opening its replacement.
@@ -1830,7 +1911,10 @@ function setPill(node, [tone, label, secs]) {
 
 function dotFor(p) {
   if (p.offline || p.status === 'error') return 'd-bad';
-  if (p.status === 'live') return p.wanted ? 'd-live' : 'd-ready';
+  if (p.status === 'live') {
+    if (playbackHealth(p, now()).state !== 'ok') return 'd-wait';
+    return p.wanted ? 'd-live' : 'd-ready';
+  }
   if (p.status === 'connecting' || p.status === 'reconnecting' || p.status === 'waiting') return 'd-wait';
   return '';
 }
@@ -2093,6 +2177,7 @@ export class NourieCamerasCard extends Base {
   }
 
   set hass(hass) {
+    camLog.hass = hass;
     this._hass = hass;
     if (!this.built) this.build();
     this.sync();
@@ -3205,6 +3290,7 @@ export class NourieWallCard extends Base {
   }
 
   set hass(hass) {
+    camLog.hass = hass;
     this._hass = hass;
     if (!this.built) this.build();
     this.sync();

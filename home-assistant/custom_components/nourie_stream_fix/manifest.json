@@ -1,8 +1,11 @@
 {
   "domain": "nourie_stream_fix",
-  "name": "Nest stream name compatibility",
-  "version": "1.0.0",
-  "dependencies": ["go2rtc"],
+  "name": "Nest stream fixes and camera log",
+  "version": "2.0.0",
+  "dependencies": [
+    "go2rtc",
+    "websocket_api"
+  ],
   "iot_class": "local_push",
   "integration_type": "system"
 }
