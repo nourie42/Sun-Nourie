@@ -30,7 +30,7 @@
  * the left; family radar, map and inside air on the right). Its options are listed further down.
  */
 
-export const VERSION = '1.0.10';
+export const VERSION = '1.0.11';
 
 const FONTS_CSS = 'https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Figtree:wght@400;500;600;700&display=swap';
 const HLS_JS = 'https://cdn.jsdelivr.net/npm/hls.js@1.7.3/dist/hls.min.js';
@@ -38,6 +38,14 @@ const STORE = 'nourie-cams:';
 
 const CONNECT_TIMEOUT_MS = 30000;
 const STALL_MS = 8000;
+// A live stream counts as frozen once no new frame has been decoded for this long, and as choppy when
+// it decodes under 40% of the frame rate that camera managed earlier in the session.
+const FROZEN_MS = 2500;
+const CHOPPY_RATIO = 0.4;
+// A camera that stays choppy this long gets a fresh connection. When the Wall is its only viewer, go2rtc
+// then drops its stalled link to Google and dials a new one, which is what cleared the doorbell in testing.
+const CHOPPY_RESTART_MS = 12000;
+const CHOPPY_RESTART_GAP_MS = 90000;
 const BACKOFF_S = [0, 3, 8, 15, 30, 60];
 const HIDDEN_GRACE_MS = 60000;
 const DETACH_GRACE_MS = 8000;
@@ -278,6 +286,18 @@ export function connectionPath(report, video) {
   };
 }
 
+// What the viewer actually sees on a live WebRTC stream: ok, choppy or frozen.
+export function playbackHealth(player, t) {
+  const s = player.session;
+  if (player.status !== 'live' || s?.kind !== 'webrtc' || s.closed || !s.lastDecodeAt) return { state: 'ok', fps: null };
+  const shown = Math.max(s.lastDecodeAt, player.rtcPresentation?.lastAt || 0);
+  const age = t - shown;
+  if (age >= FROZEN_MS) return { state: 'frozen', age, fps: 0 };
+  const fps = s.stats?.recentFps;
+  if (Number.isFinite(fps) && s.typicalFps >= 6 && fps < Math.max(2, s.typicalFps * CHOPPY_RATIO)) return { state: 'choppy', fps };
+  return { state: 'ok', fps: Number.isFinite(fps) ? fps : null };
+}
+
 export function connectionGraphSample(player, t) {
   const session = player.session;
   const kind = session?.kind || player.protocol || '';
@@ -286,7 +306,7 @@ export function connectionGraphSample(player, t) {
   const metric = kind === 'webrtc' ? 'traffic' : kind === 'hls' ? 'buffer' : 'none';
   const raw = metric === 'traffic' ? stats.incomingBps : metric === 'buffer' ? stats.behind : null;
   const value = fresh && Number.isFinite(raw) && raw >= 0 ? raw : null;
-  const frameAt = player.rtcPresentation?.lastAt;
+  const frameAt = Math.max(player.rtcPresentation?.lastAt || 0, session?.lastDecodeAt || 0) || null;
   return { at: t, kind, metric, value, state: player.status || 'idle',
     fps: fresh && Number.isFinite(stats.decodedFps) ? stats.decodedFps : null,
     frameAgeMs: frameAt ? Math.max(0, t - frameAt) : null };
@@ -327,12 +347,15 @@ export function connectionGraphHtml(player, t) {
     : sample.value >= 1000000 ? `${(sample.value / 1000000).toFixed(1)} Mb/s` : `${Math.round(sample.value / 1000)} kb/s`;
   const protocol = sample.kind === 'webrtc' ? 'RTC' : sample.kind === 'hls' ? 'HLS' : sample.kind === 'mjpeg' ? 'MJPEG' : 'No stream';
   const state = sample.state === 'live' ? '' : ` · ${sample.state === 'waiting' ? 'retrying' : sample.state}`;
-  const playback = sample.metric === 'traffic'
+  const health = playbackHealth(player, t);
+  const playback = health.state === 'frozen' ? `frozen ${Math.round(health.age / 1000)} s`
+    : sample.metric === 'traffic'
     ? sample.fps == null ? 'decode —' : `${Math.round(sample.fps)} fps decoded`
     : sample.metric === 'buffer' ? 'buffer behind live edge' : 'waiting for receiver data';
   const frame = sample.frameAgeMs == null ? 'frame progress timing unavailable' : `last frame progress ${(sample.frameAgeMs / 1000).toFixed(1)} s ago`;
   const label = `Last 60 seconds: ${sample.metric === 'buffer' ? 'HLS buffer seconds' : 'incoming video bitrate'}. ${protocol}${state}. ${measured}. ${playback}. ${frame}. Gaps mean no measurement.`;
-  const warning = sample.state !== 'live' || (sample.fps === 0 && sample.value > 0) || sample.frameAgeMs > 5000;
+  const warning = sample.state !== 'live' || health.state !== 'ok' || sample.fps === 0
+    || (sample.metric === 'traffic' && sample.value === 0) || sample.frameAgeMs > FROZEN_MS;
   const html = `<div class="connection ${warning ? 'connection-wait' : ''}" role="img" aria-label="${esc(label)}" title="${esc(label)}"><div class="connection-label"><span>${esc(protocol + state)}</span><b>${esc(measured)}</b></div><svg viewBox="0 0 160 20" aria-hidden="true"><path class="connection-base" d="M1,18 H159"></path><path class="connection-line" d="${path}"></path>${lastY == null ? '' : `<circle cx="${lastX.toFixed(1)}" cy="${lastY.toFixed(1)}" r="1.5"></circle>`}</svg><div class="connection-caption"><span>${esc(playback)}</span><span>60s</span></div></div>`;
   player.connectionGraphCache = { bucket, session, kind, state: connectionState, closed, html };
   return html;
@@ -359,6 +382,9 @@ export class RtcSession {
     this.decodedFrames = null;
     this.previousReport = null;
     this.trafficPrevious = null;
+    this.lastDecodeAt = 0;
+    this.decodeHistory = [];
+    this.typicalFps = 0;
     this.stats = {};
   }
 
@@ -522,7 +548,21 @@ export class RtcSession {
     const decodeTime = delta('totalDecodeTime');
     const jitterTime = delta('jitterBufferDelay');
     const traffic = connectionTraffic(video, this.trafficPrevious, t);
+    // Decoded frames are the honest measure of what is on screen: packets can keep trickling in
+    // while the picture sits still, and that must not read as live.
+    let recentFps = null;
+    if (Number.isFinite(video.framesDecoded)) {
+      if (previous && previous.id !== video.id) this.decodeHistory = [];
+      const last = this.decodeHistory[this.decodeHistory.length - 1];
+      if (video.framesDecoded > 0 && (!last || video.framesDecoded > last.n)) this.lastDecodeAt = t;
+      this.decodeHistory.push({ t, n: video.framesDecoded });
+      while (this.decodeHistory.length > 2 && t - this.decodeHistory[0].t > 6000) this.decodeHistory.shift();
+      const first = this.decodeHistory[0];
+      if (t - first.t >= 3000) recentFps = (1000 * (video.framesDecoded - first.n)) / (t - first.t);
+      if (recentFps != null) this.typicalFps = Math.max(recentFps, this.typicalFps * 0.995);
+    }
     this.stats = {
+      recentFps,
       ...pathStats,
       width: video.frameWidth || 0, height: video.frameHeight || 0, fps: Math.round(video.framesPerSecond || 0),
       decodedFramesDelta: decoded,
@@ -1467,6 +1507,16 @@ export class Player {
       this.onStall(session);
       return;
     }
+    if (rtc && watched) {
+      const health = playbackHealth(this, t);
+      this.choppySince = health.state === 'choppy' ? this.choppySince || t : 0;
+      if (this.choppySince && t - this.choppySince > CHOPPY_RESTART_MS && t - (this.choppyRestartAt || 0) > CHOPPY_RESTART_GAP_MS) {
+        this.choppyRestartAt = t;
+        this.choppySince = 0;
+        this.onStall(session, 'presentation');
+        return;
+      }
+    }
     if (this.status === 'live' && t - this.liveSince > 120000) {
       this.attempt = 0;
       if (rtc && watched && this.card.rtcStallFallback === true) this.rtcFails = 0;
@@ -1748,11 +1798,15 @@ class EventTracker {
 function pillFor(p, t) {
   if (p.offline) return ['bad', 'Offline', ''];
   switch (p.status) {
-    case 'live':
+    case 'live': {
+      const health = playbackHealth(p, t);
+      if (health.state === 'frozen') return ['wait', 'Frozen', `${Math.round(health.age / 1000)}s`];
+      if (health.state === 'choppy') return ['wait', 'Choppy', `${Math.round(health.fps)} fps`];
       if (p.session?.kind === 'hls' && p.session.stats.delayed) {
         return ['wait', p.session.stats.catchingUp ? 'Catching up' : 'Delayed', ''];
       }
       return ['live', 'Live', ''];
+    }
     case 'connecting': {
       const s = p.requestAt ? Math.round((t - p.requestAt) / 1000) : 0;
       return ['wait', 'Connecting', s >= 3 ? `${s}s` : ''];
