@@ -5,9 +5,10 @@
 2. Keep live Nest links. Nest renews its RTSP link about every five minutes and
    the new URL carries a new token. Before every WebRTC offer and every still,
    Home Assistant compares the URL with go2rtc's and re-registers the stream when
-   they differ, which tears down the connection everyone is watching. While
-   go2rtc's link to the same Nest stream is connected, it is kept as it is.
-   When that link is down, Home Assistant's normal behaviour applies unchanged.
+   they differ, which can create another upstream reader while existing viewers
+   retain the old stream. Keep the same Nest link while video packets arrive.
+   Serialize source decisions and observe one stable video receiver before
+   treating its lack of progress as a stalled link.
 3. Camera log. Offers, stills, kept and replaced links, and events sent by the
    Wall card go to <config>/nourie_cameras_log.jsonl. Lines are queued in memory
    and written by a background job every 10 seconds, so nothing on the video
@@ -25,7 +26,7 @@ import logging
 import os
 import threading
 import time
-from typing import Any
+from typing import Any, NamedTuple
 
 import voluptuous as vol
 
@@ -88,10 +89,66 @@ def _base(url: str) -> str:
     return (url or "").split("?", 1)[0]
 
 
-# Last byte count seen per stream: identifier -> (monotonic time, bytes_recv).
-_SEEN: dict[str, tuple[float, int]] = {}
 FLOWING_WINDOW = 1.5  # seconds between two looks when there is no recent one
 RECENT = 10.0  # a look this recent can serve as the first of the two
+
+
+class VideoSample(NamedTuple):
+    """An immutable observation of identified video receivers on one producer."""
+
+    at: float
+    producer_id: int
+    receivers: tuple[tuple[int, int], ...]
+
+
+def _counter(value: Any) -> int | None:
+    return value if isinstance(value, int) and not isinstance(value, bool) and 0 <= value < 2**63 else None
+
+
+def _video_receivers(producer: dict[str, Any]) -> list[dict[str, int]] | None:
+    """Return bounded video packet counters; absent or malformed tracks are unknown."""
+    receivers = producer.get("receivers")
+    if not isinstance(receivers, list) or len(receivers) > 32:
+        return None
+    video = []
+    for receiver in receivers:
+        if not isinstance(receiver, dict) or not isinstance(codec := receiver.get("codec"), dict):
+            return None
+        if codec.get("codec_type") != "video":
+            continue
+        ident = _counter(receiver.get("id"))
+        # go2rtc omits zero counters from otherwise identified receiver objects.
+        count = _counter(receiver.get("bytes", 0))
+        packets = _counter(receiver.get("packets", 0))
+        if ident is None or count is None or packets is None:
+            return None
+        video.append({"id": ident, "bytes": count, "packets": packets})
+    if not video or len({item["id"] for item in video}) != len(video):
+        return None
+    return sorted(video, key=lambda item: item["id"])
+
+
+def _video_sample(producer: dict[str, Any]) -> VideoSample | None:
+    ident = _counter(producer.get("id"))
+    receivers = _video_receivers(producer)
+    if ident is None or receivers is None:
+        return None
+    return VideoSample(time.monotonic(), ident, tuple((item["id"], item["bytes"]) for item in receivers))
+
+
+def _comparable(before: VideoSample, after: VideoSample) -> bool:
+    return (
+        before.producer_id == after.producer_id
+        and tuple(item[0] for item in before.receivers) == tuple(item[0] for item in after.receivers)
+        and all(new[1] >= old[1] for old, new in zip(before.receivers, after.receivers, strict=True))
+    )
+
+
+def _source_lock(provider: Any, identifier: str) -> asyncio.Lock:
+    locks = getattr(provider, "_nourie_source_locks", None)
+    if locks is None:
+        provider._nourie_source_locks = locks = {}
+    return locks.setdefault(identifier, asyncio.Lock())
 
 
 async def _producer(provider: Any, identifier: str) -> dict[str, Any] | None:
@@ -106,30 +163,51 @@ async def _producer(provider: Any, identifier: str) -> dict[str, Any] | None:
 
 
 async def _live_producer(provider: Any, identifier: str) -> dict[str, Any] | None:
-    """The producer only if video is still arriving: go2rtc keeps reporting a link whose
-    connection to Google has silently died, and keeping that one leaves every viewer black."""
+    """Observe video packet progress while the caller holds the source lock.
+
+    An unchanged counter is a stall only after a full observation window on the
+    same producer and receiver IDs. Changed or unobservable tracks are unknown.
+    These counters establish packet arrival, not decoded frames or scene age.
+    """
+    seen = getattr(provider, "_nourie_video_seen", None)
+    if seen is None:
+        provider._nourie_video_seen = seen = {}
     producer = await _producer(provider, identifier)
     if producer is None:
-        _SEEN.pop(identifier, None)
+        seen.pop(identifier, None)
         return None
-    now = time.monotonic()
-    count = int(producer.get("bytes_recv") or 0)
-    seen = _SEEN.get(identifier)
-    if seen is None or now - seen[0] > RECENT or count < seen[1]:
-        _SEEN[identifier] = (now, count)
-        await asyncio.sleep(FLOWING_WINDOW)
+    current = _video_sample(producer)
+    previous = seen.get(identifier)
+    if current is None:
+        seen.pop(identifier, None)
+        return {**producer, "_activity_unknown": True}
+    seen[identifier] = current
+    baseline = current
+    if previous is not None and 0 <= current.at - previous.at <= RECENT:
+        if not _comparable(previous, current):
+            return {**producer, "_activity_unknown": True}
+        if current.receivers != previous.receivers:
+            return producer
+        baseline = previous
+    remaining = FLOWING_WINDOW - (current.at - baseline.at)
+    if remaining > 0:
+        await asyncio.sleep(remaining)
         producer = await _producer(provider, identifier)
         if producer is None:
-            _SEEN.pop(identifier, None)
+            seen.pop(identifier, None)
             return None
-        seen = _SEEN[identifier]
-        now = time.monotonic()
-        count = int(producer.get("bytes_recv") or 0)
-    _SEEN[identifier] = (now, count)
-    if count > seen[1]:
+        current = _video_sample(producer)
+        if current is None:
+            seen.pop(identifier, None)
+            return {**producer, "_activity_unknown": True}
+        seen[identifier] = current
+        if not _comparable(baseline, current):
+            return {**producer, "_activity_unknown": True}
+    if current.receivers != baseline.receivers:
         return producer
-    producer["_stalled"] = True
-    return producer
+    if current.at - baseline.at < FLOWING_WINDOW:
+        return {**producer, "_activity_unknown": True}
+    return {**producer, "_stalled": True}
 
 
 def _patch_identifier() -> None:
@@ -162,29 +240,42 @@ def _patch_provider(log: CameraLog) -> None:
     async def update_stream_source(self, camera):
         cam = _camera_id(camera)
         clog: CameraLog = provider_cls._nourie_log  # noqa: SLF001
-        if camera.platform.platform_name == "nest":
+        if camera.platform.platform_name != "nest":
+            await original_update(self, camera)
+            return
+        identifier = go2rtc.get_camera_identifier(camera)
+        # Include the normal HA update in the same critical section: otherwise
+        # another offer can replace the named stream after our observation.
+        async with _source_lock(self, identifier):
             try:
                 source = await camera.stream_source()
-                identifier = go2rtc.get_camera_identifier(camera)
                 if source:
                     producer = await _live_producer(self, identifier)
+                    # Sampling can wait. Never register a URL captured before that wait.
+                    source = await camera.stream_source()
+                    if source and producer and producer.get("_activity_unknown") and (
+                        not producer.get("url") or _base(producer["url"]) == _base(source)
+                    ):
+                        clog.add("ha", "link_check_deferred", camera=cam, reason="video producer changed or is not observable")
+                        return
                     stalled = bool(producer and producer.get("_stalled"))
-                    if producer and not stalled and producer.get("url") != source and _base(producer.get("url", "")) == _base(source):
+                    if source and producer and not stalled and producer.get("url") != source and _base(producer.get("url", "")) == _base(source):
                         clog.add("ha", "link_kept", camera=cam, bytes=producer.get("bytes_recv"))
                         return
-                    if stalled:
-                        clog.add("ha", "link_registered", camera=cam, reason="link stalled, no video from Google")
+                    if source and stalled:
+                        clog.add("ha", "link_registered", camera=cam, reason="link stalled, no video packet progress", decision_only=True)
                         if producer.get("url") == source:
                             # Same URL means Home Assistant would leave it alone; drop it so go2rtc dials again.
                             await self._rest_client.streams.add(identifier, [source, f"ffmpeg:{identifier}#audio=opus#query=log_level=debug"])
+                            self._nourie_video_seen.pop(identifier, None)
                             return
                     elif producer is None:
-                        clog.add("ha", "link_registered", camera=cam, reason="no running link")
+                        clog.add("ha", "link_registered", camera=cam, reason="no running link", decision_only=True)
                     elif producer.get("url") != source:
-                        clog.add("ha", "link_registered", camera=cam, reason="new Nest stream")
+                        clog.add("ha", "link_registered", camera=cam, reason="new Nest stream", decision_only=True)
             except Exception as err:  # noqa: BLE001 - never block the normal path
                 clog.add("ha", "link_check_failed", camera=cam, error=type(err).__name__)
-        await original_update(self, camera)
+            await original_update(self, camera)
 
     async def handle_offer(self, camera, offer_sdp, session_id, send_message):
         provider_cls._nourie_log.add("ha", "offer", camera=_camera_id(camera))  # noqa: SLF001
@@ -212,6 +303,29 @@ def _provider(hass: HomeAssistant) -> Any:
         if getattr(entry, "runtime_data", None) is not None:
             return entry.runtime_data
     return None
+
+
+def _hls_status(camera: Any) -> dict[str, Any]:
+    """Inspect existing stream objects only; never create or start a worker."""
+    stream = getattr(camera, "stream", None)
+    if stream is None:
+        return {"present": False, "worker_alive": False, "outputs": []}
+    thread = getattr(stream, "_thread", None)
+    result = {
+        "present": True,
+        "worker_alive": bool(thread and thread.is_alive()),
+        "keepalive": bool(getattr(getattr(stream, "dynamic_stream_settings", None), "preload_stream", False)),
+        "outputs": [
+            {"format": fmt if fmt in {"hls", "recorder"} else "other", "idle": bool(output.idle)}
+            for fmt, output in list(stream.outputs().items())[:8]
+        ],
+    }
+    diagnostics = stream.get_diagnostics()
+    result["diagnostics"] = {
+        key: value for key in ("start_worker", "worker_error", "update_source", "retry_timeout")
+        if (value := _counter(diagnostics.get(key))) is not None
+    }
+    return result
 
 
 @websocket_api.websocket_command(
@@ -244,7 +358,8 @@ async def ws_status(hass: HomeAssistant, connection: websocket_api.ActiveConnect
         return
     resp = await provider._rest_client._client.request("GET", "/api/streams")  # noqa: SLF001
     data = await resp.json()
-    names = {go2rtc.get_camera_identifier(state_obj): state_obj.entity_id for state_obj in _cameras(hass)}
+    cameras = _cameras(hass)
+    names = {go2rtc.get_camera_identifier(state_obj): state_obj.entity_id for state_obj in cameras}
     out = {}
     for name, stream in (data or {}).items():
         producers = [
@@ -253,6 +368,8 @@ async def ws_status(hass: HomeAssistant, connection: websocket_api.ActiveConnect
                 "kind": (p.get("url") or "").split(":", 1)[0],
                 "remote": (p.get("remote_addr") or "").rsplit(":", 1)[0],
                 "bytes": p.get("bytes_recv"),
+                "id": _counter(p.get("id")),
+                "video_receivers": _video_receivers(p),
             }
             for p in (stream or {}).get("producers") or []
         ]
@@ -261,6 +378,8 @@ async def ws_status(hass: HomeAssistant, connection: websocket_api.ActiveConnect
             for c in (stream or {}).get("consumers") or []
         ]
         out[names.get(name, name[:24])] = {"producers": producers, "consumers": consumers}
+    for camera in cameras:
+        out.setdefault(_camera_id(camera), {"producers": [], "consumers": []})["hls"] = _hls_status(camera)
     connection.send_result(msg["id"], out)
 
 
