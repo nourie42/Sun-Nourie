@@ -31,7 +31,7 @@
  * the left; family radar, map and inside air on the right). Its options are listed further down.
  */
 
-export const VERSION = '1.3.0';
+export const VERSION = '1.3.1';
 
 const FONTS_CSS = 'https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Figtree:wght@400;500;600;700&display=swap';
 const HLS_JS = 'https://cdn.jsdelivr.net/npm/hls.js@1.7.3/dist/hls.min.js';
@@ -987,7 +987,8 @@ export class FrameSmoother {
     this.lastRaw = null;
     this.lastDrawnM = -Infinity;
     this.drawn = [];
-    this.raf = 0;
+    this.timer = 0;
+    this.timerDue = 0;
     this.active = false;
   }
 
@@ -1008,19 +1009,30 @@ export class FrameSmoother {
     }
     this.reader = reader;
     this.active = true;
+    this.startedAt = performance.now();
     this.pump(reader);
-    const loop = () => {
-      if (!this.active) return;
+  }
+
+  // Timers, not animation frames: Chrome slows animation frames to a few a second in windows it
+  // considers occluded, while a frame painted on time still shows wherever the window is visible.
+  schedule() {
+    if (!this.active || !this.queue.length) return;
+    const due = this.queue[0].m + this.base + this.delay;
+    const wait = Math.max(0, Math.min(1000, due - performance.now()));
+    if (this.timer && this.timerDue <= due) return;
+    clearTimeout(this.timer);
+    this.timerDue = due;
+    this.timer = setTimeout(() => {
+      this.timer = 0;
       this.render();
-      this.raf = requestAnimationFrame(loop);
-    };
-    this.raf = requestAnimationFrame(loop);
+      this.schedule();
+    }, wait);
   }
 
   stop() {
     this.active = false;
-    cancelAnimationFrame(this.raf);
-    this.raf = 0;
+    clearTimeout(this.timer);
+    this.timer = 0;
     try { this.reader?.cancel(); } catch { /* Already done. */ }
     this.reader = null;
     this.track = null;
@@ -1093,10 +1105,13 @@ export class FrameSmoother {
       bitmap.close();
       return;
     }
-    this.lags.push({ at: arrival, lag: arrival - m });
+    // go2rtc hands a new viewer its cached frames all at once; those say nothing about the network.
+    this.lags.push({ at: arrival, lag: arrival - m, warm: arrival - this.startedAt < 2500 });
     while (this.lags.length && arrival - this.lags[0].at > SMOOTH_WINDOW_MS) this.lags.shift();
-    const base = Math.min(...this.lags.map((x) => x.lag));
-    const late = this.lags.map((x) => x.lag - base).sort((a, b) => a - b);
+    const steady = this.lags.filter((x) => !x.warm);
+    const pool = steady.length >= 10 ? steady : this.lags;
+    const base = Math.min(...pool.map((x) => x.lag));
+    const late = pool.map((x) => x.lag - base).sort((a, b) => a - b);
     const p95 = late[Math.min(late.length - 1, Math.floor(late.length * 0.95))] || 0;
     const want = Math.max(SMOOTH_MIN_DELAY_MS, Math.min(SMOOTH_MAX_DELAY_MS, p95 + 40));
     // Grow at once so frames are not skipped; shrink slowly so playback speed barely changes.
@@ -1106,6 +1121,7 @@ export class FrameSmoother {
     while (i > 0 && this.queue[i - 1].m > m) i -= 1;
     this.queue.splice(i, 0, { m, bitmap });
     while (this.queue.length > SMOOTH_MAX_QUEUE) this.queue.shift().bitmap.close();
+    this.schedule();
   }
 
   render() {
