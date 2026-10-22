@@ -1,14 +1,14 @@
 import {calendarDayWindow} from '../public/weather-fusion/calendar-day.js';
 import {forecastConfidence} from '../public/weather-fusion/forecast-confidence.js';
 import {solarElevation} from '../public/weather-fusion/weather-math.js';
-import {MIN_RAIN_SIGNAL_INCHES,TRACE_QPF_THRESHOLD_INCHES} from './weatherFusionDirect.js';
+import {TRACE_QPF_THRESHOLD_INCHES} from './weatherFusionDirect.js';
 
 export const CONDITION_CONFIDENCE_VERSION='weather-nourie-sky-rain-agreement-v2';
 const H=3600000,finite=value=>typeof value==='number'&&Number.isFinite(value),round=value=>Math.round(value*1000)/1000;
 const sourceIds=['nws','hrrr','ecmwf','nbm','wn'];
 const iso=time=>finite(time)?new Date(time).toISOString():null;
 const skyCategory=value=>value<=30?'clear':value>=70?'cloudy':'mixed';
-const rainCategory=value=>value<MIN_RAIN_SIGNAL_INCHES?'dry':value<=TRACE_QPF_THRESHOLD_INCHES?'trace':'wet';
+const rainCategory=value=>value<=0?'dry':value<=TRACE_QPF_THRESHOLD_INCHES?'trace':'wet';
 const categories={clear:0,mixed:1,cloudy:2,dry:0,trace:1,wet:1};
 const names={nws:'NWS',hrrr:'HRRR',ecmwf:'ECMWF',nbm:'NBM',wn:'Google WeatherNext'};
 const number=value=>String(Number(value.toFixed(4)));
@@ -141,7 +141,7 @@ export function addConditionConfidence(out,{now=Date.now()}={}){
   if(score!==null&&key!=='high'){
    if(rainEvidence.probabilityConflictCap<=score&&rainEvidence.probabilityConflictCap<100){
     const conflict=assessedRain.filter(hour=>hour.probabilityConflict).sort((a,b)=>a.probabilityAgreement-b.probabilityAgreement)[0];
-    summary=`NWS gives a ${conflict.officialPop}% rain chance at ${localClock(conflict.time,out.location?.timeZone)}, while the model amounts ${conflict.officialPop>=20?'stay below 0.001 inch for that hour':'show precipitation'}.`;
+    summary=`NWS gives a ${conflict.officialPop}% rain chance at ${localClock(conflict.time,out.location?.timeZone)}, while the model amounts ${conflict.officialPop>=20?'are zero for that hour':'show precipitation'}.`;
    }else if(sky.score<=score&&sky.score<85&&sky.worstHour?.agreement<1)summary=rangeSummary('sky',sky,rainEvidence,out.location?.timeZone)||summary;
    else if(rainEvidence.score<=score&&rainEvidence.score<85&&rainEvidence.worstModelHour?.agreement<1)summary=rangeSummary('rain',{...rainEvidence,worstHour:rainEvidence.worstModelHour},sky,out.location?.timeZone)||summary;
    else if(probabilityCoverageCap<=score&&probabilityCoverageCap<100)summary=rainEvidence.fallbackHours>0?`Required rain-model inputs are missing for ${rainEvidence.fallbackHours} hours, so those hours use the official NWS rain fallback.`:`The official rain probability is missing for ${round(rainEvidence.expectedHours-rainEvidence.officialProbabilityCoveredHours)} assessed hours; the available model amounts agree more closely.`;
@@ -149,7 +149,7 @@ export function addConditionConfidence(out,{now=Date.now()}={}){
    else summary=`Only ${Math.min(sky.completeSources.length,rainEvidence.completeSources.length)} named sources cover both the assessed sky and rain windows.`;
   }
   day.confidence.weather={version:CONDITION_CONFIDENCE_VERSION,scope:'sky-and-rain',label,key,score,evidenceScore,sameDayCoverageFloorApplied,summary,factors,sourceIds:ids,sourceCount:ids.length,leadDays:index,
-   note:'Agreement among named forecast sources about sky cover and precipitation timing, not a calibrated accuracy percentage or a claim that the sources are statistically independent. Temperature, wind and winter precipitation type are assessed separately. Hourly amounts below 0.001 inch are below the existing rain-signal minimum; 0.001 through 0.010 inch is trace precipitation, and larger amounts are wet. Missing values are never dry weather.',
+   note:'Agreement among named forecast sources about sky cover and precipitation timing, not a calibrated accuracy percentage or a claim that the sources are statistically independent. Temperature, wind and winter precipitation type are assessed separately. Zero hourly QPF is dry; any positive amount through 0.010 inch is trace precipitation, and larger amounts are wet. Missing values are never dry weather.',
    evidence:{window,sky,rain:rainEvidence,currentPartialExcluded:{sky:!!skyCurrentPartialExcluded,rain:!!rainCurrentPartialExcluded}}};
   day.confidence.temperature=temperatureComponent(day,index);
  }

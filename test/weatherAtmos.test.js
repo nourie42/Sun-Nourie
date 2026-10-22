@@ -99,14 +99,14 @@ test('the rain breakdown adds up to the published score and explains each source
   const sum=breakdown.rows.reduce((total,row)=>total+row.points,0);
   assert.ok(Math.abs(sum-hour.rainLikelihood.rawTotal)<1e-6);
   assert.equal(breakdown.total,hour.rainLikelihood.value);
-  const notes=rainBreakdown({value:43,rawTotal:43.3,officialProbability:40,sourceAmounts:{hrrr:.004,ecmwf:.2,nbm:.0004},sources:[
-    {id:'nbm',value:0,weight:.2,points:0,reductionReason:'below-minimum'},{id:'nws',value:40,weight:.4,points:16},
-    {id:'hrrr',value:100/3,weight:.3,points:10,reductionReason:'trace'},{id:'ecmwf',value:100/3,weight:.1,points:3.3,reductionReason:'uncorroborated'}]});
+  const notes=rainBreakdown({value:46,rawTotal:46,officialProbability:40,sourceAmounts:{hrrr:.004,ecmwf:.2,nbm:0},sources:[
+    {id:'nbm',value:0,weight:.2,points:0},{id:'nws',value:40,weight:.4,points:16},
+    {id:'hrrr',value:100/3,weight:.3,points:10,reductionReason:'trace'},{id:'ecmwf',value:100,weight:.1,points:10}]});
   assert.deepEqual(notes.rows.map(r=>r.id),['nws','hrrr','ecmwf','nbm']);
   assert.match(notes.rows[0].note,/Official 40% chance, counted at 40%/);
   assert.match(notes.rows[1].note,/trace.*third of its 30 points/);
-  assert.match(notes.rows[2].note,/no backup.*third of its 10 points/);
-  assert.match(notes.rows[3].note,/Less than 0.001 in/);
+  assert.match(notes.rows[2].note,/Over 0.01 in, so all 10 points/);
+  assert.match(notes.rows[3].note,/Dry, so no points/);
 });
 
 test('comfort classes centre on the 72° ideal and follow the UTCI heat-stress limits',()=>{

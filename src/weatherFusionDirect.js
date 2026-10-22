@@ -158,23 +158,20 @@ export function weightedTemperature(values,index){
 }
 export const TRACE_QPF_THRESHOLD_INCHES = .010;
 export const TRACE_QPF_POINT_FRACTION = 1/3;
-export const RAIN_SUPPORT_NWS_THRESHOLD = 20;
-// Explicit floor for the custom hourly rain signal, not a model probability.
-// Keep full-precision QPF amounts: sub-.001-inch drizzle must not receive the
-// same fixed points as a resolved light-rain forecast simply for being positive.
-export const MIN_RAIN_SIGNAL_INCHES = .001;
-/** Amounts from .001 through .010 inch contribute one-third of model points. */
+// Compatibility field retained in the API. The rain-signal floor is zero:
+// every positive deterministic QPF through .010 inch receives one-third credit.
+export const MIN_RAIN_SIGNAL_INCHES = 0;
+/** Zero contributes zero; positive amounts through .010 inch contribute one-third. */
 export function deterministicRainSignal(amount) {
   if (!finite(amount)) return null;
-  if (amount < MIN_RAIN_SIGNAL_INCHES) return 0;
+  if (amount <= 0) return 0;
   return amount <= TRACE_QPF_THRESHOLD_INCHES ? 100*TRACE_QPF_POINT_FRACTION : 100;
 }
 /**
  * Fill the policy's NWS share in proportion to its official probability, then
- * add one-third of a deterministic model's fixed weight for QPF .001–.010
- * inch. A larger amount gets full points only when NWS is at least 20% or
- * another included model also exceeds .010 inch. Otherwise it gets one-third.
- * Rainfall inches stay separate.
+ * add one-third of a deterministic model's fixed weight for any positive QPF
+ * through .010 inch. A larger amount gets full points. Rainfall inches stay
+ * separate from the score.
  */
 export function precipitationLikelihood(nwsProbability, precipitationBlend, policy = SAME_DAY_WEIGHTS) {
   const amounts = precipitationBlend?.sourceValues || {};
@@ -187,18 +184,10 @@ export function precipitationLikelihood(nwsProbability, precipitationBlend, poli
   };
   const ids=['nws','hrrr','ecmwf','nbm',...(policy.wn>0?['wn']:[])];
   if(policy.wn>0)values.wn=deterministicRainSignal(amounts.wn);
-  // Successive interpolated hours from one coarse model interval are not
-  // independent corroboration. Check the other inputs for this same hour.
   const models=ids.filter(id=>id!=='nws'&&finite(policy[id])&&policy[id]>0);
-  const meaningful=models.filter(id=>finite(amounts[id])&&amounts[id]>TRACE_QPF_THRESHOLD_INCHES);
   const reductionReasons={};
   for(const id of models) {
-    if(amounts[id]>0&&amounts[id]<MIN_RAIN_SIGNAL_INCHES)reductionReasons[id]='below-minimum';
-    else if(values[id]>0&&values[id]<100)reductionReasons[id]='trace';
-    else if(values[id]===100&&!(nws>=RAIN_SUPPORT_NWS_THRESHOLD)&&!meaningful.some(other=>other!==id)) {
-      values[id]=100*TRACE_QPF_POINT_FRACTION;
-      reductionReasons[id]='uncorroborated';
-    }
+    if(values[id]>0&&values[id]<100)reductionReasons[id]='trace';
   }
   const points=(id,value)=>finite(value)&&finite(policy[id])&&policy[id]>0?round(value*policy[id],8):null;
   const sourcePoints=Object.fromEntries(ids.map(id=>[id,points(id,values[id])]));
@@ -207,7 +196,7 @@ export function precipitationLikelihood(nwsProbability, precipitationBlend, poli
   const value=finite(rawTotal)?Math.min(100,Math.round(rawTotal)):null;
   const sourceAmounts=Object.fromEntries(ids.map(id=>[id,finite(amounts[id])?amounts[id]:null]));
   const drySources=models.filter(id=>finite(amounts[id])&&amounts[id]<=0);
-  const negligibleSources=models.filter(id=>reductionReasons[id]==='below-minimum');
+  const negligibleSources=[];
   const wetSources=models.filter(id=>finite(values[id])&&values[id]>0);
   const reducedSources=Object.keys(reductionReasons);
   const sources=included.map(id=>({id,value:values[id],weight:policy[id],points:sourcePoints[id],reductionReason:reductionReasons[id]||null}));
@@ -215,7 +204,6 @@ export function precipitationLikelihood(nwsProbability, precipitationBlend, poli
     sourceAmounts,officialProbability:nws,drySources,wetSources,negligibleSources,reducedSources,reductionReasons,sources,
     minimumRainSignalInches:MIN_RAIN_SIGNAL_INCHES,
     reducedQpfThresholdInches:TRACE_QPF_THRESHOLD_INCHES,reducedPointFraction:TRACE_QPF_POINT_FRACTION,
-    supportNwsThreshold:RAIN_SUPPORT_NWS_THRESHOLD,
     source:'Weighted NWS probability plus tiered wet-model points',calibrated:false};
 }
 
@@ -573,16 +561,16 @@ export function enhanceForecast(out, { models, grid, periods = [], hourlyPeriods
     message:nvidia?'Google WeatherNext has a 10% starting share where fresh, matching forecast inputs are available.':nvidiaFeed?.message||'No verified Google WeatherNext forecast is available for this location.',url:'https://developers.google.com/weathernext/guides/models'};
   out.repairVersion=REPAIR_VERSION;
   out.rainPeriodVersion='local-calendar-v1';
-  out.blendPolicy={sameDay:SAME_DAY_WEIGHTS,extendedRain:EXTENDED_RAIN_WEIGHTS,extendedAmount:EXTENDED_QPF_WEIGHTS,precipitation:'Rainfall amount is calculated separately in inches from the hourly source amounts. HRRR contributes only on the selected location\'s current local calendar day.',probability:'On the current local day, the NWS hourly probability fills its 40-point share proportionally; HRRR is worth 30 points, ECMWF 10 and NBM 20. After the current local day, NWS fills a 15-point share proportionally; ECMWF is worth 60 points and NBM 25, with no HRRR contribution. Each deterministic model adds zero rain-signal points below 0.001 inch/hour, and one-third of its points from 0.001 through 0.010 inch/hour. Original rainfall amounts remain unchanged. Above 0.010 inch, full points require NWS at least 20% or another included model above 0.010 inch; otherwise the model gets one-third. Repeated interpolated hours from one model do not establish corroboration.',periodProbability:'Highest canonical hourly score within the explicit period window, not an independently estimated all-day event probability',partialCoverage:'When a required model is unavailable, show the official NWS hourly probability with an explicit fallback label. Preserve the incomplete model score separately; missing data is not dry weather.'};
+  out.blendPolicy={sameDay:SAME_DAY_WEIGHTS,extendedRain:EXTENDED_RAIN_WEIGHTS,extendedAmount:EXTENDED_QPF_WEIGHTS,precipitation:'Rainfall amount is calculated separately in inches from the hourly source amounts. HRRR contributes only on the selected location\'s current local calendar day.',probability:'The NWS hourly probability always fills its 40-point share proportionally. On the current local day, HRRR is worth 30 points, ECMWF 10 and NBM 20. After the current local day, HRRR is excluded and the remaining 60 model points retain the established ECMWF-to-NBM ratio. Deterministic QPF of zero adds zero points; any positive amount through 0.010 inch/hour adds one-third of that model\'s points; and an amount above 0.010 inch/hour adds all of that model\'s points. Original rainfall amounts remain unchanged.',periodProbability:'Highest canonical hourly score within the explicit period window, not an independently estimated all-day event probability',partialCoverage:'When a required model is unavailable, show the official NWS hourly probability with an explicit fallback label. Preserve the incomplete model score separately; missing data is not dry weather.'};
   out.blendPolicy.temperatureOutliers={version:TEMPERATURE_OUTLIER_VERSION,days:[1,2],retainedWeightFraction:.1,recipient:'ecmwf',minimumSources:4,maximumPeerSpreadF:3,minimumMedianDeviationF:4,minimumOutsidePeerRangeF:3};
-  out.methodology='Numeric Weather Nourie blend: On the selected location\'s current local calendar day, the official NWS hourly probability fills its 40-point share proportionally, HRRR is worth 30 points, ECMWF 10 points and NBM 20 points. After that local date ends, the NWS hourly probability fills its 15-point share proportionally, ECMWF is worth 60 points and NBM 25 points; HRRR does not contribute to rain chance. A model amount below 0.001 inch/hour contributes zero rain-signal points while retaining its original rainfall amount. From 0.001 through 0.010 inch/hour, it contributes exactly one-third of that model\'s points. Above 0.010 inch, full points require NWS at least 20% or another included model above 0.010 inch; an uncorroborated signal contributes one-third. Each hour uses its own available inputs; repeated interpolated hours from one model do not establish corroboration. The total is capped at 100%. Rainfall amount is calculated separately in inches. Unavailable deterministic inputs remain missing. If a required model is unavailable, the published rain chance uses the official NWS hourly probability and is explicitly labeled as a fallback; the incomplete weighted score is retained separately. This is a transparent, uncalibrated estimate, not a proven accuracy ranking. Official warnings are never altered. Explicit HRRR, ECMWF IFS 0.25° and NBM point feeds cover the selected coordinates through Open-Meteo, with native extracts as a fallback. Point feeds can combine successive runs of the same named model; their initialization metadata refers to the latest published run. Temperature, dew point, wind, gust and cloud cover use their separate requested weighted-average policy; humidity and feels-like are derived consistently. Pressure and visibility include only published fields. Station observations, UV and official text retain separate provenance. Coarser precipitation intervals are prorated at boundaries; interpolated hourly amounts do not establish storm arrival times. Daily rain chance and amount cover the labeled local calendar date, excluding elapsed hours today; Tonight is a separately labeled overnight period; the main precipitation metric covers the next 24 hours.';
+  out.methodology='Numeric Weather Nourie blend: The official NWS hourly probability always fills its 40-point share proportionally. On the selected location\'s current local calendar day, HRRR is worth 30 points, ECMWF 10 points and NBM 20 points. After that local date ends, HRRR does not contribute and the remaining 60 model points retain the established ECMWF-to-NBM ratio. Deterministic QPF of zero contributes zero rain-signal points. Any positive amount through 0.010 inch/hour contributes exactly one-third of that model\'s points. Above 0.010 inch/hour it contributes all of that model\'s points. The total is capped at 100%. Rainfall amount is calculated separately in inches. Unavailable deterministic inputs remain missing. If a required model is unavailable, the published rain chance uses the official NWS hourly probability and is explicitly labeled as a fallback; the incomplete weighted score is retained separately. This is a transparent, uncalibrated estimate, not a proven accuracy ranking. Official warnings are never altered. Explicit HRRR, ECMWF IFS 0.25° and NBM point feeds cover the selected coordinates through Open-Meteo, with native extracts as a fallback. Point feeds can combine successive runs of the same named model; their initialization metadata refers to the latest published run. Temperature, dew point, wind, gust and cloud cover use their separate requested weighted-average policy; humidity and feels-like are derived consistently. Pressure and visibility include only published fields. Station observations, UV and official text retain separate provenance. Coarser precipitation intervals are prorated at boundaries; interpolated hourly amounts do not establish storm arrival times. Daily rain chance and amount cover the labeled local calendar date, excluding elapsed hours today; Tonight is a separately labeled overnight period; the main precipitation metric covers the next 24 hours.';
   if(nvidia) {
-    out.blendPolicy.sameDay=weatherNextPolicy(SAME_DAY_WEIGHTS,true);
-    out.blendPolicy.extendedRain=weatherNextPolicy(EXTENDED_RAIN_WEIGHTS,true);
+    out.blendPolicy.sameDay=precipitationPolicy(0,true);
+    out.blendPolicy.extendedRain=precipitationPolicy(1,true);
     out.blendPolicy.extendedAmount=weatherNextPolicy(EXTENDED_QPF_WEIGHTS,true);
     out.blendPolicy.weatherNext={requestedWeight:WEATHERNEXT_WEIGHT,runAt:nvidia.runAt,missingInputs:'Only verified matching inputs contribute. Missing Google WeatherNext fields or hours retain the existing available-model policy.'};
-    out.blendPolicy.probability='With matching Google WeatherNext input: current local day NWS 36 points, HRRR 27, ECMWF 9, NBM 18, Google WeatherNext 10. Later local days: NWS 13.5 points, ECMWF 54, NBM 22.5, Google WeatherNext 10; HRRR is excluded. NWS probability fills its share proportionally. Deterministic model rainfall below 0.001 inch/hour adds zero rain-signal points, with original amounts retained. Higher amounts use the existing trace and corroboration rules; it is not a native rain probability.';
-    out.methodology='Weather Nourie includes verified Google WeatherNext at the established 10% starting share. Temperature and other matching numeric weather inputs start at NWS 36%, HRRR 27%, ECMWF 9%, NBM 18%, Google WeatherNext 10%; unavailable inputs are excluded. Rain uses those shares on the current local date. Later dates preserve the existing extended proportions: NWS 13.5%, ECMWF 54%, NBM 22.5%, Google WeatherNext 10%, without HRRR. Each field and hour must have a fresh, matching Google WeatherNext input; otherwise the existing available-model policy applies. Google WeatherNext initialization age is checked independently of collection time, with a 36-hour maximum; only the selected location’s published grid is used. Rainfall amount is calculated separately in inches from timestamp-matched intervals. NWS supplies official probabilities; deterministic models supply uncalibrated rain signals under the existing trace and corroboration rules, never invented model probabilities. An amount below 0.001 inch/hour adds zero rain-signal points without changing the rainfall amount. From 0.001 through 0.010 inch/hour it contributes one-third of that model’s points. Larger amounts get full points only with NWS at least 20% or another included model above 0.010 inch. Daily chance is the highest canonical hourly score in the same period. The daily tiles, hour-by-hour views and comparison graph share these published calculations. Station observations, UV, air quality, official conditions and warnings retain their own sources. Google WeatherNext does not supply gusts, visibility, snowfall depth or winter precipitation-type probabilities; those fields keep their available sources. Today covers the remaining local calendar date; future days cover midnight to midnight. Tonight is a separately labeled overnight period, and the main rain metric covers the next 24 hours. When required rain-model inputs are missing, the published hourly chance is the explicitly identified official NWS fallback.';
+    out.blendPolicy.probability='With matching Google WeatherNext input, NWS keeps its fixed 40-point share and Google WeatherNext receives 10 points. The remaining deterministic-model shares total 50 points while preserving their established relative proportions; HRRR is excluded after the current local day. NWS probability fills its 40-point share proportionally. Deterministic QPF of zero adds zero points, any positive amount through 0.010 inch/hour adds one-third of that model’s points, and an amount above 0.010 inch/hour adds all of that model’s points.';
+    out.methodology='Weather Nourie includes verified Google WeatherNext at the established 10% starting share. Temperature and other matching numeric weather inputs retain their separate requested blend. For rain chance, NWS always keeps 40 points, Google WeatherNext receives 10 points, and the other deterministic models share the remaining 50 points in their established relative proportions; HRRR is excluded after the current local date. Each field and hour must have a fresh, matching Google WeatherNext input; otherwise the existing available-model policy applies. Google WeatherNext initialization age is checked independently of collection time, with a 36-hour maximum; only the selected location’s published grid is used. Rainfall amount is calculated separately in inches from timestamp-matched intervals. NWS supplies official probabilities; deterministic models supply uncalibrated rain signals, never invented model probabilities. QPF of zero adds zero points. Any positive amount through 0.010 inch/hour contributes one-third of that model’s points, and a larger amount contributes all of its points. Daily chance is the highest canonical hourly score in the same period. The daily tiles, hour-by-hour views and comparison graph share these published calculations. Station observations, UV, air quality, official conditions and warnings retain their own sources. Google WeatherNext does not supply gusts, visibility, snowfall depth or winter precipitation-type probabilities; those fields keep their available sources. Today covers the remaining local calendar date; future days cover midnight to midnight. Tonight is a separately labeled overnight period, and the main rain metric covers the next 24 hours. When required rain-model inputs are missing, the published hourly chance is the explicitly identified official NWS fallback.';
   }
   out.methodology=out.methodology.replace('The hourly rain likelihood','Each hourly rain likelihood')+' Daily, daytime and overnight rain percentages are the highest canonical hourly score inside their stated windows, not independently calculated full-period probabilities. The same complete hourly timeline supplies daily cards, forecast details, the hourly display, car-wash decisions and experimental source evidence. A missing hourly score leaves its period unavailable. Expected rainfall amounts are summed from that same timeline.';
   out.methodology+=' For tomorrow and the following local calendar day, one isolated temperature source retains one tenth of its normalized share and transfers the remainder to ECMWF only when at least three other sources, including ECMWF, agree within 3°F, the isolated value differs from their median by at least 4°F, and it lies at least 3°F beyond their range. Raw model temperatures remain visible. This selected policy does not change wind, moisture or rainfall weighting.';

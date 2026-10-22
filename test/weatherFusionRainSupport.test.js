@@ -8,62 +8,62 @@ import {snapshot,testInputs} from './weatherFusion.fixtures.js';
 
 const extended=(pop,amounts)=>precipitationLikelihood(pop,{sourceValues:amounts},EXTENDED_RAIN_WEIGHTS);
 
-test('the reported tiny WeatherNext amounts do not create a repeated 3.33-point rain floor',()=>{
+test('every positive WeatherNext amount through .010 receives one-third of its share',()=>{
  const policy=precipitationPolicy(1,true);
  for(const amount of [.00000214,.00001069,.00000316,.00099999]){
   const score=publishedPrecipitationLikelihood(2,{sourceValues:{hrrr:0,ecmwf:0,nbm:0,wn:amount}},policy);
-  assert.equal(score.sourcePoints.wn,0);
-  assert.equal(score.value,0);
+  assert.equal(score.sourcePoints.wn,3.33333333);
+  assert.equal(score.value,4);
   assert.equal(score.officialProbability,2);
   assert.equal(score.sourceAmounts.wn,amount,'retain the actual published model amount');
   assert.equal(score.sources.find(s=>s.id==='wn').weight,.1);
-  assert.equal(score.reductionReasons.wn,'below-minimum');
-  assert.ok(score.negligibleSources.includes('wn'));
+  assert.equal(score.reductionReasons.wn,'trace');
+  assert.ok(score.wetSources.includes('wn'));
   assert.ok(!score.drySources.includes('wn'),'do not mislabel a tiny positive amount as a published zero');
  }
 });
 
-test('the hourly signal floor preserves resolved light rain, zero and unavailable inputs',()=>{
- assert.equal(MIN_RAIN_SIGNAL_INCHES,.001);
+test('the hourly signal boundaries follow zero, one-third and full-credit tiers exactly',()=>{
+ assert.equal(MIN_RAIN_SIGNAL_INCHES,0);
  assert.equal(deterministicRainSignal(null),null);
  assert.equal(deterministicRainSignal(0),0);
- assert.equal(deterministicRainSignal(.00099999),0);
- for(const amount of [.001,.00306636,.010])assert.ok(Math.abs(deterministicRainSignal(amount)-100/3)<1e-8);
+ for(const amount of [Number.MIN_VALUE,.00000214,.00099999,.001,.00306636,.010])assert.ok(Math.abs(deterministicRainSignal(amount)-100/3)<1e-8);
  assert.equal(deterministicRainSignal(.010001),100);
  for(const id of ['hrrr','ecmwf','nbm']){
   const score=precipitationLikelihood(0,{sourceValues:{hrrr:0,ecmwf:0,nbm:0,[id]:.00000214}});
-  assert.equal(score.sourcePoints[id],0);
-  assert.equal(score.reductionReasons[id],'below-minimum');
+  assert.ok(score.sourcePoints[id]>0);
+  assert.equal(score.reductionReasons[id],'trace');
  }
  const missing=publishedPrecipitationLikelihood(40,{sourceValues:{hrrr:0,ecmwf:0,nbm:null}});
  assert.equal(missing.value,40);assert.equal(missing.mode,'nws-fallback');
 });
 
-test('the reported 0.055-inch ECMWF blip adds 20 points rather than 60',()=>{
+test('QPF above .010 receives the model full share without corroboration',()=>{
   const score=extended(8,{hrrr:0,ecmwf:.055,nbm:0});
-  assert.equal(score.sourcePoints.ecmwf,20);
-  assert.equal(score.rawTotal,21.2);
-  assert.equal(score.value,21);
+  assert.equal(score.sourcePoints.ecmwf,42.352941);
+  assert.equal(score.rawTotal,45.552941);
+  assert.equal(score.value,46);
   assert.equal(score.sourceAmounts.ecmwf,.055);
-  assert.ok(Math.abs(score.sourceValues.ecmwf-100/3)<1e-8);
-  assert.deepEqual(score.reductionReasons,{ecmwf:'uncorroborated'});
-  assert.equal(score.sources.find(s=>s.id==='ecmwf').weight,.6);
+  assert.equal(score.sourceValues.ecmwf,100);
+  assert.deepEqual(score.reductionReasons,{});
+  assert.equal(score.sources.find(s=>s.id==='ecmwf').weight,.42352941);
 });
 
-test('NWS or another included meaningful model can corroborate full credit',()=>{
-  assert.equal(extended(19,{ecmwf:.055,nbm:0}).sourcePoints.ecmwf,20);
-  assert.equal(extended(20,{ecmwf:.055,nbm:0}).sourcePoints.ecmwf,60);
-  assert.equal(extended(0,{ecmwf:.055,nbm:.010}).sourcePoints.ecmwf,20);
+test('the full-credit tier does not depend on NWS or another model',()=>{
+  assert.equal(extended(0,{ecmwf:.055,nbm:0}).sourcePoints.ecmwf,42.352941);
+  assert.equal(extended(19,{ecmwf:.055,nbm:0}).sourcePoints.ecmwf,42.352941);
+  assert.equal(extended(20,{ecmwf:.055,nbm:0}).sourcePoints.ecmwf,42.352941);
+  assert.equal(extended(0,{ecmwf:.055,nbm:.010}).sourcePoints.ecmwf,42.352941);
   const supported=extended(0,{ecmwf:.055,nbm:.010001});
-  assert.equal(supported.sourcePoints.ecmwf,60);
-  assert.equal(supported.sourcePoints.nbm,25);
+  assert.equal(supported.sourcePoints.ecmwf,42.352941);
+  assert.equal(supported.sourcePoints.nbm,17.647059);
   assert.deepEqual(supported.reducedSources,[]);
 });
 
 test('excluded HRRR and missing inputs cannot corroborate extended rain',()=>{
   for(const pop of [0,null])for(const nbm of [0,null]) {
     const score=extended(pop,{hrrr:1,ecmwf:.055,nbm});
-    assert.equal(score.sourcePoints.ecmwf,20);
+    assert.equal(score.sourcePoints.ecmwf,42.352941);
     assert.equal(score.sourcePoints.hrrr,null);
     assert.equal(score.sourcePoints.nbm,nbm===0?0:null);
     assert.ok(!score.drySources.includes('hrrr'));
@@ -71,12 +71,12 @@ test('excluded HRRR and missing inputs cannot corroborate extended rain',()=>{
   }
 });
 
-test('the support cap also applies consistently to same-day models',()=>{
-  for(const [id,points] of [['hrrr',10],['ecmwf',3.33333333],['nbm',6.66666667]]) {
+test('the full-credit tier applies consistently to same-day models',()=>{
+  for(const [id,points] of [['hrrr',30],['ecmwf',10],['nbm',20]]) {
     const amounts={hrrr:0,ecmwf:0,nbm:0,[id]:.055};
     const score=precipitationLikelihood(8,{sourceValues:amounts});
     assert.equal(score.sourcePoints[id],points);
-    assert.equal(score.reductionReasons[id],'uncorroborated');
+    assert.equal(score.reductionReasons[id],undefined);
   }
   const supported=precipitationLikelihood(0,{sourceValues:{hrrr:.02,ecmwf:.02,nbm:0}});
   assert.equal(supported.sourcePoints.hrrr,30);
@@ -105,18 +105,18 @@ for(const [name,latitude,longitude] of [['Greenville, NC',35.6127,-77.3664],['Ra
     }));
     const forecast=buildForecast(input),rows=forecast.rainTimeline.filter(row=>Date.parse(row.time)>=target&&Date.parse(row.time)<target+3*H);
     assert.equal(rows.length,3);
-    assert.ok(rows.every(row=>row.rainLikelihood.value===21&&row.rainLikelihood.sourcePoints.ecmwf===20));
+    assert.ok(rows.every(row=>row.rainLikelihood.value===46&&row.rainLikelihood.sourcePoints.ecmwf===42.352941));
     assert.ok(rows.every(row=>row.rainLikelihood.sourceAmounts.ecmwf===.055));
     assert.ok(rows.every(row=>row.precipitation===.033));
-    for(const hour of forecast.hours.filter(row=>rows.some(r=>r.time===row.time)))assert.equal(hour.rainLikelihood.value,21);
+    for(const hour of forecast.hours.filter(row=>rows.some(r=>r.time===row.time)))assert.equal(hour.rainLikelihood.value,46);
     const index=forecast.days.findIndex(day=>Date.parse(day.rainLikelihood.window.start)<=target&&Date.parse(day.rainLikelihood.window.end)>target);
     const day=forecast.days[index];
-    assert.equal(day.rainLikelihood.value,21);
-    assert.equal(day.rainLikelihood.peak.sourcePoints.ecmwf,20);
+    assert.equal(day.rainLikelihood.value,46);
+    assert.equal(day.rainLikelihood.peak.sourcePoints.ecmwf,42.352941);
     const html=modelExplanationHTML(forecast,{index,phase:'overall',now});
-    assert.match(html,/Uncorroborated rain: one-third of model points/);
-    assert.match(html,/<td>20<small>of 60 max<\/small><\/td>/);
-    assert.match(html,/1\.2 \+ 20 \+ 0 = 21\.2/);
-    assert.match(html,/Shown: <b>21%/);
+    assert.match(html,/above 0\.010 in\/hour gets all of its points/i);
+    assert.match(html,/<td>42\.352941<small>of 42\.3529 max<\/small><\/td>/);
+    assert.match(html,/3\.2 \+ 42\.3529 \+ 0 = 45\.552941/);
+    assert.match(html,/Shown: <b>46%/);
   });
 }

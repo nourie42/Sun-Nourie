@@ -1,13 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {publishedPrecipitationLikelihood,precipitationLikelihood,validateSnapshot,createDirectModels} from '../src/weatherFusionDirect.js';
-import {EXTENDED_RAIN_WEIGHTS,weatherNextPolicy} from '../src/weatherFusionPolicy.js';
+import {precipitationPolicy} from '../src/weatherFusionPolicy.js';
 import {snapshot,testInputs} from './weatherFusion.fixtures.js';
 
 test('failed model feeds cannot turn official 57% into a misleading 18% chance',()=>{
- const policy=weatherNextPolicy(EXTENDED_RAIN_WEIGHTS,true),amount={sourceValues:{hrrr:null,ecmwf:null,nbm:null,wn:.05}};
+ const policy=precipitationPolicy(1,true),amount={sourceValues:{hrrr:null,ecmwf:null,nbm:null,wn:.05}};
  const published=publishedPrecipitationLikelihood(57,amount,policy);
- assert.equal(published.value,57);assert.equal(published.mode,'nws-fallback');assert.equal(published.partialBlend.value,18);
+ assert.equal(published.value,57);assert.equal(published.mode,'nws-fallback');assert.equal(published.partialBlend.value,33);
  assert.deepEqual(published.sources.map(s=>[s.id,s.weight]),[['nws',1]]);
  assert.deepEqual(published.missingModels,['ecmwf','nbm']);
 });

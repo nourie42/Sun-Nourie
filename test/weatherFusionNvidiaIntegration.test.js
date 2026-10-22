@@ -12,7 +12,9 @@ const iso=time=>new Date(time).toISOString();
 const close=(actual,expected,tolerance=1e-8)=>assert.ok(Math.abs(actual-expected)<tolerance,`${actual} should equal ${expected}`);
 const weights=sources=>Object.fromEntries(sources.map(source=>[source.id,source.weight]));
 const sameDay={nws:.36,hrrr:.27,ecmwf:.09,nbm:.18,wn:.10};
-const extended={nws:.135,ecmwf:.54,nbm:.225,wn:.10};
+const sameDayRain={nws:.4,hrrr:.25,ecmwf:.08333333,nbm:.16666667,wn:.10};
+const extendedRain={nws:.4,ecmwf:.35294117,nbm:.14705883,wn:.10};
+const extendedAmount={nws:.135,ecmwf:.54,nbm:.225,wn:.10};
 
 function sourceInputs({withNvidia=true,patchNvidia}={}) {
   const input=structuredClone(testInputs);
@@ -42,13 +44,13 @@ function sourceInputs({withNvidia=true,patchNvidia}={}) {
 
 const at=(series,time)=>series.find(row=>Date.parse(row.time)===time);
 
-test('the established NVIDIA 10 percent preserves original same-day and extended relative shares',()=>{
+test('WeatherNext keeps NWS rain at 40 points and preserves other relative shares',()=>{
   assert.deepEqual(temperaturePolicy(0,true),sameDay);
   assert.deepEqual(temperaturePolicy(4,true),sameDay);
-  assert.deepEqual(precipitationPolicy(0,true),sameDay);
+  assert.deepEqual(precipitationPolicy(0,true),sameDayRain);
   assert.deepEqual(precipitationAmountPolicy(0,true),sameDay);
-  assert.deepEqual(precipitationPolicy(1,true),extended);
-  assert.deepEqual(precipitationAmountPolicy(1,true),extended);
+  assert.deepEqual(precipitationPolicy(1,true),extendedRain);
+  assert.deepEqual(precipitationAmountPolicy(1,true),extendedAmount);
   assert.equal(temperaturePolicy(0),SAME_DAY_WEIGHTS);
   assert.equal(precipitationAmountPolicy(1),EXTENDED_QPF_WEIGHTS);
 });
@@ -73,12 +75,12 @@ test('NVIDIA changes published daily and hourly temperatures with attributed 10 
 test('NVIDIA contributes to hourly rain amounts and scores while later rain excludes HRRR',()=>{
   const forecast=buildForecast(sourceInputs()),first=at(forecast.rainTimeline,now+H),later=at(forecast.rainTimeline,now+30*H);
   assert.deepEqual(weights(first.precipitationBlend.sources),sameDay);
-  assert.deepEqual(weights(first.rainLikelihood.sources),sameDay);
+  assert.deepEqual(weights(first.rainLikelihood.sources),sameDayRain);
   close(first.precipitationBlend.sourceValues.wn,.04);
   assert.equal(first.rainLikelihood.sourceAmounts.wn,.04);
   assert.equal(first.rainLikelihood.sourcePoints.wn,10);
-  assert.deepEqual(weights(later.precipitationBlend.sources),extended);
-  assert.deepEqual(weights(later.rainLikelihood.sources),extended);
+  assert.deepEqual(weights(later.precipitationBlend.sources),extendedAmount);
+  assert.deepEqual(weights(later.rainLikelihood.sources),extendedRain);
   assert.equal(later.rainLikelihood.sourcePoints.hrrr,null);
   assert.equal(later.precipitationBlend.sources.some(source=>source.id==='hrrr'),false);
   const expected=later.precipitationBlend.sources.reduce((sum,source)=>sum+source.value*source.weight,0);
@@ -160,7 +162,7 @@ test('a published zero NVIDIA rainfall amount stays a genuine zero contributor',
   assert.equal(rain.precipitationBlend.sources.find(source=>source.id==='wn').weight,.1);
 });
 
-test('sub-minimum NVIDIA rain keeps its raw amount and forecast share without lifting every hourly chance',()=>{
+test('tiny positive NVIDIA rain receives one-third of its forecast share',()=>{
  const input=sourceInputs({patchNvidia:wn=>{
   wn.precipitationIntervals.forEach(row=>{row.value=.00000214;});wn.hourly.precipitation.fill(.00000214);
  }});
@@ -171,11 +173,11 @@ test('sub-minimum NVIDIA rain keeps its raw amount and forecast share without li
  for(const epoch of [now+H,now+30*H]){
   const row=at(forecast.rainTimeline,epoch);
   assert.equal(row.rainLikelihood.sourceAmounts.wn,.00000214);
-  assert.equal(row.rainLikelihood.sourcePoints.wn,0);
-  assert.equal(row.rainLikelihood.reductionReasons.wn,'below-minimum');
+  assert.equal(row.rainLikelihood.sourcePoints.wn,3.33333333);
+  assert.equal(row.rainLikelihood.reductionReasons.wn,'trace');
   assert.equal(row.precipitationBlend.sources.find(s=>s.id==='wn').weight,.1);
   assert.ok(row.precipitation>0,'raw rainfall amount still contributes separately');
-  assert.ok(row.rainLikelihood.value<=1);
+  assert.equal(row.rainLikelihood.value,4);
  }
  for(const [index,card] of cards.entries())assert.equal(card.pop,chances.forecastValues[index]);
  const day=forecast.days[1],rows=forecast.rainTimeline.filter(r=>Date.parse(r.time)>=Date.parse(day.rainLikelihood.window.start)&&Date.parse(r.time)<Date.parse(day.rainLikelihood.window.end));

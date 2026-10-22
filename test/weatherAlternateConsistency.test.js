@@ -96,13 +96,13 @@ test('Halo UV category matches the displayed rounded UV index',()=>{
  assert.match(haloDailySummary('uv',[{t:now,v:2.6}],[],'Today','America/New_York'),/peaks at 3 \(Moderate\)/);
 });
 test('Today explains matching temperature and rain shares independently, including WeatherNext',()=>{
- const f=fixture();f.blendPolicy={sameDay:{nws:.36,hrrr:.27,nbm:.18,ecmwf:.09,wn:.1},extendedRain:{nws:.135,ecmwf:.54,nbm:.225,wn:.1}};
- for(const h of f.hours){h.temperatureBlend.sources=[{id:'nws',value:40,weight:.2},{id:'ecmwf',value:42,weight:.7},{id:'wn',value:41,weight:.1}];h.rainLikelihood.sources=[{id:'nws',value:0,weight:.36},{id:'hrrr',value:0,weight:.27},{id:'nbm',value:0,weight:.18},{id:'ecmwf',value:0,weight:.09},{id:'wn',value:0,weight:.1}];}
+ const f=fixture();f.blendPolicy={sameDay:{nws:.4,hrrr:.25,nbm:.16666667,ecmwf:.08333333,wn:.1},extendedRain:{nws:.4,ecmwf:.35294118,nbm:.14705882,wn:.1}};
+ for(const h of f.hours){h.temperatureBlend.sources=[{id:'nws',value:40,weight:.2},{id:'ecmwf',value:42,weight:.7},{id:'wn',value:41,weight:.1}];h.rainLikelihood.sources=[{id:'nws',value:0,weight:.4},{id:'hrrr',value:0,weight:.25},{id:'nbm',value:0,weight:.16666667},{id:'ecmwf',value:0,weight:.08333333},{id:'wn',value:0,weight:.1}];}
  const m=buildTodayModel(f,now);
  assert.equal(m.calc.models.find(s=>s.id==='ecmwf').weight,.7);
  assert.equal(m.calc.models.find(s=>s.id==='wn').weight,.1);
  assert.ok(Math.abs(m.calc.models.reduce((sum,s)=>sum+(s.weight||0),0)-1)<1e-12);
- assert.match(m.calc.rainNote,/ECMWF 9/);assert.match(m.calc.rainNote,/Google WeatherNext 10/);assert.match(m.calc.rainNote,/NWS 13.5/);assert.match(m.calc.rainNote,/uncalibrated/);
+ assert.match(m.calc.rainNote,/ECMWF 8\.3/);assert.match(m.calc.rainNote,/Google WeatherNext 10/);assert.match(m.calc.rainNote,/NWS 40/);assert.match(m.calc.rainNote,/uncalibrated/);
  assert.equal(m.series[0].models.wn,41);assert.equal(m.days7[0].pop,17);
  const blend=buildBlendModel(f,null,'knightdale',now);
  assert.equal(blend.weights.ecmwf,.7);assert.equal(blend.modelCards.find(s=>s.id==='weathernext').weight,.1);

@@ -196,10 +196,8 @@ export function rainNote(source,amount,likelihood){
   const chance=finite(likelihood?.officialProbability)?likelihood.officialProbability:source.value;
   return finite(chance)&&finite(max)?`Official ${Math.round(chance)}% chance, counted at ${max}%`:'Official chance unavailable';
  }
- if(source?.reductionReason==='below-minimum')return 'Less than 0.001 in, so no points';
  if(source?.reductionReason==='trace')return `A trace of rain, so a third of its ${max} points`;
- if(source?.reductionReason==='uncorroborated')return `Over 0.01 in with no backup, so a third of its ${max} points`;
- if(finite(source?.value)&&source.value>=100)return `Over 0.01 in and backed up, so all ${max} points`;
+ if(finite(source?.value)&&source.value>=100)return `Over 0.01 in, so all ${max} points`;
  if(finite(amount)&&amount<=0)return 'Dry, so no points';
  if(source?.value===0)return 'No rain signal, so no points';
  return finite(source?.points)?'Partial points':'No data for this hour';

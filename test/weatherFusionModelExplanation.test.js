@@ -61,11 +61,11 @@ test('rain inputs scale the NWS share and explain full and reduced model points'
   assert.match(html,/30% probability/);
   assert.match(html,/<th scope="row">NBM<\/th><td>0 in<small>Rain forecast: No<\/small><\/td><td>0<small>of 20 max<\/small><\/td>/);
   assert.doesNotMatch(html,/QPF support|NWS-anchored input/);
-  assert.match(html,/NWS hourly probability fills its 40-point share proportionally/);
+  assert.match(html,/NWS hourly probability always fills its 40-point share proportionally/);
   assert.match(html,/40% NWS chance contributes 16 points/);
-  assert.match(html,/below 0\.001 in\/hour add zero rain-signal points; the original amounts are retained/);
-  assert.match(html,/From 0\.001 through 0\.010 in\/hour, a model gets one-third/);
-  assert.match(html,/above 0\.010 in gets full points only if NWS is at least 20%/);
+  assert.match(html,/Zero deterministic QPF gets zero points/);
+  assert.match(html,/positive amount through 0\.010 in\/hour gets one-third/);
+  assert.match(html,/above 0\.010 in\/hour gets all of its points/);
   assert.match(html,/result is capped at 100%/);
   assert.match(html,/uncalibrated estimate, not a proven model-accuracy ranking/);
   assert.match(html,/not a separate probability of rain at any time/);
@@ -105,22 +105,22 @@ test('missing models do not renormalize the NWS base or remaining model points',
   assert.match(html,/<th scope="row">HRRR<\/th><td>Unavailable<\/td><td>Not used<\/td>/);
 });
 
-test('a reduced wet vote keeps its exact points without hiding a low score',()=>{
+test('a wet vote above .010 keeps its full points without hiding the score',()=>{
   const forecast=fixture(),single=precipitationLikelihood(0,{sourceValues:{hrrr:0,ecmwf:0,nbm:.02}});
   for(const row of forecast.rainTimeline)row.rainLikelihood=single;
-  Object.assign(forecast.days[0].rainLikelihood,{value:7,peak:single});
+  Object.assign(forecast.days[0].rainLikelihood,{value:20,peak:single});
   const html=modelExplanationHTML(forecast,{now});
-  assert.match(html,/Rounded: <b>7%<\/b>\. Shown: <b>7%/);
+  assert.match(html,/Rounded: <b>20%<\/b>\. Shown: <b>20%/);
   assert.doesNotMatch(html,/fewer than two available sources|below 25%/);
   assert.doesNotMatch(html,/Data mismatch/);
 });
 
-test('a tiny positive WeatherNext amount is disclosed with zero signal points, not called dry or a light-rain vote',()=>{
- const forecast=fixture(),score=precipitationLikelihood(2,{sourceValues:{hrrr:0,ecmwf:0,nbm:0,wn:.00000214}},{nws:.36,hrrr:.27,ecmwf:.09,nbm:.18,wn:.1});
+test('a tiny positive WeatherNext amount is disclosed as a one-third light-rain vote',()=>{
+ const forecast=fixture(),score=precipitationLikelihood(2,{sourceValues:{hrrr:0,ecmwf:0,nbm:0,wn:.00000214}},{nws:.4,hrrr:.25,ecmwf:.08333333,nbm:.16666667,wn:.1});
  for(const row of forecast.rainTimeline)row.rainLikelihood=score;
  Object.assign(forecast.days[0].rainLikelihood,{value:score.value,peak:score});
  const html=modelExplanationHTML(forecast,{now});
- assert.match(html,/<th scope="row">Google WeatherNext<\/th><td>0\.00000214 in<small>Below 0\.001 in\/hour: zero rain-signal points; amount retained<\/small><\/td><td>0<small>of 10 max<\/small>/);
+ assert.match(html,/<th scope="row">Google WeatherNext<\/th><td>0\.00000214 in<small>Light rain forecast: one-third of model points<\/small><\/td><td>3\.333333<small>of 10 max<\/small>/);
 });
 
 test('missing hourly data remains unavailable instead of becoming a zero or a reassuring match',()=>{
@@ -160,7 +160,7 @@ test('source status distinguishes a checked-but-failed refresh from the last dat
   assert.match(html,/Last check: Sat, Sep 12, 8 AM/);
   assert.match(html,/Using last verified data; the latest refresh did not succeed/);
   assert.match(html,/Latest fetch unavailable; retaining the verified run/);
-  assert.match(html,/NWS hourly probability fills its 40-point share proportionally/);
+  assert.match(html,/NWS hourly probability always fills its 40-point share proportionally/);
 });
 
 test('NWS hourly source time never borrows the different daily forecast issuance',()=>{
@@ -198,7 +198,7 @@ test('Google WeatherNext participation and evidence reflect recorded backend con
   assert.match(html,/actual share varies by field and hour/);
   assert.match(html,/Missing or stale data is excluded/);
   assert.match(html,/Google WeatherNext <span>Used at peak/);
-  assert.doesNotMatch(html,/comparison-only|Comparison only|not connected yet|40-point share/);
+  assert.doesNotMatch(html,/comparison-only|Comparison only|not connected yet/);
   assert.equal(weatherNextParticipation(forecast).badge,'10% starting share');
 
   const separateOnly={google:{status:'unavailable',contributes:false,requestedWeight:.1,message:'Matching forecast data is stale.'},feeds:[{id:'wn',status:'ready'}]};

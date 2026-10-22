@@ -773,7 +773,7 @@ function renderRainChart(){
   bindChart(el,()=>steps.length,i=>rainTip(i));
   el.dataset.left=left;el.dataset.right=right;el.dataset.top=top;el.dataset.plot=plot;
   const policy=forecast.blendPolicy||{};
-  $('rain-science').innerHTML=`<p><strong>It is a score, not a single forecast’s chance.</strong> The official NWS chance fills its share in proportion. A model adds its whole share when it forecasts at least 0.01 inch of rain in the hour and another source backs it up, a third of its share for a trace (0.001 to 0.01 inch) or for heavier rain nobody else shows, and nothing below 0.001 inch.</p>
+  $('rain-science').innerHTML=`<p><strong>It is a score, not a single forecast’s chance.</strong> The official NWS chance always fills its 40-point share in proportion. A deterministic model adds zero points for zero QPF, one-third of its share for any positive amount through 0.010 inch, and its whole share above 0.010 inch.</p>
    <p><strong>Shares today:</strong> ${esc(shareList(policy.sameDay))||'not published'}. <strong>After today:</strong> ${esc(shareList(policy.extendedRain))||'not published'}; HRRR is left out after today.</p>
    <p>If a model the score needs is missing, the page shows the official NWS chance instead, so missing data never reads as dry weather. Chances under 5% are not printed.</p>`;
  });

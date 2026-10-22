@@ -19,7 +19,7 @@ test('today uses 40/30/10/20 while later rain excludes HRRR',()=>{
  assert.deepEqual(temperaturePolicy(0),{nws:.4,hrrr:.3,ecmwf:.1,nbm:.2});
  assert.deepEqual(temperaturePolicy(6),temperaturePolicy(0));
  assert.deepEqual(precipitationPolicy(0),temperaturePolicy(0));
- assert.deepEqual(precipitationPolicy(1),{nws:.15,ecmwf:.6,nbm:.25});
+ assert.deepEqual(precipitationPolicy(1),{nws:.4,ecmwf:.42352941,nbm:.17647059});
  assert.deepEqual(precipitationPolicy(6),precipitationPolicy(1));
  assert.deepEqual(out.blendPolicy.sameDay,temperaturePolicy(0));
  assert.deepEqual(out.blendPolicy.extendedRain,precipitationPolicy(1));
@@ -165,9 +165,11 @@ test('fresh nearby precipitation condition survives a rejected station temperatu
  assert.match(current.conditionSource,/observation/i);
 });
 
-test('public methodology states the restored extended rain blend',()=>{
+test('public methodology states the fixed 40-point NWS share and exact QPF tiers',()=>{
  const out=buildForecast({...testInputs,models:models()});
- assert.match(out.methodology,/NWS hourly probability fills its 15-point share proportionally, ECMWF is worth 60 points and NBM 25 points/i);
- assert.match(out.blendPolicy.probability,/NWS fills a 15-point share proportionally; ECMWF is worth 60 points and NBM 25/i);
+ assert.match(out.methodology,/NWS hourly probability always fills its 40-point share proportionally/i);
+ assert.match(out.blendPolicy.probability,/NWS hourly probability always fills its 40-point share proportionally/i);
+ assert.match(out.blendPolicy.probability,/positive amount through 0\.010 inch\/hour adds one-third/i);
+ assert.match(out.blendPolicy.probability,/above 0\.010 inch\/hour adds all/i);
  assert.doesNotMatch(out.methodology,/displayed rain chance uses the official NWS hourly probability directly/i);
 });
