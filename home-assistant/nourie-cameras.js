@@ -31,7 +31,7 @@
  * the left; family radar, map and inside air on the right). Its options are listed further down.
  */
 
-export const VERSION = '1.3.1';
+export const VERSION = '1.3.2';
 
 const FONTS_CSS = 'https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Figtree:wght@400;500;600;700&display=swap';
 const HLS_JS = 'https://cdn.jsdelivr.net/npm/hls.js@1.7.3/dist/hls.min.js';
@@ -1002,7 +1002,8 @@ export class FrameSmoother {
     this.track = track;
     let reader;
     try {
-      reader = new MediaStreamTrackProcessor({ track: track.clone() }).readable.getReader();
+      // Clumps of up to seven frames arrive at once; the default one-frame buffer would drop most of them.
+      reader = new MediaStreamTrackProcessor({ track: track.clone(), maxBufferSize: 30 }).readable.getReader();
     } catch {
       this.track = null;
       return;
