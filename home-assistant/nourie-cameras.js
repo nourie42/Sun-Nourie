@@ -31,7 +31,7 @@
  * the left; family radar, map and inside air on the right). Its options are listed further down.
  */
 
-export const VERSION = '1.3.4';
+export const VERSION = '1.3.5';
 
 const FONTS_CSS = 'https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Figtree:wght@400;500;600;700&display=swap';
 const HLS_JS = 'https://cdn.jsdelivr.net/npm/hls.js@1.7.3/dist/hls.min.js';
@@ -810,21 +810,23 @@ class HlsSession {
       return;
     }
     if (this.closed) return;
-    if (video.canPlayType('application/vnd.apple.mpegurl')) {
-      video.src = url;
-      this.player.playIfMounted();
-      return;
-    }
     let Hls;
+    let libraryError;
     try {
       Hls = await loadHls();
     } catch (err) {
-      this.fail(err.message, 'lib');
-      return;
+      libraryError = err;
     }
     if (this.closed) return;
-    if (!Hls.isSupported()) {
-      this.fail("This browser can't play this camera's stream", 'support');
+    // Some Chromium versions advertise native HLS without actually starting it.
+    // Prefer the working MSE player; native HLS remains available when it cannot run.
+    if (!Hls?.isSupported()) {
+      if (video.canPlayType('application/vnd.apple.mpegurl')) {
+        video.src = url;
+        this.player.playIfMounted();
+      } else {
+        this.fail(libraryError?.message || "This browser can't play this camera's stream", libraryError ? 'lib' : 'support');
+      }
       return;
     }
     const hls = new Hls({
@@ -1852,7 +1854,14 @@ export class Player {
     if (session !== this.session || session.closed) return;
     const rtc = session.kind === 'webrtc';
     const presentation = rtc ? this.pollRtcPresentation(session, t) : null;
-    const watched = rtc ? this.rtcWatchable(session) : (this.mount && !this.video.paused);
+    const hlsStarting = session.kind === 'hls' && !session.firstMediaAt;
+    // Autoplay can fail before the first frame. A wanted, visible HLS startup must
+    // still time out while paused, rather than staying in Reconnecting forever.
+    const watched = rtc ? this.rtcWatchable(session) : hlsStarting
+      ? this.wanted && !!this.mount && this.video.parentNode === this.mount
+        && this.video.isConnected !== false && !globalThis.document?.hidden
+        && (!this.video.getClientRects || this.video.getClientRects().length > 0)
+      : (this.mount && !this.video.paused);
     const painted = rtc && watched ? this.smoother?.recent() : null;
     if (painted && painted.ageMs > this.card.stallMs && presentation?.lastAt
       && t - presentation.lastAt <= this.card.stallMs) {
