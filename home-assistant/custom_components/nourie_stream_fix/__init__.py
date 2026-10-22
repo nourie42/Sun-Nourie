@@ -97,8 +97,10 @@ def _base(url: str) -> str:
 FLOWING_WINDOW = 1.5  # seconds between two looks when there is no recent one
 RECENT = 10.0  # a look this recent can serve as the first of the two
 HLS_PART_RECENT = 15.0  # seconds since an actual HLS media part was published
+# Retain original input tracks on older Nest feeds: excluding audio caused
+# slow media clocks and late stalls in sustained playback. All players are muted.
 WALL_VIDEO_ONLY_CAMERAS = frozenset({
-    "camera.driveway", "camera.front_door", "camera.hallway", "camera.living_room",
+    "camera.front_door",
 })
 
 
