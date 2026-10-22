@@ -19,6 +19,7 @@ from __future__ import annotations
 from collections import deque
 from datetime import timedelta
 from hashlib import sha256
+import asyncio
 import json
 import logging
 import os
@@ -87,8 +88,14 @@ def _base(url: str) -> str:
     return (url or "").split("?", 1)[0]
 
 
-async def _live_producer(provider: Any, identifier: str) -> dict[str, Any] | None:
-    """go2rtc's running producer for this stream, from the raw API (the client model drops runtime fields)."""
+# Last byte count seen per stream: identifier -> (monotonic time, bytes_recv).
+_SEEN: dict[str, tuple[float, int]] = {}
+FLOWING_WINDOW = 1.5  # seconds between two looks when there is no recent one
+RECENT = 10.0  # a look this recent can serve as the first of the two
+
+
+async def _producer(provider: Any, identifier: str) -> dict[str, Any] | None:
+    """go2rtc's connected producer for this stream, from the raw API (the client model drops runtime fields)."""
     resp = await provider._rest_client._client.request("GET", "/api/streams")  # noqa: SLF001
     data = await resp.json()
     stream = data.get(identifier) if isinstance(data, dict) else None
@@ -96,6 +103,33 @@ async def _live_producer(provider: Any, identifier: str) -> dict[str, Any] | Non
         if producer.get("remote_addr") or producer.get("bytes_recv"):
             return producer
     return None
+
+
+async def _live_producer(provider: Any, identifier: str) -> dict[str, Any] | None:
+    """The producer only if video is still arriving: go2rtc keeps reporting a link whose
+    connection to Google has silently died, and keeping that one leaves every viewer black."""
+    producer = await _producer(provider, identifier)
+    if producer is None:
+        _SEEN.pop(identifier, None)
+        return None
+    now = time.monotonic()
+    count = int(producer.get("bytes_recv") or 0)
+    seen = _SEEN.get(identifier)
+    if seen is None or now - seen[0] > RECENT or count < seen[1]:
+        _SEEN[identifier] = (now, count)
+        await asyncio.sleep(FLOWING_WINDOW)
+        producer = await _producer(provider, identifier)
+        if producer is None:
+            _SEEN.pop(identifier, None)
+            return None
+        seen = _SEEN[identifier]
+        now = time.monotonic()
+        count = int(producer.get("bytes_recv") or 0)
+    _SEEN[identifier] = (now, count)
+    if count > seen[1]:
+        return producer
+    producer["_stalled"] = True
+    return producer
 
 
 def _patch_identifier() -> None:
@@ -134,10 +168,17 @@ def _patch_provider(log: CameraLog) -> None:
                 identifier = go2rtc.get_camera_identifier(camera)
                 if source:
                     producer = await _live_producer(self, identifier)
-                    if producer and producer.get("url") != source and _base(producer.get("url", "")) == _base(source):
+                    stalled = bool(producer and producer.get("_stalled"))
+                    if producer and not stalled and producer.get("url") != source and _base(producer.get("url", "")) == _base(source):
                         clog.add("ha", "link_kept", camera=cam, bytes=producer.get("bytes_recv"))
                         return
-                    if producer is None:
+                    if stalled:
+                        clog.add("ha", "link_registered", camera=cam, reason="link stalled, no video from Google")
+                        if producer.get("url") == source:
+                            # Same URL means Home Assistant would leave it alone; drop it so go2rtc dials again.
+                            await self._rest_client.streams.add(identifier, [source, f"ffmpeg:{identifier}#audio=opus#query=log_level=debug"])
+                            return
+                    elif producer is None:
                         clog.add("ha", "link_registered", camera=cam, reason="no running link")
                     elif producer.get("url") != source:
                         clog.add("ha", "link_registered", camera=cam, reason="new Nest stream")

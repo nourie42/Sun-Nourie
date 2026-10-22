@@ -31,7 +31,7 @@
  * the left; family radar, map and inside air on the right). Its options are listed further down.
  */
 
-export const VERSION = '1.2.0';
+export const VERSION = '1.2.1';
 
 const FONTS_CSS = 'https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Figtree:wght@400;500;600;700&display=swap';
 const HLS_JS = 'https://cdn.jsdelivr.net/npm/hls.js@1.7.3/dist/hls.min.js';
@@ -43,6 +43,8 @@ const STALL_MS = 8000;
 // it decodes under 40% of the frame rate that camera managed earlier in the session.
 const FROZEN_MS = 2500;
 const CHOPPY_RATIO = 0.4;
+// Once choppy, a camera stays choppy until it is back above this share of its usual rate, so the badge doesn't flicker.
+const CHOPPY_CLEAR_RATIO = 0.55;
 // Video goes over go2rtc's TCP port when it offers one. Measured on the Home Assistant Pi's Wi-Fi, UDP lost
 // 26-31% of the Driveway's packets and no frame could be rebuilt (go2rtc cannot resend them and Nest cannot
 // send a fresh keyframe on request); the same stream over TCP lost none. If no TCP candidate arrives within
@@ -50,7 +52,7 @@ const CHOPPY_RATIO = 0.4;
 const TCP_WAIT_MS = 3000;
 // A camera that stays choppy this long gets a fresh connection. When the Wall is its only viewer, go2rtc
 // then drops its stalled link to Google and dials a new one, which is what cleared the doorbell in testing.
-const CHOPPY_RESTART_MS = 12000;
+const CHOPPY_RESTART_MS = 20000;
 const CHOPPY_RESTART_GAP_MS = 90000;
 const BACKOFF_S = [0, 3, 8, 15, 30, 60];
 const HIDDEN_GRACE_MS = 60000;
@@ -208,7 +210,7 @@ const hassUrl = (hass, path) => (typeof hass?.hassUrl === 'function' ? hass.hass
 
 export function describeError(message, code) {
   const raw = String(message || '').replace(/^Nest API error:\s*/i, '').replace(/^Error from API:\s*/i, '').trim();
-  if (code === 'timeout') return { title: 'The camera took too long to start', detail: 'Battery cameras can be slow to wake up.', wait: 0 };
+  if (code === 'timeout') return { title: 'The camera took too long to start', detail: 'No video arrived from the camera within 30 seconds.', wait: 0 };
   if (/RESOURCE_EXHAUSTED|rate.?limit|\b429\b/i.test(raw)) return { title: 'Google is limiting stream requests', detail: 'Too many streams were opened in a short time.', wait: 60 };
   if (/UNAUTHENTICATED|PERMISSION_DENIED|\b401\b|\b403\b|invalid_grant|re-?auth/i.test(raw)) return { title: 'Home Assistant lost access to this camera', detail: 'Re-authorize the Nest integration in Home Assistant.', wait: 120 };
   if (/NOT_FOUND|\b404\b/i.test(raw)) return { title: 'The camera stream could not be opened', detail: 'Trying a fresh connection.', wait: 5 };
@@ -349,7 +351,8 @@ export function playbackHealth(player, t) {
   const age = t - shown;
   if (age >= FROZEN_MS) return { state: 'frozen', age, fps: 0 };
   const fps = s.stats?.recentFps;
-  if (Number.isFinite(fps) && s.typicalFps >= 6 && fps < Math.max(2, s.typicalFps * CHOPPY_RATIO)) return { state: 'choppy', fps };
+  const ratio = player.healthState === 'choppy' ? CHOPPY_CLEAR_RATIO : CHOPPY_RATIO;
+  if (Number.isFinite(fps) && s.typicalFps >= 6 && fps < Math.max(2, s.typicalFps * ratio)) return { state: 'choppy', fps };
   return { state: 'ok', fps: Number.isFinite(fps) ? fps : null };
 }
 
