@@ -31,7 +31,7 @@
  * the left; family radar, map and inside air on the right). Its options are listed further down.
  */
 
-export const VERSION = '1.2.1';
+export const VERSION = '1.3.0';
 
 const FONTS_CSS = 'https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Figtree:wght@400;500;600;700&display=swap';
 const HLS_JS = 'https://cdn.jsdelivr.net/npm/hls.js@1.7.3/dist/hls.min.js';
@@ -350,9 +350,16 @@ export function playbackHealth(player, t) {
   const shown = Math.max(s.lastDecodeAt, player.rtcPresentation?.lastAt || 0);
   const age = t - shown;
   if (age >= FROZEN_MS) return { state: 'frozen', age, fps: 0 };
-  const fps = s.stats?.recentFps;
+  const painted = player.smoother?.recent();
+  if (painted && painted.gapMs >= FROZEN_MS) return { state: 'frozen', age: painted.gapMs, fps: 0 };
+  const fps = painted ? painted.fps : s.stats?.recentFps;
   const ratio = player.healthState === 'choppy' ? CHOPPY_CLEAR_RATIO : CHOPPY_RATIO;
   if (Number.isFinite(fps) && s.typicalFps >= 6 && fps < Math.max(2, s.typicalFps * ratio)) return { state: 'choppy', fps };
+  // Uneven frames look choppy even at a decent average: a pause of 3+ frame times on screen
+  // (painted), or a swing in frame timing larger than the frame time itself (browser player).
+  const even = painted ? painted.gapMs <= Math.max(300, 3000 / Math.max(fps, 1)) : !(s.stats?.frameSpread > 1);
+  if (!even && player.healthState !== 'choppy') return { state: 'choppy', fps };
+  if (player.healthState === 'choppy' && !(painted ? painted.gapMs <= Math.max(250, 2500 / Math.max(fps, 1)) : s.stats?.frameSpread <= 0.7)) return { state: 'choppy', fps };
   return { state: 'ok', fps: Number.isFinite(fps) ? fps : null };
 }
 
@@ -648,6 +655,13 @@ export class RtcSession {
     const decoded = delta('framesDecoded');
     const emitted = delta('jitterBufferEmittedCount');
     const decodeTime = delta('totalDecodeTime');
+    const interDelay = delta('totalInterFrameDelay');
+    const interSquared = delta('totalSquaredInterFrameDelay');
+    let frameSpread = null;
+    if (decoded > 2 && interDelay > 0 && interSquared != null) {
+      const mean = interDelay / decoded;
+      frameSpread = Math.sqrt(Math.max(0, interSquared / decoded - mean * mean)) / mean;
+    }
     const jitterTime = delta('jitterBufferDelay');
     const traffic = connectionTraffic(video, this.trafficPrevious, t);
     // Decoded frames are the honest measure of what is on screen: packets can keep trickling in
@@ -665,6 +679,7 @@ export class RtcSession {
     }
     this.stats = {
       recentFps,
+      frameSpread,
       ...pathStats,
       width: video.frameWidth || 0, height: video.frameHeight || 0, fps: Math.round(video.framesPerSecond || 0),
       decodedFramesDelta: decoded,
@@ -679,7 +694,7 @@ export class RtcSession {
       jitterMs: Number.isFinite(video.jitter) && Number.isFinite(video.jitter * 1000) && video.jitter >= 0 ? video.jitter * 1000 : null,
     };
     this.trafficPrevious = traffic.previous;
-    this.previousReport = Object.fromEntries(['id', 'framesReceived', 'bytesReceived', 'framesDecoded', 'totalDecodeTime', 'jitterBufferDelay', 'jitterBufferEmittedCount'].map((key) => [key, video[key]]));
+    this.previousReport = Object.fromEntries(['id', 'framesReceived', 'bytesReceived', 'framesDecoded', 'totalDecodeTime', 'jitterBufferDelay', 'jitterBufferEmittedCount', 'totalInterFrameDelay', 'totalSquaredInterFrameDelay'].map((key) => [key, video[key]]));
   }
 
   close() {
@@ -942,6 +957,191 @@ class MjpegSession {
   }
 }
 
+
+// --------------------------------------------------------------- smooth playback
+
+// Some Nest cameras (here the Hallway and Living Room) encode with B-frames, so frames leave the
+// decoder out of display order: their RTP timestamps run +333, -67, +334, -134 ms. Browsers' WebRTC
+// players show frames as they come, so anything moving jerks back and forth, and these streams also
+// arrive in clumps with gaps up to 1.5 s. Google Home reorders and paces them; this does the same:
+// it takes each decoded frame, sorts by capture time and paints it on a canvas at that time, after
+// a delay that adapts to how late frames have recently been (typically 0.1-0.6 s, at most 1.5 s).
+const SMOOTH_MIN_DELAY_MS = 60;
+const SMOOTH_MAX_DELAY_MS = 1500;
+const SMOOTH_WINDOW_MS = 15000;
+const SMOOTH_MAX_QUEUE = 90;
+
+export class FrameSmoother {
+  constructor(player) {
+    this.player = player;
+    this.canvas = document.createElement('canvas');
+    this.canvas.className = 'smooth';
+    this.canvas.hidden = true;
+    this.ctx = null;
+    this.track = null;
+    this.reader = null;
+    this.queue = [];
+    this.lags = [];
+    this.delay = 200;
+    this.unwrapped = null;
+    this.lastRaw = null;
+    this.lastDrawnM = -Infinity;
+    this.drawn = [];
+    this.raf = 0;
+    this.active = false;
+  }
+
+  static supported() {
+    return typeof globalThis.MediaStreamTrackProcessor === 'function' && typeof globalThis.createImageBitmap === 'function';
+  }
+
+  start(track) {
+    if (!track || track === this.track) return;
+    this.stop();
+    this.track = track;
+    let reader;
+    try {
+      reader = new MediaStreamTrackProcessor({ track: track.clone() }).readable.getReader();
+    } catch {
+      this.track = null;
+      return;
+    }
+    this.reader = reader;
+    this.active = true;
+    this.pump(reader);
+    const loop = () => {
+      if (!this.active) return;
+      this.render();
+      this.raf = requestAnimationFrame(loop);
+    };
+    this.raf = requestAnimationFrame(loop);
+  }
+
+  stop() {
+    this.active = false;
+    cancelAnimationFrame(this.raf);
+    this.raf = 0;
+    try { this.reader?.cancel(); } catch { /* Already done. */ }
+    this.reader = null;
+    this.track = null;
+    for (const f of this.queue) f.bitmap?.close?.();
+    this.queue = [];
+    this.lags = [];
+    this.unwrapped = null;
+    this.lastRaw = null;
+    this.lastDrawnM = -Infinity;
+    this.drawn = [];
+    this.canvas.hidden = true;
+  }
+
+  mediaMs(frame) {
+    let raw = null;
+    try { raw = frame.metadata?.().rtpTimestamp; } catch { raw = null; }
+    if (!Number.isFinite(raw)) return frame.timestamp / 1000;
+    if (this.lastRaw === null) this.unwrapped = raw;
+    else {
+      let d = raw - this.lastRaw;
+      if (d > 2147483648) d -= 4294967296;
+      else if (d < -2147483648) d += 4294967296;
+      this.unwrapped += d;
+    }
+    this.lastRaw = raw;
+    return this.unwrapped / 90;
+  }
+
+  async pump(reader) {
+    while (this.active && reader === this.reader) {
+      let result;
+      try {
+        result = await reader.read();
+      } catch {
+        break;
+      }
+      if (result.done || !this.active || reader !== this.reader) {
+        result.value?.close?.();
+        break;
+      }
+      const frame = result.value;
+      const arrival = performance.now();
+      const m = this.mediaMs(frame);
+      let bitmap = null;
+      try {
+        bitmap = await createImageBitmap(frame);
+      } catch {
+        bitmap = null;
+      }
+      frame.close();
+      if (!bitmap || !this.active || reader !== this.reader) {
+        bitmap?.close?.();
+        continue;
+      }
+      this.accept(m, arrival, bitmap);
+    }
+    if (reader === this.reader) this.stop();
+  }
+
+  accept(m, arrival, bitmap) {
+    // A big jump means a new stream behind the same track: start the timeline again.
+    const last = this.lags[this.lags.length - 1];
+    if (last && Math.abs((arrival - m) - last.lag) > 10000) {
+      for (const f of this.queue) f.bitmap.close();
+      this.queue = [];
+      this.lags = [];
+      this.lastDrawnM = -Infinity;
+    }
+    if (m <= this.lastDrawnM) {
+      bitmap.close();
+      return;
+    }
+    this.lags.push({ at: arrival, lag: arrival - m });
+    while (this.lags.length && arrival - this.lags[0].at > SMOOTH_WINDOW_MS) this.lags.shift();
+    const base = Math.min(...this.lags.map((x) => x.lag));
+    const late = this.lags.map((x) => x.lag - base).sort((a, b) => a - b);
+    const p95 = late[Math.min(late.length - 1, Math.floor(late.length * 0.95))] || 0;
+    const want = Math.max(SMOOTH_MIN_DELAY_MS, Math.min(SMOOTH_MAX_DELAY_MS, p95 + 40));
+    // Grow at once so frames are not skipped; shrink slowly so playback speed barely changes.
+    this.delay = want > this.delay ? want : Math.max(want, this.delay - 2);
+    this.base = base;
+    let i = this.queue.length;
+    while (i > 0 && this.queue[i - 1].m > m) i -= 1;
+    this.queue.splice(i, 0, { m, bitmap });
+    while (this.queue.length > SMOOTH_MAX_QUEUE) this.queue.shift().bitmap.close();
+  }
+
+  render() {
+    const now = performance.now();
+    let show = null;
+    while (this.queue.length && this.queue[0].m + this.base + this.delay <= now) {
+      show?.bitmap.close();
+      show = this.queue.shift();
+    }
+    if (!show) return;
+    const { bitmap } = show;
+    const c = this.canvas;
+    if (c.width !== bitmap.width || c.height !== bitmap.height) {
+      c.width = bitmap.width;
+      c.height = bitmap.height;
+      this.ctx = null;
+    }
+    this.ctx = this.ctx || c.getContext('2d', { alpha: false, desynchronized: true });
+    this.ctx.drawImage(bitmap, 0, 0);
+    bitmap.close();
+    this.lastDrawnM = show.m;
+    this.drawn.push(now);
+    while (this.drawn.length && now - this.drawn[0] > 6000) this.drawn.shift();
+    if (c.hidden) c.hidden = false;
+  }
+
+  // What was actually painted: frames per second and the longest pause, over the last 3 s.
+  recent(now = performance.now()) {
+    const shown = this.drawn.filter((t) => now - t <= 3000);
+    if (!this.active || this.canvas.hidden || !this.drawn.length) return null;
+    let gap = now - this.drawn[this.drawn.length - 1];
+    for (let i = 1; i < shown.length; i++) gap = Math.max(gap, shown[i] - shown[i - 1]);
+    return { fps: shown.length / 3, gapMs: gap, delayMs: Math.round(this.delay) };
+  }
+}
+
 // --------------------------------------------------------------- player
 
 // One per camera. Owns the video element and keeps a stream alive while the card wants it.
@@ -962,6 +1162,7 @@ export class Player {
     this.video = video;
     this.img = null;
     this.canvas = null;
+    this.smoother = card?.smooth !== false && FrameSmoother.supported() ? new FrameSmoother(this) : null;
 
     this.session = null;
     this.shadow = null;
@@ -1048,15 +1249,15 @@ export class Player {
 
   mountIn(container) {
     if (!container) return;
-    const node = this.element();
+    const nodes = this.protocol !== 'mjpeg' && this.smoother ? [this.video, this.smoother.canvas] : [this.element()];
     this.mount = container;
-    if (node.parentNode !== container || container.childNodes.length !== 1) container.replaceChildren(node);
+    if (container.childNodes.length !== nodes.length || nodes.some((n, i) => container.childNodes[i] !== n)) container.replaceChildren(...nodes);
     this.playIfMounted();
   }
 
   unmount() {
     this.pauseRtcWatch();
-    for (const node of [this.video, this.img]) {
+    for (const node of [this.video, this.img, this.smoother?.canvas]) {
       if (node && node.parentNode === this.mount) node.remove();
     }
     this.mount = null;
@@ -1142,6 +1343,7 @@ export class Player {
 
   closeSessions() {
     this.clearRtcPresentation();
+    this.smoother?.stop();
     this.startGeneration += 1;
     this.shadow?.close();
     this.shadow = null;
@@ -1238,6 +1440,7 @@ export class Player {
       video.removeAttribute('src');
       video.srcObject = session.stream;
       this.beginRtcPresentation(session);
+      this.startSmoothing(session);
     } else if (session.kind === 'hls') {
       video.srcObject = null;
     }
@@ -1248,7 +1451,14 @@ export class Player {
   onTrack(session) {
     if (session !== this.session) return;
     if (this.video.srcObject !== session.stream) this.attach(session);
+    this.startSmoothing(session);
     this.playIfMounted();
+  }
+
+  startSmoothing(session) {
+    if (!this.smoother || session?.kind !== 'webrtc' || session !== this.session) return;
+    const track = session.stream.getVideoTracks()[0];
+    if (track) this.smoother.start(track);
   }
 
   // Only native WebRTC cameras need parallel Nest offers/renewal. Provider-backed RTSP
@@ -2081,6 +2291,8 @@ button:focus-visible { outline: 2px solid var(--nc-cyan); outline-offset: 2px; }
 .backdrop { position: absolute; inset: -24px; width: calc(100% + 48px); height: calc(100% + 48px); max-width: none; object-fit: cover; filter: blur(24px) brightness(.42) saturate(1.15); pointer-events: none; }
 .vid { position: absolute; inset: 0; }
 .vid > video, .vid > img { width: 100%; height: 100%; display: block; object-fit: contain; background: transparent; }
+.vid > canvas.smooth { position: absolute; inset: 0; width: 100%; height: 100%; display: block; object-fit: contain; }
+.vid > canvas.smooth[hidden] { display: none; }
 .still { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; opacity: 0; transition: opacity .35s ease; pointer-events: none; }
 .still.show { opacity: 1; }
 .scrim { position: absolute; left: 0; right: 0; display: flex; justify-content: space-between; gap: 8px; pointer-events: none; }
@@ -2212,6 +2424,7 @@ export class NourieCamerasCard extends Base {
     this.remember = config.remember_frames !== false;
     this.keepWarmMs = Math.max(0, Number(config.keep_warm ?? 60) || 0) * 1000;
     this.transport = config.transport === 'auto' ? 'auto' : 'tcp';
+    this.smooth = config.smooth !== false;
     this.stallMs = Number(config._stall_ms) || STALL_MS;
     this.lifetimeWindow = Array.isArray(config._lifetime_window) ? config._lifetime_window : LIFETIME_WINDOW_S;
     this.handoffLeadS = Number(config._handoff_lead_s) || HANDOFF_LEAD_S;
@@ -2669,6 +2882,7 @@ export class NourieCamerasCard extends Base {
 //   preferred_protocol: auto                auto or hls; HLS uses HA's low latency HTTP stream when supported
 //                                           (HLS opens a second Nest stream per camera; WebRTC shares go2rtc's)
 //   hls_fallback: false                     true switches a camera to HLS after repeated WebRTC stalls
+//   smooth: true                            reorder and pace frames on a canvas (fixes jerky B-frame cameras)
 //   transport: tcp                          tcp = video over go2rtc's TCP port (lossless; falls back to UDP
 //                                           on its own when TCP isn't offered or fails); auto = browser picks
 //   camera_priority: false                  maximize the camera grid; side panel uses space only while visible
@@ -3078,6 +3292,8 @@ button:focus-visible { outline: 2px solid var(--nc-cyan); outline-offset: 2px; }
 .backdrop { position: absolute; inset: -24px; width: calc(100% + 48px); height: calc(100% + 48px); max-width: none; object-fit: cover; filter: blur(24px) brightness(.42) saturate(1.15); pointer-events: none; }
 .vid { position: absolute; inset: 0; }
 .vid > video, .vid > img { width: 100%; height: 100%; display: block; object-fit: var(--nc-fit, contain); background: transparent; }
+.vid > canvas.smooth { position: absolute; inset: 0; width: 100%; height: 100%; display: block; object-fit: var(--nc-fit, contain); }
+.vid > canvas.smooth[hidden] { display: none; }
 .still { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: var(--nc-fit, contain); opacity: 0; transition: opacity .35s ease; pointer-events: none; }
 .still.show { opacity: 1; }
 .scrim { position: absolute; left: 0; right: 0; display: flex; align-items: center; justify-content: space-between; gap: 8px; pointer-events: none; }
@@ -3311,6 +3527,7 @@ export class NourieWallCard extends Base {
     this.rtcStallFallback = config.hls_fallback === true;
     this.preferredProtocol = config.preferred_protocol ?? 'auto';
     this.transport = config.transport === 'auto' ? 'auto' : 'tcp';
+    this.smooth = config.smooth !== false;
     this.connectionDiagnostics = config.connection_diagnostics === true;
     this.stallMs = Number(config._stall_ms) || STALL_MS;
     this.lifetimeWindow = Array.isArray(config._lifetime_window) ? config._lifetime_window : LIFETIME_WINDOW_S;
