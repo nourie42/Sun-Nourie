@@ -31,13 +31,15 @@
  * the left; family radar, map and inside air on the right). Its options are listed further down.
  */
 
-export const VERSION = '1.3.6';
+export const VERSION = '1.3.7';
+// 1.3.7: hls.js loads from Home Assistant (/local/hls.min.js) with the CDN as a fallback. Drivers show
+//        their current speed (Life360 reports mph, or km/h on metric systems) on the family chips and map markers.
 // 1.3.6: Honest live detection for Nest-through-go2rtc streams. Liveness is decoded-frame progress
 // (not byte increases); a byte trickle, a choppy rate or an unchanging picture reconnects with backoff;
 // the Live badge needs measured, healthy frames and bitrate.
 
 const FONTS_CSS = 'https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Figtree:wght@400;500;600;700&display=swap';
-const HLS_JS = 'https://cdn.jsdelivr.net/npm/hls.js@1.7.3/dist/hls.min.js';
+const HLS_JS = ['/local/hls.min.js?v=1.7.3', 'https://cdn.jsdelivr.net/npm/hls.js@1.7.3/dist/hls.min.js'];
 const STORE = 'nourie-cams:';
 
 const CONNECT_TIMEOUT_MS = 30000;
@@ -256,15 +258,20 @@ function loadHls() {
   if (globalThis.Hls?.isSupported) return Promise.resolve(globalThis.Hls);
   if (!hlsPromise) {
     hlsPromise = new Promise((resolve, reject) => {
-      const script = document.createElement('script');
-      script.src = HLS_JS;
-      script.async = true;
-      script.onload = () => (globalThis.Hls?.isSupported ? resolve(globalThis.Hls) : reject(new Error('The video player did not start')));
-      script.onerror = () => {
-        hlsPromise = null;
-        reject(new Error('The video player could not load'));
+      const attempt = (i) => {
+        const script = document.createElement('script');
+        script.src = HLS_JS[i];
+        script.async = true;
+        script.onload = () => (globalThis.Hls?.isSupported ? resolve(globalThis.Hls) : reject(new Error('The video player did not start')));
+        script.onerror = () => {
+          script.remove();
+          if (i + 1 < HLS_JS.length) return attempt(i + 1);
+          hlsPromise = null;
+          reject(new Error('The video player could not load'));
+        };
+        document.head.appendChild(script);
       };
-      document.head.appendChild(script);
+      attempt(0);
     });
   }
   return hlsPromise;
@@ -3190,6 +3197,26 @@ export function trackerDriving(tracker, isHome = false) {
   return speed !== null && factor !== undefined && speed * factor > 6;
 }
 
+// Speed in m/s, or null. Life360 (pnbruckner 0.10.x) reports speed without a unit: mph on
+// imperial systems, km/h on metric. Other trackers count only when they state their unit.
+export function trackerSpeedMs(tracker, platform, metric) {
+  if (!tracker || typeof tracker.state !== 'string' || ['unknown', 'unavailable'].includes(tracker.state.toLowerCase())) return null;
+  const a = tracker.attributes || {};
+  const speed = toNum(a.speed);
+  if (speed === null || speed < 0) return null;
+  let unit = String(a.speed_unit || a.speed_units || a.speed_unit_of_measurement || a.unit_of_measurement || '').trim().toLowerCase();
+  if (!unit && platform === 'life360') unit = metric ? 'km/h' : 'mph';
+  const factor = { 'm/s': 1, 'km/h': 1 / 3.6, kph: 1 / 3.6, kmh: 1 / 3.6, mph: 0.44704, 'mi/h': 0.44704 }[unit];
+  return factor === undefined ? null : speed * factor;
+}
+
+// Current speed for a driver, e.g. "42 mph"; empty when not driving or the speed is 0 or unknown.
+export function fmtSpeed(p, metric) {
+  if (!p?.driving || !Number.isFinite(p.speedMs) || p.speedMs <= 0) return '';
+  const v = Math.round(metric ? p.speedMs * 3.6 : p.speedMs / 0.44704);
+  return v >= 1 ? `${v} ${metric ? 'km/h' : 'mph'}` : '';
+}
+
 function personOf(hass, id, index, home, locationId) {
   const st = hass.states[id];
   const a = st.attributes || {};
@@ -3221,6 +3248,7 @@ function personOf(hass, id, index, home, locationId) {
     distKm,
     bearing: distKm !== null && distKm > 0.05 ? bearingDeg(home.lat, home.lon, lat, lon) : null,
     driving: trackerDriving(tracker, isHome),
+    speedMs: unavailable ? null : trackerSpeedMs(tracker, trackerId && hass.entities?.[trackerId]?.platform, hass?.config?.unit_system?.length === 'km'),
   };
 }
 
@@ -3253,7 +3281,7 @@ export function compassLabel(bearing) {
 }
 
 function personStatus(p, metric) {
-  if (p.driving) return 'Driving';
+  if (p.driving) return fmtSpeed(p, metric) ? `Driving · ${fmtSpeed(p, metric)}` : 'Driving';
   if (p.isHome) return 'Home';
   if (p.zone) return p.zone;
   if (p.distKm !== null) return `${fmtDistance(p.distKm, metric)}${compassLabel(p.bearing) ? ` ${compassLabel(p.bearing)}` : ''}`;
@@ -3311,7 +3339,7 @@ export function radarHtml(fam) {
       <text class="rl" x="0" y="98" text-anchor="middle">Linear distance from home</text>
     </svg>`;
   const pins = marks.map(({ p, x, y, bearing }) => {
-    const label = `${p.name} · ${fmtDistance(p.distKm, fam.metric)} ${compassLabel(bearing)} from home`;
+    const label = `${p.name} · ${fmtSpeed(p, fam.metric) ? `${fmtSpeed(p, fam.metric)} · ` : ''}${fmtDistance(p.distKm, fam.metric)} ${compassLabel(bearing)} from home`;
     const initial = (p.first || p.name || '?').slice(0, 1).toUpperCase();
     const pinRadius = radarPinRadius(p.distKm);
     return `<g class="radar-pin" data-person="${esc(p.id)}" style="--pc:${p.color}" transform="translate(${x.toFixed(3)} ${y.toFixed(3)})" role="img" aria-label="${esc(label)}"><title>${esc(label)}</title><circle class="radar-location" r="${pinRadius.toFixed(2)}"/><text class="radar-initial" style="font-size:${(pinRadius * 1.25).toFixed(2)}px" text-anchor="middle" dominant-baseline="central">${esc(initial)}</text></g>`;
@@ -3324,7 +3352,7 @@ function peopleHtml(fam, drivingOnly = false) {
   if (!fam.people.length) return '<span class="none">Add a person with a phone tracker in Home Assistant and they show up here.</span>';
   return fam.people
     .map((p) => {
-      const status = drivingOnly ? (p.distKm === null ? 'Location unavailable' : `${fmtDistance(p.distKm, fam.metric)} ${compassLabel(p.bearing)}`.trim()) : personStatus(p, fam.metric);
+      const status = drivingOnly ? [fmtSpeed(p, fam.metric), p.distKm === null ? 'Location unavailable' : `${fmtDistance(p.distKm, fam.metric)} ${compassLabel(p.bearing)}`.trim()].filter(Boolean).join(' · ') : personStatus(p, fam.metric);
       const tone = p.isHome ? 'home' : p.lat !== null ? 'away' : 'unknown';
       return `<span class="who-chip ${tone}" style="--pc:${p.color}">${avatarHtml(p, 'xs')}<b>${esc(p.first)}</b><small>${esc(status)}</small></span>`;
     })
@@ -3566,6 +3594,7 @@ button:focus-visible { outline: 2px solid var(--nc-cyan); outline-offset: 2px; }
 .nc-marker { background: none; border: 0; }
 .mk { position: relative; width: 40px; height: 40px; }
 .mk .ava { width: 40px; height: 40px; font-size: 14px; }
+.mk-spd { position: absolute; top: 100%; left: 50%; transform: translateX(-50%); margin-top: 4px; padding: 2px 8px; border-radius: 999px; font: 700 12px var(--nc-body); line-height: 1.25; white-space: nowrap; color: #fff; background: rgba(5, 13, 24, .9); border: 1px solid var(--nc-line); box-shadow: 0 1px 6px rgba(0, 0, 0, .5); pointer-events: none; }
 .mk-home { width: 30px; height: 30px; display: grid; place-items: center; border-radius: 50%; font-size: 15px; color: var(--nc-cyan); background: rgba(5, 13, 24, .9); box-shadow: 0 0 0 1.5px rgba(77, 227, 255, .7), 0 0 18px rgba(77, 227, 255, .5); }
 .mk-zone { display: inline-block; transform: translate(-50%, -50%); padding: 2px 8px; border-radius: 999px; font: 600 10.5px var(--nc-body); white-space: nowrap; color: var(--nc-dim); background: rgba(5, 13, 24, .8); border: 1px solid var(--nc-line); }
 
@@ -4147,7 +4176,8 @@ export class NourieWallCard extends Base {
     const seen = new Set();
     for (const p of placed) {
       seen.add(p.id);
-      const html = `<div class="mk">${avatarHtml(p)}</div>`;
+      const spd = fmtSpeed(p, fam.metric);
+      const html = `<div class="mk">${avatarHtml(p)}${spd ? `<span class="mk-spd">${esc(spd)}</span>` : ''}</div>`;
       let mk = this._markers.get(p.id);
       if (!mk) {
         const marker = L.marker([p.lat, p.lon], { icon: L.divIcon({ className: 'nc-marker', html, iconSize: [40, 40], iconAnchor: [20, 20] }), keyboard: false, riseOnHover: true }).addTo(this._peopleLayer);
