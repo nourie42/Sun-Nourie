@@ -1,6 +1,7 @@
 // Independent winter outlook: amount blends and precipitation-type probabilities
 // have separate provenance. Missing guidance never means a zero chance of snow.
 import { WINTER_WEIGHTS, winterWeights, winterIntervalAmount, blendWinterAmounts } from './weatherFusionWinterModels.js';
+import { weatherDateTimeFormat } from './weatherDateTimeFormat.js';
 import {createWpcSnowAmountService} from './weatherFusionWpcSnowAmounts.js';
 import {nwsSnowPhaseWindows} from './weatherFusionNwsSnowTiming.js';
 import {modelSnowMapDescriptor} from './weatherFusionModelSnowMap.js';
@@ -13,14 +14,14 @@ const FREEZING_WORDS = /freezing (?:rain|drizzle)|ice storm|glaze/i;
 const SLEET_WORDS = /sleet|ice pellets/i;
 const WINTER_WORDS = /snow|flurr|sleet|wintry|blizzard|ice pellets|freezing (?:rain|drizzle)|ice storm/i;
 const dateKey = (time, zone) => {
-  const parts = new Intl.DateTimeFormat('en-US', { timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date(time));
+  const parts = weatherDateTimeFormat('en-US', { timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date(time));
   return ['year', 'month', 'day'].map(key => parts.find(part => part.type === key)?.value).join('-');
 };
 function localMidnight(date, zone) {
   const target = Date.parse(`${date}T00:00:00Z`);
   let guess = target;
   for (let iteration = 0; iteration < 4; iteration++) {
-    const parts = new Intl.DateTimeFormat('en-US', { timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' }).formatToParts(new Date(guess));
+    const parts = weatherDateTimeFormat('en-US', { timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' }).formatToParts(new Date(guess));
     const get = key => Number(parts.find(part => part.type === key)?.value);
     const wall = Date.UTC(get('year'), get('month') - 1, get('day'), get('hour'), get('minute'), get('second'));
     const next = guess + target - wall;

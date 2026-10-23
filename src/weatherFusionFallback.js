@@ -3,6 +3,7 @@
  * labelled as guidance and never becomes an official NWS value in the blend.
  */
 import {solarTimes} from './weatherFusionDirect.js';
+import { weatherDateTimeFormat } from './weatherDateTimeFormat.js';
 
 const H = 3600000;
 const finite = value => typeof value === 'number' && Number.isFinite(value);
@@ -29,7 +30,7 @@ function modelsAt(models, rows, time) {
     ? (rows[id] || []).filter(row => row.time === time).map(row => ({id, row})) : []);
 }
 function localDate(time, zone) {
-  const parts = new Intl.DateTimeFormat('en-US', {timeZone:zone, year:'numeric', month:'2-digit', day:'2-digit'}).formatToParts(new Date(time));
+  const parts = weatherDateTimeFormat('en-US', {timeZone:zone, year:'numeric', month:'2-digit', day:'2-digit'}).formatToParts(new Date(time));
   const part = type => parts.find(value => value.type === type)?.value;
   return `${part('year')}-${part('month')}-${part('day')}`;
 }
