@@ -31,7 +31,7 @@
  * the left; family radar, map and inside air on the right). Its options are listed further down.
  */
 
-export const VERSION = '1.3.3';
+export const VERSION = '1.3.4';
 
 const FONTS_CSS = 'https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Figtree:wght@400;500;600;700&display=swap';
 const HLS_JS = 'https://cdn.jsdelivr.net/npm/hls.js@1.7.3/dist/hls.min.js';
@@ -972,9 +972,10 @@ class MjpegSession {
 // players show frames as they come, so anything moving jerks back and forth, and these streams also
 // arrive in clumps with gaps up to 1.5 s. Google Home reorders and paces them; this does the same:
 // it takes each decoded frame, sorts by capture time and paints it on a canvas at that time, after
-// a delay that adapts to how late frames have recently been (typically 0.1-0.6 s, at most 1.5 s).
+// a delay that adapts to how late frames have recently been. The delay is capped (smooth_max_delay_ms,
+// 600 ms by default): a larger cap hides longer stalls, but every frame then shows that much later.
 const SMOOTH_MIN_DELAY_MS = 60;
-const SMOOTH_MAX_DELAY_MS = 1500;
+const SMOOTH_MAX_DELAY_MS = 600;
 const SMOOTH_WINDOW_MS = 15000;
 const SMOOTH_MAX_QUEUE = 90;
 
@@ -1121,7 +1122,8 @@ export class FrameSmoother {
     const base = Math.min(...pool.map((x) => x.lag));
     const late = pool.map((x) => x.lag - base).sort((a, b) => a - b);
     const p95 = late[Math.min(late.length - 1, Math.floor(late.length * 0.95))] || 0;
-    const want = Math.max(SMOOTH_MIN_DELAY_MS, Math.min(SMOOTH_MAX_DELAY_MS, p95 + 40));
+    const cap = this.player.card?.smoothMaxDelayMs || SMOOTH_MAX_DELAY_MS;
+    const want = Math.max(SMOOTH_MIN_DELAY_MS, Math.min(cap, p95 + 40));
     // Grow at once so frames are not skipped; shrink slowly so playback speed barely changes.
     this.delay = want > this.delay ? want : Math.max(want, this.delay - 2);
     this.base = base;
@@ -1869,7 +1871,9 @@ export class Player {
           avgFps: frames != null && this.summaryFrames != null && frames >= this.summaryFrames ? Math.round(10000 * (frames - this.summaryFrames) / (t - this.summaryAt)) / 10 : null,
           frozenS: Math.round(((this.frozenMs || 0) + frozenNow) / 1000), restarts: this.restarts - (this.summaryRestarts || 0),
           kbps: session.stats?.incomingBps != null ? Math.round(session.stats.incomingBps / 1000) : null, lossPct: session.stats?.lossPct != null ? Math.round(session.stats.lossPct * 10) / 10 : null,
-          res: session.stats?.width ? `${session.stats.width}x${session.stats.height}` : null, path: session.stats?.localProtocol || null });
+          res: session.stats?.width ? `${session.stats.width}x${session.stats.height}` : null, path: session.stats?.localProtocol || null,
+          smoothMs: this.smoother ? Math.round(this.smoother.delay) : null,
+          jbMs: session.stats?.jitterBufferMs != null ? Math.round(session.stats.jitterBufferMs) : null });
         this.summaryAt = t;
         this.summaryFrames = frames;
         this.summaryRestarts = this.restarts;
@@ -2450,6 +2454,7 @@ export class NourieCamerasCard extends Base {
     this.keepWarmMs = Math.max(0, Number(config.keep_warm ?? 60) || 0) * 1000;
     this.transport = config.transport === 'auto' ? 'auto' : 'tcp';
     this.smooth = config.smooth !== false;
+    this.smoothMaxDelayMs = Math.max(200, Math.min(3000, Number(config.smooth_max_delay_ms) || SMOOTH_MAX_DELAY_MS));
     this.stallMs = Number(config._stall_ms) || STALL_MS;
     this.lifetimeWindow = Array.isArray(config._lifetime_window) ? config._lifetime_window : LIFETIME_WINDOW_S;
     this.handoffLeadS = Number(config._handoff_lead_s) || HANDOFF_LEAD_S;
@@ -2908,6 +2913,8 @@ export class NourieCamerasCard extends Base {
 //                                           (HLS opens a second Nest stream per camera; WebRTC shares go2rtc's)
 //   hls_fallback: false                     true switches a camera to HLS after repeated WebRTC stalls
 //   smooth: true                            reorder and pace frames on a canvas (fixes jerky B-frame cameras)
+//   smooth_max_delay_ms: 600                most extra delay smoothing adds, in ms (200-3000); lower = less
+//                                           lag, but a camera whose stream bursts shows short freezes
 //   transport: tcp                          tcp = video over go2rtc's TCP port (lossless; falls back to UDP
 //                                           on its own when TCP isn't offered or fails); auto = browser picks
 //   camera_priority: false                  maximize the camera grid; side panel uses space only while visible
@@ -3553,6 +3560,7 @@ export class NourieWallCard extends Base {
     this.preferredProtocol = config.preferred_protocol ?? 'auto';
     this.transport = config.transport === 'auto' ? 'auto' : 'tcp';
     this.smooth = config.smooth !== false;
+    this.smoothMaxDelayMs = Math.max(200, Math.min(3000, Number(config.smooth_max_delay_ms) || SMOOTH_MAX_DELAY_MS));
     this.connectionDiagnostics = config.connection_diagnostics === true;
     this.stallMs = Number(config._stall_ms) || STALL_MS;
     this.lifetimeWindow = Array.isArray(config._lifetime_window) ? config._lifetime_window : LIFETIME_WINDOW_S;
