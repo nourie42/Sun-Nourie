@@ -3,12 +3,19 @@ import {forecastConfidence} from '../public/weather-fusion/forecast-confidence.j
 import {solarElevation} from '../public/weather-fusion/weather-math.js';
 import {TRACE_QPF_THRESHOLD_INCHES} from './weatherFusionDirect.js';
 
-export const CONDITION_CONFIDENCE_VERSION='weather-nourie-sky-rain-agreement-v2';
+export const CONDITION_CONFIDENCE_VERSION='weather-nourie-sky-rain-agreement-v3';
 const H=3600000,finite=value=>typeof value==='number'&&Number.isFinite(value),round=value=>Math.round(value*1000)/1000;
 const sourceIds=['nws','hrrr','ecmwf','nbm','wn'];
 const iso=time=>finite(time)?new Date(time).toISOString():null;
 const skyCategory=value=>value<=30?'clear':value>=70?'cloudy':'mixed';
-const rainCategory=value=>value<=0?'dry':value<=TRACE_QPF_THRESHOLD_INCHES?'trace':'wet';
+// WeatherNext precipitation is a probability-weighted expected value, so it
+// carries positive numerical noise (~1e-6 in) in nearly every hour even when
+// rain is essentially impossible, while the deterministic models report an
+// exact 0. Amounts under 0.001 in are below any source's meaningful
+// resolution, so they are dry for agreement; genuine trace amounts
+// (0.001-0.010 in) still count as trace.
+const RAIN_NOISE_FLOOR_INCHES=.001;
+const rainCategory=value=>value<RAIN_NOISE_FLOOR_INCHES?'dry':value<=TRACE_QPF_THRESHOLD_INCHES?'trace':'wet';
 const categories={clear:0,mixed:1,cloudy:2,dry:0,trace:1,wet:1};
 const names={nws:'NWS',hrrr:'HRRR',ecmwf:'ECMWF',nbm:'NBM',wn:'Google WeatherNext'};
 const number=value=>String(Number(value.toFixed(4)));
@@ -149,7 +156,7 @@ export function addConditionConfidence(out,{now=Date.now()}={}){
    else summary=`Only ${Math.min(sky.completeSources.length,rainEvidence.completeSources.length)} named sources cover both the assessed sky and rain windows.`;
   }
   day.confidence.weather={version:CONDITION_CONFIDENCE_VERSION,scope:'sky-and-rain',label,key,score,evidenceScore,sameDayCoverageFloorApplied,summary,factors,sourceIds:ids,sourceCount:ids.length,leadDays:index,
-   note:'Agreement among named forecast sources about sky cover and precipitation timing, not a calibrated accuracy percentage or a claim that the sources are statistically independent. Temperature, wind and winter precipitation type are assessed separately. Zero hourly QPF is dry; any positive amount through 0.010 inch is trace precipitation, and larger amounts are wet. Missing values are never dry weather.',
+   note:'Agreement among named forecast sources about sky cover and precipitation timing, not a calibrated accuracy percentage or a claim that the sources are statistically independent. Temperature, wind and winter precipitation type are assessed separately. Hourly QPF under 0.001 inch is dry (expected-value noise); amounts from 0.001 through 0.010 inch are trace precipitation, and larger amounts are wet. Missing values are never dry weather.',
    evidence:{window,sky,rain:rainEvidence,currentPartialExcluded:{sky:!!skyCurrentPartialExcluded,rain:!!rainCurrentPartialExcluded}}};
   day.confidence.temperature=temperatureComponent(day,index);
  }

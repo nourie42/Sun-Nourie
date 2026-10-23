@@ -94,6 +94,20 @@ test('the existing rain minimum and trace thresholds preserve real drizzle evide
  const boundary=fixture();boundary.rainTimeline[0].precipitationBlend.sources=sources(.001);assert.equal(calculate(boundary).evidence.rain.hours[0].category,'trace');
 });
 
+test('sub-thousandth-inch expected-value noise does not turn dry agreement into disagreement',()=>{
+ // WeatherNext reports ~1e-6 in in nearly every hour even when rain is
+ // essentially impossible; the deterministic models report an exact 0.
+ const out=fixture();for(const row of out.rainTimeline)row.precipitationBlend.sources=[...sources(0),{id:'wn',value:.0000028,weight:.25,runAt:'2026-10-19T18:00:00Z'}];
+ const weather=calculate(out);assert.equal(weather.key,'high');assert.equal(weather.score,100);
+ assert.equal(weather.evidence.rain.hours[0].category,'dry');assert.ok(weather.evidence.rain.hours[0].sources.every(source=>source.category==='dry'));
+});
+
+test('a genuine trace from one source still lowers rain agreement',()=>{
+ const out=fixture();out.rainTimeline[12].precipitationBlend.sources[0].value=.004;
+ const weather=calculate(out);assert.equal(weather.evidence.rain.worstHour.agreement,1/3);
+ assert.equal(weather.evidence.rain.agreementScore,53);assert.equal(weather.key,'low');
+});
+
 test('an official meaningful rain chance cannot be described as agreed dry weather',()=>{
  const out=fixture();out.rainTimeline[12].officialPop=60;
  const weather=calculate(out);assert.notEqual(weather.key,'high');assert.equal(weather.evidence.rain.worstHour.probabilityConflict,true);assert.equal(weather.evidence.rain.worstHour.category,'rain-possible');
