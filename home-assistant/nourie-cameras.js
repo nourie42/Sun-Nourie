@@ -31,7 +31,10 @@
  * the left; family radar, map and inside air on the right). Its options are listed further down.
  */
 
-export const VERSION = '1.3.5';
+export const VERSION = '1.3.6';
+// 1.3.6: Honest live detection for Nest-through-go2rtc streams. Liveness is decoded-frame progress
+// (not byte increases); a byte trickle, a choppy rate or an unchanging picture reconnects with backoff;
+// the Live badge needs measured, healthy frames and bitrate.
 
 const FONTS_CSS = 'https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Figtree:wght@400;500;600;700&display=swap';
 const HLS_JS = 'https://cdn.jsdelivr.net/npm/hls.js@1.7.3/dist/hls.min.js';
@@ -54,6 +57,23 @@ const TCP_WAIT_MS = 3000;
 // then drops its stalled link to Google and dials a new one, which is what cleared the doorbell in testing.
 const CHOPPY_RESTART_MS = 20000;
 const CHOPPY_RESTART_GAP_MS = 90000;
+// A connection can stay open while Google's feed to go2rtc has stalled upstream. Below this incoming
+// rate for the stall time (8 s), a live WebRTC camera counts as stalled and gets a fresh connection.
+const LOW_BPS = 20000;
+// Without a learned baseline (under 6 fps seen), a camera decoding below this rate counts as choppy.
+const MIN_FPS_NO_BASELINE = 5;
+// A camera stays below 40% of its usual rate (or the floor above) this long before it is reconnected.
+const QUALITY_RESTART_MS = 18000;
+// Minimum seconds since the previous quality reconnect of the same camera, by how many it has had.
+// The count resets after QUALITY_RESET_MS of healthy video, so a bad link backs off instead of looping.
+const QUALITY_RESTART_GAPS_S = [0, 30, 60, 120, 300, 600];
+const QUALITY_RESET_MS = 300000;
+// Cheap frozen-picture check: a 16x9 sample every 2 s. Identical for this long while the incoming rate is
+// under PICTURE_LOW_BPS means the picture is frozen even if a few frames still decode.
+const PICTURE_SAMPLE_MS = 2000;
+const PICTURE_FROZEN_MS = 10000;
+const PICTURE_LOW_BPS = 80000;
+const STATS_FRESH_MS = 3500;
 const BACKOFF_S = [0, 3, 8, 15, 30, 60];
 const HIDDEN_GRACE_MS = 60000;
 const DETACH_GRACE_MS = 8000;
@@ -353,10 +373,25 @@ export function playbackHealth(player, t) {
   // playback; only the age of its latest paint means that it is currently frozen.
   const age = painted ? painted.ageMs : shown ? Math.max(0, t - shown) : null;
   if (age != null && age >= FROZEN_MS) return { state: 'frozen', age, fps: 0 };
-  if (!painted && !shown) return { state: 'ok', fps: null };
-  const fps = painted ? painted.fps : s.stats?.recentFps;
+  const st = s.stats || {};
+  const fresh = Number.isFinite(st.sampleAt) && t - st.sampleAt >= 0 && t - st.sampleAt <= STATS_FRESH_MS;
+  const bps = fresh && Number.isFinite(st.incomingBps) ? st.incomingBps : null;
+  const fpsNow = painted ? painted.fps : st.recentFps;
+  // A picture that has not changed for 10 s while little data arrives is frozen, even if frames decode.
+  if (player.pictureSameSince && t - player.pictureSameSince >= PICTURE_FROZEN_MS && bps != null && bps < PICTURE_LOW_BPS) {
+    return { state: 'frozen', age: t - player.pictureSameSince, fps: Number.isFinite(fpsNow) ? fpsNow : 0, bps };
+  }
+  // A byte trickle is not video: report it as stalled after 2 s instead of Live.
+  if (bps != null && bps < LOW_BPS && player.lowBpsSince && t - player.lowBpsSince >= 2000) {
+    return { state: 'stalled', fps: Number.isFinite(fpsNow) ? fpsNow : null, bps };
+  }
+  // Live needs measurements: frames, a frame rate and a bitrate.
+  if (!painted && !shown) return { state: 'checking', fps: null, bps };
+  const fps = fpsNow;
+  if (!Number.isFinite(fps) || bps == null) return { state: 'checking', fps: Number.isFinite(fps) ? fps : null, bps };
   const ratio = player.healthState === 'choppy' ? CHOPPY_CLEAR_RATIO : CHOPPY_RATIO;
   if (Number.isFinite(fps) && s.typicalFps >= 6 && fps < Math.max(2, s.typicalFps * ratio)) return { state: 'choppy', fps };
+  if (Number.isFinite(fps) && !(s.typicalFps >= 6) && fps < MIN_FPS_NO_BASELINE) return { state: 'choppy', fps };
   // Uneven frames look choppy even at a decent average: a pause of 3+ frame times on screen
   // (painted), or a swing in frame timing larger than the frame time itself (browser player).
   const even = painted ? painted.gapMs <= Math.max(300, 3000 / Math.max(fps, 1)) : !(s.stats?.frameSpread > 1);
@@ -640,11 +675,13 @@ export class RtcSession {
       this.stats = { ...this.stats, ...pathStats };
       return;
     }
-    // These are inbound media counters, not transport keepalives. Even a small byte
-    // increase is a heartbeat; either frame counter may work when the other stays zero.
+    // Liveness is frame progress: a trickle of bytes can continue while no picture arrives
+    // (Nest via go2rtc after an upstream stall). Either frame counter may work when the other
+    // stays zero; bytes count only when the browser exposes no frame counters at all.
     // A replacement stats report establishes a baseline rather than apparent progress.
     const previous = this.previousReport;
-    const keys = ['framesReceived', 'framesDecoded', 'bytesReceived'];
+    const frameKeys = ['framesReceived', 'framesDecoded'].filter((key) => Number.isFinite(video[key]));
+    const keys = frameKeys.length ? frameKeys : ['bytesReceived'];
     const moved = keys.some((key) => Number.isFinite(video[key]) && (previous
       ? previous.id === video.id && Number.isFinite(previous[key]) && video[key] > previous[key]
       : video[key] > 0));
@@ -1666,7 +1703,7 @@ export class Player {
     const presentation = this.rtcPresentation;
     const snapshot = {
       build: VERSION, camera: this.id,
-      cause: choice(cause, ['entity_unavailable', 'no_frames', 'no_packets', 'config', 'support', 'offer', 'answer', 'ice', 'nostream', 'stream', 'lib', 'hls', 'mjpeg', 'error']),
+      cause: choice(cause, ['entity_unavailable', 'no_frames', 'no_packets', 'low_bitrate', 'frozen_picture', 'choppy', 'config', 'support', 'offer', 'answer', 'ice', 'nostream', 'stream', 'lib', 'hls', 'mjpeg', 'error']),
       protocol: choice(session.kind, ['webrtc', 'hls', 'mjpeg']),
       phase: session.firstMediaAt ? 'active' : 'startup',
       connection: choice(session.pc?.connectionState, ['new', 'connecting', 'connected', 'disconnected', 'failed', 'closed']),
@@ -1909,6 +1946,20 @@ export class Player {
       return;
     }
     if (rtc && watched) {
+      // Quality trackers belong to one continuously watched session.
+      if (this.qualitySession !== session || !this.qualityWatchAt || t - this.qualityWatchAt > 3000) {
+        this.qualitySession = session;
+        this.lowBpsSince = 0;
+        this.pictureSameSince = 0;
+        this.pictureHash = null;
+        this.choppySince = 0;
+      }
+      this.qualityWatchAt = t;
+      const qs = session.stats || {};
+      const qFresh = Number.isFinite(qs.sampleAt) && t - qs.sampleAt >= 0 && t - qs.sampleAt <= STATS_FRESH_MS;
+      const qBps = qFresh && Number.isFinite(qs.incomingBps) ? qs.incomingBps : null;
+      this.lowBpsSince = qBps != null && qBps < LOW_BPS ? this.lowBpsSince || t : 0;
+      this.samplePicture(t);
       const health = playbackHealth(this, t);
       if (health.state !== (this.healthState || 'ok')) {
         camLog.add('health', { camera: this.id, from: this.healthState || 'ok', to: health.state,
@@ -1936,12 +1987,29 @@ export class Player {
         this.frozenMs = 0;
         if (this.healthState === 'frozen') this.frozenSince = t;
       }
-      // A fresh connection can't make a camera send more frames, so only near-stalls get one.
-      this.choppySince = health.state === 'choppy' && Number.isFinite(health.fps) && health.fps < 2 ? this.choppySince || t : 0;
-      if (this.choppySince && t - this.choppySince > CHOPPY_RESTART_MS && t - (this.choppyRestartAt || 0) > CHOPPY_RESTART_GAP_MS) {
-        this.choppyRestartAt = t;
+      // Nest via go2rtc can keep a connection open after Google's feed has stalled upstream: a byte
+      // trickle, a low frame rate or a picture that no longer changes. A fresh connection makes go2rtc
+      // dial Google again. Successive quality reconnects of one camera back off (QUALITY_RESTART_GAPS_S).
+      const floor = session.typicalFps >= 6 ? session.typicalFps * CHOPPY_RATIO : MIN_FPS_NO_BASELINE;
+      this.choppySince = health.state === 'choppy' && Number.isFinite(health.fps) && health.fps < floor ? this.choppySince || t : 0;
+      let quality = null;
+      if (this.lowBpsSince && t - this.lowBpsSince > this.card.stallMs) quality = 'low_bitrate';
+      else if (this.pictureSameSince && t - this.pictureSameSince > PICTURE_FROZEN_MS && qBps != null && qBps < PICTURE_LOW_BPS) quality = 'frozen_picture';
+      else if (this.choppySince && t - this.choppySince > QUALITY_RESTART_MS) quality = 'choppy';
+      if (health.state === 'ok') {
+        this.okSince = this.okSince || t;
+        if (t - this.okSince > QUALITY_RESET_MS) this.qualityRestarts = 0;
+      } else this.okSince = 0;
+      const gaps = QUALITY_RESTART_GAPS_S;
+      const gapMs = 1000 * gaps[Math.min(this.qualityRestarts || 0, gaps.length - 1)];
+      if (quality && t - (this.qualityRestartAt || 0) >= gapMs) {
+        this.qualityRestartAt = t;
+        this.qualityRestarts = (this.qualityRestarts || 0) + 1;
         this.choppySince = 0;
-        this.onStall(session, 'presentation');
+        this.lowBpsSince = 0;
+        this.pictureSameSince = 0;
+        this.qualitySession = null;
+        this.onStall(session, quality);
         return;
       }
     }
@@ -1959,9 +2027,10 @@ export class Player {
   }
 
   onStall(session, reason = 'media') {
-    camLog.add('restart', { camera: this.id, reason: this.choppyRestartAt && now() - this.choppyRestartAt < 1000 ? 'choppy' : reason === 'presentation' ? 'frozen' : 'no_video',
+    const qualityReason = ['low_bitrate', 'frozen_picture', 'choppy'].includes(reason);
+    camLog.add('restart', { camera: this.id, reason: qualityReason ? reason : reason === 'presentation' ? 'frozen' : 'no_video',
       ranForS: Math.round((now() - session.startedAt) / 1000), fps: session.stats?.recentFps != null ? Math.round(session.stats.recentFps * 10) / 10 : null });
-    this.logConnectionFailure(session, reason === 'presentation' ? 'no_frames' : 'no_packets');
+    this.logConnectionFailure(session, qualityReason ? reason : reason === 'presentation' ? 'no_frames' : 'no_packets');
     // A connection that repeatedly starts and freezes also needs the existing HLS
     // fallback. Close this camera's RTC/shadow below before opening its replacement.
     if (session.kind === 'webrtc' && this.card.rtcStallFallback === true) this.rtcFails += 1;
@@ -1986,10 +2055,35 @@ export class Player {
     }
     this.restarts += 1;
     if (ranFor < 20) {
-      this.scheduleRetry({ title: 'The stream keeps stopping', detail: reason === 'presentation' ? 'Video playback stopped advancing.' : 'The camera stopped sending video.', wait: 0 });
+      this.scheduleRetry({ title: 'The stream keeps stopping', detail: reason === 'presentation' || reason === 'frozen_picture' || reason === 'choppy' ? 'Video playback stopped advancing.' : 'The camera stopped sending video.', wait: 0 });
       return;
     }
     this.start(true);
+  }
+
+  // A 16x9 sample of what is on screen every 2 s; pictureSameSince marks when it last changed.
+  samplePicture(t) {
+    if (this.pictureAt && t - this.pictureAt < PICTURE_SAMPLE_MS) return;
+    this.pictureAt = t;
+    const sm = this.smoother;
+    const source = sm?.active && sm.canvas && !sm.canvas.hidden && sm.canvas.width ? sm.canvas
+      : this.video.readyState >= 2 && this.video.videoWidth ? this.video : null;
+    if (!source) { this.pictureSameSince = 0; this.pictureHash = null; return; }
+    try {
+      const c = this.pictureCanvas || (this.pictureCanvas = document.createElement('canvas'));
+      if (c.width !== 16) { c.width = 16; c.height = 9; }
+      const ctx = this.pictureCtx || (this.pictureCtx = c.getContext('2d', { willReadFrequently: true }));
+      ctx.drawImage(source, 0, 0, 16, 9);
+      const d = ctx.getImageData(0, 0, 16, 9).data;
+      let h = 2166136261;
+      for (let i = 0; i < d.length; i += 4) h = Math.imul(h ^ (d[i] | (d[i + 1] << 8) | (d[i + 2] << 16)), 16777619);
+      if (this.pictureHash === h) this.pictureSameSince = this.pictureSameSince || this.pictureChangedAt || t;
+      else { this.pictureHash = h; this.pictureChangedAt = t; this.pictureSameSince = 0; }
+    } catch {
+      // Sampling is optional evidence; without it the frame and bitrate checks still apply.
+      this.pictureSameSince = 0;
+      this.pictureHash = null;
+    }
   }
 
   startShadow(purpose) {
@@ -2233,6 +2327,8 @@ function pillFor(p, t) {
       const health = playbackHealth(p, t);
       if (health.state === 'frozen') return ['wait', 'Frozen', `${Math.round(health.age / 1000)}s`];
       if (health.state === 'choppy') return ['wait', 'Choppy', `${Math.round(health.fps)} fps`];
+      if (health.state === 'stalled') return ['wait', 'Stalled', `${Math.round((health.bps || 0) / 1000)} kb/s`];
+      if (health.state === 'checking') return ['wait', 'Checking', ''];
       if (p.session?.kind === 'hls' && p.session.stats.delayed) {
         return ['wait', p.session.stats.catchingUp ? 'Catching up' : 'Delayed', ''];
       }
