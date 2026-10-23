@@ -1,4 +1,5 @@
 import {forecastProseConflict} from '../public/weather-fusion/forecast-consistency.js';
+import { weatherDateTimeFormat } from './weatherDateTimeFormat.js';
 import {createDiscussionSource,DISCUSSION_SOURCE_VERSION} from './weatherFusionDiscussionSource.js';
 import {createExposureWeatherService,addExposureWeather} from './weatherFusionExposure.js';
 import {airQualityUrl,normalizeAirQuality,addAirQuality} from './weatherFusionAirQuality.js';
@@ -85,7 +86,7 @@ export function coordinates(query = {}) {
 }
 
 export function dateKey(ms, zone) {
-  const parts = new Intl.DateTimeFormat('en-US', { timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date(ms));
+  const parts = weatherDateTimeFormat('en-US', { timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date(ms));
   const get = (type) => parts.find((p) => p.type === type)?.value;
   return `${get('year')}-${get('month')}-${get('day')}`;
 }
@@ -97,7 +98,7 @@ export function localTime(date, hour, zone) {
   const target = Date.parse(`${date}T${String(hour).padStart(2, '0')}:00:00Z`);
   let guess = target;
   for (let i = 0; i < 4; i += 1) {
-    const p = new Intl.DateTimeFormat('en-US', { timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' }).formatToParts(new Date(guess));
+    const p = weatherDateTimeFormat('en-US', { timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' }).formatToParts(new Date(guess));
     const get = (type) => p.find((part) => part.type === type)?.value;
     const wall = Date.parse(`${get('year')}-${get('month')}-${get('day')}T${get('hour')}:${get('minute')}:${get('second')}Z`);
     const correction = target - wall;
@@ -292,17 +293,33 @@ export function summarizeRadarMotion(current,previous){
 
 /** Bounded cache; callers explicitly validate any retained value on failure. */
 export class Cache {
-  constructor(limit = 350, now = Date.now) { this.values = new Map(); this.pending = new Map(); this.limit = limit; this.now = now; }
+  constructor(limit = 350, now = Date.now, { maxBytes = 16 * 1024 * 1024, retainExpired = true, maxPending = 50 } = {}) {
+    this.values = new Map(); this.pending = new Map(); this.limit = limit; this.now = now;
+    // Serialized bytes are a conservative payload budget, not a heap measurement.
+    // Official feeds retain expired entries for their separately validated recovery.
+    this.maxBytes = maxBytes; this.retainExpired = retainExpired; this.maxPending = maxPending;
+  }
+  get sizeBytes() { return [...this.values.values()].reduce((sum, entry) => sum + entry.bytes, 0); }
   async get(key, ttl, load, {onError} = {}) {
+    if (!this.retainExpired) for (const [id, entry] of this.values) if (entry.expires <= this.now()) this.values.delete(id);
     const hit = this.values.get(key);
     if (hit && hit.expires > this.now()) return hit.value;
     if (this.pending.has(key)) return this.pending.get(key);
     const recover=error=>{if(hit&&onError)return onError(error,hit.value);throw error;};
-    if (this.pending.size >= 50) return recover(errorWithStatus('Weather sources are busy. Please retry shortly.', 429));
+    if (this.pending.size >= this.maxPending) return recover(errorWithStatus('Weather sources are busy. Please retry shortly.', 429));
     const work = Promise.resolve().then(load).then((value) => {
       this.values.delete(key);
-      if (this.values.size >= this.limit) this.values.delete(this.values.keys().next().value);
-      this.values.set(key, { value, expires: this.now() + ttl });
+      let bytes;
+      try { bytes = Buffer.byteLength(JSON.stringify(value) ?? '') + Buffer.byteLength(String(key)); }
+      catch { return value; } // An uncacheable value must not fail a successful load.
+      if (bytes > this.maxBytes || this.limit <= 0) return value;
+      let retainedBytes = this.sizeBytes;
+      while (this.values.size && (this.values.size >= this.limit || retainedBytes + bytes > this.maxBytes)) {
+        const oldest = this.values.keys().next().value;
+        retainedBytes -= this.values.get(oldest).bytes;
+        this.values.delete(oldest);
+      }
+      this.values.set(key, { value, bytes, expires: this.now() + ttl });
       return value;
     }).catch(recover).finally(() => this.pending.delete(key));
     this.pending.set(key, work);
@@ -345,7 +362,7 @@ export function buildForecast({ location, point, forecast, hourly, grid, discuss
     const qpfSpread=qpfValues.length>=2?max(qpfValues)-min(qpfValues):null;
     const guidanceCount=Object.values(modelValues).filter(v=>finite(v.high)||finite(v.low)||finite(v.qpf)).length;
     const confidence=forecastConfidence({dayIndex:index,highSpread:spread,qpfSpread,guidanceCount,officialDay:high!==null,officialNight:low!==null});
-    return { date, label: index === 0 ? 'Today' : new Intl.DateTimeFormat('en-US', { timeZone: zone, weekday: 'short' }).format(new Date(midnight + 12 * HOUR)),
+    return { date, label: index === 0 ? 'Today' : weatherDateTimeFormat('en-US', { timeZone: zone, weekday: 'short' }).format(new Date(midnight + 12 * HOUR)),
       high: rounded(high ?? guidanceHigh), low: rounded(low ?? guidanceLow),
       temperatureSource: high !== null || low !== null ? 'NWS; missing values may use guidance' : 'Model guidance; NWS unavailable',
       lowLabel: low !== null ? 'Overnight low' : 'Calendar-day model low',
@@ -414,7 +431,8 @@ export function buildForecast({ location, point, forecast, hourly, grid, discuss
 }
 
 export function createWeatherService({ fetchImpl = globalThis.fetch, env = process.env, now = Date.now } = {}) {
-  const cache = new Cache(350, now), officialCache = new Cache(150, now), forecastCache = new Cache(100, now), aiCache = new Cache(100, now);
+  const cache = new Cache(350, now), officialCache = new Cache(150, now), aiCache = new Cache(100, now);
+  const forecastCache = new Cache(100, now, { retainExpired: false, maxPending: 4 });
   const failureCooldown = new Map();
   const approvedTakes = new Map();
   const approvedSummaries=new Map();
@@ -586,7 +604,7 @@ export function createWeatherService({ fetchImpl = globalThis.fetch, env = proce
       properties.forecastChanges={type:'array',maxItems:2,items:{type:'object',additionalProperties:false,properties:{evidenceId:{type:'string',enum:takeEvidence.candidates.length?takeEvidence.candidates.map(c=>c.id):['no-eligible-evidence']},summary:{type:'string'}},required:['evidenceId','summary']}};
       const requiredSources=['nws','afd',...data.modelContributions.map(m=>m.id)];
       properties.sources = { type: 'array', items: { type: 'string', enum: requiredSources } };
-      const facts = { danTakeEvidence:takeEvidence, currentLocalTime: new Intl.DateTimeFormat('en-US',{timeZone:data.location.timeZone,dateStyle:'full',timeStyle:'short'}).format(new Date(now())), discussionPriority: 'Translate the latest local NWS discussion into everyday language; technical provenance is only for metadata.', blendPolicy: data.methodology, modelContributions: data.modelContributions, convectiveGuidance: data.convectiveGuidance, next24HoursPrecipitation: data.precipitation, location: data.location, localDate: dateKey(now(), data.location.timeZone), days: data.days, hours: data.hours.slice(0, 30), discussion: {...data.discussion,text:withoutAviation(data.discussion.text)}, feedStatus: data.feeds.map((f) => ({ id: f.id, status: f.status, issuedAt: f.issuedAt })) };
+      const facts = { danTakeEvidence:takeEvidence, currentLocalTime: weatherDateTimeFormat('en-US',{timeZone:data.location.timeZone,dateStyle:'full',timeStyle:'short'}).format(new Date(now())), discussionPriority: 'Translate the latest local NWS discussion into everyday language; technical provenance is only for metadata.', blendPolicy: data.methodology, modelContributions: data.modelContributions, convectiveGuidance: data.convectiveGuidance, next24HoursPrecipitation: data.precipitation, location: data.location, localDate: dateKey(now(), data.location.timeZone), days: data.days, hours: data.hours.slice(0, 30), discussion: {...data.discussion,text:withoutAviation(data.discussion.text)}, feedStatus: data.feeds.map((f) => ({ id: f.id, status: f.status, issuedAt: f.issuedAt })) };
       for (let attempt = 0; attempt < 2 && aiBudget.count < limit; attempt += 1) {
       aiBudget.count += 1;
       try {
