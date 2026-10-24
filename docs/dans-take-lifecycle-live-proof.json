@@ -1,0 +1,152 @@
+{
+  "commit": "731d0e26e7df6b1f1c1adf36dfe0b22766b38344",
+  "checkedAt": "2026-10-24T18:21:09.304Z",
+  "fixture": false,
+  "success": true,
+  "checks": [
+    {
+      "label": "initial-page",
+      "checkedAt": "2026-10-24T18:22:03.892Z",
+      "assembledAt": "2026-10-24T18:21:38.329Z",
+      "sourceCheckedAt": "2026-10-24T18:21:36.845Z",
+      "sourceRetrieval": "verified-latest",
+      "signature": "997b9b7267f2944ecfe21c80",
+      "discussionId": "5232e3fd-b65a-47d3-b6d2-c18c09c7221c",
+      "issuedAt": "2026-10-24T18:01:00+00:00",
+      "cachedItems": [],
+      "visible": true,
+      "text": "Dry weather will stick around. High pressure keeps skies mostly clear and winds from the northeast. A bit more cloudiness and tiny rain chances appear late next weekend into early the following week."
+    },
+    {
+      "label": "refresh-1",
+      "checkedAt": "2026-10-24T18:23:11.276Z",
+      "assembledAt": "2026-10-24T18:23:09.204Z",
+      "sourceCheckedAt": "2026-10-24T18:21:36.845Z",
+      "sourceRetrieval": "verified-latest",
+      "signature": "950ff0f96a6c40ba7256be30",
+      "discussionId": "5232e3fd-b65a-47d3-b6d2-c18c09c7221c",
+      "issuedAt": "2026-10-24T18:01:00+00:00",
+      "cachedItems": [],
+      "visible": true,
+      "text": "The persistent pattern of dry and largely seasonable weather will continue through next week."
+    },
+    {
+      "label": "refresh-2",
+      "checkedAt": "2026-10-24T18:24:18.484Z",
+      "assembledAt": "2026-10-24T18:24:16.579Z",
+      "sourceCheckedAt": "2026-10-24T18:23:56.733Z",
+      "sourceRetrieval": "verified-latest",
+      "signature": "3ecc4bbd9a0963aba7bce0f7",
+      "discussionId": "5232e3fd-b65a-47d3-b6d2-c18c09c7221c",
+      "issuedAt": "2026-10-24T18:01:00+00:00",
+      "cachedItems": [],
+      "visible": true,
+      "text": "The persistent pattern of dry and largely seasonable weather will continue through next week."
+    },
+    {
+      "label": "full-page-reload",
+      "checkedAt": "2026-10-24T18:24:33.750Z",
+      "assembledAt": "2026-10-24T18:24:16.579Z",
+      "sourceCheckedAt": "2026-10-24T18:23:56.733Z",
+      "sourceRetrieval": "verified-latest",
+      "signature": "3ecc4bbd9a0963aba7bce0f7",
+      "discussionId": "5232e3fd-b65a-47d3-b6d2-c18c09c7221c",
+      "issuedAt": "2026-10-24T18:01:00+00:00",
+      "cachedItems": [],
+      "visible": true,
+      "text": "Dry, seasonable weather looks to continue through next week with high pressure nearby. A few weak, dry disturbances may pass with little to no rain. Late next weekend the pattern shifts east and you may notice more clouds and a few small, spotty rain chances."
+    }
+  ],
+  "deployed": {
+    "sourceVersion": "nws-afd-monotonic-v1",
+    "danTakeVersion": "weather-nourie-dans-take-kid-clear-v10",
+    "assets": {
+      "index.html": "e5a5ec61c2de9ee679c62c70de46a1ca7312dd6896963e3c1bd295aaf6f8ad46",
+      "app.js": "9d99dfe144557e0c090ae8e76c7e80cabdfabe9e2906a7193270d895f9fc9567",
+      "dans-summary.js": "f6151f33a484b05bcceb501bdce980a9b3d1ee1948c772537799bdff1e6aa86a",
+      "current-inputs.js": "c81a04b681090b11bc7695e9b522c811ea9db05c87c677b20ab5642668c4abe4",
+      "pavement.js": "39e3461c0f9a7e57cd6209fb79951e49f36fde8760d8be7bd044c76849ad7725",
+      "daily-uv.js": "4327bb7ab8a9bac7d21abbcafe674a13849d40a54c0c73966ee2e9a78a98e2e8",
+      "dans-take.js": "84eaf789e1dd76b211ee84fb2e69f7db8211fc112ccacc1c2db90b3be5d7f79c"
+    }
+  },
+  "independentOfficialLatest": {
+    "id": "5232e3fd-b65a-47d3-b6d2-c18c09c7221c",
+    "issuedAt": "2026-10-24T18:01:00+00:00"
+  },
+  "initial": {
+    "discussion": {
+      "id": "5232e3fd-b65a-47d3-b6d2-c18c09c7221c",
+      "office": "RAH",
+      "issuanceTime": "2026-10-24T18:01:00+00:00",
+      "text": "\n000\nFXUS62 KRAH 241801\nAFDRAH\n\nArea Forecast Discussion\nNational Weather Service Raleigh NC\n201 PM EDT Sat Oct 24 2026\n\n.WHAT HAS CHANGED...\n\n* Nothing appreciable.\n\n&&\n\n.KEY MESSAGES...\nAs of 115 PM Saturday... \n\n1) The persistent pattern of dry and largely seasonable weather will \ncontinue through next week. \n\n\n&&\n\n.DISCUSSION...\nAs of 115 PM Saturday... \n\nKEY MESSAGE 1... The persistent pattern of dry and largely \nseasonable weather will continue through next week. \n\nThe mid and upper level weather pattern will feature high amplitude \nupper level ridge extending from the western Gulf north into the \nwestern Great Lakes with a general northerly flow across the \nCarolinas through Monday. The ridge will weaken and flatten as it \nslowly shifts east reaching the eastern U.S. coast by early in the \nweekend. Moisture-starved disturbances will move near or across our \narea early Sunday morning and Wednesday night with little impact. \n\nAt the surface, high pressure centered over New England today will \nshift south into the mid Atlantic for Sunday and Monday. A \nreinforcing Canadian high will build into the region for Wednesday \nand Thursday with potentially another surface high extending into \nour region for Saturday. \n\nIt's worth noting that as the ridge flattens and shifts east late \nin the week/weekend and the flow becomes more westerly and even \nsouthwesterly, deep layer moisture will increase somewhat resulting \nin more clouds. There will also be the need to consider limited \nnon-zero rain chances late next weekend into early next week. \n\n&&\n\n.AVIATION /18Z SATURDAY THROUGH THURSDAY/...\nAs of 200 PM Saturday...\n\n24 hour TAF period: VFR conditions should largely prevail through \nthe next 24 hours. Stratocumulus clouds should persist across the \narea through the weekend, with cloud bases generally above 3 kft and \nfew to scattered in coverage. However, brief periods of MVFR stratus \nare possible again early Sun morning, mainly at KINT and KGSO. \nExpect nely winds to prevail, with occasional gusts into the teens \nto 20 kts with daytime heating today and Sun. \n\nOutlook: Aside from the aforementioned small chance of sub-VFR \nceilings in nely flow this weekend, dry, VFR conditions are expected \nto persist for at least the next several days. \n\n&&\n\n.RAH WATCHES/WARNINGS/ADVISORIES...\nNone.\n\n&&\n\n$$\n\nDISCUSSION...Blaes\nAVIATION...10/MWS\n",
+      "url": "https://api.weather.gov/products/5232e3fd-b65a-47d3-b6d2-c18c09c7221c"
+    },
+    "feed": {
+      "id": "afd",
+      "label": "NWS RAH discussion",
+      "url": "https://api.weather.gov/products/types/AFD/locations/RAH/latest",
+      "status": "ready",
+      "sourceVersion": "nws-afd-monotonic-v1",
+      "retrievalStatus": "verified-latest",
+      "fetchedAt": "2026-10-24T18:21:36.845Z",
+      "checkedAt": "2026-10-24T18:21:36.845Z",
+      "issuedAt": "2026-10-24T18:01:00+00:00",
+      "productUrl": "https://api.weather.gov/products/5232e3fd-b65a-47d3-b6d2-c18c09c7221c",
+      "message": ""
+    },
+    "aiMode": "ai",
+    "generatedAt": "2026-10-24T18:22:00.199Z",
+    "items": []
+  },
+  "observedRefreshVisibility": [
+    {
+      "hidden": false,
+      "text": "Dry weather will stick around. High pressure keeps skies mostly clear and winds from the northeast. A bit more cloudiness and tiny rain chances appear late next weekend into early the following week."
+    },
+    {
+      "hidden": false,
+      "text": "Dry weather will stick around. High pressure keeps skies mostly clear and winds from the northeast. A bit more cloudiness and tiny rain chances appear late next weekend into early the following week."
+    },
+    {
+      "hidden": false,
+      "text": "Dry weather will stick around. High pressure keeps skies mostly clear and winds from the northeast. A bit more cloudiness and tiny rain chances appear late next weekend into early the following week."
+    },
+    {
+      "hidden": false,
+      "text": "Dry weather will stick around. High pressure keeps skies mostly clear and winds from the northeast. A bit more cloudiness and tiny rain chances appear late next weekend into early the following week."
+    },
+    {
+      "hidden": false,
+      "text": "The persistent pattern of dry and largely seasonable weather will continue through next week."
+    },
+    {
+      "hidden": false,
+      "text": "A ridge of higher pressure will keep us dry and near normal for temperatures. High pressure will sit nearby Sunday and Monday, so it will stay quiet. By late in the week the ridge shifts east and clouds will increase, and there may be a few light rain chances late next weekend."
+    },
+    {
+      "hidden": false,
+      "text": "A ridge of higher pressure will keep us dry and near normal for temperatures. High pressure will sit nearby Sunday and Monday, so it will stay quiet. By late in the week the ridge shifts east and clouds will increase, and there may be a few light rain chances late next weekend."
+    },
+    {
+      "hidden": false,
+      "text": "A ridge of higher pressure will keep us dry and near normal for temperatures. High pressure will sit nearby Sunday and Monday, so it will stay quiet. By late in the week the ridge shifts east and clouds will increase, and there may be a few light rain chances late next weekend."
+    },
+    {
+      "hidden": false,
+      "text": "A ridge of higher pressure will keep us dry and near normal for temperatures. High pressure will sit nearby Sunday and Monday, so it will stay quiet. By late in the week the ridge shifts east and clouds will increase, and there may be a few light rain chances late next weekend."
+    },
+    {
+      "hidden": false,
+      "text": "A ridge of higher pressure will keep us dry and near normal for temperatures. High pressure will sit nearby Sunday and Monday, so it will stay quiet. By late in the week the ridge shifts east and clouds will increase, and there may be a few light rain chances late next weekend."
+    },
+    {
+      "hidden": false,
+      "text": "The persistent pattern of dry and largely seasonable weather will continue through next week."
+    }
+  ],
+  "distinctWeatherSignatures": 3,
+  "distinctForecastAssemblies": 3,
+  "distinctDiscussionChecks": 2,
+  "browserErrors": []
+}
