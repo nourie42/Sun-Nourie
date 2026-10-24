@@ -21,10 +21,10 @@ function forecast(){
  }));
  return buildForecast(input);
 }
-test('93% at 5 AM tomorrow cannot inflate a 32% Today tile or its detail graph',()=>{
+test('53% at 5 AM tomorrow cannot inflate a 19% Today tile or its detail graph',()=>{
  const f=forecast(),day=f.days[0],next=f.days[1];
- assert.equal(day.rainLikelihood.value,32);
- assert.equal(next.rainLikelihood.value,93);
+ assert.equal(day.rainLikelihood.value,19);
+ assert.equal(next.rainLikelihood.value,53);
  assert.equal(dateKey(Date.parse(next.rainLikelihood.peakTime),zone),next.date);
  for(const d of f.days.slice(0,2)){
   assert.equal(dateKey(Date.parse(d.rainLikelihood.window.start),zone),d.date);
@@ -33,8 +33,8 @@ test('93% at 5 AM tomorrow cannot inflate a 32% Today tile or its detail graph',
  const points=dayGraphPoints(f,0,false,now),today=dailyForecastReadings(f,now)[0];
  assert.ok(points.every(p=>dateKey(Date.parse(p.time),zone)===day.date));
  assert.equal(Math.max(...points.map(p=>p.rainChance)),today.pop);
- assert.equal(today.pop,32);
- assert.equal(forecastPeriodSummary(f,0,'overall',now).chance,32);
+ assert.equal(today.pop,19);
+ assert.equal(forecastPeriodSummary(f,0,'overall',now).chance,19);
  const view=modelExplanationView(f,{now});
  assert.equal(view.phase,'overall');
 });
@@ -50,11 +50,11 @@ test('the daily precipitation amount is the sum of matching calendar hours, not 
 });
 test('an evening graph cannot include tomorrow even when called with the legacy Tonight flag',()=>{
  const f=forecast(),day=f.days[0];
- assert.equal(day.popNightLikelihood.value,93);
+ assert.equal(day.popNightLikelihood.value,53);
  const points=dayGraphPoints(f,0,true,now);
- assert.equal(Math.max(...points.map(p=>p.rainChance)),32);
+ assert.equal(Math.max(...points.map(p=>p.rainChance)),19);
  assert.ok(points.every(p=>dateKey(Date.parse(p.time),zone)===day.date));
- assert.equal(Math.max(...dayGraphPoints(f,1,true,now).map(p=>p.rainChance)),93);
+ assert.equal(Math.max(...dayGraphPoints(f,1,true,now).map(p=>p.rainChance)),53);
 });
 test('ongoing peak hour remains in the graph when forecast assembly is between hours',()=>{
  const f=forecast(),minuteNow=now+19*60000;

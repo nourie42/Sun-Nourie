@@ -11,8 +11,11 @@ import {testInputs,snapshot,now,H} from './weatherFusion.fixtures.js';
 const iso=time=>new Date(time).toISOString();
 const close=(actual,expected,tolerance=1e-8)=>assert.ok(Math.abs(actual-expected)<tolerance,`${actual} should equal ${expected}`);
 const weights=sources=>Object.fromEntries(sources.map(source=>[source.id,source.weight]));
-const sameDay={nws:.36,hrrr:.27,ecmwf:.09,nbm:.18,wn:.10};
-const extended={nws:.135,ecmwf:.54,nbm:.225,wn:.10};
+const rounded6=obj=>Object.fromEntries(Object.entries(obj).map(([id,weight])=>[id,Number(weight.toFixed(6))]));
+const sameDay={nws:.21,hrrr:.26,ecmwf:.11,nbm:.26,wn:.16};
+const sameDayPrecip={nws:.21,hrrr:.32,ecmwf:.11,nbm:.26,wn:.10};
+const tempDays47={nws:.12,ecmwf:.24,nbm:.29,wn:.35};
+const extended={nws:.22,ecmwf:.22,nbm:.34,wn:.22};
 
 function sourceInputs({withNvidia=true,patchNvidia}={}) {
   const input=structuredClone(testInputs);
@@ -42,18 +45,19 @@ function sourceInputs({withNvidia=true,patchNvidia}={}) {
 
 const at=(series,time)=>series.find(row=>Date.parse(row.time)===time);
 
-test('the established NVIDIA 10 percent preserves original same-day and extended relative shares',()=>{
+test('the researched NVIDIA shares keep the stepped band proportions',()=>{
   assert.deepEqual(temperaturePolicy(0,true),sameDay);
-  assert.deepEqual(temperaturePolicy(4,true),sameDay);
-  assert.deepEqual(precipitationPolicy(0,true),sameDay);
-  assert.deepEqual(precipitationAmountPolicy(0,true),sameDay);
-  assert.deepEqual(precipitationPolicy(1,true),extended);
-  assert.deepEqual(precipitationAmountPolicy(1,true),extended);
+  assert.deepEqual(temperaturePolicy(4,true),tempDays47);
+  assert.deepEqual(precipitationPolicy(0,true),sameDayPrecip);
+  assert.deepEqual(precipitationPolicy(1,true),sameDayPrecip);
+  assert.deepEqual(precipitationAmountPolicy(0,true),sameDayPrecip);
+  assert.deepEqual(precipitationPolicy(2,true),extended);
+  assert.deepEqual(precipitationAmountPolicy(2,true),extended);
   assert.equal(temperaturePolicy(0),SAME_DAY_WEIGHTS);
-  assert.equal(precipitationAmountPolicy(1),EXTENDED_QPF_WEIGHTS);
+  assert.equal(precipitationAmountPolicy(2),EXTENDED_QPF_WEIGHTS);
 });
 
-test('NVIDIA changes published daily and hourly temperatures with attributed 10 percent inputs',()=>{
+test('NVIDIA changes published daily and hourly temperatures with attributed band-share inputs',()=>{
   const input=sourceInputs(),forecast=buildForecast(input),baseline=buildForecast(sourceInputs({withNvidia:false}));
   const hour=forecast.hours[1];
   assert.deepEqual(weights(hour.temperatureBlend.sources),sameDay);
@@ -65,15 +69,15 @@ test('NVIDIA changes published daily and hourly temperatures with attributed 10 
   assert.deepEqual(weights(forecast.days[0].lowBlend.sources),sameDay);
   assert.notEqual(forecast.days[0].high,baseline.days[0].high);
   assert.notEqual(forecast.days[0].low,baseline.days[0].low);
-  assert.equal(forecast.google.contributes,true);assert.equal(forecast.google.requestedWeight,.1);
+  assert.equal(forecast.google.contributes,true);assert.equal(forecast.google.requestedWeight,.16);
   assert.equal(forecast.google.runAt,input.models.wn.runAt);
   assert.ok(forecast.modelContributions.some(source=>source.id==='wn'&&source.runAt===input.models.wn.runAt));
 });
 
-test('NVIDIA contributes to hourly rain amounts and scores while later rain excludes HRRR',()=>{
-  const forecast=buildForecast(sourceInputs()),first=at(forecast.rainTimeline,now+H),later=at(forecast.rainTimeline,now+30*H);
-  assert.deepEqual(weights(first.precipitationBlend.sources),sameDay);
-  assert.deepEqual(weights(first.rainLikelihood.sources),sameDay);
+test('NVIDIA contributes to hourly rain amounts and scores while days 2-3 rain excludes HRRR',()=>{
+  const forecast=buildForecast(sourceInputs()),first=at(forecast.rainTimeline,now+H),later=at(forecast.rainTimeline,now+36*H);
+  assert.deepEqual(weights(first.precipitationBlend.sources),sameDayPrecip);
+  assert.deepEqual(weights(first.rainLikelihood.sources),sameDayPrecip);
   close(first.precipitationBlend.sourceValues.wn,.04);
   assert.equal(first.rainLikelihood.sourceAmounts.wn,.04);
   assert.equal(first.rainLikelihood.sourcePoints.wn,10);
@@ -124,7 +128,7 @@ test('missing NVIDIA fields restore the original field policy without suppressin
   for(const field of ['dewpoint','pressure']){
     const point=at(forecast.metricForecasts.series[field],epoch),old=at(baseline.metricForecasts.series[field],epoch);
     assert.equal(point.sources.some(source=>source.id==='wn'),false,field);
-    assert.deepEqual(weights(point.sources),SAME_DAY_WEIGHTS,field);
+    assert.deepEqual(weights(point.sources),rounded6(SAME_DAY_WEIGHTS),field);
     assert.equal(point.value,old.value,field);
   }
   assert.ok(at(forecast.metricForecasts.series.wind,epoch).sources.some(source=>source.id==='wn'));
@@ -139,7 +143,7 @@ test('an unavailable NVIDIA hour is neither interpolated nor fabricated as zero'
   }})),baseline=buildForecast(sourceInputs({withNvidia:false}));
   const hour=at(forecast.hours,epoch),old=at(baseline.hours,epoch),rain=at(forecast.rainTimeline,epoch),oldRain=at(baseline.rainTimeline,epoch);
   assert.equal(hour.temperatureBlend.sources.some(source=>source.id==='wn'),false);
-  assert.deepEqual(weights(hour.temperatureBlend.sources),SAME_DAY_WEIGHTS);
+  assert.deepEqual(weights(hour.temperatureBlend.sources),rounded6(SAME_DAY_WEIGHTS));
   assert.equal(hour.temperature,old.temperature);
   assert.equal(rain.precipitationBlend.sourceValues.wn,null);
   assert.equal(rain.precipitationBlend.sources.some(source=>source.id==='wn'),false);
@@ -180,7 +184,7 @@ test('sub-minimum NVIDIA rain keeps its raw amount and forecast share without li
  for(const [index,card] of cards.entries())assert.equal(card.pop,chances.forecastValues[index]);
  const day=forecast.days[1],rows=forecast.rainTimeline.filter(r=>Date.parse(r.time)>=Date.parse(day.rainLikelihood.window.start)&&Date.parse(r.time)<Date.parse(day.rainLikelihood.window.end));
  assert.equal(day.rainLikelihood.value,Math.max(...rows.map(r=>r.rainLikelihood.value)));
- assert.equal(forecast.google.requestedWeight,.1);assert.equal(forecast.google.contributes,true);
+ assert.equal(forecast.google.requestedWeight,.16);assert.equal(forecast.google.contributes,true);
 });
 
 test('daily confidence includes actual NVIDIA temperature and precipitation contributions',()=>{

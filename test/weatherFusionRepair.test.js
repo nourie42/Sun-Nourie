@@ -13,22 +13,23 @@ import {dewpointPoints,graphGeometry} from '../public/weather-fusion/dewpoint-me
 import {createFramePlayer} from '../public/weather-fusion/frame-player.js';
 const H=3600000,now=testInputs.now,zone='America/New_York';
 const models=()=>Object.fromEntries(['hrrr','ecmwf','nbm'].map(id=>[id,validateSnapshot(snapshot(id),id,testInputs.location,now).value]));
-test('today uses 40/30/10/20 while later rain excludes HRRR',()=>{
+test('today uses the researched day 0-1 shares while days 2-3 rain excludes HRRR',()=>{
  const out=buildForecast({...testInputs,models:models()});
  assert.equal(out.repairVersion,REPAIR_VERSION);
- assert.deepEqual(temperaturePolicy(0),{nws:.4,hrrr:.3,ecmwf:.1,nbm:.2});
- assert.deepEqual(temperaturePolicy(6),temperaturePolicy(0));
- assert.deepEqual(precipitationPolicy(0),temperaturePolicy(0));
- assert.deepEqual(precipitationPolicy(1),{nws:.15,ecmwf:.6,nbm:.25});
- assert.deepEqual(precipitationPolicy(6),precipitationPolicy(1));
+ assert.deepEqual(temperaturePolicy(0),{nws:.25,hrrr:.30952381,ecmwf:.13095238,nbm:.30952381});
+ assert.deepEqual(temperaturePolicy(6),{nws:.18461538,ecmwf:.36923077,nbm:.44615385});
+ assert.deepEqual(precipitationPolicy(0),{nws:.23333333,hrrr:.35555556,ecmwf:.12222222,nbm:.28888889});
+ assert.deepEqual(precipitationPolicy(1),precipitationPolicy(0));
+ assert.deepEqual(precipitationPolicy(2),{nws:.28205128,ecmwf:.28205128,nbm:.43589744});
+ assert.deepEqual(precipitationPolicy(6),{nws:.15277778,ecmwf:.45833333,nbm:.38888889});
  assert.deepEqual(out.blendPolicy.sameDay,temperaturePolicy(0));
- assert.deepEqual(out.blendPolicy.extendedRain,precipitationPolicy(1));
- assert.equal(out.days[0].high,85); // .4*84 + .3*90 + .1*80 + .2*80 = 84.6
+ assert.deepEqual(out.blendPolicy.extendedRain,precipitationPolicy(2));
+ assert.equal(out.days[0].high,84); // .25*84 + .30952381*90 + .13095238*80 + .30952381*80 = 84.1
  for(const h of out.hours){if(forecastDayIndex(Date.parse(h.time),now,zone)!==0)continue;
-  assert.deepEqual(h.temperatureBlend.sources.map(s=>[s.id,s.weight]),[['nws',.4],['hrrr',.3],['ecmwf',.1],['nbm',.2]]);
-  assert.equal(h.temperature,Math.round(.4*h.officialTemperature+.3*90+.1*80+.2*80));
+  assert.deepEqual(h.temperatureBlend.sources.map(s=>[s.id,s.weight]),[['nws',.25],['hrrr',.309524],['ecmwf',.130952],['nbm',.309524]]);
+  assert.equal(h.temperature,Math.round(.25*h.officialTemperature+.30952381*90+.13095238*80+.30952381*80));
  }
- const later=out.rainTimeline.find(row=>forecastDayIndex(Date.parse(row.time),now,zone)>0);
+ const later=out.rainTimeline.find(row=>forecastDayIndex(Date.parse(row.time),now,zone)>1);
  assert.ok(later,'fixture must include a later local day');
  assert.equal(later.rainLikelihood.sourcePoints.hrrr,null);
  assert.ok(!later.rainLikelihood.sources.some(source=>source.id==='hrrr'));
@@ -164,9 +165,9 @@ test('fresh nearby precipitation condition survives a rejected station temperatu
  assert.match(current.conditionSource,/observation/i);
 });
 
-test('public methodology states the restored extended rain blend',()=>{
+test('public methodology states the researched stepped rain blend',()=>{
  const out=buildForecast({...testInputs,models:models()});
- assert.match(out.methodology,/NWS hourly probability fills its 15-point share proportionally, ECMWF is worth 60 points and NBM 25 points/i);
- assert.match(out.blendPolicy.probability,/NWS fills a 15-point share proportionally; ECMWF is worth 60 points and NBM 25/i);
+ assert.match(out.methodology,/On days 2-3, NWS fills 28 points, ECMWF 28 and NBM 44/i);
+ assert.match(out.blendPolicy.probability,/Days 2-3: NWS 28 points, ECMWF 28 and NBM 44/i);
  assert.doesNotMatch(out.methodology,/displayed rain chance uses the official NWS hourly probability directly/i);
 });

@@ -12,7 +12,7 @@ test('confidence uses all four actual same-day contributors',()=>{
  const models=Object.fromEntries(['hrrr','ecmwf','nbm'].map(id=>[id,validateSnapshot(snapshot(id),id,location,now).value]));
  const f=buildForecast({...testInputs,models}),d=f.days[0];
  assert.deepEqual(d.confidence.sourceIds,['nws','hrrr','ecmwf','nbm']);assert.equal(d.confidence.sourceCount,4);
- assert.deepEqual(d.highBlend.sources.map(s=>[s.id,s.weight]),[['nws',.4],['hrrr',.3],['ecmwf',.1],['nbm',.2]]);
+ assert.deepEqual(d.highBlend.sources.map(s=>[s.id,s.weight]),[['nws',.25],['hrrr',.309524],['ecmwf',.130952],['nbm',.309524]]);
  const values=d.highBlend.sources.map(s=>s.value);assert.equal(d.highSpread,Math.round((Math.max(...values)-Math.min(...values))*10)/10);
  const missing=buildForecast({...testInputs,models:{}});assert.deepEqual(missing.days[0].confidence.sourceIds,['nws']);
  for(const day of f.days){const ids=[...new Set(Object.values(day.confidence.contributions).flat().filter(s=>s.weight>0&&Number.isFinite(s.value)).map(s=>s.id))].sort();assert.deepEqual([...day.confidence.sourceIds].sort(),ids);}

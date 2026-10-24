@@ -52,7 +52,7 @@ export function buildBlendModel(forecast, wnFeed, locationId, nowMs = Date.now()
     .map((h) => ({ ...h, time: Date.parse(h.time) }))
     .filter((h) => Number.isFinite(h.time) && h.time + 3600000 > nowMs)
     .slice(0, 24);
-  const weights = forecast?.blendPolicy?.sameDay || { nws: 0.4, hrrr: 0.3, ecmwf: 0.1, nbm: 0.2 };
+  const weights = forecast?.blendPolicy?.sameDay || { nws: 0.21, hrrr: 0.26, ecmwf: 0.11, nbm: 0.26, wn: 0.16 };
   const contrib = Object.fromEntries((forecast?.modelContributions || []).map((m) => [m.id, m]));
 
   const point = wnPoint(wnFeed, locationId);

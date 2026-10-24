@@ -443,8 +443,8 @@ function renderBlendChart(){
   bindChart(el,()=>steps.length,i=>blendTip(i));
   el.dataset.lo=lo;el.dataset.hi=hi;el.dataset.top=top;el.dataset.plot=plot;el.dataset.left=left;el.dataset.right=right;
   const policy=forecast.blendPolicy||{};
-  $('blend-science').innerHTML=`<p><strong>Starting shares.</strong> ${esc(shareList(policy.sameDay))||'Not published in this update'}. Temperature uses these shares every hour. When a forecast does not cover an hour, the others split its share.</p>
-   <p>The shares are Weather Nourie’s chosen starting weights, not a measured accuracy ranking. ${forecast.google?.contributes?'WeatherNext holds its 10% share only while its data is fresh for this place.':'WeatherNext is not contributing for this place right now.'}</p>
+  $('blend-science').innerHTML=`<p><strong>Shares today.</strong> ${esc(shareList(policy.sameDay))||'Not published in this update'}. Temperature shares step with the forecast day: ${(policy.bands?.temperature||[]).map(b=>`${esc(b.label)} — ${esc(shareList(b.weights))}`).join('; ')||'not published'}. When a forecast does not cover an hour, the others split its share.</p>
+   <p>The shares come from an October 2026 review of forecast-blend research: near-even weights that lean toward each source's proven strength at each lead time, not a guarantee for any single day. ${forecast.google?.contributes?'WeatherNext takes its band share only while its data is fresh for this place.':'WeatherNext is not contributing for this place right now.'}</p>
    <p>Want to see what different shares would do? Try <a href="#lab">Make your own forecast</a>.</p>`;
  });
 }
@@ -661,7 +661,7 @@ function renderLabTable(){
 function renderLabScience(){
  const policy=forecast?.blendPolicy||{};
  $('lab-science').innerHTML=`<p><strong>The mix.</strong> Every hour, Weather Nourie averages the forecasts that cover that hour using fixed shares (${esc(shareList(policy.sameDay))||'its starting shares'}). Your sliders multiply each forecast’s share: Off removes it, 2× doubles it. The shares are then rescaled to add up to 100%.</p>
-  <p><strong>Two recipes.</strong> Temperature uses the same recipe every day. For rain after today, Weather Nourie switches to a long-range recipe that leans on the European model (${esc(shareList(policy.extendedRain))||'its long-range shares'}). Your sliders tilt that recipe the same way.</p>
+  <p><strong>Stepped recipes.</strong> The main page steps its shares with the forecast day — HRRR counts only on days 0-1, and ECMWF and WeatherNext gain share at longer leads for both temperature and rain. Rain on days 2-3 uses these shares: ${esc(shareList(policy.extendedRain))||'its stepped shares'}. This lab keeps one recipe for every day so your sliders stay easy to read.</p>
   <p><strong>Rain is a score.</strong> The NWS chance fills its share in proportion, and a model adds its whole share for at least 0.01 inch of rain that another source backs up, or a third of it for a trace. Past the end of the NWS hourly forecast its share adds nothing, just as on the main page.</p>
   <p><strong>Days.</strong> A day’s high and low are its warmest and coolest hours, and its rain chance is its highest hour, the same way the main page reads its hourly forecast. Rain totals add up each hour’s mix of the forecasts’ own rainfall.</p>
   <p><strong>Missing hours.</strong> When a forecast does not reach an hour (HRRR stops after a day or two, the NWS hourly forecast after about a week), the forecasts that do reach it share its weight. If none of the forecasts you kept reach an hour, that hour is left blank.</p>
@@ -727,7 +727,7 @@ function renderRainChart(){
   el.dataset.left=left;el.dataset.right=right;el.dataset.top=top;el.dataset.plot=plot;
   const policy=forecast.blendPolicy||{};
   $('rain-science').innerHTML=`<p><strong>It is a score, not a single forecast’s chance.</strong> The official NWS chance fills its share in proportion. A model adds its whole share when it forecasts at least 0.01 inch of rain in the hour and another source backs it up, a third of its share for a trace (0.001 to 0.01 inch) or for heavier rain nobody else shows, and nothing below 0.001 inch.</p>
-   <p><strong>Shares today:</strong> ${esc(shareList(policy.sameDay))||'not published'}. <strong>After today:</strong> ${esc(shareList(policy.extendedRain))||'not published'}; HRRR is left out after today.</p>
+   <p><strong>Shares by forecast day:</strong> ${(policy.bands?.precipitation||[]).map(b=>`${esc(b.label)} — ${esc(shareList(b.weights))}`).join('; ')||'not published'}. HRRR counts only on days 0-1.</p>
    <p>If a model the score needs is missing, the page shows the official NWS chance instead, so missing data never reads as dry weather. Chances under 5% are not printed.</p>`;
  });
 }

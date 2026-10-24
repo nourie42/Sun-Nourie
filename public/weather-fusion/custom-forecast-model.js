@@ -236,7 +236,7 @@ export function customForecastInput(forecast, now = Date.now()) {
   const currentEvidence=rows.get(Math.floor(now/HOUR)*HOUR);
   const actualShares=Object.fromEntries([...(currentEvidence?.hour?.temperatureBlend?.sources||[]),...(currentEvidence?.temperature?.sources||[])]
     .filter(source=>allowed.has(source.id)&&valid(source.value,'temperature')&&finite(source.weight)&&source.weight>0).map(source=>[source.id,source.weight]));
-  const requested = Object.keys(actualShares).length?actualShares:forecast?.blendPolicy?.sameDay || { nws: 40, hrrr: 30, ecmwf: 10, nbm: 20 };
+  const requested = Object.keys(actualShares).length?actualShares:forecast?.blendPolicy?.sameDay || { nws: 21, hrrr: 26, ecmwf: 11, nbm: 26, wn: 16 };
   let defaultWeights = normalizeCustomWeights(Object.fromEntries(Object.entries(requested).filter(([id]) => available.has(id))));
   if (!Object.keys(defaultWeights).length) defaultWeights = normalizeCustomWeights(Object.fromEntries([...available].map(id => [id, 1])));
   return { locationKey: `${location.latitude}|${location.longitude}|${location.timeZone || ''}`, location: { ...location }, timeZone, assembledAt: forecast?.assembledAt || null, now, calendarDays, hours, models, defaultWeights,snowProducts };

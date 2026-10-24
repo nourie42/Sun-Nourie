@@ -61,8 +61,8 @@ test('rain inputs scale the NWS share and explain full and reduced model points'
   assert.match(html,/30% probability/);
   assert.match(html,/<th scope="row">NBM<\/th><td>0 in<small>Rain forecast: No<\/small><\/td><td>0<small>of 20 max<\/small><\/td>/);
   assert.doesNotMatch(html,/QPF support|NWS-anchored input/);
-  assert.match(html,/NWS hourly probability fills its 40-point share proportionally/);
-  assert.match(html,/40% NWS chance contributes 16 points/);
+  assert.match(html,/NWS hourly probability fills its 23.3333-point share proportionally/);
+  assert.match(html,/40% NWS chance contributes 9.3333 points/);
   assert.match(html,/below 0\.001 in\/hour add zero rain-signal points; the original amounts are retained/);
   assert.match(html,/From 0\.001 through 0\.010 in\/hour, a model gets one-third/);
   assert.match(html,/above 0\.010 in gets full points only if NWS is at least 20%/);
@@ -108,9 +108,9 @@ test('missing models do not renormalize the NWS base or remaining model points',
 test('a reduced wet vote keeps its exact points without hiding a low score',()=>{
   const forecast=fixture(),single=precipitationLikelihood(0,{sourceValues:{hrrr:0,ecmwf:0,nbm:.02}});
   for(const row of forecast.rainTimeline)row.rainLikelihood=single;
-  Object.assign(forecast.days[0].rainLikelihood,{value:7,peak:single});
+  Object.assign(forecast.days[0].rainLikelihood,{value:10,peak:single});
   const html=modelExplanationHTML(forecast,{now});
-  assert.match(html,/Rounded: <b>7%<\/b>\. Shown: <b>7%/);
+  assert.match(html,/Rounded: <b>10%<\/b>\. Shown: <b>10%/);
   assert.doesNotMatch(html,/fewer than two available sources|below 25%/);
   assert.doesNotMatch(html,/Data mismatch/);
 });
@@ -160,7 +160,7 @@ test('source status distinguishes a checked-but-failed refresh from the last dat
   assert.match(html,/Last check: Sat, Sep 12, 8 AM/);
   assert.match(html,/Using last verified data; the latest refresh did not succeed/);
   assert.match(html,/Latest fetch unavailable; retaining the verified run/);
-  assert.match(html,/NWS hourly probability fills its 40-point share proportionally/);
+  assert.match(html,/NWS hourly probability fills its 23.3333-point share proportionally/);
 });
 
 test('NWS hourly source time never borrows the different daily forecast issuance',()=>{

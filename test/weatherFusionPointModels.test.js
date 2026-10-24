@@ -88,18 +88,18 @@ function forecast(patch){
 test('four-source weather fields remain while later-day rain excludes HRRR',()=>{
  const f=forecast(),g=forecast(d=>{for(const [field,change] of Object.entries({temperature_2m:8,dew_point_2m:5,wind_speed_10m:6,wind_gusts_10m:9,cloud_cover:50,precipitation:.1}))d.hourly[field]=d.hourly[field].map(v=>v+change);});
  assert.deepEqual(f.days[0].confidence.sourceIds,['nws','hrrr','ecmwf','nbm']);assert.equal(f.days[0].confidence.sourceCount,4);
- for(const part of ['high','low'])assert.deepEqual(f.days[0].confidence.contributions[part].map(s=>[s.id,s.weight]),[['nws',.4],['hrrr',.3],['ecmwf',.1],['nbm',.2]]);
+ for(const part of ['high','low'])assert.deepEqual(f.days[0].confidence.contributions[part].map(s=>[s.id,s.weight]),[['nws',.25],['hrrr',.309524],['ecmwf',.130952],['nbm',.309524]]);
  assert.ok(f.days[0].confidence.contributions.rain.some(source=>source.id==='hrrr'));
- assert.ok(!f.days[1].confidence.contributions.rain.some(source=>source.id==='hrrr'));
+ assert.ok(!f.days[2].confidence.contributions.rain.some(source=>source.id==='hrrr'));
  for(const field of ['temperature','dewpoint','wind','gust','cloud']){
   const a=f.metricForecasts.series[field].find(p=>Date.parse(p.time)===now+H),b=g.metricForecasts.series[field].find(p=>Date.parse(p.time)===now+H);
-  assert.deepEqual(a.sources.map(s=>[s.id,s.weight]),[['nws',.4],['hrrr',.3],['ecmwf',.1],['nbm',.2]],field);assert.notEqual(a.value,b.value,field);
+  assert.deepEqual(a.sources.map(s=>[s.id,s.weight]),[['nws',.25],['hrrr',.309524],['ecmwf',.130952],['nbm',.309524]],field);assert.notEqual(a.value,b.value,field);
  }
  assert.notEqual(f.days[0].high,g.days[0].high);assert.notEqual(f.days[0].low,g.days[0].low);assert.notEqual(f.hours[1].feelsLike,g.hours[1].feelsLike);assert.notEqual(f.hours[1].humidity,g.hours[1].humidity);
  assert.equal(f.hours[1].feelsLikeInputs.dewpoint,f.hours[1].dewpoint);assert.equal(f.hours[1].feelsLikeInputs.skyCover,f.metricForecasts.series.cloud[1].value);
  assert.equal(f.current.temperature,testInputs.observation.temperature,'Observations are not forecasts');
- assert.deepEqual(f.days[1].highBlend.sources.map(s=>[s.id,s.weight]),[['nws',.4],['hrrr',.3],['ecmwf',.1],['nbm',.2]]);
- assert.deepEqual(f.days[2].highBlend.sources.map(s=>[s.id,s.weight]),[['nws',.571429],['ecmwf',.142857],['nbm',.285714]]);
+ assert.deepEqual(f.days[1].highBlend.sources.map(s=>[s.id,s.weight]),[['nws',.25],['hrrr',.309524],['ecmwf',.130952],['nbm',.309524]]);
+ assert.deepEqual(f.days[2].highBlend.sources.map(s=>[s.id,s.weight]),[['nws',.305556],['ecmwf',.305556],['nbm',.388889]]);
 });
 test('surface danger and uncertainty warnings sit above the walker, with no safe claim',()=>{
  const result=(value,high)=>({status:'estimated',concrete:{value:value-10,high:high-10},asphalt:{value,high}});
