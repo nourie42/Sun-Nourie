@@ -1,5 +1,6 @@
 import {createWeatherTransport,createWeatherRequestBudget} from './weatherFusionTransport.js';
 import {createGefs} from './weatherFusionGefs.js';
+import {createEnsembleSpread,ENSEMBLE_SPREAD_VERSION,publishedEnsembleSpread} from './weatherFusionEnsembleSpread.js';
 import {BLEND_V2_VERSION,BLEND_V2_CONFIG} from './weatherFusionBlendV2.js';
 import {createWeatherNext3} from './weatherFusionWeatherNext3.js';
 import {forecastProseConflict} from '../public/weather-fusion/forecast-consistency.js';
@@ -334,7 +335,7 @@ export class Cache {
 export function withoutAviation(text=''){
  return text.replace(/(^|\n)\.(?:AVIATION)[^\n]*\n[\s\S]*?(?=\n\.[A-Z][A-Z /]*(?:\.\.\.|\s)|$)/gi,'').trim();
 }
-export function buildForecast({ location, point, forecast, hourly, grid, discussion, observation, alerts, specialDiscussions, precipitationDiscussions, riskOutlooks, snowModels, winterModels, wpcWinter, exposureWeather, airQuality, models, feeds, now, blendV2=false }) {
+export function buildForecast({ location, point, forecast, hourly, grid, discussion, observation, alerts, specialDiscussions, precipitationDiscussions, riskOutlooks, snowModels, winterModels, wpcWinter, exposureWeather, airQuality, models, feeds, now, blendV2=false, ensembleSpread=null }) {
   const zone = point?.timeZone || exposureWeather?.timezone || models.ecmwf?.timezone || 'America/New_York';
   const today = dateKey(now, zone);
   const rows = Object.fromEntries(Object.entries(models).map(([key, value]) => [key, normalizeModel(value, now, key === 'hrrr' ? 48 : 240)]));
@@ -412,13 +413,15 @@ export function buildForecast({ location, point, forecast, hourly, grid, discuss
     current, hours, days, discussion: discussion || null, alerts: alerts || [], specialDiscussions: specialDiscussions || [], precipitationDiscussions: precipitationDiscussions || [], riskOutlooks: riskOutlooks || [], feeds,
     solar: { sunrise: models.ecmwf?.daily?.sunrise?.[solarIndex] ? iso(models.ecmwf.daily.sunrise[solarIndex] * 1000) : null,
       sunset: models.ecmwf?.daily?.sunset?.[solarIndex] ? iso(models.ecmwf.daily.sunset[solarIndex] * 1000) : null },
-    methodology: 'NWS temperatures, conditions and precipitation probabilities are primary. NWS grid precipitation is integrated over local 7 AM–7 AM windows. Model guidance is supplementary and not a verified skill-weighted forecast. Model high/low comparisons use calendar days; the NWS low is overnight. Precipitation includes liquid-equivalent snow/ice. Daily forecast confidence is a relative index, not a probability; temperature confidence uses the average timestamp-matched model gap across today and the maximum same-hour gap on later dates, together with lead time and source coverage. Rainfall guidance and sky/rain agreement are disclosed separately.' };
+    methodology: 'NWS temperatures, conditions and precipitation probabilities are primary. NWS grid precipitation is integrated over local 7 AM–7 AM windows. Model guidance is supplementary and not a verified skill-weighted forecast. Model high/low comparisons use calendar days; the NWS low is overnight. Precipitation includes liquid-equivalent snow/ice. Daily forecast confidence is a relative index, not a probability. Temperature confidence uses ECMWF ENS and GEFS daily high and low member spread when that feed is available, and otherwise the hourly gap with the GEFS ensemble mean set aside. Lead time eases the combined rating. Rainfall guidance and sky/rain agreement are disclosed separately.' };
   if(blendV2)output.blendV2={enabled:true,version:BLEND_V2_VERSION,issuedAt:iso(Math.floor(now/HOUR)*HOUR),temperature:'Lead-hour temperature weights; missing sources renormalized',rainProbability:'Official NWS hourly probability fallback; no calibrated model probabilities supplied',rainAmount:'Official NWS quantitative precipitation where available; existing NBM fallback if official coverage is missing',requestedTables:BLEND_V2_CONFIG.variables,gefs:models.gefs?.verifiedModel?'Verified 31-member NOAA GEFS ensemble mean':(feeds.find(f=>f.id==='gefs')?.message||'GEFS unavailable for this forecast'),biasCorrection:'Disabled: independent observation holdouts have not established a correction',winter:'Existing independently validated winter logic retained'};
   enhanceForecast(output, { models, grid, periods: forecast?.periods || [], hourlyPeriods: hourly?.periods || [], now, gridQpf, localTime, nextDate, dateKey });
   output.current=validateCurrentConditions(output.current,output.hours,rows,now);
   Object.assign(output.current,resolveCurrentWeather(output.current,output.hours,now,gridSample(grid,'skyCover',now,'percent')));
   applyObservedSky(output,observation?.skyObservations,now);
   addExperience(output, {models, grid, periods:forecast?.periods || [], exposureWeather, now, solarTimes, nextDate});
+  output.ensembleSpread=publishedEnsembleSpread(ensembleSpread);
+  output.ensembleSpreadVersion=ENSEMBLE_SPREAD_VERSION;
   refreshCalendarConfidence(output,{now});
   addExposureWeather(output,exposureWeather);
   addAirQuality(output,airQuality);
@@ -426,7 +429,7 @@ export function buildForecast({ location, point, forecast, hourly, grid, discuss
   addConditionConfidence(output,{now});
   if(blendV2){output.blendPolicy.probability='Official NWS hourly probability fallback; deterministic wet signals do not set public percentages.';output.blendPolicy.precipitation=output.blendV2.rainAmount;output.blendPolicy.temperature=output.blendV2.temperature;}
   if(blendV2)output.methodology='Blend V2 uses lead-hour temperature weights from the supplied V2 configuration with actual source coverage and a separately labeled WeatherNext 3 ensemble-mean feed. ECMWF remains deterministic IFS; GEFS uses the mean of 31 genuine ensemble members where verified. Rain chance uses the official NWS hourly probability because calibrated model probabilities are unavailable. Rain amounts use official NWS guidance with disclosed existing NBM fallback; experimental ensemble quantile blending and bias correction are not active. Wind, moisture, cloud, winter and official alerts retain their existing methods. No measured accuracy gain is claimed.';
-  output.methodology+=' The main Forecast confidence index equally combines temperature, sky-cover and rain agreement. Missing evidence or substantial disagreement limits the rating. Separate sky/rain and temperature components remain visible in the details, including lead time and source coverage. Neither indicator is a calibrated accuracy percentage; missing source values are not clear skies or zero rain.';
+  output.methodology+=' The main Forecast confidence index equally combines temperature, sky-cover and rain agreement, then eases with lead time. Temperature agreement prefers ECMWF ENS and GEFS member spread over the warm overnight GEFS mean. Missing evidence or substantial disagreement limits the rating. Separate sky/rain and temperature components remain visible in the details. Neither indicator is a calibrated accuracy percentage; missing source values are not clear skies or zero rain.';
   output.danTakeVersion=DAN_TAKE_VERSION;
   output.forecastConfidenceVersion=FORECAST_CONFIDENCE_VERSION;
   output.weatherDisplayVersion='weather-nourie-sky-consistency-v1';
@@ -460,6 +463,7 @@ export function createWeatherService({ fetchImpl = globalThis.fetch, env = proce
   const loadWeatherNext = createWeatherNextBlendSource({fetchImpl,now});
   const loadWeatherNext3=createWeatherNext3({fetchImpl,now});
   const loadGefs=createGefs({fetchImpl,now});
+  const loadEnsembleSpread=createEnsembleSpread({fetchImpl,now});
   const blendV2Enabled=env.WEATHER_NOURIE_BLEND_V2==='true';
   async function request(url, { text = false, body = null, timeout = 12000, revalidate = false } = {}) {
     const u = new URL(url);
@@ -517,6 +521,7 @@ export function createWeatherService({ fetchImpl = globalThis.fetch, env = proce
       const point = pointFeed.value;
       const unavailable = (id, label) => Promise.resolve({ value: null, meta: { id, label, status: 'unavailable', message: 'NWS location lookup unavailable.', issuedAt: null } });
       const get = (id, label, url, ttl, transform) => url ? feed(id, label, url, ttl, transform) : unavailable(id, label);
+      const ensembleSpreadPromise=loadEnsembleSpread(location, point?.timeZone);
       const jobs = {
         forecast: get('nws', 'NWS forecast', point?.forecast, 2 * MINUTE, (d) => d.properties?.periods?.length ? d.properties : null),
         hourly: get('hourly', 'NWS hourly', point?.forecastHourly, 2 * MINUTE, (d) => d.properties?.periods?.length ? d.properties : null),
@@ -568,10 +573,13 @@ export function createWeatherService({ fetchImpl = globalThis.fetch, env = proce
         wn: loadWeatherNext(location),
         ...(blendV2Enabled?{weathernext3:loadWeatherNext3(location),gefs:loadGefs(location)}:{}),
       };
-      const values = Object.fromEntries(await Promise.all(Object.entries(jobs).map(async ([id, promise]) => [id, await promise])));
+      const [values, ensembleSpread] = await Promise.all([
+        Promise.all(Object.entries(jobs).map(async ([id, promise]) => [id, await promise])).then(entries=>Object.fromEntries(entries)),
+        ensembleSpreadPromise,
+      ]);
       const data = Object.fromEntries(Object.entries(values).map(([id, f]) => [id, id==='alerts'||Array.isArray(f.meta)?f.value:(f.meta.status === 'ready'||f.meta.recovered===true ? f.value : null)]));
       const feedMeta=[pointFeed.meta,...Object.values(values).flatMap(f=>Array.isArray(f.meta)?f.meta:[f.meta])];
-      const result = buildForecast({ ...data, point, location, models: { hrrr: data.hrrr, ecmwf: data.ecmwf, nbm: data.nbm, wn:data.wn, weathernext3:data.weathernext3,gefs:data.gefs }, feeds: feedMeta, now: now(), blendV2:blendV2Enabled });
+      const result = buildForecast({ ...data, point, location, models: { hrrr: data.hrrr, ecmwf: data.ecmwf, nbm: data.nbm, wn:data.wn, weathernext3:data.weathernext3,gefs:data.gefs }, feeds: feedMeta, now: now(), blendV2:blendV2Enabled, ensembleSpread:ensembleSpread.value });
       // Access never exposes the provider credential or a made-up model run timestamp.
       result.aiConfigured = !!env.OPENAI_API_KEY;
       result.integrityVersion='weather-nourie-integrity-v1';

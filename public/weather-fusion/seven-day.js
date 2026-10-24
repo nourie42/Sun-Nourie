@@ -4,7 +4,7 @@ import {hideLowRainChance,displayedRainChance,rainAwareCondition,dailySkyCover} 
 import {forecastPeriodSummary} from './forecast-story.js?v=low-rain-display-v1';
 import {shortForecastCondition} from './today-card.js?v=low-rain-display-v1';
 import {weatherIcon,weatherMetricIcon} from './weather-display.js?v=low-rain-display-v1';
-import {confidenceMeterPosition,displayForecastConfidence,forecastConfidenceLabel} from './forecast-confidence.js?v=same-day-confidence-v7';
+import {confidenceMeterPosition,displayForecastConfidence,forecastConfidenceLabel} from './forecast-confidence.js?v=ensemble-confidence-v1';
 import {winterAmountText,winterDayAmount} from './snow-outlook.js?v=snow-readable-v1';
 
 const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));

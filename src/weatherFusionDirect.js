@@ -290,7 +290,7 @@ export function refreshCalendarConfidence(out,{now=Date.now()}={}) {
     const window={start:currentPartialExcluded?Math.min(calendarWindow.start+H,calendarWindow.end):calendarWindow.start,end:calendarWindow.end},expectedHours=(window.end-window.start)/H;
     if(!(expectedHours>0))continue;
     const localDayIndex=forecastDayIndex(window.start,now,out.location?.timeZone);
-    const samples={},weights={},counts={},runs={};let availableHours=0,maximumHourlySpread=null,worstHour=null,maximumConfidenceSpread=null,confidenceHour=null,hourlySpreadTotal=0,hourlySpreadCount=0;const temperatureAdjustments=[];
+    const samples={},weights={},counts={},runs={};let availableHours=0,maximumHourlySpread=null,worstHour=null,maximumConfidenceSpread=null,confidenceHour=null,hourlySpreadTotal=0,hourlySpreadCount=0,excludedTotal=0,excludedCount=0,excludedMax=null;const temperatureAdjustments=[];
     for(let time=window.start;time<window.end;time+=H) {
       const row=temperatures.get(time);
       if(finite(row?.value))availableHours++;
@@ -336,6 +336,15 @@ export function refreshCalendarConfidence(out,{now=Date.now()}={}) {
             temperatureAdjustment:usePeers?adjustment:null};
         }
       }
+      // The GEFS mean is one number, not the ensemble's uncertainty. Keep it in
+      // the disclosed full gap, and remember the gap without it for fallback
+      // scoring when member spread is unavailable.
+      const excludedPool=(usePeers?peers:sources).filter(source=>source.id!=='gefs');
+      if(excludedPool.length>1){
+        const excludedGap=Math.max(...excludedPool.map(source=>source.value))-Math.min(...excludedPool.map(source=>source.value));
+        excludedTotal+=excludedGap;excludedCount++;
+        if(excludedMax===null||excludedGap>excludedMax)excludedMax=excludedGap;
+      }
     }
     const sourceOrder=['nws','hrrr','ecmwf','nbm','wn','weathernext3','gefs'];
     const contributors=kind=>sourceOrder.filter(id=>samples[id]?.length).map(id=>({id,value:round(kind==='high'?Math.max(...samples[id]):Math.min(...samples[id]),1),weight:round(weights[id]/expectedHours,6),coverageHours:counts[id],complete:counts[id]===expectedHours,
@@ -358,6 +367,8 @@ export function refreshCalendarConfidence(out,{now=Date.now()}={}) {
     const averageHourlySpread=hourlySpreadCount?round(hourlySpreadTotal/hourlySpreadCount,1):null;
     const sameDayAverage=index===0&&finite(averageHourlySpread);
     const temperatureSpread=sameDayAverage?averageHourlySpread:round(maximumConfidenceSpread,1);
+    const excludedAverage=excludedCount?round(excludedTotal/excludedCount,1):null;
+    const temperatureSpreadExcludingGefs=index===0&&finite(excludedAverage)?excludedAverage:round(excludedMax,1);
     const temperatureSpreadBasis=sameDayAverage?'same-day-average':temperatureAdjustments.length?'peer-consensus':'same-hour';
     const rain=(day.qpfBlend?.sources||[]).filter(source=>source.weight>0&&finite(source.value)).map(source=>({...source,complete:finite(day.qpfBlend?.sourceValues?.[source.id])}));
     const completeRain=rain.filter(source=>source.complete);
@@ -376,6 +387,7 @@ export function refreshCalendarConfidence(out,{now=Date.now()}={}) {
     day.confidence.window={start:iso(window.start),end:iso(window.end)};
     if(currentPartialExcluded)day.confidence.factors.push('The partially elapsed current hour had no comparable temperature forecast and is excluded from the remaining-day rating.');
     day.confidence.temperatureSpread=temperatureSpread;
+    day.confidence.temperatureSpreadExcludingGefs=temperatureSpreadExcludingGefs;
     day.confidence.rawTemperatureSpread=rawTemperatureSpread;
     day.confidence.temperatureComparison={basis:'maximum-same-hour-spread',worstHour,dailyHigh,confidenceHour,averageHourlySpread,confidenceSpread:temperatureSpread,
       confidenceBasis:sameDayAverage?(temperatureAdjustments.length?'same-day-average-peer-consensus':'same-day-average-same-hour'):temperatureAdjustments.length?'isolated-outlier-peers':'all-contributing-sources',

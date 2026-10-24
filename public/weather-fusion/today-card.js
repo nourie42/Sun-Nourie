@@ -5,7 +5,7 @@ import {dailyDisplay,dailyRainPeriod,finite} from './weather-math.js?v=current-r
 import {dailyFeels,degrees,timeAt} from './hourly-feels.js?v=current-rain-20261017-v3';
 import {uvCategory} from './daily-uv.js?v=weather-art-labels-v10';
 import {currentAirQuality} from './air-quality.js?v=mobile-repair-v1';
-import {displayForecastConfidence,forecastConfidenceLabel} from './forecast-confidence.js?v=same-day-confidence-v7';
+import {displayForecastConfidence,forecastConfidenceLabel} from './forecast-confidence.js?v=ensemble-confidence-v1';
 import {weatherIcon,weatherMetricIcon} from './weather-display.js?v=low-rain-display-v1';
 import {hideLowRainChance,displayedRainChance,observedRainLabel,rainAwareCondition,dailySkyCover} from './rain-display.js?v=low-rain-display-v1';
 const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));

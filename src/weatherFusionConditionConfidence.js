@@ -2,6 +2,7 @@ import {calendarDayWindow} from '../public/weather-fusion/calendar-day.js';
 import {forecastConfidence} from '../public/weather-fusion/forecast-confidence.js';
 import {solarElevation} from '../public/weather-fusion/weather-math.js';
 import {TRACE_QPF_THRESHOLD_INCHES} from './weatherFusionDirect.js';
+import {ensembleLeadTrim,scoreDeterministicTemperature,scoreEnsembleTemperature} from './weatherFusionEnsembleSpread.js';
 
 export const CONDITION_CONFIDENCE_VERSION='weather-nourie-sky-rain-agreement-v6';
 const H=3600000,finite=value=>typeof value==='number'&&Number.isFinite(value),round=value=>Math.round(value*1000)/1000;
@@ -78,20 +79,29 @@ function component(hours,window,scope){
 /** Overall agreement index; component scores remain independently inspectable.
  * Equal component weights avoid letting a cloud-only rating stand for the whole
  * forecast. Missing evidence and substantial disagreement prevent High ratings.
+ * Lead time eases the combined rating so a settled near-term day can be High
+ * while a later day steps down even when the ensemble is still fairly tight.
  */
 export function overallForecastConfidence(temperature,weather){
  const sky=weather.evidence.sky,rain=weather.evidence.rain;
  const components={temperature:temperature.score,sky:sky.score,rain:rain.score};
  const available=Object.values(components).filter(finite),missingComponents=Object.keys(components).filter(key=>!finite(components[key]));
+ const leadDays=Number.isFinite(weather.leadDays)?Math.max(0,Math.trunc(weather.leadDays)):0,leadTrim=ensembleLeadTrim(weather.leadDays);
  let score=available.length>=2?Math.round(available.reduce((a,b)=>a+b,0)/available.length):null;
  const complete=missingComponents.length===0&&temperature.coverage?.temperature?.complete!==false&&sky.complete&&rain.complete&&sky.completeSources.length>=2&&rain.completeSources.length>=2&&temperature.sourceCount>=2;
- if(score!==null){if(!complete)score=Math.min(score,80);if(Math.min(...available)<70)score=Math.min(score,84);if(Math.min(...available)<55)score=Math.min(score,54);score=Math.min(score,rain.probabilityConflictCap??100);}
+ if(score!==null){score=Math.max(35,score-leadTrim);if(!complete)score=Math.min(score,80);if(Math.min(...available)<70)score=Math.min(score,84);if(Math.min(...available)<55)score=Math.min(score,54);score=Math.min(score,rain.probabilityConflictCap??100);}
  const key=score===null?'unavailable':score>=85?'high':score>=70?'moderate':'low';
- return {scope:'overall',version:'weather-nourie-overall-confidence-v2',score,key,label:key[0].toUpperCase()+key.slice(1),sourceCount:weather.sourceCount,sourceIds:weather.sourceIds,components,missingComponents,
-  summary:score===null?'Fewer than two forecast components have comparable evidence.':`Temperature agreement ${components.temperature??'unavailable'}; sky agreement ${components.sky??'unavailable'}; rain agreement ${components.rain??'unavailable'}.`,
-  factors:['Equal weighting of available temperature, sky cover and rain agreement','At least two components are required; a missing component caps overall confidence at Moderate','Missing inputs and substantial component disagreement limit the rating'],note:'Relative agreement index, not a calibrated probability or a measured accuracy percentage.'};
+ const factors=['Equal weighting of available temperature, sky cover and rain agreement','At least two components are required; a missing component caps overall confidence at Moderate','Missing inputs and substantial component disagreement limit the rating'];
+ if(leadTrim)factors.push(`${leadDays}-day lead time eases the combined rating`);
+ return {scope:'overall',version:'weather-nourie-overall-confidence-v3',score,key,label:key[0].toUpperCase()+key.slice(1),sourceCount:weather.sourceCount,sourceIds:weather.sourceIds,components,missingComponents,leadDays,leadTrim,
+  summary:score===null?'Fewer than two forecast components have comparable evidence.':`Temperature agreement ${components.temperature??'unavailable'}; sky agreement ${components.sky??'unavailable'}; rain agreement ${components.rain??'unavailable'}.${leadTrim?` The ${leadDays}-day lead lowers this combined rating.`:''}`,
+  factors,note:'Relative agreement index, not a calibrated probability or a measured accuracy percentage. Temperature uses ensemble member spread when that feed is available.'};
 }
-function temperatureComponent(day,index){
+function ensembleDay(out,date){
+ const days=out.ensembleSpread?.days;
+ return out.ensembleSpread?.status==='ready'&&Array.isArray(days)?days.find(day=>day.date===date&&day.usable&&finite(day.uncertainty))||null:null;
+}
+function temperatureComponent(day,index,ensemble){
  const current=day.confidence,coverage=current.coverage?.temperature;
  const contributing=(current.contributions?.high||[]).filter(source=>finite(source.value)&&source.weight>0);
  const complete=contributing.filter(source=>source.complete),ids=contributing.map(source=>source.id),expected=coverage?.expectedHours,nws=contributing.find(source=>source.id==='nws');
@@ -99,13 +109,25 @@ function temperatureComponent(day,index){
   temperatureOutlierHours:current.temperatureComparison?.adjustments?.length||0,qpfSpread:0,guidanceCount:complete.length,sourceIds:ids,
   officialCoverage:finite(expected)&&expected>0?(nws?.coverageHours||0)/expected:null,temperatureCoverage:coverage?.complete??false,rainCoverage:true,
   temperatureSourceCount:complete.length,rainSourceCount:complete.length,rainFallback:false});
- result.factors=result.factors.filter(factor=>!/rainfall|rain-model|rain forecast/i.test(factor));
- result.factors.push(`${complete.length} temperature sources cover all assessed hours`);
- result.reasons=result.reasons.filter(reason=>!/rainfall|rain-model|rain forecast/i.test(reason));
- result.summary=result.reasons.length?result.reasons.join(' '):'Temperature forecasts agree closely for these hours.';
+ const limited=result.sameDayCoverageFloorApplied||coverage?.complete===false;
+ const fallbackSpread=finite(current.temperatureSpreadExcludingGefs)?current.temperatureSpreadExcludingGefs:current.temperatureSpread;
+ const gefsExcluded=finite(current.temperatureSpreadExcludingGefs)&&finite(current.temperatureSpread)&&current.temperatureSpreadExcludingGefs+0.05<current.temperatureSpread;
+ const scored=!limited&&ensemble?scoreEnsembleTemperature({dayIndex:index,uncertainty:ensemble.uncertainty,models:ensemble.modelIds||[]})
+  :!limited&&finite(fallbackSpread)?scoreDeterministicTemperature({dayIndex:index,spread:fallbackSpread,gefsExcluded}):null;
+ if(scored){
+  result.score=scored.score;result.evidenceScore=scored.score;result.uncappedScore=scored.uncappedScore;result.label=scored.label;result.key=scored.key;
+  result.summary=scored.summary;result.reasons=scored.reasons;result.version=scored.version;result.factors=[...scored.factors,`${complete.length} temperature sources cover all assessed hours`];
+ }else{
+  result.factors=result.factors.filter(factor=>!/rainfall|rain-model|rain forecast/i.test(factor));
+  result.factors.push(`${complete.length} temperature sources cover all assessed hours`);
+  result.reasons=result.reasons.filter(reason=>!/rainfall|rain-model|rain forecast/i.test(reason));
+  result.summary=result.reasons.length?result.reasons.join(' '):'Temperature forecasts agree closely for these hours.';
+ }
+ const temperatureComparison=current.temperatureComparison&&scored?.basis==='ensemble-daily-spread'?{...current.temperatureComparison,confidenceBasis:'ensemble-daily-spread',ensembleUncertainty:ensemble.uncertainty}:current.temperatureComparison;
  return {...result,scope:'temperature',temperatureSpread:current.temperatureSpread,rawTemperatureSpread:current.rawTemperatureSpread,
-  temperatureComparison:current.temperatureComparison,window:current.window,coverage:{temperature:coverage},contributions:{high:current.contributions?.high||[],low:current.contributions?.low||[]},
-  note:'Relative temperature-confidence index using temperature agreement, lead time and temperature-source coverage. It is separate from sky/rain agreement and is not a calibrated accuracy percentage.'};
+  temperatureComparison,window:current.window,coverage:{temperature:coverage},contributions:{high:current.contributions?.high||[],low:current.contributions?.low||[]},
+  ensemble:ensemble?{status:'ready',uncertainty:ensemble.uncertainty,modelIds:ensemble.modelIds||[],version:scored?.version}:scored?{status:'fallback'}:null,
+  note:scored?.basis==='ensemble-daily-spread'?'Relative temperature-confidence index from ECMWF ENS and GEFS daily high and low member spread. The GEFS ensemble mean is not scored as a separate forecast. Lead time is applied to the combined rating. This is not a calibrated accuracy percentage.':'Relative temperature-confidence index using temperature agreement and temperature-source coverage. The GEFS ensemble mean is set aside when it is the value widening the hourly gap. It is separate from sky/rain agreement and is not a calibrated accuracy percentage.'};
 }
 
 /** Append separate component indicators without changing legacy confidence. */
@@ -180,7 +202,7 @@ export function addConditionConfidence(out,{now=Date.now()}={}){
   day.confidence.weather={version:CONDITION_CONFIDENCE_VERSION,scope:'sky-and-rain',label,key,score,evidenceScore,sameDayCoverageFloorApplied,summary,factors,sourceIds:ids,sourceCount:ids.length,leadDays:index,
    note:'Agreement among named forecast sources about sky cover and precipitation timing, not a calibrated accuracy percentage or a claim that the sources are statistically independent. Temperature, wind and winter precipitation type are assessed separately. Hourly QPF under 0.001 inch is dry (expected-value noise); amounts from 0.001 through 0.010 inch are trace precipitation, and larger amounts are wet. Trace-versus-dry differences count less than measurable-rain-versus-dry differences. Missing values are never dry weather.',
    evidence:{window,sky,rain:rainEvidence,currentPartialExcluded:{sky:!!skyCurrentPartialExcluded,rain:!!rainCurrentPartialExcluded}}};
-  day.confidence.temperature=temperatureComponent(day,index);
+  day.confidence.temperature=temperatureComponent(day,index,ensembleDay(out,day.date));
   day.confidence.overall=overallForecastConfidence(day.confidence.temperature,day.confidence.weather);
  }
  return out;

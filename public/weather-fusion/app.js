@@ -1,4 +1,4 @@
-import {confidenceDetailsHTML} from './forecast-confidence.js?v=same-day-confidence-v7';
+import {confidenceDetailsHTML} from './forecast-confidence.js?v=ensemble-confidence-v1';
 import {rainTiming,rainTimingHTML} from './rain-timing.js?v=current-rain-20261017-v3';
 import {DAN_TAKE_VERSION,visibleDanTakeItems,danTakeText,rebindDanTake} from './dans-take.js?v=audit-20261017-v1';
 import {danCard,danTakeDisplay} from './dans-summary.js?v=weather-summary-no-referrals-v2';
