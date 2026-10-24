@@ -1,5 +1,5 @@
 {
-  "checkedAt": "2026-10-24T18:45:28Z",
+  "checkedAt": "2026-10-24T21:16:10Z",
   "results": [
     {
       "model": "ecmwf",
@@ -15,10 +15,10 @@
     },
     {
       "model": "hrrr",
-      "runAt": "2026-10-24T17:00:00Z",
+      "runAt": "2026-10-24T19:00:00Z",
       "messages": 152,
       "complete": true,
-      "checkedAt": "2026-10-24T18:45:25Z"
+      "checkedAt": "2026-10-24T21:16:10Z"
     }
   ]
 }
