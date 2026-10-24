@@ -1,0 +1,62 @@
+(() => {
+
+  const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+  let active=null,timer=null,lastId=null;const dollars=OriginalModel.money;
+
+  const display=(n,s)=>n==null?'':n.toLocaleString('en-US',{maximumFractionDigits:s.unit.startsWith('$')||s.unit==='gallons'||s.unit==='sites'?0:2});
+
+  function input(key,m){const s=OriginalModel.byKey[key],item=m.items[key],raw=active.originalInputs?.[key]??(key==='price'?active.modelInputs?.price:null);return `<label class="assumption-row ${item.status==='estimated'?'estimated':''}" data-original-wrap="${key}"><span class="assumption-label">${esc(s.label)} <small>${esc(s.unit)}</small></span><span class="assumption-status">${item.status==='estimated'?'ESTIMATE':item.status==='manual'?'YOUR ENTRY':item.status==='confirmed'?'CONFIRMED':'FROM DOCUMENT'}</span><input data-original-input="${key}" aria-label="${esc(s.label)}" inputmode="decimal" autocomplete="off" type="text" value="${esc(raw??display(item.value,s))}"><small class="input-hint">${s.unit.startsWith('$')?dollars(item.value):display(item.value,s)+' '+s.unit}</small><details class="input-source"><summary>Source / basis</summary><p>${esc(item.basis)}</p><small>Original model: ${s.sheet}!${s.cell}</small></details></label>`;}
+
+  function shell(){
+
+    const main=document.createElement('section');main.id='modelPreview';main.className='deal-result';main.hidden=true;main.innerHTML='<div class="result-title"><div><span class="eyebrow">YOUR DEAL MODEL</span><h2 id="modelDealTitle"></h2><p id="modelCoverage"></p></div><button class="button primary" data-original-export>Download your model ↓</button></div><div id="intakeModelResults" aria-live="polite"></div><div id="mainAskingPrice"></div><div class="estimate-heading"><h3>Estimates to review</h3><span id="estimateCount"></span></div><p class="estimate-intro">Your documents fill the model. Edit the red estimates below. Changes save automatically.</p><div id="mainEstimates" class="assumption-grid"></div><details class="secondary-estimates"><summary>Other model assumptions</summary><div id="otherEstimates" class="assumption-grid"></div></details><p class="original-caption">Download returns ModelExample (1).xlsx with all 22 original tabs, formatting and non-input formulas preserved. Only yellow/orange input cells are updated; calculated results refresh.</p>';
+
+    document.querySelector('#dealNumbersCard').before(main);
+
+    for(const id of ['dealNumbersCard','materialsRegister','dealHistory']){const node=document.getElementById(id);const card=id==='dealNumbersCard'?node:node.closest('article,section,.card');if(!card)continue;const detail=document.createElement('details');detail.className=card.className+' intake-evidence';const summary=document.createElement('summary');summary.textContent=id==='dealNumbersCard'?'Figures read from your documents':id==='materialsRegister'?'Files in this deal':'Reading history and limits';detail.append(summary);while(card.firstChild)detail.append(card.firstChild);if(id==='dealNumbersCard'){card.id='';detail.id=id;}card.replaceWith(detail);}
+
+    document.getElementById('tableReviewCard').hidden=true;
+
+    document.querySelector('#numbers').innerHTML='<div class="page-title"><div><div class="eyebrow">ORIGINAL WORKBOOK</div><h1>Your original model.</h1><p>All 22 tabs are preserved. The website and download use the workbook’s own formulas.</p></div><button class="button primary" data-original-export>Download your model ↓</button></div><div id="fullModelResults"></div><details class="card" open><summary>Original yellow/orange inputs</summary><div id="allOriginalInputs" class="assumption-grid"></div></details><div class="card"><h2>Original model cash flows</h2><div class="site-scroll" id="originalCashflows"></div></div><details class="card"><summary>Source evidence</summary><div id="evidenceList"></div></details>';
+
+    document.querySelector('#intakeAssumptions').hidden=true;
+
+    document.querySelector('.intake-card .section-head h2').textContent='Use your AI chat';
+
+  }
+
+  function output(m){if(!m.result)return `<div class="model-incomplete"><strong>${m.errors.length?'Finish the number you’re editing.':'Upload deal materials to fill your original model.'}</strong><p>${esc(m.errors.join(' · ')||'The model will appear here after the documents are read.')}</p></div>`;const r=m.result,rate=r.irr==null?'—':(r.irr*100).toFixed(1)+'%';return `<p class="case-note">Estimated case · ${m.estimated} inputs to review. Source digits and missing operating terms remain assumptions.</p><div class="result-metrics"><div class="primary-return"><span>MODEL IRR</span><strong>${rate}</strong><small>${r.irr==null?'Original model has no calculable IRR':r.irr<.13?'Below your 13% minimum':'Above your 13% minimum'}</small></div><div><span>Seller earnings base</span><strong>${dollars(m.inputs.base)}</strong><small>From documents / estimated composition</small></div><div><span>Buyer year 1 EBITDA</span><strong>${dollars(r.years[0].ebitda)}</strong><small>Original COOP model</small></div><div><span>Total cash at closing</span><strong>${dollars(r.initial)}</strong><small>Price, working capital, UNAM and fees</small></div></div>`;}
+
+  function render(d,rebuild=true){active=d;const m=OriginalModel.calculate(d),newDeal=lastId!==d.id;if(newDeal)rebuild=true;lastId=d.id;
+
+    document.getElementById('modelPreview').hidden=!m.hasSource&&!Object.keys(d.originalInputs||{}).length;document.getElementById('modelDealTitle').textContent=d.fields.name||'New deal';
+
+    const coverage=d.aiReview?.coverage||[];const facts=DealIntake.facts(d).length;document.getElementById('modelCoverage').textContent=(m.hasSource?m.inputs.sites+' sites · '+facts+' source figures · ':'')+'Original 15-year model';
+
+    document.getElementById('intakeModelResults').innerHTML=output(m);document.getElementById('fullModelResults').innerHTML=output(m);document.getElementById('estimateCount').textContent=m.estimated+' estimated inputs';
+
+    document.querySelectorAll('[data-original-export]').forEach(b=>{b.disabled=!m.result;b.title=m.result?'Download the original filled workbook':'Read documents before downloading a populated model';});
+
+    if(rebuild){document.getElementById('mainAskingPrice').innerHTML=input('price',m);const critical=['sites','gallons','fuelMargin','inside','insideMargin','otherIncome','opex','rent'];document.getElementById('mainEstimates').innerHTML=critical.filter(k=>m.items[k].status==='estimated'||d.originalInputs?.[k]!=null).map(k=>input(k,m)).join('')||'<p class="no-estimates">Operating figures were read from the documents.</p>';document.getElementById('otherEstimates').innerHTML=OriginalModel.definitions.filter(s=>!critical.includes(s.key)&&s.key!=='price').map(s=>input(s.key,m)).join('');document.getElementById('allOriginalInputs').innerHTML=OriginalModel.definitions.map(s=>input(s.key,m)).join('');}
+
+    else for(const row of document.querySelectorAll('[data-original-wrap]')){const key=row.dataset.originalWrap,item=m.items[key],s=OriginalModel.byKey[key],el=row.querySelector('input');if(el!==document.activeElement)el.value=d.originalInputs?.[key]??display(item.value,s);row.classList.toggle('estimated',item.status==='estimated');row.querySelector('.assumption-status').textContent=item.status==='estimated'?'ESTIMATE':item.status==='manual'?'YOUR ENTRY':item.status==='confirmed'?'CONFIRMED':'FROM DOCUMENT';row.querySelector('.input-hint').textContent=s.unit.startsWith('$')?dollars(item.value):display(item.value,s)+' '+s.unit;}
+
+    const r=m.result;document.getElementById('originalCashflows').innerHTML=r?'<table class="model-flow"><thead><tr><th>Year</th><th>EBITDA</th><th>Funds flow</th></tr></thead><tbody><tr><td>Closing</td><td>—</td><td>'+dollars(-r.initial)+'</td></tr>'+r.years.map(y=>'<tr><td>'+y.year+'</td><td>'+dollars(y.ebitda)+'</td><td>'+dollars(y.cash)+'</td></tr>').join('')+'</tbody></table>':'';
+
+    return m;
+
+  }
+
+  function commit(){clearTimeout(timer);if(!active)return;render(active,false);document.dispatchEvent(new CustomEvent('deal-model-change'));}
+
+  document.addEventListener('input',e=>{const key=e.target.dataset.originalInput;if(!key||!active)return;(active.originalInputs||={})[key]=e.target.value;delete (active.originalConfirmed||={})[key];const spec=OriginalModel.byKey[key],n=DealModel.parse(e.target.value);e.target.closest('.assumption-row').querySelector('.input-hint').textContent=n==null?'Enter a number':spec.unit.startsWith('$')?dollars(n):n.toLocaleString('en-US')+' '+spec.unit;clearTimeout(timer);timer=setTimeout(commit,450);});
+
+  document.addEventListener('focusout',e=>{if(e.target.dataset.originalInput)commit();});
+
+  document.addEventListener('click',async e=>{const button=e.target.closest('[data-original-export]');if(!button)return;commit();const label=button.textContent;button.disabled=true;button.textContent='Preparing your model…';try{const blob=await OriginalModelExport.make(active);const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=(active.fields.name||'deal').replace(/[^a-z0-9-]+/gi,'-')+'-original-model.xlsx';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),10000);button.textContent='Original model downloaded ✓';}catch(error){button.textContent=error.message;console.error(error);}finally{button.disabled=false;setTimeout(()=>button.textContent=label,5000);}});
+
+  globalThis.DealModelUI={shell,render,commit};
+
+})();
+

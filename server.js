@@ -24,6 +24,7 @@ import { registerAiAgentRoutes } from "./src/aiAgent.js";
 import { registerAiCouncilRoutes } from "./src/aiCouncil.js";
 import { registerDealDeskRoutes } from "./src/dealDeskRoutes.js";
 import { registerHouseholdPLRoutes } from "./src/householdPLRoutes.js";
+import { registerDealLensRoutes } from "./src/dealLensRoutes.js";
 import { registerDealIntelligenceRoutes } from "./src/dealIntelligenceRoutes.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -96,6 +97,7 @@ registerAiCouncilRoutes(app);
 registerDealDeskRoutes(app);
 registerHouseholdPLRoutes(app);
 registerDealIntelligenceRoutes(app);
+registerDealLensRoutes(app);
 
 app.get("/fuel-atlas", (_req, res) => res.redirect(302, "/fuel-atlas.html"));
 app.get("/fuel-atlas.html", (_req, res) => {
@@ -224,6 +226,9 @@ app.get("/health", (_req, res) => {
     aiAgent: true,
     dealDesk: true,
     dealIntelligence: true,
+    dealLens: true,
+    dealLensModelConfigured: Boolean(process.env.DEAL_LENS_MODEL_KEY),
+    dealLensVersion: "copy-paste-local-v1",
     dealIntelligenceAiConfigured: Boolean(process.env.OPENAI_API_KEY),
     dealDeskAiConfigured: Boolean(process.env.ANTHROPIC_API_KEY),
     dealDeskPasscodeRequired: Boolean(process.env.DEAL_DESK_PASSWORD || process.env.AI_COUNCIL_ACCESS_CODE),

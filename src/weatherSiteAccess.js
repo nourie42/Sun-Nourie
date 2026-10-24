@@ -25,7 +25,7 @@ export function isPublicWeatherPath(url, method = 'GET') {
   try { pathname = canonicalPath(url); } catch { return false; }
   return PUBLIC_PAGES.has(pathname) || PUBLIC_ASSET.test(pathname) || PUBLIC_APIS.has(pathname);
 }
-const PREFIXES = ['/weather', '/weather-fusion', '/weathernext', '/api/weather-fusion', '/whats-up', '/whatsup', '/api/whats-up', '/deal-intelligence', '/api/deal-intelligence'];
+const PREFIXES = ['/weather', '/weather-fusion', '/weathernext', '/api/weather-fusion', '/whats-up', '/whatsup', '/api/whats-up', '/deal-intelligence', '/api/deal-intelligence', '/deal-lens'];
 
 // The gateway passes this private key to its child processes. It is never sent
 // to clients; a restart invalidates sessions unless an environment key is set.

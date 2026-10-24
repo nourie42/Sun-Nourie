@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0b1422">
+  <meta name="description" content="A private, browser-based workspace to screen, analyze, and brief Sunoco fuel and convenience deals.">
+  <title>Deal Lens | Strategic M&A workspace</title>
+  <link rel="stylesheet" href="./style.css">
+  <script src="./vendor/jszip.min.js" defer></script>
+  <script src="./vendor/pdf-lib.min.js" defer></script>
+  <script src="./roster.js?v=18" defer></script>
+  <script src="./ingest.js?v=18" defer></script>
+  
+  <script src="./intake-state.js?v=13" defer></script>
+  <script src="./model.js?v=14" defer></script>
+  <script src="./original-model-data.js?v=16" defer></script>
+  <script src="./original-engine.js?v=16" defer></script>
+  <script src="./original-model.js?v=18" defer></script>
+  <script src="./original-export.js?v=16" defer></script>
+  <script src="./intake-model-ui.js?v=17" defer></script>
+  <script src="./plain-intake.js?v=18" defer></script>
+  <script src="./evidence-state.js?v=18" defer></script>
+  <script src="./paste-intake.js?v=18" defer></script>
+  <script src="./app.js?v=18" defer></script>
+</head>
+<body>
+  <a class="weather-return" href="/weather-fusion/experimental-weather.html">← Experimental weather</a>
+  <div class="shell">
+    <aside class="rail">
+      <div class="brand"><span class="mark">D<span></span></span><div><strong>DEAL LENS</strong><small>STRATEGY → DECISION</small></div></div>
+      <div class="rail-label">WORKSPACE</div>
+      <nav class="nav" aria-label="Workspace sections">
+        <button class="nav-btn" data-tab="tracker"><span>◈</span> Deal tracker</button>
+        <button class="nav-btn active" data-tab="intake"><span>01</span> Deal intake</button>
+        <button class="nav-btn" data-tab="fit"><span>02</span> Strategic fit</button>
+        <button class="nav-btn" data-tab="plan"><span>03</span> Deal plan</button>
+        <button class="nav-btn" data-tab="numbers"><span>04</span> Model &amp; returns</button>
+        <button class="nav-btn" data-tab="brief"><span>05</span> Brief for Chip</button>
+      </nav>
+      <div class="rail-bottom">
+        <div class="privacy"><span class="dot"></span> Private deal workspace</div>
+        <p>Your entries stay in this browser. Export a backup to move them to another device.</p>
+      </div>
+    </aside>
+    <main class="main">
+      <header class="topbar">
+        <div class="breadcrumbs">M&A WORKSPACE <span>/</span> <strong id="crumb">DEAL INTAKE</strong></div>
+        <div class="top-actions">
+          <label class="sr-only" for="dealPicker">Choose deal</label>
+          <select id="dealPicker" aria-label="Choose deal"></select>
+          <button class="button primary" id="newDeal" type="button">+ New deal</button>
+          <div class="more-wrap"><button class="button icon" id="moreButton" aria-label="More actions" aria-expanded="false">⋯</button><div id="moreMenu" class="more-menu" hidden><button id="exportDeal">Export Deal Lens backup (.json)</button><button id="importDeal">Import Deal Lens backup (.json)</button><button id="deleteDeal">Delete current deal</button></div></div>
+          <input type="file" id="importFile" accept="application/json,.json" hidden>
+        </div>
+      </header>
+      <div class="content">
+        <section id="tracker" class="panel" aria-label="Deal tracker">
+          <div class="eyebrow">YOUR PIPELINE</div>
+          <div class="page-title"><div><h1>Know where every deal stands.</h1><p>See the decision, evidence gaps, and next action. Open any deal to keep working.</p></div><span class="badge">Saved on this device</span></div>
+          <div id="pipelineMetrics" class="metric-row"></div>
+          <div class="card"><div class="fields two"><label>Find a deal<input id="pipelineSearch" type="search" placeholder="Deal name or market"></label><label>Stage<select id="pipelineStage"><option value="">All stages</option><option>Screening</option><option>Initial diligence</option><option>Indication of interest</option><option>Confirmatory diligence</option><option>Approval / negotiation</option><option>Closed</option><option>Passed</option></select></label></div></div>
+          <div id="pipelineDeals" class="pipeline-deals"></div>
+        </section>
+        <section id="intake" class="panel active" aria-label="Deal intake">
+          <div class="eyebrow">01 / DROP THE DEAL IN</div>
+          <div class="page-title"><div><h1>Copy prompt. Paste results. Get your model.</h1><p>Use your AI chat to read the files. Paste its results here to fill your original workbook and review the red estimates.</p></div><span class="badge" id="aiConnection">Copy & paste · no API charges</span></div>
+          <div class="card intake-identity"><div class="section-head"><div><h2>Current deal</h2><p id="currentDealLabel">New deal</p></div><button class="button primary" id="newIntakeDeal" type="button">+ New deal</button></div><div class="fields two"><label>Deal name<input id="intakeDealName" data-field="name" placeholder="Name this deal"></label><label>Market / location<input data-field="market" placeholder="City or region"></label></div></div>
+          <div class="card" id="dealNumbersCard"><div class="section-head"><div><h2>Deal numbers</h2><p>Figures from your documents, including individual site P&amp;Ls. Amounts below are dollars.</p></div><span class="badge" id="intakeNumberCount">0 numbers</span></div><div id="intakeNumberSource"></div><div id="intakeNumberGrid" class="intake-number-grid"></div><details id="intakeAssumptions"><summary>Enter or edit deal assumptions</summary><div class="fields three"><label>Seller price, $ millions<input data-field="ask" type="number" step="any" placeholder="Not provided"></label><label>Number of sites<input data-field="sites" type="number" step="1" placeholder="Not provided"></label><label>Annual gallons, millions<input data-field="gallons" type="number" step="any" placeholder="Not provided"></label><label>TTM EBITDA, $ millions<input data-field="ttmEbitda" type="number" step="any" placeholder="Not provided"></label><label>Prior-year EBITDA, $ millions<input data-field="priorEbitda" type="number" step="any" placeholder="Not provided"></label><label>Normalized EBITDA, $ millions<input data-field="normEbitda" type="number" step="any" placeholder="Not provided"></label></div></details></div>
+          <div class="intake-grid">
+            <div class="card intake-card"><div class="section-head"><div><h2>Use your AI chat</h2><p id="uploadDestination">Prepare a prompt for this deal.</p></div></div>
+              <fieldset class="upload-intent"><legend>These results belong to</legend><label><input type="radio" name="uploadIntent" value="new" checked> A new deal</label><label><input type="radio" name="uploadIntent" value="current"> Add to this deal</label></fieldset>
+              <label class="upload-zone" for="dealFiles"><span class="upload-icon">1</span><strong>Choose files for the prompt (optional)</strong><small>Files stay on your device. Attach the same PDF, Excel, Word, CSV or photos in your AI chat. Excel asset rosters are read automatically on this device. Selecting files makes no API requests.</small></label>
+              <input id="dealFiles" type="file" multiple hidden>
+              <div id="fileQueue" class="file-queue">No files selected · you can still copy the prompt</div>
+              <details class="prompt-context"><summary>Add context or instructions (optional)</summary><label class="full-label">Deal context<textarea id="rawDealText" rows="3" placeholder="Deal name, asking price, or what you want the AI to focus on"></textarea></label></details>
+              <div class="prompt-copy-row"><button class="button primary" id="copyAiPrompt" type="button">2. Copy AI prompt</button><span id="promptCopyStatus" role="status">Paste it into your AI chat and attach your files.</span></div>
+              <details id="generatedPromptDetails"><summary>View the generated prompt</summary><label class="sr-only" for="generatedPrompt">Generated AI prompt</label><textarea id="generatedPrompt" rows="12" readonly></textarea></details>
+              <label class="full-label paste-response-label" for="pastedAiResponse">3. Paste the AI response<textarea id="pastedAiResponse" rows="7" placeholder="Paste the AI’s readable summary, numbers and full site table here. JSON also works."></textarea></label>
+              <div class="paste-apply-row"><button class="button primary" id="applyAiPaste" type="button">Fill deal & model →</button><span id="pasteStatus" role="status">Plain language and tables accepted. Source figures fill the model; estimates appear in red.</span></div>
+              <details class="offline-reader"><summary>Optional: read text or spreadsheets locally</summary><label class="full-label">Reading method<select id="readingMethod"><option value="local">Local reader · no API charge</option></select></label><p class="review-note" id="readingNotice">The local reader runs on this device. For AI extraction, use Copy AI prompt and paste the response above.</p><div class="intake-actions"><button class="button subtle" id="analyzeDeal">Read locally</button><span id="intakeStatus" role="status">No paid API calls</span></div></details>
+              <div id="fileResults" class="file-results" aria-live="polite"></div>
+            </div>
+            <div class="card prelim-card"><div class="section-head"><div><h2>Preliminary read</h2><p>What seems to fit, what changes the value, and what you need next.</p></div><span id="prelimVersion" class="saved">No analysis yet</span></div><div id="prelimOutput" class="prelim-empty">The first read will appear here when you process deal details.</div></div>
+          </div>
+          <div class="card next-action"><div class="section-head"><div><h2>The next move</h2><p>One specific action, owner and date for this deal.</p></div><span id="actionState" class="badge">No action set</span></div><div class="fields three"><label>Next action<input data-field="nextAction" placeholder="e.g., Reconcile TTM EBITDA to site P&Ls"></label><label>Owner<input data-field="actionOwner" placeholder="Who owns the answer?"></label><label>Due date<input data-field="actionDue" type="date"></label></div></div>
+          <div class="card"><div class="section-head"><div><h2>Materials register</h2><p>What each file contributed, including files that need attention. Original files stay on your device.</p></div></div><div id="materialsRegister" class="file-results"></div></div>
+          <div class="card" id="needsCard"><div class="section-head"><div><h2>What we have · what is still needed</h2><p>Seller materials can establish leads. Mark evidence verified only after checking the underlying record.</p></div><span id="needsCount" class="badge">Open</span></div><div id="needsList" class="needs-list"></div></div>
+          <div class="card" id="tableReviewCard" hidden><div class="section-head"><div><h2>Seller financial table</h2><p>Excel and CSV totals are matched to their row and TOTAL column. For a compressed photo, zoom the crops and review figures you can read. Add the original workbook later to fill the same deal automatically.</p></div><span class="badge">Seller figures · unverified</span></div><div id="tableReviewImages" class="table-review-images"></div><div class="fields three table-review-fields"><label>Period covered<input data-field="sellerTablePeriod" placeholder="e.g., FY2025 actual or budget"></label><label>Total revenue, $<input data-field="sellerRevenueUsd" type="number" inputmode="decimal" step="any" placeholder="—"></label><label>Total cost of sales, $<input data-field="sellerCostUsd" type="number" inputmode="decimal" step="any" placeholder="—"></label><label>Total gross profit, $<input data-field="sellerGrossProfitUsd" type="number" inputmode="decimal" step="any" placeholder="—"></label><label>Total expenses, $<input data-field="sellerExpensesUsd" type="number" inputmode="decimal" step="any" placeholder="—"></label><label>Seller table EBITDA, $<input data-field="sellerEbitdaUsd" type="number" inputmode="decimal" step="any" placeholder="—"></label></div><p class="review-note">These are seller table figures, not verified TTM or normalized EBITDA. Corrections stay in place as more files are added. Review crops are stored locally; original uploads are not retained.</p></div>
+          <div class="card" id="siteCluesCard"><div class="section-head"><div><h2>Site facts found</h2><p>Individual site asking prices and owner-operator NOI are seller claims. They are kept separate from portfolio EBITDA and price.</p></div><span id="siteClueCount" class="badge">0 sites</span></div><div id="siteClues" class="site-clues"></div></div>
+          <div class="card" id="extractedCard"><div class="section-head"><div><h2>Facts pulled from your materials</h2><p>Check the source for every number. Use a different candidate when a document contains conflicting periods or definitions.</p></div><span id="factCount" class="badge">0 facts</span></div><div id="extractedFacts" class="fact-list"><div class="prelim-empty">No facts extracted yet.</div></div></div>
+          <div class="card"><div class="section-head"><div><h2>Deal timeline</h2><p>Each pass adds to the record. Your manual corrections stay in place when you process more material.</p></div></div><div id="dealHistory" class="history-list">No updates yet.</div></div>
+        </section>
+        <section id="fit" class="panel" aria-label="Strategic fit">
+          <div class="eyebrow">02 / FIRST PASS</div>
+          <div class="page-title"><div><h1>Should we spend time on this?</h1><p>Get to the strategic answer before getting lost in the model.</p></div><span class="badge">10-minute screen</span></div>
+          <div class="deal-meta card">
+            <div class="section-head"><div><h2>Deal at a glance</h2><p>Start with the few facts that shape the whole decision.</p></div><div id="saveStatus" class="saved">Saved on this device</div></div>
+            <div class="fields three">
+              <label>Deal name<input data-field="name" placeholder="e.g., Project Oak"></label>
+              <label>Market / geography<input data-field="market" placeholder="State, metro, or territory"></label>
+              <label>Transaction scope<select data-field="scope"><option value="">Select scope</option><option>Retail + fuel</option><option>Fuel distribution</option><option>Commercial / bulk</option><option>Mixed platform</option><option>Real estate + supply</option></select></label>
+              <label>Number of sites<input data-field="sites" inputmode="decimal" type="number" min="0" step="1" placeholder="—"></label>
+              <label>Seller price, $MM<input data-field="ask" inputmode="decimal" type="number" step="any" placeholder="—"></label>
+              <label>Current stage<select data-field="stage"><option>Screening</option><option>Initial diligence</option><option>Indication of interest</option><option>Confirmatory diligence</option><option>Approval / negotiation</option></select></label>
+            </div>
+          </div>
+          <div class="score-banner" id="fitBanner"><div class="score-icon">?</div><div><span class="mini-label">PRELIMINARY READ</span><strong id="fitHeadline">Answer the strategic gates</strong><p id="fitSubline">Unknowns are the next questions, not automatic deal killers.</p></div><div class="score-meter"><span id="fitCount">0 / 7</span><small>gates answered</small></div></div>
+          <div class="section-head with-gap"><div><h2>The seven questions that matter</h2><p>Choose Yes, Open, or No. Add the evidence or the answer you need.</p></div></div>
+          <div id="gateList" class="gate-list"></div>
+          <div class="insight-strip"><span class="insight-icon">↗</span><div><strong>Strategic lens</strong><p>Sunoco publicly emphasizes fuel distribution bolt-ons, channel optimization, supply-chain improvement and expense management. The questions above turn that direction into deal-level proof. <a href="https://www.sunocolp.com/content/userfiles/files/March-2026-Investor-Presentation_vF.pdf" target="_blank" rel="noopener">Investor presentation ↗</a></p></div></div>
+        </section>
+        <section id="plan" class="panel" aria-label="Deal plan">
+          <div class="eyebrow">03 / EXECUTION MAP</div><div class="page-title"><div><h1>Move the deal forward.</h1><p>At each phase, produce one decision-ready output.</p></div><span class="badge" id="planProgress">0 / 0 complete</span></div>
+          <div class="flowbar"><span>SCREEN</span><i></i><span>PROVE</span><i></i><span>DESIGN</span><i></i><span>PRICE</span><i></i><span>DECIDE</span></div>
+          <div id="phaseList" class="phase-list"></div>
+          <div class="card"><div class="section-head"><div><h2>Site-by-site operating plan</h2><p>A portfolio average hides the stores that create or destroy the case. Choose the route for each site.</p></div><button class="button subtle" id="addSite">+ Add site</button></div><div class="site-scroll"><table class="site-table"><thead><tr><th>Site / group</th><th>TTM EBITDA, $MM</th><th>Gallons, MM</th><th>Route</th><th>Critical reason / right</th><th></th></tr></thead><tbody id="siteRows"></tbody></table></div><div class="site-total" id="siteTotal"></div></div>
+          <div class="card thought-card"><div class="section-head"><div><h2>Working thought pad</h2><p>Capture the point you want to make before it disappears into a workbook.</p></div></div><div class="fields two"><label>What changed your view?<textarea data-field="viewChange" rows="4" placeholder="One or two sentences"></textarea></label><label>Who owes which answer?<textarea data-field="owners" rows="4" placeholder="Name → question → due date"></textarea></label></div></div>
+        </section>
+        <section id="numbers" class="panel" aria-label="Model and returns"><p>Loading model…</p></section>
+        <section id="brief" class="panel" aria-label="Brief for Chip">
+          <div class="eyebrow">05 / DECISION NOTE</div><div class="page-title"><div><h1>Walk in with a point of view.</h1><p>A one-page discussion brief that leads with your recommendation and the proof.</p></div><div class="title-actions"><button id="copyBrief" class="button primary">Copy brief</button><button id="printBrief" class="button subtle">Print / PDF</button></div></div>
+          <div class="brief-layout"><div class="card brief-editor"><h2>Shape the message</h2><p>Write in plain language. These prompts are the questions Chip is likely to ask.</p>
+            <label>Recommended move<select data-field="recommendation"><option value="Clarify before pricing">Clarify before pricing</option><option value="Pursue">Pursue</option><option value="Pause">Pause</option><option value="Pass">Pass</option></select></label>
+            <label>One sentence thesis<textarea data-field="thesis" rows="3" placeholder="We should [action] because Sunoco can [specific value] if [conditions]."></textarea></label>
+            <label>Why Sunoco specifically?<textarea data-field="whyUs" rows="3" placeholder="Fuel channel, supply costs, site operating model, geography, or commercial relationship."></textarea></label>
+            <label>What is the biggest downside?<textarea data-field="downside" rows="3" placeholder="What breaks the value case even if the spreadsheet works?"></textarea></label>
+            <label>What decision do you need from Chip?<textarea data-field="chipAsk" rows="3" placeholder="Approve diligence, set a price guardrail, pick an operating route, or stop."></textarea></label>
+            <label>Three next answers / owners<textarea data-field="nextAnswers" rows="4" placeholder="1. Question — owner — date\n2. Question — owner — date\n3. Question — owner — date"></textarea></label>
+            <label>Source / model version<input data-field="sourceVersion" placeholder="CIM date, actuals through, model filename or version"></label>
+          </div><article class="paper" id="briefPaper"></article></div>
+          <div class="last-note"><strong>Use the brief as a conversation opener.</strong> If a core fact is unknown, the brief calls it out. A multiple or illustrative run-rate is not an approved offer.</div>
+        </section>
+      </div>
+      <footer class="footer"><span>DEAL LENS · STRATEGY → DECISION</span><span>Autosaved on this device · Copy & paste · no API extraction charges</span></footer>
+    </main>
+  </div>
+  <div id="toast" role="status" aria-live="polite"></div>
+</body>
+</html>
