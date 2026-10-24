@@ -11,6 +11,7 @@ const VARIABLES = {
   rain:     { label: 'Precipitation', unit: 'in',  fmt: (v) => `${v.toFixed(2)}"` },
   wind:     { label: 'Wind',          unit: 'mph', fmt: (v) => `${Math.round(v)}` },
   dewpoint: { label: 'Dewpoint',      unit: '°F',  fmt: (v) => `${Math.round(v)}°` },
+  cloud:    { label: 'Cloud cover',   unit: '%', fmt: (v) => `${Math.round(v)}%` },
   pop:      { label: 'Rain chance',   unit: '%',   fmt: (v) => `${Math.round(v)}%` },
   uv:       { label: 'UV Index',      unit: '',    fmt: (v) => `${Math.round(v)}` },
   snow:     { label: 'Snow',          unit: 'in',  fmt: (v) => `${v.toFixed(1)}"` },
@@ -223,6 +224,28 @@ export function buildSeries(fx, wn, varId, now = Date.now()) {
     }
     out.wnVals = wnDaily(fx.google?.contributes ? null : wn?.hourly, varId === 'temp' ? 'temperature_2m' : 'total_precipitation_1hr',
       varId === 'temp' ? 'max' : 'sum', days, tz, varId === 'temp' ? K2F : M2IN, windows);
+  } else if (varId === 'cloud') {
+    // Compare the same daylight window assessed by Sky/rain agreement.
+    // If no daylight remains, that evidence supplies the remaining night.
+    days.forEach((day,i)=>{
+      const sky=fx.days[i]?.confidence?.weather?.evidence?.sky?.window;
+      const start=Date.parse(sky?.start),end=Date.parse(sky?.end);
+      if(finite(start)&&finite(end)&&end>start)windows[i]={start,end};
+      const totals=new Map(),coverage=new Map(),cursor=new Map(),invalid=new Set();
+      const rows=(fx.metricForecasts?.series?.cloud||[]).filter(p=>Date.parse(p.time)<windows[i].end&&Date.parse(p.time)+3600000>windows[i].start).sort((a,b)=>Date.parse(a.time)-Date.parse(b.time));
+      for(const row of rows){
+        const time=Date.parse(row.time),left=Math.max(time,windows[i].start),right=Math.min(time+3600000,windows[i].end);
+        for(const source of [{id:'nourie',value:row.value},...(row.sources||[])]){
+          if(!finite(source.value)||source.value<0||source.value>100)continue;
+          const id=source.id,last=cursor.get(id)??windows[i].start;
+          if(left!==last){invalid.add(id);continue;}
+          const duration=right-left;
+          totals.set(id,(totals.get(id)||0)+source.value*duration);coverage.set(id,(coverage.get(id)||0)+duration);cursor.set(id,right);
+        }
+      }
+      const values=Object.fromEntries([...totals].filter(([id])=>!invalid.has(id)&&cursor.get(id)===windows[i].end).map(([id,total])=>[id,total/coverage.get(id)]));
+      out.forecastValues[i]=values.nourie??null;delete values.nourie;out.modelMaps[i]=values;
+    });
   } else if (varId === 'pop') {
     // Per-model rain chance at each day's peak hour (from the server's rain-likelihood blend).
     // NWS is a true probability; HRRR/NBM/ECMWF are each model's wet/dry rain signal. WeatherNext has no PoP field.
@@ -319,6 +342,7 @@ function renderChart(container, built, varDef, varId) {
   lo = varDef.unit === '%' || varDef.unit === '' || varDef.unit === 'in' ? Math.max(0, lo - pad) : lo - pad;
   hi += pad;
   if (varDef.unit === '%') hi = Math.min(100, hi);
+  if(varId==='cloud'){lo=0;hi=100;}
   const n = days.length;
   const X = (i) => PL + (i / Math.max(1, n - 1)) * (W - PL - PR);
   const Y = (v) => PT + (1 - (v - lo) / (hi - lo)) * (H - PT - PB);
@@ -347,7 +371,7 @@ function renderChart(container, built, varDef, varId) {
   const legend = built.perModel ? ids.map(chip).join('')
     : `<span style="font-size:11px;color:#d5deee">${varId === 'aqi' ? 'Daily max AQI (Open-Meteo / CAMS)' : varId === 'uv' ? 'Daily max UV index' : ''}</span>`;
   const snapshot=Date.parse(built.assembledAt),stamp=finite(snapshot)?new Intl.DateTimeFormat('en-US',{timeZone:built.timeZone,month:'short',day:'numeric',hour:'numeric',minute:'2-digit',timeZoneName:'short'}).format(new Date(snapshot)):null;
-  const note = built.perModel ? `<p style="font-size:11px;color:#c4d9ed;margin:6px 0 0">${built.nwsFallback?'Official NWS rain chances are used where model data is unavailable.':'Weather Nourie blend is the forecast shown on this page.'} Other lines show individual models. Tap a model to show/hide its line, or tap the graph for values.${varId === 'temp' ? ' Daily highs require every forecast hour in the displayed day. Incomplete model days are unavailable. The daily-high range includes all published model highs, including hidden lines, and excludes the blended forecast. Comparison-only models are labeled separately from contributing models. Confidence also checks same-hour disagreements, including overnight; that is a separate comparison from the daily-high range.'+(stamp?' Forecast updated '+stamp+'.':'') : varId === 'rain' ? ' Rain totals use the same local calendar dates as the daily tiles, ending at midnight.' : varId === 'wind' ? ' Wind shows the average over that forecast period.' : varId === 'dewpoint' ? ' Dew point shows the highest reading over that forecast period.' : varId === 'pop' ? ' Individual model rain signals are not calibrated probabilities.' : varId === 'snow' ? ' Snow totals are inches for the same local calendar date. HRRR and NAM stop at their published forecast range; missing coverage is Unavailable. Overlapping zero lines mean the models forecast no snow. WPC uses different accumulation periods, and WeatherNext does not publish snowfall depth, so neither is substituted into these daily model lines.' : ''}</p>` : '';
+  const note = built.perModel ? `<p style="font-size:11px;color:#c4d9ed;margin:6px 0 0">${built.nwsFallback?'Official NWS rain chances are used where model data is unavailable.':'Weather Nourie blend is the forecast shown on this page.'} Other lines show individual models. Tap a model to show/hide its line, or tap the graph for values.${varId === 'temp' ? ' Daily highs require every forecast hour in the displayed day. Incomplete model days are unavailable. The daily-high range includes all published model highs, including hidden lines, and excludes the blended forecast. Comparison-only models are labeled separately from contributing models. Confidence also checks same-hour disagreements, including overnight; that is a separate comparison from the daily-high range.'+(stamp?' Forecast updated '+stamp+'.':'') : varId === 'rain' ? ' Rain totals use the same local calendar dates as the daily tiles, ending at midnight.' : varId === 'wind' ? ' Wind shows the average over that forecast period.' : varId === 'cloud' ? ' Cloud cover is the average percentage across the same remaining daylight hours used for Sky/rain agreement, or remaining nighttime when daylight has ended. 0% means clear; 100% means overcast. Tap the graph to compare models. Incomplete model coverage stays unavailable.' : varId === 'dewpoint' ? ' Dew point shows the highest reading over that forecast period.' : varId === 'pop' ? ' Individual model rain signals are not calibrated probabilities.' : varId === 'snow' ? ' Snow totals are inches for the same local calendar date. HRRR and NAM stop at their published forecast range; missing coverage is Unavailable. Overlapping zero lines mean the models forecast no snow. WPC uses different accumulation periods, and WeatherNext does not publish snowfall depth, so neither is substituted into these daily model lines.' : ''}</p>` : '';
   container.innerHTML = `<div style="display:flex;flex-wrap:wrap;gap:4px;padding:2px 0 8px">${legend}</div>`
     + `<div class="wn-chart-wrap" style="position:relative;touch-action:pan-y">`
     + `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" style="width:100%;height:auto;display:block;cursor:crosshair" role="img" aria-label="${varId==='temp'?'Daily high temperature':varDef.label} comparison chart">${ylabels}${labels}${lines}${dots}`
