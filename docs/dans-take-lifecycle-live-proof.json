@@ -1,0 +1,152 @@
+{
+  "commit": "4ae2fd538c63e23827181d01beb85ce1d200d593",
+  "checkedAt": "2026-10-24T09:43:45.816Z",
+  "fixture": false,
+  "success": true,
+  "checks": [
+    {
+      "label": "initial-page",
+      "checkedAt": "2026-10-24T09:44:06.932Z",
+      "assembledAt": "2026-10-24T09:43:42.786Z",
+      "sourceCheckedAt": "2026-10-24T09:43:41.602Z",
+      "sourceRetrieval": "verified-latest",
+      "signature": "fa2d3b5eaffe426a7ca54fa5",
+      "discussionId": "3f475012-de46-4ac6-a5d4-cadb33830a04",
+      "issuedAt": "2026-10-24T07:02:00+00:00",
+      "cachedItems": [],
+      "visible": true,
+      "text": "A dry pattern will hold. High pressure will keep most days clear and comfortable. Any clouds or light showers are isolated and not widespread."
+    },
+    {
+      "label": "refresh-1",
+      "checkedAt": "2026-10-24T09:45:13.228Z",
+      "assembledAt": "2026-10-24T09:44:28.313Z",
+      "sourceCheckedAt": "2026-10-24T09:44:26.621Z",
+      "sourceRetrieval": "verified-latest",
+      "signature": "9448b3304dd0814978f91f30",
+      "discussionId": "3f475012-de46-4ac6-a5d4-cadb33830a04",
+      "issuedAt": "2026-10-24T07:02:00+00:00",
+      "cachedItems": [],
+      "visible": true,
+      "text": "The NWS discussion says dry, seasonable weather will stay in place through next week. High pressure will keep rain away and temperatures close to normal. A gradual warming is possible late next week."
+    },
+    {
+      "label": "refresh-2",
+      "checkedAt": "2026-10-24T09:46:20.716Z",
+      "assembledAt": "2026-10-24T09:46:18.680Z",
+      "sourceCheckedAt": "2026-10-24T09:44:26.621Z",
+      "sourceRetrieval": "verified-latest",
+      "signature": "d78d88a2f43a4840d0c4dc86",
+      "discussionId": "3f475012-de46-4ac6-a5d4-cadb33830a04",
+      "issuedAt": "2026-10-24T07:02:00+00:00",
+      "cachedItems": [],
+      "visible": true,
+      "text": "A continuation of dry and seasonable conditions is expected through next week."
+    },
+    {
+      "label": "full-page-reload",
+      "checkedAt": "2026-10-24T09:46:31.472Z",
+      "assembledAt": "2026-10-24T09:46:18.680Z",
+      "sourceCheckedAt": "2026-10-24T09:44:26.621Z",
+      "sourceRetrieval": "verified-latest",
+      "signature": "d78d88a2f43a4840d0c4dc86",
+      "discussionId": "3f475012-de46-4ac6-a5d4-cadb33830a04",
+      "issuedAt": "2026-10-24T07:02:00+00:00",
+      "cachedItems": [],
+      "visible": true,
+      "text": "Forecasters expect dry, seasonable weather to stick around. A few Canadian surface highs will keep rain away. Temperatures will slowly trend a bit warmer late next week. There may be brief lower clouds and reduced ceilings at INT and GSO early this morning."
+    }
+  ],
+  "deployed": {
+    "sourceVersion": "nws-afd-monotonic-v1",
+    "danTakeVersion": "weather-nourie-dans-take-kid-clear-v10",
+    "assets": {
+      "index.html": "714ae0c975d09a5de52ec94f35d84cc3a0b50d271d7e50c29747cc198e8fd702",
+      "app.js": "af06d05add693607f50455af2cfe708eb4fbb78ed09ac02f651faffaf318ebe6",
+      "dans-summary.js": "6d7bb7609157e48241078beb5875638372bfec3f126cb660042548b50fb64956",
+      "current-inputs.js": "c81a04b681090b11bc7695e9b522c811ea9db05c87c677b20ab5642668c4abe4",
+      "pavement.js": "39e3461c0f9a7e57cd6209fb79951e49f36fde8760d8be7bd044c76849ad7725",
+      "daily-uv.js": "4327bb7ab8a9bac7d21abbcafe674a13849d40a54c0c73966ee2e9a78a98e2e8",
+      "dans-take.js": "84eaf789e1dd76b211ee84fb2e69f7db8211fc112ccacc1c2db90b3be5d7f79c"
+    }
+  },
+  "independentOfficialLatest": {
+    "id": "3f475012-de46-4ac6-a5d4-cadb33830a04",
+    "issuedAt": "2026-10-24T07:02:00+00:00"
+  },
+  "initial": {
+    "discussion": {
+      "id": "3f475012-de46-4ac6-a5d4-cadb33830a04",
+      "office": "RAH",
+      "issuanceTime": "2026-10-24T07:02:00+00:00",
+      "text": "\n000\nFXUS62 KRAH 240702\nAFDRAH\n\nArea Forecast Discussion \nNational Weather Service Raleigh NC \n302 AM EDT Sat Oct 24 2026\n\n.WHAT HAS CHANGED...\n\n* Temporary MVFR ceilings possible at INT and GSO through 10-11Z Sat\n\n&&\n\n.KEY MESSAGES...\nAs of 300 AM Saturday... \n\n1) A continuation of dry and seasonable conditions is expected \nthrough next week.\n\n&&\n\n.DISCUSSION...\nAs of 300 AM Saturday... \n\nKEY MESSAGE 1... A continuation of dry and seasonable conditions is \nexpected through next week. \n\nAn initially high amplitude mid and upr-level ridge over the MS \nValley will dampen while progressing slowly ewd and across the \nSoutheast through next week, where it may remain through next \nweekend. To the east of the slowly progressive and dampening ridge, \na moisture-starved shortwave trough will dig across the Middle \nAtlantic and offshore through this weekend. \n\nAt the surface, a series of reinforcing, Canadian surface highs will \nprogress across the Great Lakes and Middle Atlantic and extend \nacross cntl NC through next week (and probably through next \nweekend), while modifying/moderating. A prolonged period of dry and \nseasonable conditions will result, with a gradual moderation of \ntemperatures likely late next week through Halloween weekend. \n\n&&\n\n.AVIATION /00Z SATURDAY THROUGH WEDNESDAY/...\nAs of 200 AM Saturday...\n\n...Fleeting MVFR ceilings possible at INT and GSO this morning...\n\nReinforcing Canadian surface high pressure will build swd across the \nMiddle Atlantic and Carolinas through the weekend, with related nely \nsurface winds that will become occasionally gusty into the teens to \n20 kts mainly at FAY and RWI with daytime heating each day. The nely \nflow regime will be a maritime-influenced one that will favor the \ndevelopment of areas of stratocumulus, with relatively greatest \ncoverage with afternoon heating. While most stratocumulus will be \nbased above 3000 ft AGL and generally scattered in coverage, patchy \nMVFR ceilings will be possible each morning. The first of that risk \nof MVFR ceilings will be in the next several hours, as the \naforementioned nely flow regime \"upslopes\" into the mountains and \ncauses ceilings to expand across the adjacent Foothills and far nw \nPiedmont this morning, including at INT and GSO generally between 06-\n11Z.\n\nOutlook: Aside from the aforementioned small chance of sub-VFR \nceilings in nely flow this weekend, dry, VFR conditions are expected \nto persist for at least the next several days. \n\n&&\n\n.RAH WATCHES/WARNINGS/ADVISORIES...\nNone.\n\n&&\n\n$$\n\nDISCUSSION...MWS\nAVIATION...MWS\n",
+      "url": "https://api.weather.gov/products/3f475012-de46-4ac6-a5d4-cadb33830a04"
+    },
+    "feed": {
+      "id": "afd",
+      "label": "NWS RAH discussion",
+      "url": "https://api.weather.gov/products/types/AFD/locations/RAH/latest",
+      "status": "ready",
+      "sourceVersion": "nws-afd-monotonic-v1",
+      "retrievalStatus": "verified-latest",
+      "fetchedAt": "2026-10-24T09:43:41.602Z",
+      "checkedAt": "2026-10-24T09:43:41.602Z",
+      "issuedAt": "2026-10-24T07:02:00+00:00",
+      "productUrl": "https://api.weather.gov/products/3f475012-de46-4ac6-a5d4-cadb33830a04",
+      "message": ""
+    },
+    "aiMode": "ai",
+    "generatedAt": "2026-10-24T09:43:57.025Z",
+    "items": []
+  },
+  "observedRefreshVisibility": [
+    {
+      "hidden": false,
+      "text": "A dry pattern will hold. High pressure will keep most days clear and comfortable. Any clouds or light showers are isolated and not widespread."
+    },
+    {
+      "hidden": false,
+      "text": "A dry pattern will hold. High pressure will keep most days clear and comfortable. Any clouds or light showers are isolated and not widespread."
+    },
+    {
+      "hidden": false,
+      "text": "A dry pattern will hold. High pressure will keep most days clear and comfortable. Any clouds or light showers are isolated and not widespread."
+    },
+    {
+      "hidden": false,
+      "text": "A dry pattern will hold. High pressure will keep most days clear and comfortable. Any clouds or light showers are isolated and not widespread."
+    },
+    {
+      "hidden": false,
+      "text": "The NWS discussion says dry, seasonable weather will stay in place through next week. High pressure will keep rain away and temperatures close to normal. A gradual warming is possible late next week."
+    },
+    {
+      "hidden": false,
+      "text": "The NWS discussion says dry, seasonable weather will stay in place through next week. High pressure will keep rain away and temperatures close to normal. A gradual warming is possible late next week."
+    },
+    {
+      "hidden": false,
+      "text": "The NWS discussion says dry, seasonable weather will stay in place through next week. High pressure will keep rain away and temperatures close to normal. A gradual warming is possible late next week."
+    },
+    {
+      "hidden": false,
+      "text": "The NWS discussion says dry, seasonable weather will stay in place through next week. High pressure will keep rain away and temperatures close to normal. A gradual warming is possible late next week."
+    },
+    {
+      "hidden": false,
+      "text": "The NWS discussion says dry, seasonable weather will stay in place through next week. High pressure will keep rain away and temperatures close to normal. A gradual warming is possible late next week."
+    },
+    {
+      "hidden": false,
+      "text": "The NWS discussion says dry, seasonable weather will stay in place through next week. High pressure will keep rain away and temperatures close to normal. A gradual warming is possible late next week."
+    },
+    {
+      "hidden": false,
+      "text": "A continuation of dry and seasonable conditions is expected through next week."
+    }
+  ],
+  "distinctWeatherSignatures": 3,
+  "distinctForecastAssemblies": 3,
+  "distinctDiscussionChecks": 2,
+  "browserErrors": []
+}
