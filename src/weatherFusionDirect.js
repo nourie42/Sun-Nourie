@@ -155,7 +155,7 @@ export function weightedTemperature(values,index,context=null){
   const {policy,temperatureAdjustment}=adjustTemperaturePolicy(values,result.policy,index);
   const blend=weighted(values,policy);
   if(temperatureAdjustment)blend.sources=blend.sources.map(source=>source.id===temperatureAdjustment.sourceId?{...source,temperatureOutlier:true,baseWeight:temperatureAdjustment.baseWeight}:source.id==='ecmwf'?{...source,receivedTemperatureWeight:temperatureAdjustment.transferredWeight}:source);
-  return {...blend,version:result.version,band:result.band,leadHours:result.leadHours,requestedWeights:result.requestedWeights,excluded:result.excluded,temperatureAdjustment};
+  return {...blend,comparisonSources:Object.entries(values).filter(([,value])=>finite(value)).map(([id,value])=>({id,value,weight:policy[id]||0,comparisonOnly:!(policy[id]>0)})),version:result.version,band:result.band,leadHours:result.leadHours,requestedWeights:result.requestedWeights,excluded:result.excluded,temperatureAdjustment};
  }
  const {policy,temperatureAdjustment}=adjustTemperaturePolicy(values,tempPolicy(index,finite(values.wn)),index);
  const blend=weighted(values,policy);
@@ -365,7 +365,7 @@ export function refreshCalendarConfidence(out,{now=Date.now()}={}) {
     day.agreement=temperatureSpread===null?'Limited guidance':temperatureSpread<=3?'Close agreement':temperatureSpread<=6?'Some disagreement':'Wide disagreement';
     const sourceIds=sourceOrder.filter(id=>high.some(source=>source.id===id)||rain.some(source=>source.id===id));
     const rainRows=(out.rainTimeline||[]).filter(row=>Date.parse(row.time)<window.end&&Date.parse(row.end)>window.start);
-    const rainFallback=rainRows.some(row=>row.rainLikelihood?.mode==='nws-fallback');
+    const rainFallback=rainRows.some(row=>row.rainLikelihood?.mode==='nws-fallback'&&row.rainLikelihood.fallbackReason!=='calibrated-probability-not-supplied');
     const temperatureCoverage=availableHours===expectedHours;
     const effectiveRain=summarizeRainTimeline(out.rainTimeline||[],window.start,window.end);
     const rainCoverage=(currentPartialExcluded?effectiveRain.coverage.complete:day.rainLikelihood?.coverage?.complete===true)&&finite(day.qpf);
@@ -422,7 +422,8 @@ export function enhanceForecast(out, { models, grid, periods = [], hourlyPeriods
       cursor=stop;
     }
     const sources=Object.keys(totals).map(id=>({id,weight:round(durations[id]/covered,6),value:round(sourceTotals[id],8),coverageHours:round(sourceCoverage[id]/H,1)}));
-    return {value:covered?round(total,8):null,sources,calibrated:false,start:iso(start),end:iso(end),
+    const comparisonSources=out.blendV2?.enabled?Object.entries(sourceTotals).filter(([id])=>sourceCoverage[id]>=end-start).map(([id,value])=>({id,value:round(value,8),weight:precipitationAmountPolicy(forecastDayIndex(start,now,out.location.timeZone),finite(sourceTotals.wn))[id]||1,runAt:sourceRun(id,end)})):undefined;
+    return {value:covered?round(total,8):null,sources,...(comparisonSources?{comparisonSources}:{}),calibrated:false,start:iso(start),end:iso(end),
       sourceValues:Object.fromEntries(['nws',...active].map(id=>[id,sourceCoverage[id]>=end-start?round(sourceTotals[id],8):null])),
       source:sources.length?sources.map(s=>`${s.id.toUpperCase()} ${Math.round(s.weight*100)}%`).join(' / '):'Unavailable',
       weighting:'Per-hour blend; displayed weights are window-average contributions. HRRR contributes only during the selected location\'s current local calendar day.'};

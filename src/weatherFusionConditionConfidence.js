@@ -3,9 +3,9 @@ import {forecastConfidence} from '../public/weather-fusion/forecast-confidence.j
 import {solarElevation} from '../public/weather-fusion/weather-math.js';
 import {TRACE_QPF_THRESHOLD_INCHES} from './weatherFusionDirect.js';
 
-export const CONDITION_CONFIDENCE_VERSION='weather-nourie-sky-rain-agreement-v3';
+export const CONDITION_CONFIDENCE_VERSION='weather-nourie-sky-rain-agreement-v4';
 const H=3600000,finite=value=>typeof value==='number'&&Number.isFinite(value),round=value=>Math.round(value*1000)/1000;
-const sourceIds=['nws','hrrr','ecmwf','nbm','wn'];
+const sourceIds=['nws','hrrr','ecmwf','nbm','wn','weathernext3','gefs'];
 const iso=time=>finite(time)?new Date(time).toISOString():null;
 const skyCategory=value=>value<=30?'clear':value>=70?'cloudy':'mixed';
 // WeatherNext precipitation is a probability-weighted expected value, so it
@@ -17,7 +17,7 @@ const skyCategory=value=>value<=30?'clear':value>=70?'cloudy':'mixed';
 const RAIN_NOISE_FLOOR_INCHES=.001;
 const rainCategory=value=>value<RAIN_NOISE_FLOOR_INCHES?'dry':value<=TRACE_QPF_THRESHOLD_INCHES?'trace':'wet';
 const categories={clear:0,mixed:1,cloudy:2,dry:0,trace:1,wet:1};
-const names={nws:'NWS',hrrr:'HRRR',ecmwf:'ECMWF',nbm:'NBM',wn:'Google WeatherNext'};
+const names={nws:'NWS',hrrr:'HRRR',ecmwf:'ECMWF',nbm:'NBM',wn:'Google WeatherNext',weathernext3:'WeatherNext 3',gefs:'GEFS'};
 const number=value=>String(Number(value.toFixed(4)));
 function localClock(time,zone){try{return new Intl.DateTimeFormat('en-US',{timeZone:zone,weekday:'short',hour:'numeric',minute:'2-digit',timeZoneName:'short'}).format(new Date(time)).replace(':00','');}catch{return time;}}
 function rangeSummary(kind,evidence,other,zone){
@@ -102,7 +102,7 @@ export function addConditionConfidence(out,{now=Date.now()}={}){
    const daylight=partial&&finite(elevation)?elevation>0:typeof point?.daylight==='boolean'?point.daylight:finite(elevation)&&elevation>0;
    allSky.push({time:iso(left),end:iso(right),durationHours,daylight,partialCurrent:index===0&&partial,inputMissing:!hasSkyPoint,agreement:agreement(sources,'sky'),category:sources.length?new Set(sources.map(source=>source.category)).size===1?sources[0].category:'split':null,sources});
    const hasRainPoint=rain.has(time),candidate=rain.get(time),row=candidate&&Date.parse(candidate.end)===time+H?candidate:null;
-   const rainSources=validSources(row?.precipitationBlend?.sources,'rain');
+   const rainSources=validSources(row?.precipitationBlend?.comparisonSources??row?.precipitationBlend?.sources,'rain');
    const officialPop=finite(row?.officialPop)&&row.officialPop>=0&&row.officialPop<=100?row.officialPop:null;
    const models=rainSources.filter(source=>source.id!=='nws'),allDry=models.length>0&&models.every(source=>source.category==='dry'),allWet=models.length>0&&models.every(source=>source.category!=='dry');
    const probabilityConflict=officialPop!==null&&((officialPop>=20&&allDry)||(officialPop<=10&&allWet));
@@ -110,7 +110,7 @@ export function addConditionConfidence(out,{now=Date.now()}={}){
    const probabilityAgreement=probabilityConflict?(officialPop>=20&&officialPop<50?.8:.5):1;
    const category=rainSources.length?new Set(rainSources.map(source=>source.category)).size===1?rainSources[0].category:'split':null;
    rainHours.push({time:iso(left),end:iso(right),durationHours,partialCurrent:index===0&&partial,inputMissing:!hasRainPoint,agreement:rawAgreement,probabilityAgreement,
-    category:category==='dry'&&officialPop>=20?'rain-possible':category,sources:rainSources,officialPop,probabilityConflict,officialFallback:row?.rainLikelihood?.mode==='nws-fallback'});
+    category:category==='dry'&&officialPop>=20?'rain-possible':category,sources:rainSources,officialPop,probabilityConflict,officialFallback:row?.rainLikelihood?.mode==='nws-fallback'&&row.rainLikelihood.fallbackReason!=='calibrated-probability-not-supplied'});
   }
   // The current partial hour is already underway. If its forecast row has no
   // second source to compare, omit only that partial interval; a later missing

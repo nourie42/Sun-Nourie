@@ -20,12 +20,13 @@ if(typeof document!=='undefined'){
  const root=document.getElementById('main-hourly-trend');
  if(root){
   let forecast=null,metric='temperature',observer=null;
-  root.innerHTML=`<div class="section-top"><h2>Next 48 hours</h2></div><div class="main-trend-tabs" role="tablist" aria-label="Hourly graph weather variable">${Object.entries(TREND_METRICS).map(([id,d])=>`<button type="button" role="tab" id="main-trend-tab-${id}" aria-controls="main-trend-chart" aria-selected="${id===metric}" data-trend="${id}">${d.label}</button>`).join('')}</div><div class="main-trend-reading" aria-live="polite"><strong id="main-trend-value">—</strong><span id="main-trend-time">Waiting for forecast</span></div><div id="main-trend-chart" class="chart tall" role="tabpanel" aria-labelledby="main-trend-tab-temperature" tabindex="0"></div><p class="main-trend-note">Tap or drag for the forecast time and value. Missing hours stay blank.</p>`;
+  root.innerHTML=`<details class="main-trend-disclosure"><summary>Explore the next 48 hours</summary><div class="main-trend-content"><div class="main-trend-tabs" role="tablist" aria-label="Hourly graph weather variable">${Object.entries(TREND_METRICS).map(([id,d])=>`<button type="button" role="tab" id="main-trend-tab-${id}" aria-controls="main-trend-chart" aria-selected="${id===metric}" data-trend="${id}">${d.label}</button>`).join('')}</div><div class="main-trend-reading" aria-live="polite"><strong id="main-trend-value">—</strong><span id="main-trend-time">Waiting for forecast</span></div><div id="main-trend-chart" class="chart tall" role="tabpanel" aria-labelledby="main-trend-tab-temperature" tabindex="0"></div><p class="main-trend-note">Tap or drag for the forecast time and value. Missing hours stay blank.</p></div></details>`;
+  const disclosure=root.querySelector('.main-trend-disclosure');
   const chart=root.querySelector('.chart'),value=root.querySelector('#main-trend-value'),stamp=root.querySelector('#main-trend-time');
   let keyboardIndex=0,available=[];
   const show=p=>{value.textContent=trendReading(metric,p);stamp.textContent=p?fmt(p.t,forecast.location.timeZone,{weekday:'short',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}):'Now · drag across the graph';};
   const render=()=>{
-   if(!forecast)return;
+   if(!forecast||!disclosure.open)return;
    const series=mainTrendSeries(forecast),start=Math.floor(Date.now()/H)*H,end=start+48*H,def=TREND_METRICS[metric];
    const points=series[metric]||[];available=points.filter(p=>p.t>=start&&p.t<=end&&finite(p.v));keyboardIndex=0;
    const idle=()=>{show(available[0]);stamp.textContent=available[0]?.t===start?'Now · drag across the graph':available.length?'First available hour · drag across the graph':'No forecast data for this period';};
@@ -33,6 +34,7 @@ if(typeof document!=='undefined'){
    chart.setAttribute('aria-labelledby',`main-trend-tab-${metric}`);
    mountChart(chart,{points,extra:metric==='wind'?series.gust:[],t0:start,t1:end,tz:forecast.location.timeZone,nowT:null,nights:nightBands(solarDays(forecast),start,end),multiDay:true},def,p=>p?show(p):idle());idle();
   };
+  disclosure.addEventListener('toggle',()=>{if(disclosure.open)render();});
   root.addEventListener('click',e=>{const b=e.target.closest('[data-trend]');if(b){metric=b.dataset.trend;render();}});
   root.querySelector('[role=tablist]').addEventListener('keydown',e=>{
    if(!['ArrowLeft','ArrowRight','Home','End'].includes(e.key))return;
@@ -40,7 +42,7 @@ if(typeof document!=='undefined'){
    const next=e.key==='Home'?0:e.key==='End'?buttons.length-1:(index+(e.key==='ArrowRight'?1:-1)+buttons.length)%buttons.length;buttons[next].focus();buttons[next].click();
   });
   chart.addEventListener('keydown',e=>{if(!['ArrowLeft','ArrowRight','Home','End'].includes(e.key)||!available.length)return;e.preventDefault();keyboardIndex=e.key==='Home'?0:e.key==='End'?available.length-1:Math.max(0,Math.min(available.length-1,keyboardIndex+(e.key==='ArrowRight'?1:-1)));show(available[keyboardIndex]);});
-  if(typeof ResizeObserver!=='undefined'){observer=new ResizeObserver(()=>chart._redraw?.());observer.observe(chart);}
+  if(typeof ResizeObserver!=='undefined'){observer=new ResizeObserver(()=>{if(disclosure.open)chart._redraw?.();});observer.observe(chart);}
   const escape=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const evidence=data=>{
    document.getElementById('blend-v2-evidence')?.remove();if(!data.blendV2?.enabled)return;

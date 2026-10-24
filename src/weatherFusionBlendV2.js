@@ -35,7 +35,7 @@ export function temperatureV2(values,index,validTime,issuedAt){
 /** Deterministic QPF signals never enter the probability adapter. */
 export function officialRainV2(nwsProbability){
  const value=finite(nwsProbability)&&nwsProbability>=0&&nwsProbability<=100?nwsProbability:null;
- return {value,rawValue:value,rawTotal:value,weightedValue:value,mode:finite(value)?'nws-fallback':'unavailable',source:'Official NWS hourly probability · calibrated model probabilities unavailable',sources:finite(value)?[{id:'nws',weight:1,value,points:value}]:[],sourceValues:{nws:value},sourcePoints:{nws:value},missingModels:['hrrr','nbm','ecmwf','gefs','weathernext3'],calibrated:false,version:BLEND_V2_VERSION};
+ return {value,rawValue:value,rawTotal:value,weightedValue:value,mode:finite(value)?'nws-fallback':'unavailable',fallbackReason:'calibrated-probability-not-supplied',source:'Official NWS hourly probability · calibrated model probabilities unavailable',sources:finite(value)?[{id:'nws',weight:1,value,points:value}]:[],sourceValues:{nws:value},sourcePoints:{nws:value},missingProbabilitySources:['hrrr','nbm','ecmwf','gefs','weathernext3'],calibrated:false,version:BLEND_V2_VERSION};
 }
 
 /** Adapter boundary for future true calibrated PoP feeds; period/threshold

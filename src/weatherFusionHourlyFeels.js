@@ -20,7 +20,7 @@ export function rebuildHourlyFeels(out,{now,temperatureAt,humidityAt,skyAt=()=>n
   const humidity=round(humidityFromDewpoint(temperature,dewpoint)??maps.humidity.get(epoch)?.value??humidityAt(epoch));
   const sky=skyAt(epoch),skyCover=typeof sky==='object'?sky?.value:sky;
   const solar=solarAt(epoch),solarRadiation=typeof solar==='object'?solar?.value:solar;
-  const inputs={temperature,dewpoint,wind,humidity,skyCover:finite(skyCover)?skyCover:null,skySource:finite(skyCover)?(sky?.source||'NWS same-hour sky-cover grid'):null,skySources:sky?.sources||[],
+  const inputs={temperature,dewpoint,wind,humidity,skyCover:finite(skyCover)?skyCover:null,skySource:finite(skyCover)?(sky?.source||'NWS same-hour sky-cover grid'):null,skySources:sky?.sources||[],...(sky?.comparisonSources?{skyComparisonSources:sky.comparisonSources}:{}),
    solarRadiation:finite(solarRadiation)&&solarRadiation>=0?solarRadiation:null,solarSource:finite(solarRadiation)?(solar?.source||'Same-hour model shortwave radiation'):null};
   const condition=hour?.condition||periods.find(p=>Date.parse(p.startTime)<=epoch&&epoch<Date.parse(p.endTime))?.shortForecast||'';
   const estimate=tier3FeelsLike({...inputs,condition,type:'guidance'},out.location,epoch,'outdoors');

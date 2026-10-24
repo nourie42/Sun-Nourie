@@ -9,7 +9,7 @@ export function forecastNeedsModelRetry(forecast,now=Date.now()){
  if(forecast?.days?.[0]?.confidence?.coverage?.rain?.officialFallback===true)return true;
  return (forecast?.rainTimeline||[]).some(row=>{
   const start=Date.parse(row.time),end=Date.parse(row.end)||start+3600000;
-  return start<now+24*3600000&&end>now&&row.rainLikelihood?.mode==='nws-fallback'&&Number.isFinite(row.rainLikelihood.value);
+  return start<now+24*3600000&&end>now&&row.rainLikelihood?.mode==='nws-fallback'&&row.rainLikelihood.fallbackReason!=='calibrated-probability-not-supplied'&&Number.isFinite(row.rainLikelihood.value);
  });
 }
 export function forecastRefreshDue(forecast,now=Date.now()){

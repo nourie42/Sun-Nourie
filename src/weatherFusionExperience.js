@@ -62,7 +62,8 @@ export function addExperience(out,{models={},grid,periods=[],exposureWeather=nul
    const index=forecastDayIndex(time,now,zone);
    const result=field==='temperature_2m'?weightedTemperature(values,index,out.blendV2?.enabled?{enabled:true,validTime:time,issuedAt:Date.parse(out.blendV2.issuedAt)}:null):weighted(values,temperaturePolicy(index,finite(values.wn)));
    result.sources=result.sources.map(item=>['wn','weathernext3'].includes(item.id)?{...item,runAt:modelSample(models,time,field,[item.id]).runAt}:item);
-   return {...result,source:result.sources.map(s=>`${s.id==='wn'?'Google WeatherNext':s.id==='weathernext3'?'WeatherNext 3':s.id.toUpperCase()} ${Math.round(s.weight*100)}%`).join(' / ')||null};
+   const comparisonSources=out.blendV2?.enabled?Object.entries(values).filter(([,value])=>finite(value)).map(([id,value])=>({id,value,weight:result.sources.find(s=>s.id===id)?.weight||0,comparisonOnly:!result.sources.some(s=>s.id===id),runAt:id==='nws'?null:modelSample(models,time,field,[id]).runAt})):null;
+   return {...result,...(comparisonSources?{comparisonSources}:{}),source:result.sources.map(s=>`${s.id==='wn'?'Google WeatherNext':s.id==='weathernext3'?'WeatherNext 3':s.id.toUpperCase()} ${Math.round(s.weight*100)}%`).join(' / ')||null};
  };
  const raw=[];
  const fieldsByTime=new Map();
@@ -82,7 +83,7 @@ export function addExperience(out,{models={},grid,periods=[],exposureWeather=nul
    h.officialWindDirection=h.windDirection;h.windDirectionBlend=mixWindDirection(directions,temperaturePolicy(forecastDayIndex(epoch,now,zone),finite(directions.wn)));
    h.windDirectionDegrees=round(h.windDirectionBlend.value);h.windDirection=finite(h.windDirectionDegrees)?COMPASS[Math.round(h.windDirectionDegrees/22.5)%16]:null;
    raw.push({epoch,time,temperature:h.temperature,dewpoint:dewpoint.value,humidity,wind:wind.value});
-   fieldsByTime.set(epoch,{temperature:{...source(h.temperature,h.temperatureSource||'Forecast blend'),sources:h.temperatureBlend?.sources,temperatureAdjustment:h.temperatureBlend?.temperatureAdjustment??null},dewpoint,wind,humidity:source(humidity,'Consistent forecast temperature + dew point'),gust,visibility,pressure,cloud,
+   fieldsByTime.set(epoch,{temperature:{...source(h.temperature,h.temperatureSource||'Forecast blend'),sources:h.temperatureBlend?.sources,...(h.temperatureBlend?.comparisonSources?{comparisonSources:h.temperatureBlend.comparisonSources}:{}),temperatureAdjustment:h.temperatureBlend?.temperatureAdjustment??null},dewpoint,wind,humidity:source(humidity,'Consistent forecast temperature + dew point'),gust,visibility,pressure,cloud,
      precipitation:source(h.precipitation,h.precipitationSource),pop:source(rainChanceValue(h.rainLikelihood,h.pop),h.rainLikelihood?.source||'NWS hourly')});
  }
  const aligned=alignComfortHours(raw,out.current,now);
@@ -92,7 +93,7 @@ export function addExperience(out,{models={},grid,periods=[],exposureWeather=nul
    for(const [key,v] of Object.entries(fields)) {
      const digits=key==='precipitation'?4:key==='pressure'?3:1;
      series[key].push({time:r.time,value:round(v.value,digits),source:v.source,
-       ...(v.sources?{sources:v.sources}:{}),...(v.runAt?{runAt:v.runAt}:{}),...(key==='temperature'?{temperatureAdjustment:v.temperatureAdjustment??null}:{}),
+       ...(v.sources?{sources:v.sources}:{}),...(v.comparisonSources?{comparisonSources:v.comparisonSources}:{}),...(v.runAt?{runAt:v.runAt}:{}),...(key==='temperature'?{temperatureAdjustment:v.temperatureAdjustment??null}:{}),
        ...(key==='feels'?{inputs:{temperature:round(r.temperature),dewpoint:round(r.dewpoint),wind:round(r.wind),humidity:round(r.humidity)},rawInputs:r.rawInputs,alignmentFactor:r.alignmentFactor}:{}),
        ...(key==='precipitation'?{end:new Date(r.epoch+H).toISOString()}: {})});
    }
@@ -106,7 +107,7 @@ export function addExperience(out,{models={},grid,periods=[],exposureWeather=nul
    for(let epoch=start;epoch<=end;epoch+=H) {
      if(existing.has(epoch)){extended.push(existing.get(epoch));continue;}
      const value=mix(gridSample(grid,gridField,epoch,kind),epoch,field);
-     extended.push({time:new Date(epoch).toISOString(),value:round(value.value),source:value.source,sources:value.sources});
+     extended.push({time:new Date(epoch).toISOString(),value:round(value.value),source:value.source,sources:value.sources,...(value.comparisonSources?{comparisonSources:value.comparisonSources}:{})});
    }
    series[key]=extended;
  }

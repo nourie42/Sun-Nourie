@@ -51,7 +51,7 @@ export function hourlyRainHTML(sample){
  }
  const blend=sample.rainLikelihood,value=sampleRainChance(sample);
  if(hideLowRainChance(value))return '<span class="hour-rain" aria-hidden="true"></span>';
- if(blend?.mode==='nws-fallback')return `<span class="hour-rain" title="Official NWS hourly rain chance; model data is unavailable"><small class="hour-pop">${weatherMetricIcon('drop')}${finite(value)?Math.round(value)+'%':'—'}</small></span>`;
+ if(blend?.mode==='nws-fallback')return `<span class="hour-rain" title="${blend.fallbackReason==='calibrated-probability-not-supplied'?'Official NWS hourly rain probability; model rainfall amounts are separate':'Official NWS hourly rain chance; model data is unavailable'}"><small class="hour-pop">${weatherMetricIcon('drop')}${finite(value)?Math.round(value)+'%':'—'}</small></span>`;
  const votes=blend?.sourceValues||{},awarded=blend?.sourcePoints||{},parts=[];
  const pointText=points=>String(Math.round(points*100)/100);
  const fullPoints={nws:40,hrrr:30,ecmwf:10,nbm:20};

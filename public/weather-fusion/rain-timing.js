@@ -18,9 +18,10 @@ export function rainTiming(forecast,index=0,tonight=false,now=Date.now()){
  };
  const all=segment(start,end);
  const nwsFallback=period.rows.some(row=>row.rainLikelihood?.mode==='nws-fallback'&&finite(row.rainLikelihood.value));
- return {...all,value:period.chance,peakLabel:finite(period.chance)?all.peakLabel:'',split:false,nwsFallback,beforeMidnight:null,afterMidnight:null};
+ return {...all,value:period.chance,peakLabel:finite(period.chance)?all.peakLabel:'',split:false,nwsFallback,...(period.rows.some(row=>row.rainLikelihood?.fallbackReason==='calibrated-probability-not-supplied')?{probabilityOnlyFallback:true}:{}),beforeMidnight:null,afterMidnight:null};
 }
 
 export function rainTimingHTML(timing){
+ if(timing?.probabilityOnlyFallback)return '<p class="rain-source-note">Rain chances use official NWS probabilities. Model rainfall amounts are compared separately.</p>';
  return timing?.nwsFallback?'<p class="rain-source-note">Official NWS rain chances are shown while model data is unavailable.</p>':'';
 }

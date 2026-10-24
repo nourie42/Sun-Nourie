@@ -50,7 +50,7 @@ test('activated engine changes hourly and calendar values together, official rai
  const point=v2.metricForecasts.series.temperature[0];assert.ok(point.sources.length>1);assert.ok(Math.abs(point.sources.reduce((sum,s)=>sum+s.weight,0)-1)<.00001);
  assert.equal(point.sources.find(s=>s.id==='wn'),undefined,'legacy WN must not become WeatherNext 3');
  assert.ok(v2.hours[0].temperatureBlend.version.includes('blend-v2'));
- for(const field of ['wind','dewpoint','cloud'])assert.deepEqual(v2.metricForecasts.series[field],old.metricForecasts.series[field],field+' retains its own existing policy');
+ for(const field of ['wind','dewpoint','cloud'])assert.deepEqual(v2.metricForecasts.series[field].map(({comparisonSources,...row})=>row),old.metricForecasts.series[field],field+' retains its own existing policy');
 });
 
 test('GEFS adapter requires the real 31-member ensemble and independent initialization metadata',async()=>{
