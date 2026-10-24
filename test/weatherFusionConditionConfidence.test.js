@@ -31,9 +31,9 @@ test('cloud agreement uses all raw positive source values rather than the blende
  assert.deepEqual(weather.evidence.sky.worstHour.sources.map(source=>source.value),[0,0,100]);
 });
 
-test('a short cloud disagreement remains visible instead of disappearing in a daily average',()=>{
+test('a brief cloud disagreement remains in details without defining the whole day',()=>{
  const out=fixture();out.metricForecasts.series.feels[12].inputs.skySources[2].value=100;
- const weather=calculate(out);assert.notEqual(weather.key,'high');assert.equal(weather.evidence.sky.worstHour.time,new Date(now+12*H).toISOString());
+ const weather=calculate(out);assert.equal(weather.key,'high');assert.equal(weather.evidence.sky.score,94);assert.equal(weather.evidence.sky.worstHour.time,new Date(now+12*H).toISOString());
 });
 
 test('equal daily rain totals at different hours do not imply agreement on rain timing',()=>{
@@ -104,8 +104,8 @@ test('sub-thousandth-inch expected-value noise does not turn dry agreement into 
 
 test('a genuine trace from one source still lowers rain agreement',()=>{
  const out=fixture();out.rainTimeline[12].precipitationBlend.sources[0].value=.004;
- const weather=calculate(out);assert.equal(weather.evidence.rain.worstHour.agreement,1/3);
- assert.equal(weather.evidence.rain.agreementScore,53);assert.equal(weather.key,'low');
+ const weather=calculate(out);assert.equal(weather.evidence.rain.worstHour.agreement,2/3);
+ assert.equal(weather.evidence.rain.agreementScore,87);assert.ok(weather.evidence.rain.agreementScore<100);
 });
 
 test('an official meaningful rain chance cannot be described as agreed dry weather',()=>{
@@ -157,6 +157,28 @@ test('dark remaining minutes after sunset cannot inherit an old daylight flag',(
 
 test('a lower sky grade names the actual source values and local disagreement hour',()=>{
  const out=fixture();for(const row of out.metricForecasts.series.feels)row.inputs.skySources.push({id:'hrrr',value:0,weight:.25});
- out.metricForecasts.series.feels[12].inputs.skySources.find(source=>source.id==='hrrr').value=77;
+ for(const row of out.metricForecasts.series.feels.slice(12))row.inputs.skySources.find(source=>source.id==='hrrr').value=77;
  const weather=calculate(out);assert.notEqual(weather.key,'high');assert.match(weather.summary,/0% \(NWS\).*77% \(HRRR\).*Tue.*12 PM.*Rain guidance agrees/);
+});
+
+test('Williamsburg morning cloud differences do not label a mostly agreeing day Low',()=>{
+ const out=fixture();
+ const readings=[[13,100,18],[9,73,15],[5,32,11],[1,2,7],[1,0,4],[1,0,2],[0,0,1],[0,0,0],[0,0,0],[0,0,0],[0,0,0]];
+ for(const [i,values] of readings.entries())out.metricForecasts.series.feels[i+7].inputs.skySources=ids.map((id,j)=>({id,value:values[j],weight:1/3}));
+ const weather=calculate(out);assert.equal(weather.evidence.sky.score,85);
+ assert.equal(weather.evidence.sky.worstHour.sources[1].value,100);
+ // The daily average uses all 11 daylight hours, including the disagreeing ones.
+ assert.ok(Math.abs(weather.evidence.sky.averageAgreementScore-84.848)<.001);
+});
+
+test('trace rain is distinct from measurable rain when judging a dry forecast',()=>{
+ const trace=fixture(),wet=fixture();
+ for(const row of trace.rainTimeline)row.precipitationBlend.sources[2].value=.0033;
+ for(const row of wet.rainTimeline)row.precipitationBlend.sources[2].value=.1;
+ const a=calculate(trace),b=calculate(wet);
+ assert.ok(a.evidence.rain.score>b.evidence.rain.score);
+ assert.equal(a.evidence.rain.worstHour.sources[2].category,'trace');
+ assert.equal(b.key,'low');
+ const unanimous=fixture();for(const row of unanimous.rainTimeline)row.precipitationBlend.sources=sources(.0033);
+ const c=calculate(unanimous);assert.equal(c.evidence.rain.probabilityConflictCap,100,'Trace amounts alone do not contradict a low measurable-rain probability.');
 });

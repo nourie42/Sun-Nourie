@@ -125,7 +125,7 @@ test('Gross Meter heading stays centered and bold without changing chart geometr
  assert.match(css,/#gross-title\{text-align:center;font-weight:800\}/);assert.match(meterCss,/\.gross-eyebrow\{width:calc\(100% \+ 86px\);[^}]*text-align:center/);assert.match(meterCss,/@media\(max-width:760px\)[\s\S]*\.gross-eyebrow\{width:calc\(100% \+ 62px\)\}/);assert.ok(!/\.gross-(scroll|chart)\s*\{/.test(css));
 });
 test('changed assets are cache-busted and late briefing responses stay guarded',()=>{
- assert.match(html,/style\.css\?v=brand-v3/);assert.match(html,/forecast-layout\.css\?v=weather-qa-v67/);assert.match(html,/personal-details\.css\?v=wpc-mpd-v12/);assert.match(html,/app\.js\?v=same-day-confidence-sun-v1/);assert.match(html,/weather-polish\.css\?v=aqi-bg-v2/);assert.match(html,/car-wash\.css\?v=center-answer-v43/);assert.match(html,/forecast-cards\.css\?v=tonight-timing-v2/);assert.match(html,/scenario-layout\.css\?v=feel-auto-v6/);assert.match(html,/risk-outlooks\.css\?v=risk-outlooks-v4/);
+ assert.match(html,/style\.css\?v=brand-v3/);assert.match(html,/forecast-layout\.css\?v=weather-qa-v67/);assert.match(html,/personal-details\.css\?v=wpc-mpd-v12/);assert.match(html,/app\.js\?v=direct-nourie-take-v1/);assert.match(html,/weather-polish\.css\?v=aqi-bg-v2/);assert.match(html,/car-wash\.css\?v=center-answer-v43/);assert.match(html,/forecast-cards\.css\?v=tonight-timing-v2/);assert.match(html,/scenario-layout\.css\?v=feel-auto-v6/);assert.match(html,/risk-outlooks\.css\?v=risk-outlooks-v4/);
  assert.match(app,/dans-take\.js\?v=audit-20261017-v1/);
  assert.match(app,/bulletins\.js\?v=county-warnings-v1/);
  assert.match(app,/experience\.js\?v=low-rain-display-v1/);

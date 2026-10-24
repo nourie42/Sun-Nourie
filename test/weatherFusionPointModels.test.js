@@ -44,7 +44,7 @@ test('searched coordinates use explicit requested models, deduplicate and never 
  const [a,b]=await Promise.all([load('hrrr',location),load('hrrr',location)]);assert.equal(a,b);assert.equal(calls.length,2);
  assert.equal(a.fetchedAt,new Date(clock).toISOString());assert.equal(a.checkedAt,a.fetchedAt);assert.equal(a.retrievalStatus,'fresh');
  clock+=60000;const cached=await load('hrrr',location);assert.equal(calls.length,2);assert.equal(cached,a);assert.equal(cached.checkedAt,new Date(now).toISOString(),'A cache read must not claim a new provider check.');
- const other=await load('hrrr',{latitude:36.1,longitude:-79});assert.equal(other.latitude,36.1);assert.equal(calls.length,4);
+ const other=await load('hrrr',{latitude:36.1,longitude:-79});assert.equal(other.latitude,36.1);assert.equal(calls.length,3,'Initialization metadata is shared across locations, point data is not.');
  clock+=6*60000;fail=true;const kept=await load('hrrr',location);assert.match(kept.refreshWarning,/still-fresh/);
  assert.equal(kept.fetchedAt,a.fetchedAt);assert.equal(kept.checkedAt,new Date(clock).toISOString());assert.equal(kept.retrievalStatus,'last-verified');
  const failedCalls=calls.length;clock+=60000;assert.equal(await load('hrrr',location),kept);assert.equal(calls.length,failedCalls,'A failed refresh keeps the existing five-minute request cadence.');
@@ -136,4 +136,27 @@ test('warmest sun card uses the same sunny-hour estimate and says the exposure e
  assert.match(peakComparisonHTML(null,null,'America/New_York',now),/No direct sun in the remaining forecast today/);
  assert.doesNotMatch(peakComparisonHTML(null,null,'America/New_York',now),/unavailable/i);
  assert.doesNotMatch(peakComparisonHTML(null,85,'America/New_York',now),/Warmest feels like today/);
+});
+
+test('negative rain increments do not discard valid cloud and temperature forecasts',()=>{
+ const data=raw('ecmwf');data.hourly.precipitation[20]=-.004;
+ const result=validatePointModel(data,metadata,'ecmwf',location,now);
+ assert.equal(result.hourly.precipitation[20],null);
+ assert.equal(result.precipitationIntervals.some(x=>x.end===data.hourly.time[20]),false);
+ assert.equal(result.hourly.cloud_cover[20],data.hourly.cloud_cover[20]);
+ assert.equal(result.hourly.temperature_2m[20],data.hourly.temperature_2m[20]);
+ assert.equal(result.validationIssues[0].value,-.004);
+ const bad=raw();bad.hourly.precipitation.fill(-.004);bad.hourly_units.precipitation='mm';assert.throws(()=>validatePointModel(bad,metadata,'hrrr',location,now),/units/);
+});
+test('provider Retry-After is respected across searched locations without borrowing point data',async()=>{
+ let clock=now,calls=0,limited=false;
+ const load=createPointModels({now:()=>clock,fetchImpl:async url=>{
+  calls++;if(url.includes('/static/'))return response(metadata);
+  if(limited)return new Response('',{status:429,headers:{'retry-after':'120'}});
+  const u=new URL(url);return response(raw('hrrr',{latitude:+u.searchParams.get('latitude'),longitude:+u.searchParams.get('longitude')}));
+ }});
+ const first=await load('hrrr',location);clock+=6*60000;limited=true;
+ const retained=await load('hrrr',location);assert.equal(retained.fetchedAt,first.fetchedAt);
+ const count=calls;await assert.rejects(()=>load('hrrr',{latitude:36,longitude:-79}),/rate limit/);assert.equal(calls,count);
+ clock+=121000;limited=false;const other=await load('hrrr',{latitude:36,longitude:-79});assert.equal(other.longitude,-79);assert.ok(calls>count);
 });

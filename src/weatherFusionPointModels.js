@@ -11,15 +11,21 @@ export function validatePointModel(data,meta,id,location,now){
  if(!finite(data?.latitude)||!finite(data.longitude)||Math.abs(data.latitude-location.latitude)>.35||Math.abs(data.longitude-location.longitude)>.35)throw new Error('Model grid does not match the requested location.');
  const raw=data.hourly,units=data.hourly_units,times=raw?.time;
  if(units?.time!=='unixtime'||!Array.isArray(times)||times.length<12||times.length>500||times.some((t,i)=>!finite(t)||(i&&t-times[i-1]!==3600)))throw new Error('Invalid named-model time axis.');
- const hourly={time:[...times]},hourly_units={time:'unixtime'};
+ const hourly={time:[...times]},hourly_units={time:'unixtime'},validationIssues=[];
  for(const [field,[unit,min,max]] of Object.entries(FIELDS)){
   // Imperial query settings also convert visibility to feet, independently of
   // its field name. Normalize BEFORE range validation, then convert to miles.
   const feet=field==='visibility'&&units[field]==='ft';
-  const values=feet?raw[field]?.map(v=>finite(v)?v*.3048:v):raw[field];
+  let values=feet?raw[field]?.map(v=>finite(v)?v*.3048:v):raw[field];
+  // An impossible negative rain increment must not discard valid temperatures
+  // and clouds from the same model. Reject only that measurement, never turn it
+  // into dry weather. Structural/unit errors still reject the response.
+  if(field==='precipitation'&&Array.isArray(values))values=values.map((v,i)=>{
+   if(finite(v)&&v<0){validationIssues.push({field,time:times[i],value:v,reason:'Negative precipitation is invalid; excluded from comparisons.'});return null;}return v;
+  });
   if(!Array.isArray(values)||values.length!==times.length||values.some(v=>v!==null&&(!finite(v)||v<min||v>max)))throw new Error(`Invalid named-model field: ${field}.`);
   // Unsupported variables (e.g. NBM pressure) are genuinely null, not zero.
-  if(values.some(finite)&&units[field]!==unit&&!feet)throw new Error(`Invalid named-model units: ${field}.`);
+  if((values.some(finite)||raw[field].some(finite))&&units[field]!==unit&&!feet)throw new Error(`Invalid named-model units: ${field}.`);
   hourly[field]=values.map((v,i)=>times[i]*1000>run+(id==='hrrr'?48:240)*H?null:v);
   hourly_units[field]=unit;
  }
@@ -35,19 +41,29 @@ export function validatePointModel(data,meta,id,location,now){
  hourly.visibility=hourly.visibility.map(v=>finite(v)?v/1609.344:null);hourly_units.visibility='mi';
  const precipitationIntervals=times.flatMap((t,i)=>finite(hourly.precipitation[i])?[{start:t-3600,end:t,value:hourly.precipitation[i]}]:[]);
  return {latitude:location.latitude,longitude:location.longitude,modelGrid:{latitude:data.latitude,longitude:data.longitude},hourly,hourly_units,precipitationIntervals,
-  verifiedModel:true,model:id,runAt:new Date(run).toISOString(),validUntil:new Date(Math.max(...future)*1000).toISOString(),resolution:model.resolution,
+  validationIssues,verifiedModel:true,model:id,runAt:new Date(run).toISOString(),validUntil:new Date(Math.max(...future)*1000).toISOString(),resolution:model.resolution,
   sourceUrl:'https://open-meteo.com/en/docs',transport:'Open-Meteo explicit named-model point API',runScope:'Latest published initialization; continuous series may combine successive runs of this same model.',timezone:'GMT'};
 }
 export function createPointModels({fetchImpl=globalThis.fetch,now=Date.now}={}){
- const cache=new Map(),pending=new Map();
+ const cache=new Map(),pending=new Map(),metadataCache=new Map(),metadataPending=new Map(),rateLimits=new Map();
  const remember=(key,value)=>{
   cache.delete(key);cache.set(key,{value,until:now()+5*60000});while(cache.size>96)cache.delete(cache.keys().next().value);
   return value;
  };
  async function json(url){
   const response=await fetchImpl(url,{cache:'no-store',headers:{Accept:'application/json','Cache-Control':'no-cache',Pragma:'no-cache','User-Agent':'Sun-Nourie-WeatherFusion/3.0'},redirect:'error',signal:AbortSignal.timeout(18000)});
-  if(!response.ok)throw Object.assign(new Error(`Named model request returned HTTP ${response.status}.`),{status:response.status});
+  if(!response.ok){
+   const retry=response.headers?.get?.('retry-after'),seconds=Number(retry);
+   const retryAt=retry?(Number.isFinite(seconds)?now()+seconds*1000:Date.parse(retry)):NaN;
+   throw Object.assign(new Error(`Named model request returned HTTP ${response.status}.`),{status:response.status,retryAt:Number.isFinite(retryAt)?Math.max(now()+60000,retryAt):now()+5*60000});
+  }
   const text=await response.text();if(text.length>2500000)throw new Error('Named model response too large.');return JSON.parse(text);
+ }
+ async function metadata(id,model){
+  const hit=metadataCache.get(id);if(hit?.until>now())return hit.value;
+  if(metadataPending.has(id))return metadataPending.get(id);
+  const task=json(`https://api.open-meteo.com/data/${model.domain}/static/meta.json`).then(value=>{metadataCache.set(id,{value,until:now()+5*60000});return value;}).finally(()=>metadataPending.delete(id));
+  metadataPending.set(id,task);return task;
  }
  return async function load(id,location){
   const model=MODELS[id];if(!model)throw new Error('Unknown named model.');
@@ -55,6 +71,11 @@ export function createPointModels({fetchImpl=globalThis.fetch,now=Date.now}={}){
   const fresh=value=>value&&Date.parse(value.validUntil)>now()&&now()-Date.parse(value.runAt)<=model.age*H;
   if(hit?.until>now()&&fresh(hit.value))return hit.value;
   if(pending.has(key))return pending.get(key);
+  const limited=rateLimits.get(id);
+  if(limited?.retryAt>now()){
+   if(fresh(hit?.value))return {...hit.value,retrievalStatus:'last-verified',refreshWarning:'Provider rate limit; retaining previously verified, still-fresh model data.'};
+   throw Object.assign(new Error('Named model provider rate limit; retry after '+new Date(limited.retryAt).toISOString()),{status:429,retryAt:limited.retryAt});
+  }
   if(pending.size>=50)throw new Error('Named model sources are busy. Please retry.');
   const task=(async()=>{
    const query=new URLSearchParams({latitude:String(location.latitude),longitude:String(location.longitude),models:model.name,hourly:[...Object.keys(FIELDS),'weather_code'].join(','),temperature_unit:'fahrenheit',wind_speed_unit:'mph',precipitation_unit:'inch',timeformat:'unixtime',timezone:'GMT',forecast_days:'10'});
@@ -69,8 +90,8 @@ export function createPointModels({fetchImpl=globalThis.fetch,now=Date.now}={}){
       return json(`https://api.open-meteo.com/v1/forecast?${required}`);
      }
     };
-    const [data,metadata]=await Promise.all([forecast(),json(`https://api.open-meteo.com/data/${model.domain}/static/meta.json`)]);
-    const value=validatePointModel(data,metadata,id,location,now());
+    const [data,meta]=await Promise.all([forecast(),metadata(id,model)]);
+    const value=validatePointModel(data,meta,id,location,now());
     if(hit?.value&&Date.parse(value.runAt)<Date.parse(hit.value.runAt)){
      if(!fresh(hit.value))throw new Error('Provider returned an older model initialization and the previously verified newer data is no longer valid.');
      return remember(key,{...hit.value,checkedAt:new Date(now()).toISOString(),retrievalStatus:'last-verified',refreshWarning:'Provider returned an older initialization; retaining the previously verified, still-valid newer model data.'});
@@ -78,6 +99,7 @@ export function createPointModels({fetchImpl=globalThis.fetch,now=Date.now}={}){
     const fetchedAt=new Date(now()).toISOString();
     return remember(key,{...value,fetchedAt,checkedAt:fetchedAt,retrievalStatus:'fresh'});
    }catch(error){
+    if(error.status===429)rateLimits.set(id,{retryAt:error.retryAt});
     if(fresh(hit?.value))return remember(key,{...hit.value,checkedAt:new Date(now()).toISOString(),retrievalStatus:'last-verified',refreshWarning:'Refresh failed; retaining the previously verified, still-fresh model data.'});
     throw error;
    }
