@@ -22,6 +22,6 @@ export function rainTiming(forecast,index=0,tonight=false,now=Date.now()){
 }
 
 export function rainTimingHTML(timing){
- if(timing?.probabilityOnlyFallback)return '<p class="rain-source-note">Rain chances use official NWS probabilities. Model rainfall amounts are compared separately.</p>';
+ if(timing?.probabilityOnlyFallback)return '';
  return timing?.nwsFallback?'<p class="rain-source-note">Official NWS rain chances are shown while model data is unavailable.</p>':'';
 }

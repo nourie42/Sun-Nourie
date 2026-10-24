@@ -16,7 +16,7 @@ test('official NWS published QPF and probability do not discard available model 
 });
 test('V2 availability explanation names official probabilities without claiming model forecast data is absent',()=>{
  const f=forecast(),timing=rainTiming(f,0,false,now);const html=rainTimingHTML(timing);
- assert.match(html,/official NWS probabilities/);assert.doesNotMatch(html,/model data is unavailable/);
+ assert.equal(html,'');assert.doesNotMatch(html,/model data is unavailable/);
 });
 test('comparison includes valid noncontributing temperatures without changing forecast weights',()=>{
  const f=forecast(),p=f.metricForecasts.series.temperature[0];

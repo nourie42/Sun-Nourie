@@ -70,6 +70,21 @@ function component(hours,window,scope){
  return {scope,window,expectedHours:round(expectedHours),coveredHours:round(coveredHours),comparedHours:round(comparedHours),completeSources,agreementScore,
   sourceCoverage:Object.fromEntries(sourceIds.filter(id=>coverage[id]).map(id=>[id,round(coverage[id])])),complete,score,hours,worstHour};
 }
+/** Overall agreement index; component scores remain independently inspectable.
+ * Equal component weights avoid letting a cloud-only rating stand for the whole
+ * forecast. Missing evidence and substantial disagreement prevent High ratings.
+ */
+export function overallForecastConfidence(temperature,weather){
+ const sky=weather.evidence.sky,rain=weather.evidence.rain;
+ const components={temperature:temperature.score,sky:sky.score,rain:rain.score};
+ let score=Object.values(components).every(finite)?Math.round(Object.values(components).reduce((a,b)=>a+b,0)/3):null;
+ const complete=temperature.coverage?.temperature?.complete!==false&&sky.complete&&rain.complete&&sky.completeSources.length>=2&&rain.completeSources.length>=2&&temperature.sourceCount>=2;
+ if(score!==null){if(!complete)score=Math.min(score,80);if(Math.min(...Object.values(components))<70)score=Math.min(score,84);if(Math.min(...Object.values(components))<55)score=Math.min(score,54);score=Math.min(score,rain.probabilityConflictCap??100);}
+ const key=score===null?'unavailable':score>=85?'high':score>=70?'moderate':'low';
+ return {scope:'overall',version:'weather-nourie-overall-confidence-v1',score,key,label:key[0].toUpperCase()+key.slice(1),sourceCount:weather.sourceCount,sourceIds:weather.sourceIds,components,
+  summary:score===null?'Comparable evidence is missing for a forecast component.':`Temperature agreement ${components.temperature}; sky agreement ${components.sky}; rain agreement ${components.rain}.`,
+  factors:['Equal weighting of temperature, sky cover and rain agreement','Missing inputs and substantial component disagreement limit the rating'],note:'Relative agreement index, not a calibrated probability or a measured accuracy percentage.'};
+}
 function temperatureComponent(day,index){
  const current=day.confidence,coverage=current.coverage?.temperature;
  const contributing=(current.contributions?.high||[]).filter(source=>finite(source.value)&&source.weight>0);
@@ -159,6 +174,7 @@ export function addConditionConfidence(out,{now=Date.now()}={}){
    note:'Agreement among named forecast sources about sky cover and precipitation timing, not a calibrated accuracy percentage or a claim that the sources are statistically independent. Temperature, wind and winter precipitation type are assessed separately. Hourly QPF under 0.001 inch is dry (expected-value noise); amounts from 0.001 through 0.010 inch are trace precipitation, and larger amounts are wet. Missing values are never dry weather.',
    evidence:{window,sky,rain:rainEvidence,currentPartialExcluded:{sky:!!skyCurrentPartialExcluded,rain:!!rainCurrentPartialExcluded}}};
   day.confidence.temperature=temperatureComponent(day,index);
+  day.confidence.overall=overallForecastConfidence(day.confidence.temperature,day.confidence.weather);
  }
  return out;
 }

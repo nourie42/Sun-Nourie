@@ -1,0 +1,6 @@
+import test from 'node:test';import assert from 'node:assert/strict';
+import {overallForecastConfidence} from '../src/weatherFusionConditionConfidence.js';
+import {displayForecastConfidence,forecastConfidenceLabel,confidenceMeterPosition} from '../public/weather-fusion/forecast-confidence.js';
+function rating(t=100,s=70,r=100){return overallForecastConfidence({score:t,sourceCount:5,coverage:{temperature:{complete:true}}},{sourceCount:5,evidence:{sky:{score:s,complete:true,completeSources:['nws','hrrr','nbm']},rain:{score:r,complete:true,completeSources:['nws','hrrr','nbm'],probabilityConflictCap:100}}});}
+test('the reported sunny dry days use overall forecast evidence rather than the cloud-only limiting component',()=>{assert.equal(rating().label,'High');assert.equal(rating(85).label,'High');assert.equal(rating().score,90);const c={overall:rating(),weather:{scope:'sky-and-rain',score:70,key:'moderate'}};assert.equal(displayForecastConfidence(c),c.overall);assert.equal(forecastConfidenceLabel(c),'Forecast confidence');assert.equal(confidenceMeterPosition(c.overall),100);});
+test('real component disagreement and missing data are not upgraded to High',()=>{assert.equal(rating(100,0,100).key,'low');assert.notEqual(rating(60).key,'high');assert.equal(rating(100,null).key,'unavailable');assert.equal(rating(100,100,40).key,'low');});

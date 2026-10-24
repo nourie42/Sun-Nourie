@@ -4,7 +4,7 @@ const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const MODERATE_SCORE=70,HIGH_SCORE=85;
 /** Main weather labels describe agreement about sky and rain. Retain legacy
  * snapshots as-is instead of relabeling a temperature score as sky agreement. */
-export const displayForecastConfidence=confidence=>confidence?.weather??confidence;
+export const displayForecastConfidence=confidence=>confidence?.overall??confidence?.weather??confidence;
 export const displayTemperatureConfidence=confidence=>confidence?.temperature??confidence;
 export function forecastConfidenceLabel(confidence,compact=false){
  return displayForecastConfidence(confidence)?.scope==='sky-and-rain'?'Sky/rain agreement':compact?'Confidence':'Forecast confidence';
@@ -138,10 +138,10 @@ export function confidenceWeatherEvidenceHTML(confidence,{timeZone='America/New_
 
 export function confidenceDetailsHTML(confidence,options={}){
  if(!confidence)return '';
- const primary=displayForecastConfidence(confidence),temperature=displayTemperatureConfidence(confidence),split=primary?.scope==='sky-and-rain';
+ const primary=displayForecastConfidence(confidence),temperature=displayTemperatureConfidence(confidence),split=primary?.scope==='sky-and-rain'||primary?.scope==='overall',weather=confidence.weather||primary;
  const factors=c=>Array.isArray(c?.factors)&&c.factors.length?`<p>${escapeEvidence(c.factors.join(' · '))}</p>`:'';
  const summary=c=>c?.summary?`<p>${escapeEvidence(c.summary)}</p>`:'';
  const note=c=>c?.note?`<small>${escapeEvidence(c.note)}</small>`:'';
  const temperatureSection=split?`<section class="dialog-temperature-confidence" data-confidence="${escapeEvidence(temperature?.key||'unavailable')}"><h3>Temperature confidence: ${escapeEvidence(temperature?.label||'Unavailable')}</h3>${summary(temperature)}${confidenceTemperatureEvidenceHTML(temperature,{...options,temperatureRating:true})}${factors(temperature)}${note(temperature)}</section>`:confidenceTemperatureEvidenceHTML(confidence,options);
- return `<details class="dialog-confidence" data-confidence="${escapeEvidence(primary?.key||'unavailable')}" data-confidence-scope="${split?'sky-and-rain':'legacy'}"><summary>${forecastConfidenceLabel(confidence)}: ${escapeEvidence(primary?.label||'Unavailable')} · ${primary?.sourceCount??'?'} source${primary?.sourceCount===1?'':'s'}</summary>${summary(primary)}${split?confidenceWeatherEvidenceHTML(primary,options):''}${factors(primary)}${note(primary)}${temperatureSection}</details>`;
+ return `<details class="dialog-confidence" data-confidence="${escapeEvidence(primary?.key||'unavailable')}" data-confidence-scope="${primary?.scope==='overall'?'overall':split?'sky-and-rain':'legacy'}"><summary>${forecastConfidenceLabel(confidence)}: ${escapeEvidence(primary?.label||'Unavailable')} · ${primary?.sourceCount??'?'} source${primary?.sourceCount===1?'':'s'}</summary>${summary(primary)}${split?summary(weather)+confidenceWeatherEvidenceHTML(weather,options):''}${factors(primary)}${note(primary)}${temperatureSection}</details>`;
 }
