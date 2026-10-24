@@ -1,0 +1,371 @@
+{
+  "schema": "weather-nourie-proposed-blend-v2",
+  "version": "2.0.0-proposal",
+  "created_on": "2026-10-24",
+  "status": "IMPLEMENTATION_SPEC_ONLY_NOT_INSTALLED",
+  "source_of_truth": "This JSON contains proposed percentage tables, not locally verified optimum weights.",
+  "repository": {
+    "full_name": "nourie42/Sun-Nourie",
+    "branch": "main",
+    "primary_page": "/weather-fusion/",
+    "site": "https://sun-nourie-live.onrender.com/weather-fusion/"
+  },
+  "defaults": {
+    "new_v2_public_forecast_enabled": false,
+    "weathernext3_approved_for_public_blend": false,
+    "postprocessing_enabled_only_if_calibrated": true,
+    "temperature_unit": "°F",
+    "wind_unit": "mph",
+    "precipitation_unit": "inches",
+    "snowfall_unit": "inches",
+    "hour_band_reference": "UTC elapsed hours from blended forecast issue time to target valid time; independent source validity evaluated from each model run",
+    "timezone": "use selected location timezone for calendar display, UTC for alignment"
+  },
+  "input_ids": {
+    "nws": "Official NWS local forecast (human-edited product; contains overlap with NBM)",
+    "hrrr": "HRRR valid 18/48h depending on cycle; never synthesize missing horizon",
+    "nbm": "NOAA National Blend of Models; includes overlapping upstream models",
+    "ecmwf": "ECMWF ensemble for longer lead where genuinely available; deterministic IFS otherwise, clearly labelled",
+    "gefs": "GEFS ensemble means/probabilities; NEW DATA INGESTION REQUIRED for general site",
+    "weathernext3": "WeatherNext 3 genuine validated feed; comparison-only in repo setup until approved; existing legacy `wn` is not automatically interchangeable",
+    "wpc": "Weather Prediction Center official snowfall guidance, with finite coverage",
+    "nam": "NAM winter short-range model",
+    "gfs": "GFS winter model; no silent substitution for GEFS"
+  },
+  "variables": {
+    "temperature": {
+      "method": "local_bias_correction_then_hourly_weighted_mean",
+      "bands": [
+        {
+          "id": "h00_24",
+          "label": "0–24 hours",
+          "start_hour_inclusive": 0,
+          "end_hour_exclusive": 24,
+          "weights_percent": {
+            "nws": 20,
+            "hrrr": 25,
+            "nbm": 25,
+            "ecmwf": 15,
+            "gefs": 0,
+            "weathernext3": 15
+          }
+        },
+        {
+          "id": "h24_48",
+          "label": "24–48 hours",
+          "start_hour_inclusive": 24,
+          "end_hour_exclusive": 48,
+          "weights_percent": {
+            "nws": 15,
+            "hrrr": 20,
+            "nbm": 25,
+            "ecmwf": 20,
+            "gefs": 0,
+            "weathernext3": 20
+          }
+        },
+        {
+          "id": "h48_72",
+          "label": "48–72 hours",
+          "start_hour_inclusive": 48,
+          "end_hour_exclusive": 72,
+          "weights_percent": {
+            "nws": 15,
+            "hrrr": 0,
+            "nbm": 25,
+            "ecmwf": 25,
+            "gefs": 10,
+            "weathernext3": 25
+          }
+        },
+        {
+          "id": "h72_168",
+          "label": "Days 4–7",
+          "start_hour_inclusive": 72,
+          "end_hour_exclusive": 168,
+          "weights_percent": {
+            "nws": 10,
+            "hrrr": 0,
+            "nbm": 25,
+            "ecmwf": 25,
+            "gefs": 10,
+            "weathernext3": 30
+          }
+        },
+        {
+          "id": "h168_264",
+          "label": "Days 8–11",
+          "start_hour_inclusive": 168,
+          "end_hour_exclusive": 264,
+          "weights_percent": {
+            "nws": 0,
+            "hrrr": 0,
+            "nbm": 10,
+            "ecmwf": 30,
+            "gefs": 20,
+            "weathernext3": 40
+          }
+        },
+        {
+          "id": "h264_360",
+          "label": "Days 12–15",
+          "start_hour_inclusive": 264,
+          "end_hour_exclusive": 360,
+          "weights_percent": {
+            "nws": 0,
+            "hrrr": 0,
+            "nbm": 0,
+            "ecmwf": 35,
+            "gefs": 25,
+            "weathernext3": 40
+          }
+        }
+      ],
+      "notes": [
+        "Treat these as starting priors, not an empirical ranking.",
+        "Use actual matching-hour and matching-point data; do not give expired models positive effective weight.",
+        "Use robust verified outlier handling and never hide uncertainty.",
+        "Separate calibration for daily highs/lows; calculate daily extrema from valid hourly fields."
+      ]
+    },
+    "rain_probability": {
+      "method": "blend_only_calibrated_probabilities_matching_the_same_threshold_and_period",
+      "nws_locked_percent_for_hours_below_168": 40,
+      "bands": [
+        {
+          "id": "h00_24",
+          "label": "0–24 hours",
+          "start_hour_inclusive": 0,
+          "end_hour_exclusive": 24,
+          "weights_percent": {
+            "nws": 40,
+            "hrrr": 20,
+            "nbm": 20,
+            "ecmwf": 10,
+            "gefs": 0,
+            "weathernext3": 10
+          }
+        },
+        {
+          "id": "h24_48",
+          "label": "24–48 hours",
+          "start_hour_inclusive": 24,
+          "end_hour_exclusive": 48,
+          "weights_percent": {
+            "nws": 40,
+            "hrrr": 15,
+            "nbm": 20,
+            "ecmwf": 15,
+            "gefs": 0,
+            "weathernext3": 10
+          }
+        },
+        {
+          "id": "h48_72",
+          "label": "48–72 hours",
+          "start_hour_inclusive": 48,
+          "end_hour_exclusive": 72,
+          "weights_percent": {
+            "nws": 40,
+            "hrrr": 0,
+            "nbm": 20,
+            "ecmwf": 20,
+            "gefs": 0,
+            "weathernext3": 20
+          }
+        },
+        {
+          "id": "h72_168",
+          "label": "Days 4–7",
+          "start_hour_inclusive": 72,
+          "end_hour_exclusive": 168,
+          "weights_percent": {
+            "nws": 40,
+            "hrrr": 0,
+            "nbm": 15,
+            "ecmwf": 20,
+            "gefs": 5,
+            "weathernext3": 20
+          }
+        },
+        {
+          "id": "h168_264",
+          "label": "Days 8–11",
+          "start_hour_inclusive": 168,
+          "end_hour_exclusive": 264,
+          "weights_percent": {
+            "nws": 0,
+            "hrrr": 0,
+            "nbm": 10,
+            "ecmwf": 35,
+            "gefs": 20,
+            "weathernext3": 35
+          }
+        },
+        {
+          "id": "h264_360",
+          "label": "Days 12–15",
+          "start_hour_inclusive": 264,
+          "end_hour_exclusive": 360,
+          "weights_percent": {
+            "nws": 0,
+            "hrrr": 0,
+            "nbm": 0,
+            "ecmwf": 40,
+            "gefs": 25,
+            "weathernext3": 35
+          }
+        }
+      ],
+      "fallback": "If other calibrated probabilities do not exist, publish authentic NWS or NBM probability, with provenance; NEVER convert a deterministic wet/dry model signal to an asserted PoP.",
+      "notes": [
+        "At <=7 days the NWS 40-point share is a user requirement.",
+        "Do not reinterpret current tiered deterministic QPF wet signals as calibrated probabilities.",
+        "Validate Brier score and probability reliability against observations; use location/season bins where sample size suffices.",
+        "Beyond NWS official horizon, use properly sourced NBM / ensemble probabilities, not 40% from NWS."
+      ]
+    },
+    "rain_amount": {
+      "method": "calibrated_probability_distribution_and_quantiles; use probability-matched mean ONLY when gridded ensemble fields support it",
+      "bands": [
+        {
+          "id": "h00_24",
+          "label": "0–24 hours",
+          "start_hour_inclusive": 0,
+          "end_hour_exclusive": 24,
+          "weights_percent": {
+            "nbm": 45,
+            "hrrr": 25,
+            "ecmwf": 20,
+            "weathernext3": 10,
+            "gefs": 0
+          }
+        },
+        {
+          "id": "h24_48",
+          "label": "24–48 hours",
+          "start_hour_inclusive": 24,
+          "end_hour_exclusive": 48,
+          "weights_percent": {
+            "nbm": 40,
+            "hrrr": 15,
+            "ecmwf": 30,
+            "weathernext3": 15,
+            "gefs": 0
+          }
+        },
+        {
+          "id": "h48_72",
+          "label": "48–72 hours",
+          "start_hour_inclusive": 48,
+          "end_hour_exclusive": 72,
+          "weights_percent": {
+            "nbm": 40,
+            "hrrr": 0,
+            "ecmwf": 30,
+            "weathernext3": 20,
+            "gefs": 10
+          }
+        },
+        {
+          "id": "h72_168",
+          "label": "Days 4–7",
+          "start_hour_inclusive": 72,
+          "end_hour_exclusive": 168,
+          "weights_percent": {
+            "nbm": 35,
+            "hrrr": 0,
+            "ecmwf": 30,
+            "weathernext3": 25,
+            "gefs": 10
+          }
+        }
+      ],
+      "after_168_hours": "OUTLOOK_PATTERN_ONLY; no precise point rain totals; daily wet/dry probabilities only when valid",
+      "notes": [
+        "24–72h QPF intermediate rows are proposed interpolations beyond the two explicitly recommended bands, not study-derived weights.",
+        "Do not simply average displaced storm-cell precipitation depths and call it heavy-rain estimate.",
+        "Use identical accumulation windows and complete hourly coverage; partial intervals are not zeros.",
+        "Add exceedance thresholds of 0.01, 0.10, 0.25, 0.50 and 1.00 inches only if data/probability supports them."
+      ]
+    },
+    "wind": {
+      "method": "bias_correct_u_v_vectors_then_derive_speed_direction; gusts_use_calibrated_high_quantile",
+      "shares": "DO_NOT_COPY_TEMPERATURE_SHARES_UNVERIFIED; learn or retain existing proven weights",
+      "notes": [
+        "Winds differ from temperature, particularly gusts and convection."
+      ]
+    },
+    "humidity_cloud": {
+      "method": "calibrate_each_variable_separately_and_respect_physical_consistency",
+      "shares": "DO_NOT_COPY_TEMPERATURE_SHARES_UNVERIFIED"
+    }
+  },
+  "winter": {
+    "initial_release": "PRESERVE_EXISTING_WINTER_INTERFACE_AND_RULES; stage changes separately",
+    "user_selected": [
+      {
+        "label": "Within 24h",
+        "start_hour_inclusive": 0,
+        "end_hour_exclusive": 24,
+        "weights_percent": {
+          "wpc": 60,
+          "hrrr": 25,
+          "nam": 15
+        }
+      },
+      {
+        "label": "24–72h when all inputs and valid WPC coverage exist",
+        "start_hour_inclusive": 24,
+        "end_hour_exclusive": 72,
+        "weights_percent": {
+          "wpc": 60,
+          "ecmwf": 20,
+          "weathernext3": 10,
+          "gfs": 10
+        }
+      }
+    ],
+    "critical_guardrails": [
+      "The 10% WeatherNext snowfall-depth share is CONDITIONAL: only if a valid, calibrated native snowfall amount exists; WeatherNext precipitation amount is not snowfall depth. Otherwise exclude and renormalize other VALID snowfall-depth sources.",
+      "WPC cannot receive nonzero effective weight after its published product horizon.",
+      "Above 72h do not extend the 60% WPC rule automatically; use valid winter guidance or show uncertainty/unavailable.",
+      "Keep NBM precipitation-type probabilities separate from deterministic snowfall inches.",
+      "Snow / sleet / freezing-rain warnings and probabilities are separate products from snowfall amount."
+    ]
+  },
+  "operational": {
+    "forecast_quality_first": [
+      "Use model-specific run and valid-until timestamps",
+      "Align source accumulation periods before blending",
+      "If a source is missing, stale, unconfigured, at wrong point or unsupported variable, set effective weight to 0",
+      "Redistribute within remaining ELIGIBLE source set and show requested vs effective weights",
+      "For first 7d PoP with NWS present, preserve 40% NWS when reallocating others; if NWS absent do not falsely claim that fixed-share blend was computed",
+      "Do not conflate forecast spread with calibrated confidence",
+      "Respect NWS watches/warnings independent of all blending percentages",
+      "Use observed weather and actual radar for nowcasting; HRRR simulated reflectivity is not radar observation"
+    ],
+    "feature_flags": {
+      "enable_new_forecast": false,
+      "enable_weathernext3_as_public_blend": false,
+      "enable_extended_15_day_cards": false
+    },
+    "bias_correction": "When sufficient ground truth exists, use rolling out-of-sample bias correction by variable / location / lead / season, with shrinkage and holdouts. Do not train weights against themselves.",
+    "evaluation_metrics": {
+      "temperature": "MAE and RMSE in °F",
+      "rain_probability": "Brier score and reliability diagrams by threshold",
+      "rain_amount": "MAE, CRPS, exceedance calibration and heavy-rain event skill",
+      "snow": "event verification and snowfall spread with WPC reference"
+    },
+    "rollout": "ship a feature-flagged shadow comparison first; backtest and verify before opt-in activation of user-visible forecasts"
+  },
+  "keep_unchanged": [
+    "Existing public site layout, CSS, mobile controls, tabs and charts",
+    "All current Home Assistant systems and dashboards (out of scope)",
+    "Weather Nourie branding and site URLs",
+    "Current NWS warning authority",
+    "Current snow output unless separate tests justify guarded change",
+    "Fahrenheit, miles per hour, rainfall and snowfall inches"
+  ],
+  "source_caveat": "Uploaded research and example tables include illustrative, unverified numbers and estimated improvement ranges. No measured local 3–12% advantage is established by this package."
+}

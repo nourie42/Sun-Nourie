@@ -55,14 +55,14 @@ export function addExperience(out,{models={},grid,periods=[],exposureWeather=nul
   const row=exposureRows.get(epoch),value=row?.solar;
   return finite(value)&&value>=0?{value,source:`${exposureWeather?.source||'Open-Meteo'} same-hour model shortwave radiation`,time:row.time}:null;
  };
- const modelIds=['hrrr','ecmwf','nbm',...(models.wn?.verifiedModel?['wn']:[])];
+ const modelIds=['hrrr','ecmwf','nbm',...(models.wn?.verifiedModel?['wn']:[]),...(models.weathernext3?.verifiedModel?['weathernext3']:[]),...(models.gefs?.verifiedModel?['gefs']:[])];
  const mix=(official,time,field)=>{
    const values={nws:official};
    for(const id of modelIds)values[id]=modelSample(models,time,field,[id]).value;
    const index=forecastDayIndex(time,now,zone);
-   const result=field==='temperature_2m'?weightedTemperature(values,index):weighted(values,temperaturePolicy(index,finite(values.wn)));
-   result.sources=result.sources.map(item=>item.id==='wn'?{...item,runAt:modelSample(models,time,field,['wn']).runAt}:item);
-   return {...result,source:result.sources.map(s=>`${s.id==='wn'?'Google WeatherNext':s.id.toUpperCase()} ${Math.round(s.weight*100)}%`).join(' / ')||null};
+   const result=field==='temperature_2m'?weightedTemperature(values,index,out.blendV2?.enabled?{enabled:true,validTime:time,issuedAt:Date.parse(out.blendV2.issuedAt)}:null):weighted(values,temperaturePolicy(index,finite(values.wn)));
+   result.sources=result.sources.map(item=>['wn','weathernext3'].includes(item.id)?{...item,runAt:modelSample(models,time,field,[item.id]).runAt}:item);
+   return {...result,source:result.sources.map(s=>`${s.id==='wn'?'Google WeatherNext':s.id==='weathernext3'?'WeatherNext 3':s.id.toUpperCase()} ${Math.round(s.weight*100)}%`).join(' / ')||null};
  };
  const raw=[];
  const fieldsByTime=new Map();

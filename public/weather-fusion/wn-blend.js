@@ -22,7 +22,7 @@ let curVar = 'temp';
 const COLORS = {
   nourie: '#ffffff',
   nws: '#7fd4ff', hrrr: '#ffb47d', nam: '#68e5dc', nbm: '#7de8a8', ecmwf: '#b48cff', wn: '#ffd479', gfs: '#ff8fc8',
-  single: '#7fd4ff',
+  weathernext3:'#f5cc66',gefs:'#ff8fc8',single: '#7fd4ff',
 };
 const K2F = (k) => (k - 273.15) * 9 / 5 + 32;
 const MS2MPH = (ms) => ms * 2.23694;
@@ -292,7 +292,7 @@ export function buildSeries(fx, wn, varId, now = Date.now()) {
 }
 
 const hiddenModels = new Set();
-const NAMES = { nourie: 'Weather Nourie blend', nws: 'NWS', hrrr: 'HRRR', nam: 'NAM', nbm: 'NBM', ecmwf: 'ECMWF', wn: 'Google WeatherNext', gfs: 'GFS', single: '' };
+const NAMES = { nourie: 'Weather Nourie blend', nws: 'NWS', hrrr: 'HRRR', nam: 'NAM', nbm: 'NBM', ecmwf: 'ECMWF', wn: 'Google WeatherNext', gfs: 'GFS', weathernext3:'WeatherNext 3',gefs:'GEFS', single: '' };
 export function dailyHighComparison(built,index){
   const published={...built.modelMaps[index]};
   if(!Object.hasOwn(published,'wn')&&finite(built.wnVals[index]))published.wn=built.wnVals[index];
@@ -318,20 +318,20 @@ function renderChart(container, built, varDef, varId) {
   const phone = W < 600;
   const H = phone ? 340 : 380, PL = phone ? 38 : 52, PR = phone ? 10 : 18, PT = 30, PB = 34;
   const FS = phone ? 11 : 14;
-  const series = { nourie: [], nws: [], hrrr: [], nam: [], nbm: [], ecmwf: [], wn: [], gfs: [], single: [] };
+  const series = { nourie: [], nws: [], hrrr: [], nam: [], nbm: [], ecmwf: [], wn: [], gfs: [], weathernext3:[],gefs:[],single: [] };
   if (built.perModel) {
     days.forEach((d, i) => {
       const src = { ...built.modelMaps[i] };
       if(!Object.hasOwn(src,'wn'))src.wn=built.wnVals[i];
       series.nourie.push(finite(built.forecastValues[i]) ? built.forecastValues[i] : null);
-      for (const id of ['nws', 'hrrr', 'nam', 'nbm', 'ecmwf']) series[id].push(finite(src[id]) ? src[id] : null);
+      for (const id of ['nws', 'hrrr', 'nam', 'nbm', 'ecmwf','weathernext3','gefs']) series[id].push(finite(src[id]) ? src[id] : null);
       series.wn.push(finite(src.wn) ? src.wn : null);
       series.gfs.push(finite(src.gfs) ? src.gfs : null);
     });
   } else {
     days.forEach((d, i) => series.single.push(built.single[i] ?? null));
   }
-  const ids = built.perModel ? ['nourie', ...['nws', 'hrrr', 'nam', 'nbm', 'ecmwf', 'wn', 'gfs'].filter((id) => series[id].some(finite))] : ['single'];
+  const ids = built.perModel ? ['nourie', ...['nws', 'hrrr', 'nam', 'nbm', 'ecmwf', 'wn', 'gfs','weathernext3','gefs'].filter((id) => series[id].some(finite))] : ['single'];
   const visible = ids.filter((id) => id === 'nourie' || !hiddenModels.has(id));
   const allV = visible.flatMap((id) => series[id]).filter((v) => v != null);
   if (!ids.some(id => series[id].some(finite))) {

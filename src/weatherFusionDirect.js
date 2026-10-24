@@ -1,3 +1,4 @@
+import {temperatureV2,officialRainV2} from './weatherFusionBlendV2.js';
 import {createHrrrMapSource} from './weatherFusionHrrrMap.js';
 import {createPointModels} from './weatherFusionPointModels.js';
 /** Direct, decoded NOAA/ECMWF model snapshots. No provider key and no webpage scraping. */
@@ -148,7 +149,14 @@ export function weighted(values, policy) {
     sources: sources.map((s) => ({ ...s, weight: round(s.weight/sum,6) })), calibrated: false };
 }
 /** Temperature-only policy; moisture, wind and rain retain their own weights. */
-export function weightedTemperature(values,index){
+export function weightedTemperature(values,index,context=null){
+ if(context?.enabled){
+  const result=temperatureV2(values,index,context.validTime,context.issuedAt);
+  const {policy,temperatureAdjustment}=adjustTemperaturePolicy(values,result.policy,index);
+  const blend=weighted(values,policy);
+  if(temperatureAdjustment)blend.sources=blend.sources.map(source=>source.id===temperatureAdjustment.sourceId?{...source,temperatureOutlier:true,baseWeight:temperatureAdjustment.baseWeight}:source.id==='ecmwf'?{...source,receivedTemperatureWeight:temperatureAdjustment.transferredWeight}:source);
+  return {...blend,version:result.version,band:result.band,leadHours:result.leadHours,requestedWeights:result.requestedWeights,excluded:result.excluded,temperatureAdjustment};
+ }
  const {policy,temperatureAdjustment}=adjustTemperaturePolicy(values,tempPolicy(index,finite(values.wn)),index);
  const blend=weighted(values,policy);
  if(temperatureAdjustment)blend.sources=blend.sources.map(source=>source.id===temperatureAdjustment.sourceId
@@ -329,7 +337,7 @@ export function refreshCalendarConfidence(out,{now=Date.now()}={}) {
         }
       }
     }
-    const sourceOrder=['nws','hrrr','ecmwf','nbm','wn'];
+    const sourceOrder=['nws','hrrr','ecmwf','nbm','wn','weathernext3','gefs'];
     const contributors=kind=>sourceOrder.filter(id=>samples[id]?.length).map(id=>({id,value:round(kind==='high'?Math.max(...samples[id]):Math.min(...samples[id]),1),weight:round(weights[id]/expectedHours,6),coverageHours:counts[id],complete:counts[id]===expectedHours,
       runAt:runs[id]?.size===1?[...runs[id]][0]:runs[id]?.size?null:(out.feeds?.find(feed=>feed.id===(id==='nws'?'hourly':id))?.issuedAt||null),...(runs[id]?.size>1?{runAts:[...runs[id]]}:{})}));
     const high=contributors('high'),low=contributors('low');
@@ -404,7 +412,7 @@ export function enhanceForecast(out, { models, grid, periods = [], hourlyPeriods
       const stop=Math.min(end,(Math.floor(cursor/H)+1)*H),span=stop-cursor;
       const values={nws:gridQpf(grid,cursor,stop,8)};
       for(const [id,m] of Object.entries(sourceModels))values[id]=intervalTotal(m.precipitationIntervals,cursor,stop,8);
-      const policy=precipitationAmountPolicy(forecastDayIndex(cursor,now,out.location.timeZone),finite(values.wn));
+      const policy=out.blendV2?.enabled?{nws:1}:precipitationAmountPolicy(forecastDayIndex(cursor,now,out.location.timeZone),finite(values.wn));
       let result=weighted(values,policy);
       if(result.value===null)result=weighted(values,{nbm:1});
       for(const [id,v] of Object.entries(values))if(finite(v)){sourceTotals[id]=(sourceTotals[id]||0)+v;sourceCoverage[id]=(sourceCoverage[id]||0)+span;}
@@ -446,7 +454,7 @@ export function enhanceForecast(out, { models, grid, periods = [], hourlyPeriods
       ?sourceCondition.trim():null;
     const precipitationBlend=sourceQpf(time,time+H);
     const policy=precipitationPolicy(forecastDayIndex(time,now,out.location.timeZone),finite(precipitationBlend.sourceValues?.wn));
-    const rainLikelihood=publishedPrecipitationLikelihood(officialPop,precipitationBlend,policy);
+    const rainLikelihood=out.blendV2?.enabled?officialRainV2(officialPop):publishedPrecipitationLikelihood(officialPop,precipitationBlend,policy);
     rainLikelihood.sources=rainLikelihood.sources.map(source=>({...source,runAt:sourceRun(source.id,time+H)}));
     precipitationBlend.sources=precipitationBlend.sources.map(source=>({...source,runAt:sourceRun(source.id,time+H)}));
     out.rainTimeline.push({time:iso(time),end:iso(time+H),officialPop,rainLikelihood,
@@ -498,7 +506,7 @@ export function enhanceForecast(out, { models, grid, periods = [], hourlyPeriods
           d.guidance[id] ||= {};
           d.guidance[id][kind]=round(values[id],1);
         }
-        const blend=weightedTemperature(values,index);
+        const blend=weightedTemperature(values,index,out.blendV2?.enabled?{enabled:true,issuedAt:Date.parse(out.blendV2.issuedAt),validTime:start}:null);
         d[kind]=round(blend.value,0); d[`${kind}Blend`]=blend;
         d[`${kind}Window`]={start:iso(start),end:iso(end)};
       }
@@ -539,7 +547,7 @@ export function enhanceForecast(out, { models, grid, periods = [], hourlyPeriods
     const time=Date.parse(hour.time),values={nws:hour.forecastSource==='model-guidance'?null:hour.temperature};
     for(const [id,m] of Object.entries(sourceModels)) values[id]=sample(m,time,'temperature_2m');
     hour.officialTemperature=values.nws;
-    hour.temperatureBlend=weightedTemperature(values,forecastDayIndex(time,now,out.location.timeZone));
+    hour.temperatureBlend=weightedTemperature(values,forecastDayIndex(time,now,out.location.timeZone),out.blendV2?.enabled?{enabled:true,issuedAt:Date.parse(out.blendV2.issuedAt),validTime:time}:null);
     hour.temperatureBlend.sources=hour.temperatureBlend.sources.map(source=>({...source,runAt:sourceRun(source.id,time)}));
     hour.temperature=round(hour.temperatureBlend.value,0);
     hour.temperatureSource=hour.temperatureBlend.sources.length?hour.temperatureBlend.sources.map(source=>`${source.id==='wn'?'Google WeatherNext':source.id.toUpperCase()} ${Math.round(source.weight*100)}%`).join(' / '):'Temperature forecast unavailable';

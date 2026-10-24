@@ -71,7 +71,7 @@ export function forecastConfidence({dayIndex=0,highSpread=null,temperatureSpread
    note:`Relative confidence index, not a probability or a measured accuracy percentage. It considers temperature agreement, rainfall agreement, lead time and missing inputs. Missing coverage cannot turn otherwise Moderate or High same-day evidence into Low; genuine disagreement is not raised. ${comparisonNote}`};
 }
 
-const evidenceNames={nws:'NWS',hrrr:'HRRR',ecmwf:'ECMWF',nbm:'NBM',wn:'Google WeatherNext'};
+const evidenceNames={nws:'NWS',hrrr:'HRRR',ecmwf:'ECMWF',nbm:'NBM',wn:'Google WeatherNext',weathernext3:'WeatherNext 3',gefs:'GEFS'};
 const escapeEvidence=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function evidenceTime(value,timeZone){
  const epoch=Date.parse(value);if(!finite(epoch))return null;

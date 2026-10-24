@@ -415,7 +415,7 @@ function chartSVG(L, spec, def) {
     + `<defs>${defs}</defs>${nights}${grid}${xt}${body}${marks}${scrub}</svg>`;
 }
 
-function mountChart(el, spec, def, onScrub) {
+export function mountChart(el, spec, def, onScrub) {
   const draw = () => {
     const width = Math.max(260, el.clientWidth), height = el.classList.contains('tall') ? 260 : 210;
     const L = layoutChart({ ...spec, width, height, domain: def.domain, min0: def.min0 });
@@ -944,7 +944,7 @@ function init() {
   setInterval(()=>{const place=state.places[state.index],cached=place&&state.cache.get(placeKey(place));if(cached)render(buildModel(cached.data),place);},60000);
 }
 
-if (typeof document !== 'undefined' && typeof window !== 'undefined') {
+if (typeof document !== 'undefined' && typeof window !== 'undefined' && document.getElementById('trend-chart') && document.getElementById('sheet-chart')) {
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
   else init();
 }

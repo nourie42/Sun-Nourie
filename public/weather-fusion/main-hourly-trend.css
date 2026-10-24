@@ -1,0 +1,25 @@
+/* Chart */
+#main-hourly-trend .chart { position: relative; width: 100%; min-height: 210px; touch-action: pan-y; user-select: none; -webkit-user-select: none; }
+#main-hourly-trend .chart.tall { min-height: 260px; }
+#main-hourly-trend .chart svg { display: block; overflow: visible; cursor: crosshair; }
+#main-hourly-trend .c-night { fill: rgba(0, 12, 40, .13); }
+#main-hourly-trend .c-grid { stroke: rgba(255, 255, 255, .14); stroke-width: 1; stroke-dasharray: 2 4; }
+#main-hourly-trend .c-mid { stroke: rgba(255, 255, 255, .22); stroke-width: 1; }
+#main-hourly-trend .c-ylab { fill: var(--ink-3); font-size: 11px; font-weight: 600; }
+#main-hourly-trend .c-xlab { fill: var(--ink-3); font-size: 11px; font-weight: 600; text-anchor: middle; }
+#main-hourly-trend .c-line { fill: none; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+#main-hourly-trend .c-line.draw { stroke-dasharray: 1; stroke-dashoffset: 1; animation: main-trend-draw 1.1s cubic-bezier(.4, .1, .2, 1) forwards; }
+@keyframes main-trend-draw { to { stroke-dashoffset: 0; } }
+#main-hourly-trend .c-area { animation: main-trend-fade .9s ease both .2s; }
+@keyframes main-trend-fade { from { opacity: 0; } }
+#main-hourly-trend .c-extra { fill: none; stroke-width: 2; stroke-dasharray: 3 5; opacity: .7; stroke-linecap: round; }
+#main-hourly-trend .c-past { opacity: .4; }
+#main-hourly-trend .c-bars rect { transform-box: fill-box; transform-origin: 50% 100%; animation: main-trend-grow .7s cubic-bezier(.2, .8, .2, 1) both; animation-delay: var(--d, 0ms); }
+@keyframes main-trend-grow { from { transform: scaleY(0); } }
+#main-hourly-trend .c-hl { fill: var(--ink-2); font-size: 11px; font-weight: 700; text-anchor: middle; }
+#main-hourly-trend .c-nowdot { fill: #fff; stroke: rgba(20, 40, 80, .5); stroke-width: 3; }
+#main-hourly-trend .c-scrub line { stroke: rgba(255, 255, 255, .85); stroke-width: 1.5; }
+#main-hourly-trend .c-scrub circle { stroke: #fff; stroke-width: 3; filter: drop-shadow(0 2px 6px rgba(0, 0, 0, .3)); }
+#main-hourly-trend .c-empty { position: absolute; inset: 0; display: grid; place-items: center; margin: 0; color: var(--ink-3); font-size: .9rem; }
+
+#main-hourly-trend{--ink-2:#e0ebfa;--ink-3:#bfd0e5}#main-hourly-trend .main-trend-tabs{display:flex;gap:6px;flex-wrap:wrap;margin:16px 0}#main-hourly-trend .main-trend-tabs button{border:1px solid rgba(255,255,255,.16);background:rgba(0,12,40,.2);color:inherit;font:inherit;font-size:13px;padding:9px 12px;border-radius:12px;cursor:pointer}#main-hourly-trend [role=tab][aria-selected=true]{background:rgba(150,190,240,.3);border-color:#a7deff}#main-hourly-trend .main-trend-reading{display:flex;align-items:baseline;gap:14px;margin:16px 0;flex-wrap:wrap}#main-hourly-trend .main-trend-reading strong{font-size:36px;font-weight:400}#main-hourly-trend .main-trend-reading span,#main-hourly-trend .main-trend-note{color:var(--ink-3);font-size:13px}#main-hourly-trend .chart.tall{min-height:260px}@media(prefers-reduced-motion:reduce){#main-hourly-trend .c-line.draw{stroke-dashoffset:0}#main-hourly-trend *{animation:none!important}}
