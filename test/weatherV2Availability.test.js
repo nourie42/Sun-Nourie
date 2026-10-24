@@ -46,3 +46,16 @@ test('intentional official probability does not trigger model outage retries',as
  assert.equal(forecastNeedsModelRetry(f,now),false);
  f.feeds.find(s=>s.id==='hrrr').status='unavailable';assert.equal(forecastNeedsModelRetry(f,now),true);
 });
+
+test('GEFS honors provider retry-after rather than refetching on every page load',async()=>{
+ const {createGefs}=await import('../src/weatherFusionGefs.js');let clock=now,calls=0;
+ const load=createGefs({now:()=>clock,fetchImpl:async()=>{calls++;return {ok:false,status:429,headers:{get:()=> '120'}};}});
+ const place={latitude:35.787,longitude:-78.4806};const first=await load(place);const attempts=calls;
+ assert.equal(first.meta.status,'unavailable');assert.match(first.meta.message,/rate limit/);assert.ok(first.meta.retryAfter);
+ await load(place);await load({...place,latitude:35.8});assert.equal(calls,attempts);
+ clock+=121000;await load(place);assert.ok(calls>attempts);
+});
+test('Compare keeps the real source availability reason for an unavailable model',()=>{
+ const f=forecast();f.feeds.push({id:'gefs',status:'unavailable',message:'GEFS provider rate limit'});
+ const b=buildSeries(f,null,'temp',now);assert.equal(b.sourceAvailability.gefs.message,'GEFS provider rate limit');
+});

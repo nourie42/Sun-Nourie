@@ -13,12 +13,13 @@ export function validateGefs(data,meta,location,now){
  return {verifiedModel:true,model:'gefs',ensembleMembers:31,modelLabel:'NOAA GEFS 0.25° ensemble mean',runAt:new Date(run).toISOString(),validUntil:new Date(Math.min(end,Math.max(...times)*1000)).toISOString(),latitude:location.latitude,longitude:location.longitude,modelGrid:{latitude:data.latitude,longitude:data.longitude},hourly_units:{time:'unixtime',temperature_2m:'°F'},hourly:{time:times,temperature_2m:means},precipitationIntervals:rain?times.flatMap((t,i)=>finite(rain[i])?[{start:t-3600,end:t,value:rain[i]}]:[] ):[],transport:'Open-Meteo explicit gfs025 ensemble API',runScope:'Latest published NOAA GEFS initialization; provider hourly interpolation of the 3-hourly ensemble fields',sourceUrl:'https://open-meteo.com/en/docs/ensemble-api'};
 }
 export function createGefs({fetchImpl=globalThis.fetch,now=Date.now}={}){
- const cache=new Map(),pending=new Map();
- const json=async url=>{const r=await fetchImpl(url,{redirect:'error',signal:AbortSignal.timeout(12000)});if(!r.ok)throw Error(`GEFS HTTP ${r.status}`);const t=await r.text();if(Buffer.byteLength(t)>2500000)throw Error('GEFS response too large');return JSON.parse(t);};
+ const cache=new Map(),pending=new Map();let retryAt=0;
+ const json=async url=>{const r=await fetchImpl(url,{redirect:'error',signal:AbortSignal.timeout(12000)});if(!r.ok){if(r.status===429){const header=r.headers?.get?.('retry-after'),seconds=Number(header);const delay=header&&Number.isFinite(seconds)?seconds*1000:Date.parse(header)-now();retryAt=now()+Math.max(60000,Number.isFinite(delay)&&delay>0?delay:5*60000);throw Error('GEFS provider rate limit; retry after '+new Date(retryAt).toISOString());}throw Error(`GEFS HTTP ${r.status}`);}const t=await r.text();if(Buffer.byteLength(t)>2500000)throw Error('GEFS response too large');return JSON.parse(t);};
  return async location=>{
   const key=`${location.latitude},${location.longitude}`,meta={id:'gefs',label:'NOAA GEFS ensemble mean',url:'https://open-meteo.com/en/docs/ensemble-api',status:'unavailable',fetchedAt:new Date(now()).toISOString()};
   try{
-   const hit=cache.get(key);if(hit&&hit.until>now()&&now()-Date.parse(hit.value.runAt)<24*H)return hit.result;
+   const hit=cache.get(key);if(hit&&hit.until>now()&&now()-Date.parse(hit.value.runAt)<24*H&&Date.parse(hit.value.validUntil)>now())return hit.result;
+   if(now()<retryAt)throw Error('GEFS provider rate limit; retry after '+new Date(retryAt).toISOString());
    if(!pending.has(key)){
     if(pending.size>=8)throw Error('GEFS sources are busy');
     const work=(async()=>{const query=new URLSearchParams({latitude:String(location.latitude),longitude:String(location.longitude),hourly:'temperature_2m,precipitation',models:'gfs025',temperature_unit:'fahrenheit',precipitation_unit:'inch',timezone:'GMT',forecast_days:'10',timeformat:'unixtime'});
@@ -28,6 +29,6 @@ export function createGefs({fetchImpl=globalThis.fetch,now=Date.now}={}){
     })().finally(()=>pending.delete(key));pending.set(key,work);
    }
    return await pending.get(key);
-  }catch(e){return {value:null,meta:{...meta,message:e.message}};}
+  }catch(e){const hit=cache.get(key);if(hit&&now()-Date.parse(hit.value.runAt)<24*H&&Date.parse(hit.value.validUntil)>now())return {value:hit.value,meta:{...hit.result.meta,retrievalStatus:'last-verified',checkedAt:new Date(now()).toISOString(),message:'Refresh failed; using previously verified GEFS data within its run-age and valid-horizon limits. '+e.message}};return {value:null,meta:{...meta,...(retryAt>now()?{retryAfter:new Date(retryAt).toISOString()}:{}),message:e.message}};}
  };
 }

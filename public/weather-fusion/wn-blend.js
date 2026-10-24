@@ -27,6 +27,7 @@ const COLORS = {
 const K2F = (k) => (k - 273.15) * 9 / 5 + 32;
 const MS2MPH = (ms) => ms * 2.23694;
 const M2IN = (m) => m * 39.3701; // WeatherNext/ECMWF precipitation is in metres
+const escapeHTML=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const finite = (v) => typeof v === 'number' && Number.isFinite(v);
 
 async function fetchJSON(url) {
@@ -197,7 +198,7 @@ export function buildSeries(fx, wn, varId, now = Date.now()) {
     return {start:varId!=='temp'&&finite(published?.start)?Math.max(calendar.start,published.start):calendar.start,
       end:varId==='temp'?calendar.end:finite(published?.end)?Math.min(calendar.end,published.end):calendar.end};
   });
-  const out = { nwsFallback:varId==='pop'&&readings.some(day=>day.rainSourceFallback&&finite(day.pop)),days, perModel: true, wnVals: days.map(() => null), modelMaps: days.map(() => ({})), forecastValues: days.map(() => null), windows,assembledAt:fx.assembledAt,timeZone:tz };
+  const out = { sourceAvailability:Object.fromEntries((fx.feeds||[]).map(f=>[f.id,{status:f.status,message:f.message||''}])),nwsFallback:varId==='pop'&&readings.some(day=>day.rainSourceFallback&&finite(day.pop)),days, perModel: true, wnVals: days.map(() => null), modelMaps: days.map(() => ({})), forecastValues: days.map(() => null), windows,assembledAt:fx.assembledAt,timeZone:tz };
 
   if (varId === 'temp' || varId === 'rain') {
     out.forecastValues = readings.map(day => varId === 'temp' ? day.high : day.amount);
@@ -332,7 +333,10 @@ function renderChart(container, built, varDef, varId) {
     days.forEach((d, i) => series.single.push(built.single[i] ?? null));
   }
   const ids = built.perModel ? ['nourie', ...['nws', 'hrrr', 'nam', 'nbm', 'ecmwf', 'wn', 'gfs','weathernext3','gefs'].filter((id) => series[id].some(finite))] : ['single'];
-  const coverageNote=`<details class="wn-model-coverage"><summary>Model coverage for ${varDef.label}</summary><p>Only models supplying this variable are plotted. Blank dates mean incomplete or unavailable coverage, not zero.</p><ul>${['nws','hrrr','nbm','ecmwf','wn','weathernext3','gefs','nam','gfs'].map(id=>`<li>${NAMES[id]}: ${series[id].filter(finite).length}/${days.length} dates${series[id].some(finite)?'':' · not supplied for this variable or outside coverage'}</li>`).join('')}</ul></details>`;
+  const coverageNote=`<details class="wn-model-coverage"><summary>Model coverage for ${varDef.label}</summary><p>Only models supplying this variable are plotted. Blank dates mean incomplete or unavailable coverage, not zero.</p><ul>${['nws','hrrr','nbm','ecmwf','wn','weathernext3','gefs','nam','gfs'].map(id=>`<li>${NAMES[id]}: ${series[id].filter(finite).length}/${days.length} dates${series[id].some(finite)?'':' · '+escapeHTML(built.sourceAvailability?.[id]?.status!=='ready'&&built.sourceAvailability?.[id]?.message?built.sourceAvailability[id].message:'not supplied for this variable or outside coverage')}</li>`).join('')}</ul></details>`;
+  const expectedIds=varId==='temp'||varId==='rain'?['nws','hrrr','nbm','ecmwf','wn','weathernext3','gefs']:['wind','dewpoint','cloud'].includes(varId)?['nws','hrrr','nbm','ecmwf','wn','weathernext3']:[];
+  const unavailable=expectedIds.filter(id=>built.sourceAvailability?.[id]?.status&&built.sourceAvailability[id].status!=='ready'&&!series[id].some(finite));
+  const sourceNote=unavailable.length?`<p class="wn-source-availability" role="status">${unavailable.map(id=>escapeHTML(NAMES[id])+': '+escapeHTML(built.sourceAvailability[id].message||'temporarily unavailable')).join(' · ')}</p>`:'';
   const visible = ids.filter((id) => id === 'nourie' || !hiddenModels.has(id));
   const allV = visible.flatMap((id) => series[id]).filter((v) => v != null);
   if (!ids.some(id => series[id].some(finite))) {
@@ -379,7 +383,7 @@ function renderChart(container, built, varDef, varId) {
     + `<div class="wn-chart-wrap" style="position:relative;touch-action:pan-y">`
     + `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" style="width:100%;height:auto;display:block;cursor:crosshair" role="img" aria-label="${varId==='temp'?'Daily high temperature':varDef.label} comparison chart">${ylabels}${labels}${lines}${dots}`
     + `<line class="wn-cross" x1="0" x2="0" y1="${PT - 10}" y2="${H - PB}" stroke="#fff" stroke-width="1.5" stroke-dasharray="3,3" opacity="0"/><g class="wn-cross-dots"></g></svg>`
-    + `<div class="wn-tip" role="status" aria-live="polite" style="position:absolute;top:4px;display:none;min-width:130px;padding:8px 10px;border-radius:12px;background:rgba(10,20,40,.88);border:1px solid rgba(255,255,255,.22);color:#fff;font-size:12px;line-height:1.45;pointer-events:none;box-shadow:0 6px 18px rgba(0,0,0,.35)"><button type="button" class="wn-tip-close" aria-label="Close model values" style="position:absolute;top:3px;right:3px;width:32px;height:32px;border:0;border-radius:6px;background:transparent;color:#fff;font-size:24px;line-height:1;cursor:pointer;pointer-events:auto">×</button><div class="wn-tip-content"></div></div></div>${note}${coverageNote}`;
+    + `<div class="wn-tip" role="status" aria-live="polite" style="position:absolute;top:4px;display:none;min-width:130px;padding:8px 10px;border-radius:12px;background:rgba(10,20,40,.88);border:1px solid rgba(255,255,255,.22);color:#fff;font-size:12px;line-height:1.45;pointer-events:none;box-shadow:0 6px 18px rgba(0,0,0,.35)"><button type="button" class="wn-tip-close" aria-label="Close model values" style="position:absolute;top:3px;right:3px;width:32px;height:32px;border:0;border-radius:6px;background:transparent;color:#fff;font-size:24px;line-height:1;cursor:pointer;pointer-events:auto">×</button><div class="wn-tip-content"></div></div></div>${note}${sourceNote}${coverageNote}`;
   container.querySelectorAll('button.wn-chip').forEach((b) => b.addEventListener('click', () => {
     const id = b.dataset.model; if (hiddenModels.has(id)) hiddenModels.delete(id); else hiddenModels.add(id);
     renderChart(container, built, varDef, varId);
