@@ -232,7 +232,9 @@ export function buildSeries(fx, wn, varId, now = Date.now()) {
       const start=Date.parse(sky?.start),end=Date.parse(sky?.end);
       if(finite(start)&&finite(end)&&end>start)windows[i]={start,end};
       const totals=new Map(),coverage=new Map(),cursor=new Map(),invalid=new Set();
-      const rows=(fx.metricForecasts?.series?.cloud||[]).filter(p=>Date.parse(p.time)<windows[i].end&&Date.parse(p.time)+3600000>windows[i].start).sort((a,b)=>Date.parse(a.time)-Date.parse(b.time));
+      const clouds=fx.metricForecasts?.series?.cloud||[],publishedTimes=new Set(clouds.map(p=>p.time));
+      const extended=(fx.metricForecasts?.series?.feels||[]).filter(p=>!publishedTimes.has(p.time)).map(p=>({time:p.time,value:p.inputs?.skyCover,sources:p.inputs?.skySources||[]}));
+      const rows=[...clouds,...extended].filter(p=>Date.parse(p.time)<windows[i].end&&Date.parse(p.time)+3600000>windows[i].start).sort((a,b)=>Date.parse(a.time)-Date.parse(b.time));
       for(const row of rows){
         const time=Date.parse(row.time),left=Math.max(time,windows[i].start),right=Math.min(time+3600000,windows[i].end);
         for(const source of [{id:'nourie',value:row.value},...(row.sources||[])]){
