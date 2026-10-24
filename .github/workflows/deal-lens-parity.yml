@@ -1,0 +1,33 @@
+name: Deal Lens parity report
+
+# Runs only on the deal-lens-parity branch (or by hand). Needs the repository secret
+# DEAL_LENS_MODEL_KEY. Without it the report says so and nothing is decrypted.
+on:
+  push:
+    branches: [deal-lens-parity]
+    paths:
+      - scripts/dealLensParityReport.mjs
+      - .github/workflows/deal-lens-parity.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Run parity report (synthetic numbers only)
+        env:
+          DEAL_LENS_MODEL_KEY: ${{ secrets.DEAL_LENS_MODEL_KEY }}
+        run: node scripts/dealLensParityReport.mjs docs/deal-lens-parity-status.json
+      - name: Save the report on this branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/deal-lens-parity-status.json
+          git diff --cached --quiet || (git commit -m "Record Deal Lens parity report [skip ci]" && git push)
