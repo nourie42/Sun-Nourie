@@ -7,6 +7,13 @@ on:
     branches: [deal-lens-parity]
     paths:
       - scripts/dealLensParityReport.mjs
+      - public/deal-lens/model.js
+      - public/deal-lens/original-model.js
+      - public/deal-lens/original-engine.js
+      - public/deal-lens/intake-model-ui.js
+      - public/deal-lens/app.js
+      - data/deal-lens/**
+      - test/dealLensParity.test.js
       - .github/workflows/deal-lens-parity.yml
   workflow_dispatch:
 
@@ -15,12 +22,15 @@ permissions:
 
 jobs:
   report:
+    if: github.ref == 'refs/heads/deal-lens-parity'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+      - name: Run public synthetic parity regressions
+        run: node --test test/dealLensParity.test.js
       - name: Run parity report (synthetic numbers only)
         env:
           DEAL_LENS_MODEL_KEY: ${{ secrets.DEAL_LENS_MODEL_KEY }}

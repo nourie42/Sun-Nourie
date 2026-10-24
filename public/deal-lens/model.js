@@ -41,7 +41,7 @@
     def('itCapex','Year 1 IT capital','USD','cash',null,'ModelExample COOP!S23: $7,000/site',0),
     def('maintFirst','Year 1 maintenance capital','USD','cash',null,'ModelExample COOP!C24: $20,000/site',0),
     def('maintAnnual','Annual maintenance base, from year 2','USD','cash',null,'ModelExample COOP!S24: $25,000/site, escalated from year 2',0),
-    def('operatorContribution','Year 1 operator capital contribution','USD','cash',0,'No contribution assumed. COOP!C29 includes an operator contribution',0),
+    def('operatorContribution','Year 1 operator add-back','USD','cash',null,'COOP!C29 = -C18: $50,000/site in year 1. Editable portfolio total',0),
     def('years','Forecast / hold period','years','forecast',15,'ModelExample COOP!C1:Q1: 15 annual periods',1,30),
     def('earningsGrowth','Annual earnings growth (earnings forecast)','%','forecast',2,'Estimate using COOP!S14 / S16 2% growth convention',-99,100),
     def('volumeGrowth','Annual fuel volume change','%','forecast',-1,'ModelExample COOP!S3: 99% retention',-99,100),
@@ -95,7 +95,7 @@
     // Apply count before dependent per-site estimates.
     if(Object.hasOwn(overrides,'sites')){const n=parse(overrides.sites);if(n!=null)set('sites',n,'Your model input','manual');}
     const n=inputs.sites;
-    for(const [k,rate] of [['workingCapital',50000],['itCapex',7000],['maintFirst',20000],['maintAnnual',25000]])if(inputs[k]==null)set(k,n*rate,byKey[k].basis);
+    for(const [k,rate] of [['workingCapital',50000],['itCapex',7000],['maintFirst',20000],['maintAnnual',25000],['operatorContribution',50000]])if(inputs[k]==null)set(k,n*rate,byKey[k].basis);
     if(d.modelRoute==='managed'){if(meta.fieldCost.status==='estimated')set('fieldCost',n*10000,'Managed operator case. ModelExample COOP!S19');if(meta.operatorCost.status==='estimated')set('operatorCost',n*50000,'Managed operator case. ModelExample COOP!S18');}
     if(inputs.price==null&&inputs.base>0)set('price',inputs.base*7,'Estimated entry price: 7× earnings, using workbook exit multiple. Replace with seller ask');
     for(const [k,raw] of Object.entries(overrides)){if(!byKey[k])continue;const v=parse(raw);if(v==null){errors.push(byKey[k].label+': enter a valid number');set(k,null,'Invalid entry','invalid');}else set(k,v,'Your model input',d.modelConfirmed?.[k]?'confirmed':'manual');}
@@ -122,7 +122,7 @@
       const wc=y===p.years?p.workingCapital*(p.wcRecovery??100)/100:0,cash=ebitda-maintenance-it-capital-tax+contribution+exit+wc;
       years.push({year:y,gallons,cpg,inside,opex,rent,base,fuel,insideBenefit,savings,other,field,operator,addedRent,ebitda,ebitdar,maintenance,it,capital,taxable,tax,contribution,exit,wc,cash});flows.push(cash);
     }
-    return {years,flows,initial,closing,irr:irr(flows),npv:npv(p.target/100,flows),multiple:p.base>0?p.price/p.base:null};
+    return {years,flows,initial,closing,irrBasis:'COOP!B34',irrBasisLabel:'Without capitalized lease',irr:irr(flows),npv:npv(p.target/100,flows),multiple:p.base>0?p.price/p.base:null};
   }
   function calculate(d){const r=resolve(d),p=r.inputs;if(p.price==null)r.errors.push('Add a purchase price or annual earnings to start the model');if(p.base==null&&r.method==='earnings')r.errors.push('Add annual EBITDA or site NOI to start the earnings forecast');
     if(r.method==='operations'&&p.gallons<=0&&p.inside<=0&&p.otherIncome<=0)r.errors.push('The detailed operating forecast needs fuel gallons, inside sales or other income');

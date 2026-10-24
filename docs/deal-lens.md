@@ -21,3 +21,40 @@ when the private fixture cannot be unlocked. No provider requests are required.
 Saved deals remain in browser storage. Existing records from another origin can
 be moved with the existing Export Deal Lens backup / Import Deal Lens backup
 actions. No account data or uploaded seller files are committed to the repository.
+
+## Workbook parity on `deal-lens-parity`
+
+The model and Chip brief show COOP!B34 (without capitalized lease, cash-flow row
+32) and COOP!B38 (with capitalized lease, row 37) separately. Each 13% price is
+solved by recalculating its own workbook cash flows, including price-dependent
+taxes. The primary cash-flow table uses B34. It displays C29 as the year-1
+operator add-back and Q29 as the year-15 exit value.
+
+The workbook's editable S18 controls both recurring operator retained earnings
+and the year-1 add-back through C18 and C29. No additional payment is added on
+top of the workbook's cash flows. The separate native `model.js` defaults its
+editable year-1 portfolio contribution to sites × $50,000, preserves explicit
+zero overrides, and reports the B34 basis. It is not the live page's engine.
+
+Run `node --test test/dealLensParity.test.js` without a key. These synthetic
+regressions cover timing, scaling, overrides, basis reconciliation and price
+solves. The existing private workbook/export tests require the runtime key.
+`node scripts/dealLensParityReport.mjs` verifies the encrypted model when that
+key is provided securely in the process environment. It reports `no-key` when
+unavailable, fails on mismatches, and does not print model text or the key.
+
+A fresh download can be checked without the key:
+`node scripts/inspectDealLensWorkbook.mjs /private/path/download.xlsx`.
+This checks the year-1 formula and identifies the file by SHA-256. Cached values
+are not recalculation evidence, and an older local download does not establish
+the currently deployed version. Never commit the downloaded workbook.
+
+The supplied RomeoTest acceptance targets at ten sites and $9.5M are B34
+12.9075% / $9,443,627 at 13%, and B38 12.385% / $9,089,579 at 13%.
+Those remain unverified until the exact current RomeoTest workbook and its full
+input set are available. The parity report's round synthetic operating inputs
+are a separate test case and must not be represented as that baseline.
+
+The separate `deal-desk/` app in this checkout is a ten-year pretax screen. It
+was not changed as part of the clarified `/deal-lens/` scope. The encrypted
+assets are unchanged pending verification of the deployed workbook.
