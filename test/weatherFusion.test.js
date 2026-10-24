@@ -113,7 +113,8 @@ test('direct NOAA/ECMWF data works without an intermediary API key', async () =>
   const s = createWeatherService({ now: () => now, env: {}, fetchImpl: async (...args) => { calls.push(args[0]); return mockFetch(...args); } });
   const f = await s.getForecast({ location: 'knightdale' });
   assert.equal(f.feeds.find((x) => x.id === 'hrrr').status, 'ready');
-  assert.ok(calls.some(u=>u.includes('models=gfs_hrrr')),'Try the explicitly named location-specific HRRR, never best_match');
+  assert.ok(calls.some(u=>u.includes('/data/ncep_hrrr_conus/static/meta.json')),'Check the named HRRR revision before downloading point data');
+  assert.ok(calls.every(u=>!u.includes('best_match')),'Never substitute an unnamed best-match model');
   assert.ok(calls.some(u=>u.includes('/models/hrrr.json')),'Native NOAA fallback remains usable without an API key');
   const b = await s.getBriefing({ location: 'knightdale' }); assert.equal(b.mode, 'nws-summary');
 });

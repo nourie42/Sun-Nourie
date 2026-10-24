@@ -3,7 +3,7 @@ import {forecastConfidence} from '../public/weather-fusion/forecast-confidence.j
 import {solarElevation} from '../public/weather-fusion/weather-math.js';
 import {TRACE_QPF_THRESHOLD_INCHES} from './weatherFusionDirect.js';
 
-export const CONDITION_CONFIDENCE_VERSION='weather-nourie-sky-rain-agreement-v5';
+export const CONDITION_CONFIDENCE_VERSION='weather-nourie-sky-rain-agreement-v6';
 const H=3600000,finite=value=>typeof value==='number'&&Number.isFinite(value),round=value=>Math.round(value*1000)/1000;
 const sourceIds=['nws','hrrr','ecmwf','nbm','wn','weathernext3','gefs'];
 const iso=time=>finite(time)?new Date(time).toISOString():null;
@@ -35,10 +35,10 @@ function axis(rows){
  for(const row of rows||[]){const time=Date.parse(row?.time);if(finite(time))result.set(time,result.has(time)?null:row);}
  return result;
 }
-function validSources(raw,kind){
+function validSources(raw,kind,{comparison=false}={}){
  const seen=new Map();
  for(const source of raw||[]){
-  if(!sourceIds.includes(source?.id)||!finite(source.weight)||source.weight<=0||!finite(source.value)||source.value<0||(kind==='sky'&&source.value>100))continue;
+  if(!sourceIds.includes(source?.id)||!finite(source.weight)||!(source.weight>0||(comparison&&source.comparisonOnly===true&&source.weight===0))||!finite(source.value)||source.value<0||(kind==='sky'&&source.value>100))continue;
   if(seen.has(source.id)){seen.set(source.id,null);continue;}
   seen.set(source.id,{id:source.id,value:source.value,weight:source.weight,category:(kind==='sky'?skyCategory:rainCategory)(source.value),runAt:source.runAt||null});
  }
@@ -82,13 +82,14 @@ function component(hours,window,scope){
 export function overallForecastConfidence(temperature,weather){
  const sky=weather.evidence.sky,rain=weather.evidence.rain;
  const components={temperature:temperature.score,sky:sky.score,rain:rain.score};
- let score=Object.values(components).every(finite)?Math.round(Object.values(components).reduce((a,b)=>a+b,0)/3):null;
- const complete=temperature.coverage?.temperature?.complete!==false&&sky.complete&&rain.complete&&sky.completeSources.length>=2&&rain.completeSources.length>=2&&temperature.sourceCount>=2;
- if(score!==null){if(!complete)score=Math.min(score,80);if(Math.min(...Object.values(components))<70)score=Math.min(score,84);if(Math.min(...Object.values(components))<55)score=Math.min(score,54);score=Math.min(score,rain.probabilityConflictCap??100);}
+ const available=Object.values(components).filter(finite),missingComponents=Object.keys(components).filter(key=>!finite(components[key]));
+ let score=available.length>=2?Math.round(available.reduce((a,b)=>a+b,0)/available.length):null;
+ const complete=missingComponents.length===0&&temperature.coverage?.temperature?.complete!==false&&sky.complete&&rain.complete&&sky.completeSources.length>=2&&rain.completeSources.length>=2&&temperature.sourceCount>=2;
+ if(score!==null){if(!complete)score=Math.min(score,80);if(Math.min(...available)<70)score=Math.min(score,84);if(Math.min(...available)<55)score=Math.min(score,54);score=Math.min(score,rain.probabilityConflictCap??100);}
  const key=score===null?'unavailable':score>=85?'high':score>=70?'moderate':'low';
- return {scope:'overall',version:'weather-nourie-overall-confidence-v1',score,key,label:key[0].toUpperCase()+key.slice(1),sourceCount:weather.sourceCount,sourceIds:weather.sourceIds,components,
-  summary:score===null?'Comparable evidence is missing for a forecast component.':`Temperature agreement ${components.temperature}; sky agreement ${components.sky}; rain agreement ${components.rain}.`,
-  factors:['Equal weighting of temperature, sky cover and rain agreement','Missing inputs and substantial component disagreement limit the rating'],note:'Relative agreement index, not a calibrated probability or a measured accuracy percentage.'};
+ return {scope:'overall',version:'weather-nourie-overall-confidence-v2',score,key,label:key[0].toUpperCase()+key.slice(1),sourceCount:weather.sourceCount,sourceIds:weather.sourceIds,components,missingComponents,
+  summary:score===null?'Fewer than two forecast components have comparable evidence.':`Temperature agreement ${components.temperature??'unavailable'}; sky agreement ${components.sky??'unavailable'}; rain agreement ${components.rain??'unavailable'}.`,
+  factors:['Equal weighting of available temperature, sky cover and rain agreement','At least two components are required; a missing component caps overall confidence at Moderate','Missing inputs and substantial component disagreement limit the rating'],note:'Relative agreement index, not a calibrated probability or a measured accuracy percentage.'};
 }
 function temperatureComponent(day,index){
  const current=day.confidence,coverage=current.coverage?.temperature;
@@ -116,7 +117,8 @@ export function addConditionConfidence(out,{now=Date.now()}={}){
   const window={start:iso(start),end:iso(end)},allSky=[],rainHours=[];
   if(finite(start)&&finite(end)&&end>start)for(let time=Math.floor(start/H)*H;time<end;time+=H){
    const left=Math.max(start,time),right=Math.min(end,time+H),durationHours=(right-left)/H,hasSkyPoint=feels.has(time)||cloud.has(time),point=feels.has(time)?feels.get(time):cloud.get(time);
-   const raw=point?.inputs?.skySources??point?.sources??[],sources=validSources(raw,'sky');
+   const comparison=point?.inputs?.skyComparisonSources??point?.comparisonSources;
+   const raw=comparison??point?.inputs?.skySources??point?.sources??[],sources=validSources(raw,'sky',{comparison:Array.isArray(comparison)});
    const partial=left>time;
    const elevation=solarElevation(partial?left:left+(right-left)/2,out.location?.latitude,out.location?.longitude);
    const daylight=partial&&finite(elevation)?elevation>0:typeof point?.daylight==='boolean'?point.daylight:finite(elevation)&&elevation>0;

@@ -416,16 +416,17 @@ export function enhanceForecast(out, { models, grid, periods = [], hourlyPeriods
       let result=weighted(values,policy);
       if(result.value===null)result=weighted(values,{nbm:1});
       for(const [id,v] of Object.entries(values))if(finite(v)){sourceTotals[id]=(sourceTotals[id]||0)+v;sourceCoverage[id]=(sourceCoverage[id]||0)+span;}
-      if(result.value===null)return {value:null,sources:[],calibrated:false,start:iso(start),end:iso(end),sourceValues:values,source:'Incomplete forecast coverage'};
+      if(result.value===null){cursor=stop;continue;} // Keep raw model comparisons even when published QPF is missing.
       total+=result.sources.reduce((n,s)=>n+s.value*s.weight,0);covered+=span;
       for(const src of result.sources){totals[src.id]=(totals[src.id]||0)+src.value*src.weight;durations[src.id]=(durations[src.id]||0)+src.weight*span;}
       cursor=stop;
     }
     const sources=Object.keys(totals).map(id=>({id,weight:round(durations[id]/covered,6),value:round(sourceTotals[id],8),coverageHours:round(sourceCoverage[id]/H,1)}));
     const comparisonSources=out.blendV2?.enabled?Object.entries(sourceTotals).filter(([id])=>sourceCoverage[id]>=end-start).map(([id,value])=>({id,value:round(value,8),weight:precipitationAmountPolicy(forecastDayIndex(start,now,out.location.timeZone),finite(sourceTotals.wn))[id]||1,runAt:sourceRun(id,end)})):undefined;
-    return {value:covered?round(total,8):null,sources,...(comparisonSources?{comparisonSources}:{}),calibrated:false,start:iso(start),end:iso(end),
+    const complete=end>start&&covered===end-start;
+    return {value:complete?round(total,8):null,sources:complete?sources:[],...(comparisonSources?{comparisonSources}:{}),calibrated:false,start:iso(start),end:iso(end),
       sourceValues:Object.fromEntries(['nws',...active].map(id=>[id,sourceCoverage[id]>=end-start?round(sourceTotals[id],8):null])),
-      source:sources.length?sources.map(s=>`${s.id.toUpperCase()} ${Math.round(s.weight*100)}%`).join(' / '):'Unavailable',
+      source:!complete?'Incomplete forecast coverage':sources.length?sources.map(s=>`${s.id.toUpperCase()} ${Math.round(s.weight*100)}%`).join(' / '):'Unavailable',
       weighting:'Per-hour blend; displayed weights are window-average contributions. HRRR contributes only during the selected location\'s current local calendar day.'};
   }
   // Score every forecast hour once, including the days beyond the 48-hour strip.

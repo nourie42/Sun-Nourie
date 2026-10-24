@@ -151,7 +151,7 @@ test('negative rain increments do not discard valid cloud and temperature foreca
 test('provider Retry-After is respected across searched locations without borrowing point data',async()=>{
  let clock=now,calls=0,limited=false;
  const load=createPointModels({now:()=>clock,fetchImpl:async url=>{
-  calls++;if(url.includes('/static/'))return response(metadata);
+  calls++;if(url.includes('/static/'))return response({...metadata,last_run_modification_time:limited?1:0});
   if(limited)return new Response('',{status:429,headers:{'retry-after':'120'}});
   const u=new URL(url);return response(raw('hrrr',{latitude:+u.searchParams.get('latitude'),longitude:+u.searchParams.get('longitude')}));
  }});
@@ -159,4 +159,15 @@ test('provider Retry-After is respected across searched locations without borrow
  const retained=await load('hrrr',location);assert.equal(retained.fetchedAt,first.fetchedAt);
  const count=calls;await assert.rejects(()=>load('hrrr',{latitude:36,longitude:-79}),/rate limit/);assert.equal(calls,count);
  clock+=121000;limited=false;const other=await load('hrrr',{latitude:36,longitude:-79});assert.equal(other.longitude,-79);assert.ok(calls>count);
+});
+
+test('unchanged published model revision reuses the same city data without downloading it again',async()=>{
+ let clock=now,pointCalls=0,revision=1;
+ const load=createPointModels({now:()=>clock,fetchImpl:async url=>{
+  if(url.includes('/static/'))return response({...metadata,last_run_modification_time:revision});
+  pointCalls++;return response(raw());
+ }});
+ const first=await load('hrrr',location);clock+=6*60000;
+ const same=await load('hrrr',location);assert.equal(pointCalls,1);assert.equal(same.fetchedAt,first.fetchedAt);assert.equal(same.retrievalStatus,'unchanged-run');
+ clock+=6*60000;revision++;await load('hrrr',location);assert.equal(pointCalls,2,'A modification to the same initialization refreshes the measurements.');
 });

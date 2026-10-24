@@ -12,7 +12,7 @@ function anchoredText(text,anchor,zone,now){
   const w=word.toLowerCase();return label(w==='tomorrow'?next:date)+(w==='tonight'?' night':w.startsWith('this ')?' '+w.slice(5):'');
  });
 }
-const brief=text=>{const sentences=norm(text).match(/[^.!?]+[.!?]+|[^.!?]+$/g)||[];let result='';for(const s of sentences.slice(0,2)){if(result.length+s.length>440)break;result+=s+' ';}return result.trim();};
+const brief=text=>{const sentences=norm(text).match(/[^.!?]+[.!?]+|[^.!?]+$/g)||[];let result='',count=0;for(const s of sentences){if(result.length+s.length>440)continue;result+=s+' ';if(++count===2)break;}return result.trim();};
 // An extracted sentence has lost the preceding argument. Remove its opening
 // connective, while preserving transitions inside a complete source paragraph.
 const standalone=text=>norm(text).replace(/^(?:(?:however|consequently|therefore|nevertheless|thus|as a result|in addition|meanwhile)[,:]?\s+)+/i,'').replace(/^[a-z]/,letter=>letter.toUpperCase());
@@ -22,32 +22,42 @@ const plain=text=>standalone(norm(text).replace(/\btemperatures expected\b/gi,'t
 export function directTakeWording(text){
  return String(text||'').replace(/(^|[.!?]\s+)(?:(?:the\s+)?(?:NWS|National Weather Service|weather service)(?:\s+(?:forecast\s+)?discussion)?\s+(?:says?|states?|indicates?|notes?|expects?)\s+(?:that\s+)?|according to (?:the\s+)?(?:NWS|National Weather Service|weather service)(?:\s+discussion)?,\s*)/gi,'$1').replace(/(^|[.!?]\s+)([a-z])/g,(_,prefix,letter)=>prefix+letter.toUpperCase());
 }
+// AFD offices sometimes open KEY MESSAGES with a link to a briefing PDF.
+// Remove those administrative lines before punctuation can split a URL into
+// fake sentences. Apply this to cached AI prose as well as raw discussion text.
+export function weatherOnlyProse(text){
+ return norm(String(text||'').replace(/https?:\/{1,2}\S+|www\.\S+/gi,'').split('\n').filter(line=>!/(?:for (?:the )?(?:latest|more|additional)\b.*(?:messages|information|updates|details)|please\s+(?:visit|see)|(?:visit|refer to|check)\s+(?:the\s+)?(?:NWS|National Weather Service|weather\.gov|website))/i.test(line)).join('\n'));
+}
 export function danOverview(briefing,forecast,now=Date.now()){
  if(!forecast)return {text:'Checking the latest forecast discussion…',source:'Updating'};
  const evidence=collectDanTakeEvidence(forecast,now);
  const zone=forecast.location?.timeZone||'America/New_York';
  const generated=Date.parse(briefing?.generatedAt||evidence.source?.issuedAt);
  const sameSource=briefing?.mode==='ai'&&briefing.signature===forecast.signature&&evidence.source&&Number.isFinite(generated)&&dateKey(generated,zone)===dateKey(now,zone)&&JSON.stringify(briefing.danTakeSource)===JSON.stringify(evidence.source);
- if(sameSource&&brief(briefing.summary)&&!forecastProseConflict(briefing.summary,forecast,now))return {text:brief(briefing.summary),source:'From the local NWS discussion'};
+ if(sameSource&&brief(weatherOnlyProse(briefing.summary))&&!forecastProseConflict(briefing.summary,forecast,now))return {text:brief(weatherOnlyProse(briefing.summary)),source:'From the local NWS discussion'};
  if(evidence.source){
-  // SYNOPSIS is the NWS's own current overview; no historical section is recycled.
-  const body=forecast.discussion.text.match(/^\.(?:SYNOPSIS|KEY MESSAGES)[^\n]*\n([\s\S]*?)(?=^\.[A-Z]|^&&|\$\$|(?![\s\S]))/m)?.[1]||'';
+  // Prefer the office's overview. If it contains only referrals or fragments,
+  // use still-current weather sentences from its narrative forecast sections.
+  const sections=[...forecast.discussion.text.matchAll(/^\.(SYNOPSIS|KEY MESSAGES|NEAR TERM|SHORT TERM)[^\n]*\n([\s\S]*?)(?=^\.[A-Z]|^&&|\$\$|(?![\s\S]))/gm)].sort((a,b)=>['SYNOPSIS','NEAR TERM','KEY MESSAGES','SHORT TERM'].indexOf(a[1])-['SYNOPSIS','NEAR TERM','KEY MESSAGES','SHORT TERM'].indexOf(b[1]));
   const issued=Date.parse(evidence.source.issuedAt);
-  const anchor=sectionAnchor(body,issued,zone);
-  const synopsis=Number.isFinite(anchor)&&issued-anchor<=86400000?body.replace(/^\s*(?:As of|Issued at)[^\n]*(?:\n|$)/gmi,'').replace(/^\s*(?:\d+[).]|[-*])\s*/gm,''):'';
-  const currentSentences=(norm(synopsis).match(/[^.!?]+[.!?]+|[^.!?]+$/g)||[]).filter(s=>{const period=discussionPeriod(s,anchor,zone);return (!period||period.end>now)&&!forecastProseConflict(anchoredText(s,anchor,zone,now),forecast,now);}).join(' ');
-  if(brief(currentSentences)){
-   const text=plain(anchoredText(brief(currentSentences),anchor,zone,now));
-   return {text,source:'Local NWS discussion summary'};
+  for(const [,section,body] of sections){
+   const anchor=sectionAnchor(body,issued,zone);
+   const synopsis=Number.isFinite(anchor)&&issued-anchor<=86400000?body.replace(/^\s*(?:As of|Issued at)[^\n]*(?:\n|$)/gmi,'').replace(/^\s*(?:\d+[).]|[-*])\s*/gm,''):'';
+   const sentences=weatherOnlyProse(synopsis).match(/[^.!?]+[.!?]+|[^.!?]+$/g)||[];
+   const currentSentences=sentences.filter(s=>{
+    if(section!=='SYNOPSIS'&&(!/\b(?:will|may|could|is|are|remains?|continues?|expected|possible|likely|can|should|becomes?|develops?)\b/i.test(s)||hasDanJargon(s)))return false;
+    const period=discussionPeriod(s,anchor,zone);return (!period||period.end>now)&&!forecastProseConflict(anchoredText(s,anchor,zone,now),forecast,now);
+   }).join(' ');
+   if(brief(currentSentences))return {text:plain(anchoredText(brief(currentSentences),anchor,zone,now)),source:'Local NWS discussion summary'};
   }
  }
- const day=forecast.days?.[0],text=brief((isTonightPeriod(now,zone)?day?.nightDetail:day?.detail)||day?.detail||'');
- return {text:text||'The local forecast is temporarily unavailable. Please check the National Weather Service for the latest weather.',source:'NWS forecast · discussion summary unavailable'};
+ const day=forecast.days?.[0],text=brief(weatherOnlyProse((isTonightPeriod(now,zone)?day?.nightDetail:day?.detail)||day?.detail||''));
+ return {text:text||'The weather summary is temporarily unavailable.',source:'NWS forecast · discussion summary unavailable'};
 }
 export function danTakeDisplay(briefing,forecast,now=Date.now()){
  if(forecast?.comparison?.source==='google')return 'Nourie Weather Take summarizes the NWS discussion on the regular weather page. This page shows the experimental model forecast.';
  const card=danCard(briefing,forecast,now);
- const summary=briefing?.signature===forecast?.signature&&typeof briefing?.danSummary==='string'?briefing.danSummary.trim():'';
+ const summary=briefing?.signature===forecast?.signature&&typeof briefing?.danSummary==='string'?weatherOnlyProse(briefing.danSummary):'';
  if(summary&&!forecastProseConflict(summary,forecast,now))return directTakeWording(summary)+(card.text?'\n\n'+card.text:'');
  const overview=danOverview(null,forecast,now);
  return directTakeWording(overview.text)+(card.text?'\n\n'+card.text:'');

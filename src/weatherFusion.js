@@ -1,3 +1,4 @@
+import {createWeatherTransport,createWeatherRequestBudget} from './weatherFusionTransport.js';
 import {createGefs} from './weatherFusionGefs.js';
 import {BLEND_V2_VERSION,BLEND_V2_CONFIG} from './weatherFusionBlendV2.js';
 import {createWeatherNext3} from './weatherFusionWeatherNext3.js';
@@ -437,6 +438,7 @@ export function buildForecast({ location, point, forecast, hourly, grid, discuss
 }
 
 export function createWeatherService({ fetchImpl = globalThis.fetch, env = process.env, now = Date.now } = {}) {
+  fetchImpl=createWeatherTransport(fetchImpl,now);
   const cache = new Cache(350, now), officialCache = new Cache(150, now), aiCache = new Cache(100, now);
   const forecastCache = new Cache(100, now, { retainExpired: false, maxPending: 4 });
   const failureCooldown = new Map();
@@ -452,7 +454,7 @@ export function createWeatherService({ fetchImpl = globalThis.fetch, env = proce
     if(take){if(approvedTakes.size>=100&&!approvedTakes.has(takeKey(data)))approvedTakes.delete(approvedTakes.keys().next().value);approvedTakes.set(takeKey(data),take);}
   }
   let aiBudget = { day: '', count: 0 };
-  let apiMinute = { minute: 0, count: 0 };
+  const requestBudget=createWeatherRequestBudget(now);
   const userAgent = env.WEATHER_FUSION_USER_AGENT || 'Sun-Nourie-WeatherFusion/1.0 (https://github.com/nourie42/Sun-Nourie)';
   const direct = createDirectModels({ fetchImpl, now });
   const loadWeatherNext = createWeatherNextBlendSource({fetchImpl,now});
@@ -463,9 +465,7 @@ export function createWeatherService({ fetchImpl = globalThis.fetch, env = proce
     const u = new URL(url);
     const allowed = ['api.weather.gov', 'api.open-meteo.com', 'air-quality-api.open-meteo.com', 'geocoding-api.open-meteo.com', 'opengeo.ncep.noaa.gov', 'api.openai.com', 'mapservices.weather.noaa.gov', 'www.spc.noaa.gov', 'www.wpc.ncep.noaa.gov'];
     if (u.protocol !== 'https:' || !allowed.includes(u.hostname) || u.port || u.username || u.password) throw errorWithStatus('Unexpected source URL.', 502);
-    const minute = Math.floor(now() / MINUTE);
-    if (apiMinute.minute !== minute) apiMinute = { minute, count: 0 };
-    if (++apiMinute.count > 400) throw errorWithStatus('Weather source request budget reached.', 429);
+    requestBudget(url);
     const headers = { 'User-Agent': userAgent, Accept: text ? 'application/xml,text/xml' : 'application/json' };
     if(revalidate)headers['Cache-Control']='no-cache';
     if (body) { headers['Content-Type'] = 'application/json'; headers.Authorization = `Bearer ${env.OPENAI_API_KEY}`; }
@@ -620,7 +620,7 @@ export function createWeatherService({ fetchImpl = globalThis.fetch, env = proce
       try {
         const result = await request('https://api.openai.com/v1/responses', { timeout: 35000, body: {
           model: env.WEATHER_FUSION_AI_MODEL || 'gpt-5-mini', store: false, max_output_tokens: 4000, reasoning: { effort: 'low' },
-          instructions: PLAIN_OUTLOOK_INSTRUCTIONS + ' Local Outlook: briefly analyze the point forecast and name pleasant outdoor days, rainy days, and humid days when supported. DanSummary: summarize the supplied non-aviation NWS discussion in two or three short sentences for an eleven-year-old. Cover the main expected weather, timing, and uncertainty. Write directly in Nourie’s voice: never introduce a claim with NWS says, the NWS discussion says, according to the National Weather Service, or forecasters say. Keep source attribution in metadata, not danSummary. Do not restrict danSummary to forecastChanges candidates; those remain a separate uncertainty list. Never discuss aviation or flying. Do not invent weather.',
+          instructions: PLAIN_OUTLOOK_INSTRUCTIONS + ' Local Outlook: briefly analyze the point forecast and name pleasant outdoor days, rainy days, and humid days when supported. DanSummary: summarize the supplied non-aviation NWS discussion in two or three short sentences for an eleven-year-old. Cover the main expected weather, timing, and uncertainty. Write directly in Nourie’s voice: never introduce a claim with NWS says, the NWS discussion says, according to the National Weather Service, or forecasters say. Keep source attribution in metadata, not danSummary. Do not restrict danSummary to forecastChanges candidates; those remain a separate uncertainty list. Never copy website referrals, URLs, briefing-document links, or instructions to visit NWS. Summarize the weather in the discussion itself. Never discuss aviation or flying. Do not invent weather.',
           input: JSON.stringify({ ...facts, requiredSources, revisionInstruction: attempt ? 'The previous attempt failed automated validation. Use words a ten-year-old knows. In Dan\'s Take, state only what the weather may do; never copy scientific causes such as convergence or a trough. Return every required source ID exactly. Do not include numeric weather values or quantities. Clock times are the only numeric exception and must use h:mmam/pm form, such as 2:02pm. Keep headline, summary, nearTerm and extended nonempty and concise. Leave uncertainty empty; return forecastChanges=[] when no eligible source evidence supports an upcoming change. Do not issue weather warnings or promise safe conditions.' : 'Copy every required source ID into the sources array. Use short sentences and words a ten-year-old knows. In Dan\'s Take, explain what the weather may do, not the scientific cause. Write without numeric weather values or quantities. Clock times are allowed only in h:mmam/pm form, such as 2:02pm.' }), text: { format: { type: 'json_schema', name: 'weather_briefing', strict: true, schema: { type: 'object', additionalProperties: false, properties, required: Object.keys(properties) } } },
         } });
         const text = (result.output || []).flatMap((o) => o.content || []).filter((c) => c.type === 'output_text').map((c) => c.text).join('');

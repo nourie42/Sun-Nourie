@@ -59,6 +59,7 @@ export function createPointModels({fetchImpl=globalThis.fetch,now=Date.now}={}){
   }
   const text=await response.text();if(text.length>2500000)throw new Error('Named model response too large.');return JSON.parse(text);
  }
+ const revision=meta=>JSON.stringify([meta.last_run_initialisation_time,meta.last_run_modification_time??null,meta.data_end_time??null]);
  async function metadata(id,model){
   const hit=metadataCache.get(id);if(hit?.until>now())return hit.value;
   if(metadataPending.has(id))return metadataPending.get(id);
@@ -90,8 +91,13 @@ export function createPointModels({fetchImpl=globalThis.fetch,now=Date.now}={}){
       return json(`https://api.open-meteo.com/v1/forecast?${required}`);
      }
     };
-    const [data,meta]=await Promise.all([forecast(),metadata(id,model)]);
+    const meta=await metadata(id,model);
+    // A model changes when its published revision changes, not whenever the
+    // page refreshes. Keep checking revision metadata every five minutes.
+    if(fresh(hit?.value)&&hit.value.providerRevision===revision(meta))return remember(key,{...hit.value,checkedAt:new Date(now()).toISOString(),retrievalStatus:'unchanged-run'});
+    const data=await forecast();
     const value=validatePointModel(data,meta,id,location,now());
+    value.providerRevision=revision(meta);
     if(hit?.value&&Date.parse(value.runAt)<Date.parse(hit.value.runAt)){
      if(!fresh(hit.value))throw new Error('Provider returned an older model initialization and the previously verified newer data is no longer valid.');
      return remember(key,{...hit.value,checkedAt:new Date(now()).toISOString(),retrievalStatus:'last-verified',refreshWarning:'Provider returned an older initialization; retaining the previously verified, still-valid newer model data.'});
