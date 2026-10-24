@@ -2,17 +2,17 @@
   "ok": true,
   "classificationRule": "NAICS qualifies inclusion; explicit facility wording determines terminal or bulk-plant labels. Oil companies, wholesalers, suppliers and fuel dealers default to Distributor when no physical terminal/bulk wording is present. Heating-oil and propane dealers are also included in Distributor.",
   "filterVersion": "verified-distributor-categories-v3",
-  "verifiedAt": "2026-10-15T12:43:24.067Z",
-  "verifiedCommit": "a32ff996e20f0d30cb7e464c60a12c9876afdd85",
+  "verifiedAt": "2026-10-24T23:17:13.805Z",
+  "verifiedCommit": "aa5b51e3ed13d7980a1c00e1ce7365dcf60cbd3d",
   "liveUrl": "https://sun-nourie-live.onrender.com",
   "successfulSearches": 8,
   "attemptedSearches": 8,
-  "totalFacilities": 566,
+  "totalFacilities": 565,
   "categoryTotals": {
-    "distributor": 302,
+    "distributor": 303,
     "heating_oil": 3,
-    "bulk_plant": 46,
-    "terminal": 218,
+    "bulk_plant": 45,
+    "terminal": 217,
     "propane": 7
   },
   "forbiddenFacilities": 0,
@@ -49,7 +49,7 @@
         "terminal": 1,
         "propane": 0
       },
-      "elapsedMs": 70,
+      "elapsedMs": 54,
       "sources": [
         "OpenStreetMap / Overpass",
         "EPA ECHO / FRS NAICS"
@@ -130,29 +130,12 @@
         "terminal": 15,
         "propane": 0
       },
-      "elapsedMs": 12763,
+      "elapsedMs": 12758,
       "sources": [
         "EPA ECHO / FRS NAICS"
       ],
       "partial": true,
       "samples": [
-        {
-          "name": "APEX TERMINAL",
-          "codes": [
-            "424710",
-            "454312",
-            "457210"
-          ],
-          "primary": "terminal",
-          "categories": [
-            "terminal"
-          ],
-          "classificationBasis": "Explicit terminal, depot, tank-farm or storage-terminal role",
-          "qualification": "NAICS 424710, 457210",
-          "forbidden": false,
-          "qualified": true,
-          "categoryError": ""
-        },
         {
           "name": "BLANCHARD BUFFALO SELMA TERMINAL",
           "codes": [
@@ -194,6 +177,23 @@
           ],
           "classificationBasis": "Explicit distributor, wholesaler, supplier or fuel-company role",
           "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true,
+          "categoryError": ""
+        },
+        {
+          "name": "DIXIE APEX TERMINAL",
+          "codes": [
+            "424710",
+            "454312",
+            "457210"
+          ],
+          "primary": "terminal",
+          "categories": [
+            "terminal"
+          ],
+          "classificationBasis": "Explicit terminal, depot, tank-farm or storage-terminal role",
+          "qualification": "NAICS 424710, 457210",
           "forbidden": false,
           "qualified": true,
           "categoryError": ""
@@ -376,18 +376,18 @@
     {
       "region": "Virginia and Carolinas",
       "ok": true,
-      "count": 394,
+      "count": 393,
       "forbidden": 0,
       "unqualified": 0,
       "categoryErrors": 0,
       "categoryCounts": {
-        "distributor": 227,
+        "distributor": 228,
         "heating_oil": 2,
-        "bulk_plant": 46,
-        "terminal": 121,
+        "bulk_plant": 45,
+        "terminal": 120,
         "propane": 5
       },
-      "elapsedMs": 12800,
+      "elapsedMs": 12797,
       "sources": [
         "EPA ECHO / FRS NAICS"
       ],
@@ -409,7 +409,7 @@
           "categoryError": ""
         },
         {
-          "name": "ABERCOMBIE OIL COMPANY",
+          "name": "ABERCROMBIE OIL COMPANY",
           "codes": [
             "424710"
           ],
@@ -641,7 +641,7 @@
         "terminal": 12,
         "propane": 0
       },
-      "elapsedMs": 12781,
+      "elapsedMs": 12774,
       "sources": [
         "EPA ECHO / FRS NAICS"
       ],
@@ -895,7 +895,7 @@
     {
       "region": "Houston",
       "ok": true,
-      "count": 29,
+      "count": 28,
       "forbidden": 0,
       "unqualified": 0,
       "categoryErrors": 0,
@@ -903,10 +903,10 @@
         "distributor": 3,
         "heating_oil": 0,
         "bulk_plant": 0,
-        "terminal": 26,
+        "terminal": 25,
         "propane": 1
       },
-      "elapsedMs": 12791,
+      "elapsedMs": 12755,
       "sources": [
         "EPA ECHO / FRS NAICS"
       ],
@@ -996,17 +996,11 @@
           "categoryError": ""
         },
         {
-          "name": "ENTERPRISE HYDROCARBON TERMINAL",
+          "name": "GALENA PARK TERMINAL",
           "codes": [
-            "211130",
-            "221210",
             "424710",
-            "483113",
-            "488310",
-            "488320",
-            "493110",
-            "493190",
-            "541990"
+            "486910",
+            "493190"
           ],
           "primary": "terminal",
           "categories": [
@@ -1040,23 +1034,6 @@
           "name": "GALENA PARK TERMINAL",
           "codes": [
             "424710"
-          ],
-          "primary": "terminal",
-          "categories": [
-            "terminal"
-          ],
-          "classificationBasis": "Explicit terminal, depot, tank-farm or storage-terminal role",
-          "qualification": "NAICS 424710",
-          "forbidden": false,
-          "qualified": true,
-          "categoryError": ""
-        },
-        {
-          "name": "GALENA PARK TERMINAL",
-          "codes": [
-            "424710",
-            "486910",
-            "493190"
           ],
           "primary": "terminal",
           "categories": [
@@ -1164,6 +1141,22 @@
           "forbidden": false,
           "qualified": true,
           "categoryError": ""
+        },
+        {
+          "name": "KINDER MORGAN EXPORT TERMINAL",
+          "codes": [
+            "221112",
+            "424710"
+          ],
+          "primary": "terminal",
+          "categories": [
+            "terminal"
+          ],
+          "classificationBasis": "Explicit terminal, depot, tank-farm or storage-terminal role",
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true,
+          "categoryError": ""
         }
       ]
     },
@@ -1181,7 +1174,7 @@
         "terminal": 16,
         "propane": 0
       },
-      "elapsedMs": 12763,
+      "elapsedMs": 12752,
       "sources": [
         "EPA ECHO / FRS NAICS"
       ],
@@ -1445,7 +1438,7 @@
         "terminal": 4,
         "propane": 0
       },
-      "elapsedMs": 12762,
+      "elapsedMs": 12769,
       "sources": [
         "EPA ECHO / FRS NAICS"
       ],
@@ -1492,21 +1485,6 @@
           ],
           "classificationBasis": "Explicit distributor, wholesaler, supplier or fuel-company role",
           "qualification": "NAICS 424710",
-          "forbidden": false,
-          "qualified": true,
-          "categoryError": ""
-        },
-        {
-          "name": "APEX MOTOR FUEL CO./CLOSED-BANKRUPT",
-          "codes": [
-            "424720"
-          ],
-          "primary": "distributor",
-          "categories": [
-            "distributor"
-          ],
-          "classificationBasis": "Explicit distributor, wholesaler, supplier or fuel-company role",
-          "qualification": "NAICS 424720",
           "forbidden": false,
           "qualified": true,
           "categoryError": ""
@@ -1680,13 +1658,28 @@
           "forbidden": false,
           "qualified": true,
           "categoryError": ""
+        },
+        {
+          "name": "CITGO PETROLEUM CORP",
+          "codes": [
+            "424710"
+          ],
+          "primary": "distributor",
+          "categories": [
+            "distributor"
+          ],
+          "classificationBasis": "NAICS 424710 record with no explicit terminal or bulk-plant wording",
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true,
+          "categoryError": ""
         }
       ]
     },
     {
       "region": "Los Angeles / Long Beach",
       "ok": true,
-      "count": 37,
+      "count": 38,
       "forbidden": 0,
       "unqualified": 0,
       "categoryErrors": 0,
@@ -1694,10 +1687,10 @@
         "distributor": 14,
         "heating_oil": 0,
         "bulk_plant": 0,
-        "terminal": 23,
+        "terminal": 24,
         "propane": 1
       },
-      "elapsedMs": 22238,
+      "elapsedMs": 12791,
       "sources": [
         "EPA ECHO / FRS NAICS"
       ],
