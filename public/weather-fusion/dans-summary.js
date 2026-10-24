@@ -17,6 +17,11 @@ const brief=text=>{const sentences=norm(text).match(/[^.!?]+[.!?]+|[^.!?]+$/g)||
 // connective, while preserving transitions inside a complete source paragraph.
 const standalone=text=>norm(text).replace(/^(?:(?:however|consequently|therefore|nevertheless|thus|as a result|in addition|meanwhile)[,:]?\s+)+/i,'').replace(/^[a-z]/,letter=>letter.toUpperCase());
 const plain=text=>standalone(norm(text).replace(/\btemperatures expected\b/gi,'temperatures are expected').replace(/\b(patchy frost) possible\b/gi,'$1 is possible').replace(/\s+and following sharply cooler and wet conditions that will develop\b/gi,'. Much cooler, wet weather will follow').replace(/\binto Sat\b/g,'into Saturday').replace(/\bfrost Sun morning\b/g,'frost Sunday morning').replace(/\bMon morning\b/g,'Monday morning').replace(/\bconvection\b/gi,'showers and storms').replace(/\bprecipitation\b/gi,'wet weather').replace(/\btemps\b/gi,'temperatures').replace(/\bPoPs\b/g,'rain chances').replace(/\bQPF\b/g,'rainfall amounts').replace(/\bwrt(?:\s+to)?\b/gi,'about'));
+// Remove reporting clauses from the take, including previously cached AI prose.
+// Keep the weather claim and all uncertainty words intact.
+export function directTakeWording(text){
+ return String(text||'').replace(/(^|[.!?]\s+)(?:(?:the\s+)?(?:NWS|National Weather Service|weather service)(?:\s+(?:forecast\s+)?discussion)?\s+(?:says?|states?|indicates?|notes?|expects?)\s+(?:that\s+)?|according to (?:the\s+)?(?:NWS|National Weather Service|weather service)(?:\s+discussion)?,\s*)/gi,'$1').replace(/(^|[.!?]\s+)([a-z])/g,(_,prefix,letter)=>prefix+letter.toUpperCase());
+}
 export function danOverview(briefing,forecast,now=Date.now()){
  if(!forecast)return {text:'Checking the latest forecast discussion…',source:'Updating'};
  const evidence=collectDanTakeEvidence(forecast,now);
@@ -43,9 +48,9 @@ export function danTakeDisplay(briefing,forecast,now=Date.now()){
  if(forecast?.comparison?.source==='google')return 'Nourie Weather Take summarizes the NWS discussion on the regular weather page. This page shows the experimental model forecast.';
  const card=danCard(briefing,forecast,now);
  const summary=briefing?.signature===forecast?.signature&&typeof briefing?.danSummary==='string'?briefing.danSummary.trim():'';
- if(summary&&!forecastProseConflict(summary,forecast,now))return summary+(card.text?'\n\n'+card.text:'');
+ if(summary&&!forecastProseConflict(summary,forecast,now))return directTakeWording(summary)+(card.text?'\n\n'+card.text:'');
  const overview=danOverview(null,forecast,now);
- return overview.text+(card.text?'\n\n'+card.text:'');
+ return directTakeWording(overview.text)+(card.text?'\n\n'+card.text:'');
 }
 export function danCard(briefing,forecast,now=Date.now()){
  const items=[],parts=[];
