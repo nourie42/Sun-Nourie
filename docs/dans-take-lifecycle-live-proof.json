@@ -1,0 +1,152 @@
+{
+  "commit": "52bf2e7c2d7b27420fcef73b2085bba7ddf7f18d",
+  "checkedAt": "2026-10-24T11:25:32.289Z",
+  "fixture": false,
+  "success": true,
+  "checks": [
+    {
+      "label": "initial-page",
+      "checkedAt": "2026-10-24T11:26:08.834Z",
+      "assembledAt": "2026-10-24T11:25:50.830Z",
+      "sourceCheckedAt": "2026-10-24T11:25:49.492Z",
+      "sourceRetrieval": "verified-latest",
+      "signature": "00c356c3bca583f7d5478e9b",
+      "discussionId": "77a5e48b-8568-43f8-b350-d3d62e5dfa65",
+      "issuedAt": "2026-10-24T11:07:00+00:00",
+      "cachedItems": [],
+      "visible": true,
+      "text": "Forecasters expect dry and near-normal weather to stick around. High pressure from Canada will keep rain away. Temperatures should slowly warm a bit late next week."
+    },
+    {
+      "label": "refresh-1",
+      "checkedAt": "2026-10-24T11:27:15.334Z",
+      "assembledAt": "2026-10-24T11:26:57.678Z",
+      "sourceCheckedAt": "2026-10-24T11:25:49.492Z",
+      "sourceRetrieval": "verified-latest",
+      "signature": "a2755ef028db9ed06edeb196",
+      "discussionId": "77a5e48b-8568-43f8-b350-d3d62e5dfa65",
+      "issuedAt": "2026-10-24T11:07:00+00:00",
+      "cachedItems": [],
+      "visible": true,
+      "text": "A continuation of dry and seasonable conditions is expected through next week."
+    },
+    {
+      "label": "refresh-2",
+      "checkedAt": "2026-10-24T11:28:22.774Z",
+      "assembledAt": "2026-10-24T11:28:20.872Z",
+      "sourceCheckedAt": "2026-10-24T11:28:20.872Z",
+      "sourceRetrieval": "verified-latest",
+      "signature": "15c3b0f0b358d3ed676ea314",
+      "discussionId": "77a5e48b-8568-43f8-b350-d3d62e5dfa65",
+      "issuedAt": "2026-10-24T11:07:00+00:00",
+      "cachedItems": [],
+      "visible": true,
+      "text": "A continuation of dry and seasonable conditions is expected through next week."
+    },
+    {
+      "label": "full-page-reload",
+      "checkedAt": "2026-10-24T11:28:38.137Z",
+      "assembledAt": "2026-10-24T11:28:20.872Z",
+      "sourceCheckedAt": "2026-10-24T11:28:20.872Z",
+      "sourceRetrieval": "verified-latest",
+      "signature": "15c3b0f0b358d3ed676ea314",
+      "discussionId": "77a5e48b-8568-43f8-b350-d3d62e5dfa65",
+      "issuedAt": "2026-10-24T11:07:00+00:00",
+      "cachedItems": [],
+      "visible": true,
+      "text": "Forecasters expect dry, seasonable weather to continue for several days. A dry area to our east will keep rain away. A slow shift will bring slightly warmer days late next week."
+    }
+  ],
+  "deployed": {
+    "sourceVersion": "nws-afd-monotonic-v1",
+    "danTakeVersion": "weather-nourie-dans-take-kid-clear-v10",
+    "assets": {
+      "index.html": "4253993445d07455bb9a3b42d462804f2ef62b0b010145b498af680907d8a99c",
+      "app.js": "af06d05add693607f50455af2cfe708eb4fbb78ed09ac02f651faffaf318ebe6",
+      "dans-summary.js": "6d7bb7609157e48241078beb5875638372bfec3f126cb660042548b50fb64956",
+      "current-inputs.js": "c81a04b681090b11bc7695e9b522c811ea9db05c87c677b20ab5642668c4abe4",
+      "pavement.js": "39e3461c0f9a7e57cd6209fb79951e49f36fde8760d8be7bd044c76849ad7725",
+      "daily-uv.js": "4327bb7ab8a9bac7d21abbcafe674a13849d40a54c0c73966ee2e9a78a98e2e8",
+      "dans-take.js": "84eaf789e1dd76b211ee84fb2e69f7db8211fc112ccacc1c2db90b3be5d7f79c"
+    }
+  },
+  "independentOfficialLatest": {
+    "id": "77a5e48b-8568-43f8-b350-d3d62e5dfa65",
+    "issuedAt": "2026-10-24T11:07:00+00:00"
+  },
+  "initial": {
+    "discussion": {
+      "id": "77a5e48b-8568-43f8-b350-d3d62e5dfa65",
+      "office": "RAH",
+      "issuanceTime": "2026-10-24T11:07:00+00:00",
+      "text": "\n000\nFXUS62 KRAH 241107\nAFDRAH\n\nArea Forecast Discussion \nNational Weather Service Raleigh NC \n707 AM EDT Sat Oct 24 2026\n\n.WHAT HAS CHANGED...\n\n* Nothing appreciable\n\n&&\n\n.KEY MESSAGES...\nAs of 300 AM Saturday... \n\n1) A continuation of dry and seasonable conditions is expected \nthrough next week.\n\n&&\n\n.DISCUSSION...\nAs of 300 AM Saturday... \n\nKEY MESSAGE 1... A continuation of dry and seasonable conditions is \nexpected through next week. \n\nAn initially high amplitude mid and upr-level ridge over the MS \nValley will dampen while progressing slowly ewd and across the \nSoutheast through next week, where it may remain through next \nweekend. To the east of the slowly progressive and dampening ridge, \na moisture-starved shortwave trough will dig across the Middle \nAtlantic and offshore through this weekend. \n\nAt the surface, a series of reinforcing, Canadian surface highs will \nprogress across the Great Lakes and Middle Atlantic and extend \nacross cntl NC through next week (and probably through next \nweekend), while modifying/moderating. A prolonged period of dry and \nseasonable conditions will result, with a gradual moderation of \ntemperatures likely late next week through Halloween weekend. \n\n&&\n\n.AVIATION /00Z SATURDAY THROUGH WEDNESDAY/...\nAs of 705 AM Saturday...\n\nReinforcing Canadian surface high pressure will build swd across the \nMiddle Atlantic and Carolinas through the weekend, with related nely \nsurface winds that will become occasionally gusty into the teens to \n20 kts mainly at FAY and RWI with daytime heating each day. The nely \nflow regime will be a maritime-influenced one that will favor the \ndevelopment of areas of stratocumulus, with relatively greatest \ncoverage with afternoon heating. While most stratocumulus will be \nbased above 3000 ft AGL and generally scattered in coverage, patchy \nMVFR ceilings will be possible each morning, particularly over the \nnw Piedmont. The earlier MVFR ceilings at INT and GSO have shifted \njust to the west of those sites as scheduled and focused across the \nmountains and adjacent Foothills, where they will likely disperse by \nthis afternoon. They will redevelop in a very similar manner late \ntonight-Sun morning, when a fleeting MVFR ceiling will again be \npossible near and more-so just to the northwest of INT and GSO. \n\nOutlook: Aside from the aforementioned small chance of sub-VFR \nceilings in nely flow this weekend, dry, VFR conditions are expected \nto persist for at least the next several days. \n\n&&\n\n.RAH WATCHES/WARNINGS/ADVISORIES...\nNone.\n\n&&\n\n$$\n\nDISCUSSION...MWS\nAVIATION...MWS\n",
+      "url": "https://api.weather.gov/products/77a5e48b-8568-43f8-b350-d3d62e5dfa65"
+    },
+    "feed": {
+      "id": "afd",
+      "label": "NWS RAH discussion",
+      "url": "https://api.weather.gov/products/types/AFD/locations/RAH/latest",
+      "status": "ready",
+      "sourceVersion": "nws-afd-monotonic-v1",
+      "retrievalStatus": "verified-latest",
+      "fetchedAt": "2026-10-24T11:25:49.492Z",
+      "checkedAt": "2026-10-24T11:25:49.492Z",
+      "issuedAt": "2026-10-24T11:07:00+00:00",
+      "productUrl": "https://api.weather.gov/products/77a5e48b-8568-43f8-b350-d3d62e5dfa65",
+      "message": ""
+    },
+    "aiMode": "ai",
+    "generatedAt": "2026-10-24T11:26:06.045Z",
+    "items": []
+  },
+  "observedRefreshVisibility": [
+    {
+      "hidden": false,
+      "text": "Forecasters expect dry and near-normal weather to stick around. High pressure from Canada will keep rain away. Temperatures should slowly warm a bit late next week."
+    },
+    {
+      "hidden": false,
+      "text": "Forecasters expect dry and near-normal weather to stick around. High pressure from Canada will keep rain away. Temperatures should slowly warm a bit late next week."
+    },
+    {
+      "hidden": false,
+      "text": "Forecasters expect dry and near-normal weather to stick around. High pressure from Canada will keep rain away. Temperatures should slowly warm a bit late next week."
+    },
+    {
+      "hidden": false,
+      "text": "Forecasters expect dry and near-normal weather to stick around. High pressure from Canada will keep rain away. Temperatures should slowly warm a bit late next week."
+    },
+    {
+      "hidden": false,
+      "text": "A continuation of dry and seasonable conditions is expected through next week."
+    },
+    {
+      "hidden": false,
+      "text": "Dry weather will hold for several days. Winds will be light from the northeast. Temperatures stay near normal now and slowly warm later in the week."
+    },
+    {
+      "hidden": false,
+      "text": "Dry weather will hold for several days. Winds will be light from the northeast. Temperatures stay near normal now and slowly warm later in the week."
+    },
+    {
+      "hidden": false,
+      "text": "Dry weather will hold for several days. Winds will be light from the northeast. Temperatures stay near normal now and slowly warm later in the week."
+    },
+    {
+      "hidden": false,
+      "text": "Dry weather will hold for several days. Winds will be light from the northeast. Temperatures stay near normal now and slowly warm later in the week."
+    },
+    {
+      "hidden": false,
+      "text": "Dry weather will hold for several days. Winds will be light from the northeast. Temperatures stay near normal now and slowly warm later in the week."
+    },
+    {
+      "hidden": false,
+      "text": "A continuation of dry and seasonable conditions is expected through next week."
+    }
+  ],
+  "distinctWeatherSignatures": 3,
+  "distinctForecastAssemblies": 3,
+  "distinctDiscussionChecks": 2,
+  "browserErrors": []
+}
