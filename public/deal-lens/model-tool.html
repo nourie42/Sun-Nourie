@@ -1,0 +1,832 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style><title>Deal Model Tool | Deal Lens</title><meta name="robots" content="noindex, nofollow"></head><body>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: inputs rail on the left, results on the right; the results lead with an amber "price sign" for the offer price, then the five channels side by side. On a phone the results come first and a slim sticky strip keeps the two key numbers in view while editing. */
+:root {
+  --bg: #E8ECF1;
+  --surface: #FFFFFF;
+  --surface-2: #F2F5F9;
+  --ink: #0E1F37;
+  --muted: #566882;
+  --line: #D0D8E3;
+  --accent: #1649B5;
+  --accent-ink: #FFFFFF;
+  --good: #17794A;
+  --good-bg: #DDF1E6;
+  --bad: #B42318;
+  --bad-bg: #FBE4E1;
+  --bar: #1649B5;
+  --neg: #B42318;
+  --focus: #1649B5;
+  --sign-bg: #0A1220;
+  --sign-amber: #FFC20E;
+  --sign-text: #E8EEF6;
+  --sign-dim: #A3B1C6;
+  --sign-line: #2A3A55;
+  --sign-field: #111C30;
+  --f-display: 'Barlow Condensed', 'Arial Narrow', Arial, sans-serif;
+  --f-body: 'Barlow', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --f-mono: 'IBM Plex Mono', ui-monospace, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0A1220;
+    --surface: #111D31;
+    --surface-2: #0D1727;
+    --ink: #E6ECF5;
+    --muted: #93A3B9;
+    --line: #233450;
+    --accent: #7AA4FF;
+    --accent-ink: #0A1220;
+    --good: #4CC38A;
+    --good-bg: #123526;
+    --bad: #FF8F85;
+    --bad-bg: #3B1A1A;
+    --bar: #6F9BFF;
+    --neg: #FF8F85;
+    --focus: #7AA4FF;
+    --sign-bg: #060B14;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0A1220;
+  --surface: #111D31;
+  --surface-2: #0D1727;
+  --ink: #E6ECF5;
+  --muted: #93A3B9;
+  --line: #233450;
+  --accent: #7AA4FF;
+  --accent-ink: #0A1220;
+  --good: #4CC38A;
+  --good-bg: #123526;
+  --bad: #FF8F85;
+  --bad-bg: #3B1A1A;
+  --bar: #6F9BFF;
+  --neg: #FF8F85;
+  --focus: #7AA4FF;
+  --sign-bg: #060B14;
+  color-scheme: dark;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--f-body);
+  font-size: 15px;
+  line-height: 1.45;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 0 48px;
+}
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0 0 auto;
+  height: env(safe-area-inset-top, 0px);
+  z-index: 10;
+  background: var(--bg);
+}
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+button { font: inherit; color: inherit; }
+.num { font-family: var(--f-mono); font-variant-numeric: tabular-nums; }
+
+/* sticky strip */
+.strip {
+  position: sticky;
+  top: env(safe-area-inset-top, 0px);
+  z-index: 9;
+  background: var(--bg);
+  border-bottom: 1px solid var(--line);
+  margin-inline: calc(-1 * max(16px, env(safe-area-inset-left, 0px)));
+  padding: 8px max(16px, env(safe-area-inset-right, 0px)) 8px max(16px, env(safe-area-inset-left, 0px));
+}
+.strip-in {
+  max-width: 1240px;
+  margin: 0 auto;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px 20px;
+  flex-wrap: wrap;
+}
+.strip-name { font-family: var(--f-display); font-weight: 700; font-size: 18px; letter-spacing: .06em; text-transform: uppercase; }
+.strip-kv { display: flex; gap: 6px 22px; flex-wrap: wrap; font-size: 13px; color: var(--muted); }
+.strip-kv b { color: var(--ink); font-family: var(--f-mono); font-weight: 500; font-size: 14px; }
+
+.wrap { max-width: 1240px; margin: 0 auto; }
+.intro { padding: 28px 0 22px; display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px 24px; }
+.eyebrow { margin: 0 0 4px; font-size: 12px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+h1 { margin: 0; font-family: var(--f-display); font-weight: 700; font-size: clamp(38px, 7vw, 56px); line-height: .95; letter-spacing: .005em; text-wrap: balance; }
+.lede { margin: 8px 0 0; max-width: 60ch; color: var(--muted); }
+.btn {
+  border: 1px solid var(--line);
+  background: var(--surface);
+  border-radius: 6px;
+  padding: 7px 14px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.btn:hover { border-color: var(--accent); }
+
+.layout { display: grid; gap: 20px; grid-template-columns: minmax(0, 1fr); align-items: start; }
+@media (min-width: 1020px) {
+  .layout { grid-template-columns: minmax(300px, 370px) minmax(0, 1fr); gap: 28px; }
+  .inputs { order: -1; position: sticky; top: calc(env(safe-area-inset-top, 0px) + 56px); max-height: calc(100vh - 76px); overflow-y: auto; }
+}
+.results { display: grid; gap: 20px; min-width: 0; }
+
+/* price sign */
+.sign {
+  background: var(--sign-bg);
+  color: var(--sign-text);
+  border: 1px solid var(--sign-line);
+  border-radius: 10px;
+  padding: 20px clamp(16px, 3vw, 28px) 22px;
+}
+.sign-top { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px 20px; }
+.sign-label { font-size: 12px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--sign-dim); }
+.sign .tgt { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--sign-dim); }
+.sign .in { background: var(--sign-field); border-color: var(--sign-line); color: var(--sign-text); width: 108px; }
+.sign .in input { color: var(--sign-text); }
+.sign .in .u { color: var(--sign-dim); }
+.sign-price {
+  margin: 10px 0 2px;
+  font-family: var(--f-display);
+  font-weight: 700;
+  font-size: clamp(52px, 11vw, 104px);
+  line-height: 1;
+  letter-spacing: .01em;
+  color: var(--sign-amber);
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.sign-sub { margin: 0; color: var(--sign-dim); font-size: 15px; }
+.sign-stats { margin: 20px 0 0; padding: 16px 0 0; border-top: 1px solid var(--sign-line); display: grid; gap: 14px 24px; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); }
+.sign-stats dt { font-size: 12px; letter-spacing: .1em; text-transform: uppercase; color: var(--sign-dim); font-weight: 600; }
+.sign-stats dd { margin: 2px 0 0; font-family: var(--f-display); font-weight: 600; font-size: 28px; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.sign-stats dd small { display: block; font-family: var(--f-body); font-weight: 400; font-size: 13px; color: var(--sign-dim); margin-top: 2px; }
+
+/* cards */
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: clamp(14px, 2.4vw, 22px); min-width: 0; }
+.card h2 { margin: 0; font-family: var(--f-display); font-weight: 700; font-size: 24px; letter-spacing: .02em; text-transform: uppercase; }
+.card-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 6px 16px; margin-bottom: 12px; }
+.note { margin: 10px 0 0; font-size: 13px; color: var(--muted); }
+.scroll { overflow-x: auto; }
+
+table { border-collapse: collapse; width: 100%; }
+.cmp { min-width: 640px; font-size: 14px; }
+.cmp th { text-align: right; font-size: 11px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); padding: 6px 10px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.cmp th:first-child, .cmp td:first-child { text-align: left; }
+.cmp td { text-align: right; padding: 11px 10px; border-bottom: 1px solid var(--line); font-family: var(--f-mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.cmp tr:last-child td { border-bottom: 0; }
+.cmp tr.sel td { background: var(--surface-2); }
+.chan { border: 0; background: none; padding: 0; cursor: pointer; font-family: var(--f-display); font-weight: 700; font-size: 20px; letter-spacing: .04em; color: var(--ink); text-align: left; }
+.chan:hover { color: var(--accent); }
+.tag { margin-left: 8px; font-family: var(--f-body); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; font-weight: 600; color: var(--muted); }
+.pill { display: inline-block; margin-left: 8px; padding: 1px 8px; border-radius: 99px; font-family: var(--f-body); font-size: 11px; font-weight: 600; letter-spacing: .04em; }
+.pill.ok { background: var(--good-bg); color: var(--good); }
+.pill.no { background: var(--bad-bg); color: var(--bad); }
+.price-col { font-weight: 500; color: var(--ink); }
+
+/* channel picker */
+.picker { display: flex; flex-wrap: wrap; gap: 6px; }
+.picker button { border: 1px solid var(--line); background: var(--surface); border-radius: 6px; padding: 5px 12px; cursor: pointer; font-family: var(--f-display); font-weight: 700; font-size: 17px; letter-spacing: .05em; }
+.picker button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+
+.tiles { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); margin: 14px 0 18px; }
+.tile { background: var(--surface-2); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px 12px; min-width: 0; }
+.tile span { display: block; font-size: 11px; font-weight: 600; letter-spacing: .09em; text-transform: uppercase; color: var(--muted); }
+.tile b { display: block; margin-top: 2px; font-family: var(--f-display); font-weight: 600; font-size: 26px; line-height: 1.15; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.tile b.good { color: var(--good); }
+.tile b.bad { color: var(--bad); }
+
+.chart-title { margin: 0 0 6px; font-size: 12px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+#chart { width: 100%; min-width: 0; }
+#chart svg { display: block; }
+.c-grid { stroke: var(--line); stroke-width: 1; }
+.c-zero { stroke: var(--muted); stroke-width: 1; }
+.c-txt { fill: var(--muted); font-family: var(--f-mono); font-size: 11px; }
+.c-bar { fill: var(--bar); }
+.c-neg { fill: var(--neg); }
+
+.yr { min-width: 1020px; font-family: var(--f-mono); font-size: 12px; font-variant-numeric: tabular-nums; margin-top: 18px; }
+.yr th, .yr td { padding: 6px 8px; text-align: right; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.yr thead th { font-weight: 500; color: var(--muted); }
+.yr tbody th { text-align: left; font-family: var(--f-body); font-weight: 500; font-size: 13px; position: sticky; left: 0; background: var(--surface); z-index: 1; padding-right: 14px; }
+.yr tr.key td, .yr tr.key th { font-weight: 500; color: var(--ink); }
+.yr .neg { color: var(--bad); }
+
+/* inputs */
+.inputs { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; min-width: 0; }
+.inputs-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 14px 16px 10px; }
+.inputs-head h2 { margin: 0; font-family: var(--f-display); font-weight: 700; font-size: 24px; letter-spacing: .02em; text-transform: uppercase; }
+.inputs-sub { margin: 0; padding: 0 16px 12px; font-size: 13px; color: var(--muted); border-bottom: 1px solid var(--line); }
+details { border-bottom: 1px solid var(--line); }
+details:last-child { border-bottom: 0; }
+summary { list-style: none; cursor: pointer; padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; font-size: 12px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; }
+summary::-webkit-details-marker { display: none; }
+summary::after { content: ""; width: 7px; height: 7px; border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted); transform: rotate(45deg); margin-right: 3px; }
+details[open] > summary::after { transform: rotate(-135deg); }
+.fields { padding: 2px 16px 14px; display: grid; gap: 8px; }
+.fld { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 138px); gap: 10px; align-items: center; font-size: 14px; }
+.fld .lbl { min-width: 0; line-height: 1.25; }
+.in { display: flex; align-items: center; gap: 4px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 6px; padding: 0 8px; min-width: 0; }
+.in:focus-within { border-color: var(--accent); }
+.in input { flex: 1; min-width: 0; width: 100%; border: 0; background: transparent; color: var(--ink); font-family: var(--f-mono); font-size: 13.5px; font-variant-numeric: tabular-nums; text-align: right; padding: 7px 0; }
+.in input:focus-visible { outline: none; }
+.in .u { font-size: 12px; color: var(--muted); white-space: nowrap; font-family: var(--f-mono); }
+.in .u.pre { order: -1; }
+.chk { display: flex; align-items: center; gap: 10px; font-size: 14px; }
+.chk input { width: 18px; height: 18px; accent-color: var(--accent); }
+.fld.wide { grid-template-columns: minmax(0, 1fr); }
+.fld.wide .in input { text-align: left; }
+.back { display: inline-block; margin: 0 0 10px; font-size: 13px; font-weight: 600; color: var(--accent); text-decoration: none; }
+.back:hover { text-decoration: underline; }
+.foot { margin: 22px 0 0; max-width: 78ch; font-size: 13px; color: var(--muted); }
+
+@media (max-width: 520px) {
+  .fld { grid-template-columns: minmax(0, 1fr) minmax(0, 120px); }
+  .sign-stats dd { font-size: 24px; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<header class="strip" id="strip">
+  <div class="strip-in">
+    <span class="strip-name">Deal Model</span>
+    <span class="strip-kv">
+      <span>COOP IRR at ask <b id="sb-irr">—</b></span>
+      <span>Offer at <span id="sb-t">13.0%</span> <b id="sb-offer">—</b></span>
+    </span>
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="intro">
+    <div>
+      <a class="back" href="./">&larr; Back to Deal Lens</a>
+      <p class="eyebrow">Fuel &amp; convenience acquisitions</p>
+      <h1>Deal Model Tool</h1>
+      <p class="lede">Fifteen-year returns for COOP, COAG, CODO, DODO and COCM, with the price that earns your target IRR on each. The numbers shown are an example deal; replace them with the seller's.</p>
+    </div>
+    <button class="btn" type="button" id="reset">Reset to example</button>
+  </div>
+
+  <div class="layout">
+    <main class="results">
+      <section class="sign" aria-labelledby="sign-h">
+        <div class="sign-top">
+          <span class="sign-label" id="sign-h">Offer price · COOP</span>
+          <label class="tgt" for="f-target">Target IRR
+            <span class="in"><input id="f-target" type="text" inputmode="decimal" autocomplete="off"><span class="u">%</span></span>
+          </label>
+        </div>
+        <div class="sign-price" id="offer">—</div>
+        <p class="sign-sub" id="offer-sub"></p>
+        <dl class="sign-stats">
+          <div><dt>COOP IRR at asking price</dt><dd id="st-irr">—</dd><small id="st-irr-sub"></small></div>
+          <div><dt>Asking price vs offer</dt><dd id="st-gap">—</dd><small id="st-gap-sub"></small></div>
+          <div><dt>Year-1 EBITDAR, with synergies</dt><dd id="st-eb">—</dd><small id="st-eb-sub"></small></div>
+        </dl>
+      </section>
+
+      <section class="card" aria-labelledby="cmp-h">
+        <div class="card-head"><h2 id="cmp-h">Channels compared</h2><span class="note" style="margin:0">Select a channel to see its years</span></div>
+        <div class="scroll">
+          <table class="cmp">
+            <thead><tr><th>Channel</th><th>IRR at ask</th><th>NPV at 15%</th><th>Year-1 basis</th><th>Cash in at close</th><th id="th-price">Price at target</th></tr></thead>
+            <tbody id="cmp-body"></tbody>
+          </table>
+        </div>
+        <p class="note">Year-1 basis is EBITDAR with synergies for COOP, and EBITDA with synergies for the other four. COAG shows Sunoco's share after commission and card fees.</p>
+      </section>
+
+      <section class="card" aria-labelledby="det-h">
+        <div class="card-head">
+          <h2 id="det-h">Channel detail</h2>
+          <div class="picker" id="picker" role="group" aria-label="Channel"></div>
+        </div>
+        <div class="tiles" id="tiles"></div>
+        <p class="chart-title" id="chart-title">Net cash flow</p>
+        <div id="chart"></div>
+        <p class="note">Year 0 is cash paid at close. Year 15 includes exit proceeds and the working-capital release.</p>
+        <div class="scroll"><table class="yr" id="yr"></table></div>
+        <p class="note">Dollar rows in thousands. Parentheses are outflows.</p>
+      </section>
+      <p class="foot">Costs are entered as positive numbers and the model treats them as outflows. The calculation is the COOP, COAG, CODO, DODO and COCM engine from ModelExample.xlsx, used as written.</p>
+    </main>
+
+    <aside class="inputs" aria-labelledby="in-h">
+      <div class="inputs-head"><h2 id="in-h">Inputs</h2></div>
+      <p class="inputs-sub">Per-site items are multiplied by the number of sites.</p>
+      <div id="groups"></div>
+    </aside>
+  </div>
+</div>
+
+<script>
+// ===== ENGINE START (mirrors COOP / COAG / CODO / DODO / COCM tabs of ModelExample.xlsx) =====
+function irrOf(cf){
+  const f=r=>{let s=0;for(let i=0;i<cf.length;i++)s+=cf[i]/Math.pow(1+r,i);return s;};
+  let lo=-0.9,hi=0.01,flo=f(lo),fhi=f(hi);
+  while(flo*fhi>0&&hi<50){lo=hi;flo=fhi;hi=hi*2+0.05;fhi=f(hi);}
+  if(!isFinite(flo)||!isFinite(fhi)||flo*fhi>0) return null;
+  for(let k=0;k<200;k++){const m=(lo+hi)/2,fm=f(m);if(fm===0)return m;if(flo*fm<0){hi=m;fhi=fm}else{lo=m;flo=fm}}
+  return (lo+hi)/2;
+}
+function npvOf(rate,cf){let s=cf[0];for(let i=1;i<cf.length;i++)s+=cf[i]/Math.pow(1+rate,i);return s;}
+const Y=15;
+const Z=()=>new Array(Y).fill(0);
+function runChannel(ch,p){
+  const n=p.n, P=p.price;
+  const gal=Z(),cpg=Z(),fuelM=Z(),syn=Z(),ins=Z(),insM=Z(),insSyn=Z(),oth=Z(),opex=Z(),opexSyn=Z(),draw=Z(),field=Z(),rent=Z(),rentInc=Z();
+  for(let i=0;i<Y;i++){
+    gal[i]=i?gal[i-1]*p.volg:p.gallons;
+    cpg[i]=i?cpg[i-1]+p.cpgg:p.cpg;
+    fuelM[i]=gal[i]*cpg[i]/100;
+    syn[i]=gal[i]*p.fsyn/100;
+    ins[i]=i?ins[i-1]*(1+p.insg):p.inside;
+    insM[i]=ins[i]*p.inmar;
+    insSyn[i]=ins[i]*p.inssyn;
+    oth[i]=i?oth[i-1]*(1+p.otherg):p.other;
+    opex[i]=i?opex[i-1]*(1+p.opexg):p.opex;
+    opexSyn[i]=opex[i]*-p.opsyn;
+    draw[i]=p.draw*n;
+    field[i]=i?field[i-1]*(1+p.opexg):p.field*n;
+    rent[i]=i?rent[i-1]*(1+p.rentg):p.rent;
+    rentInc[i]=i?rentInc[i-1]*(1+p.rentIncg):p.rentInc;
+  }
+  const out={ch,gal,fuelM,syn,ins};
+  const mkTax=(e,g)=>{const x=(e-g*0.12+(-P)/15)*-p.tax; return x>0?0:x;};
+  const mkTaxNoIf=(e,g)=>(e-g*0.12+(-P)/15)*-p.tax;
+  const maintArr=()=>{const a=Z();for(let i=0;i<Y;i++){a[i]= i===0? p.maintY1*n : i===1? p.maintOn*n*1.03 : a[i-1]*1.03;}return a;};
+  if(ch==='COOP'||ch==='COAG'){
+    const it=Z(),growth=Z(),tank=Z(),totalMargin=Z(),ebitdar=Z(),ebitda=Z(),priceRow=Z(),tax=Z(),wcEnd=Z(),maint=maintArr();
+    for(let i=0;i<Y;i++){
+      totalMargin[i]=fuelM[i]+syn[i]+insM[i]+insSyn[i]+oth[i];
+      ebitdar[i]=totalMargin[i]+opex[i]+opexSyn[i]+draw[i]+field[i];
+      ebitda[i]=ebitdar[i]+rent[i];
+      it[i]= i===0? p.it*n:0;
+      growth[i]= i===0? -90000*p.growthSites:0;
+      tank[i]= (i===10||i===13)? p.tank*n:0;
+      wcEnd[i]= i===Y-1? p.wc*n:0;
+      priceRow[i]= i===0? (p.drawRefund? -draw[0]:0) : (i===Y-1? ebitdar[i]*p.exit:0);
+    }
+    const B_wc=-p.wc*n, B_price=-P, B_un=-p.unams, B_close=-P*p.closing;
+    const B=B_wc+B_price+B_un+B_close;
+    const coop=[B];
+    for(let i=0;i<Y;i++){tax[i]=mkTax(ebitda[i],gal[i]);coop.push(ebitda[i]+it[i]+maint[i]+tank[i]+growth[i]+tax[i]+wcEnd[i]+priceRow[i]);}
+    const leaseCap=npvOf(0.065,[0].concat(rent));
+    const coopLease=[B+leaseCap];
+    for(let i=0;i<Y;i++)coopLease.push(ebitdar[i]+it[i]+maint[i]+tank[i]+growth[i]+tax[i]+wcEnd[i]+priceRow[i]);
+    out.coop={cf:coop,irr:irrOf(coop),npv:npvOf(0.15,coop),leaseIrr:irrOf(coopLease),ebitda:ebitda,ebitdar:ebitdar,tax:tax};
+    out.sellerEBITDA=fuelM[0]+insM[0]+oth[0]+opex[0]+rent[0];
+    out.ebitda1=ebitda[0];out.ebitdar1=ebitdar[0];out.cashIn=-B;
+    out.synergy1=syn[0]+insSyn[0]+opexSyn[0];
+    if(ch==='COOP'){out.cf=coop;out.irr=out.coop.irr;out.npv=out.coop.npv;out.ours=ebitdar[0];out.oursLabel='Year-1 EBITDAR with synergies (model basis)';}
+    else{
+      const ccT=Z(),ccSun=Z(),ccDealer=Z(),comm=Z(),prop=Z(),mop=Z(),ebS=Z(),ebitdaS=Z(),taxS=Z(),rentI=Z();
+      const cf=[B];
+      for(let i=0;i<Y;i++){
+        ccT[i]=((gal[i]*p.ppg+ins[i])*0.8)*0.0215;
+        ccSun[i]=-ccT[i]*p.sunShare;ccDealer[i]=-ccT[i]*(1-p.sunShare);
+        comm[i]=-p.commission*gal[i]/100;rentI[i]=rentInc[i];
+        prop[i]= i? prop[i-1]*(1+p.ptaxg) : -p.ptax*n;
+        mop[i]= i? mop[i-1]*(1+p.mopg) : -p.mop*n;
+        ebS[i]=(fuelM[i]+syn[i]+rentI[i])+ccSun[i]+comm[i]+mop[i]+prop[i]+field[i];
+        ebitdaS[i]=ebS[i]+rent[i];taxS[i]=mkTax(ebitdaS[i],gal[i]);
+        cf.push(ebitdaS[i]+it[i]+maint[i]+growth[i]+tank[i]+taxS[i]+wcEnd[i]+priceRow[i]);
+      }
+      const dealer=Z();
+      for(let i=0;i<Y;i++){const dOpex=opex[i]-ccDealer[i]-mop[i]-prop[i]-ccSun[i];const tm=insM[i]+insSyn[i]+oth[i]+(-comm[i]);dealer[i]=tm+dOpex+opexSyn[i]+ccDealer[i]-rentI[i];}
+      out.cf=cf;out.irr=irrOf(cf);out.npv=npvOf(0.15,cf);
+      out.ebitda1=ebitdaS[0];out.ours=ebitdaS[0];out.oursLabel='Sun Year-1 EBITDA with synergies';
+      out.dealer=dealer;out.dealer1=dealer[0];out.comm1=-comm[0];out.gal1=gal[0];
+    }
+    return out;
+  }
+  const maint=Z(),ebitda=Z(),it=Z(),tax=Z(),priceRow=Z();const mm=maintArr();
+  for(let i=0;i<Y;i++){
+    ebitda[i]=fuelM[i]+syn[i]+insM[i]+insSyn[i]+rentInc[i]+opex[i]+opexSyn[i]+draw[i]+field[i];
+    it[i]=(ch==='DODO')?0:(i===0?p.it*n:0);
+    maint[i]=(ch==='DODO')?(i===0?p.maintY1*n:i===1?p.maintY1*n*1.03:maint[i-1]*1.03):mm[i];
+  }
+  if(ch==='DODO'){
+    const ren=Z(),renCap=Z();
+    for(let i=0;i<Y;i++){ren[i]=p.renewals[i];renCap[i]=-(gal[i]/n)/12*4*ren[i];tax[i]=mkTaxNoIf(ebitda[i],gal[i]);}
+    const wcC=(gal[0]/365*2.5)*(p.wcDays-3)*-1;const wc=Z();wc[0]=wcC;wc[Y-1]=-(p.wcDays+wcC);
+    const B=p.wcDays+(-P)+(-p.unams)+(-P*p.closing);const cf=[B];
+    for(let i=0;i<Y;i++){priceRow[i]=i===Y-1?(ebitda[i]+maint[i]+renCap[i])*p.exit:0;cf.push(ebitda[i]+maint[i]+ren[i]+renCap[i]+tax[i]+wc[i]+priceRow[i]);}
+    out.cf=cf;out.irr=irrOf(cf);out.npv=npvOf(0.15,cf);out.cashIn=-(B-p.wcDays);
+    out.sellerEBITDA=fuelM[0]+insM[0]+rentInc[0]+opex[0];
+    out.ebitda1=ebitda[0];out.ours=ebitda[0];out.oursLabel='Year-1 EBITDA with synergies';out.synergy1=syn[0]+insSyn[0]+opexSyn[0];
+    return out;
+  }
+  for(let i=0;i<Y;i++)tax[i]=ch==='COCM'?mkTax(ebitda[i],gal[i]):mkTaxNoIf(ebitda[i],gal[i]);
+  const wc=Z();let B_wc;
+  if(ch==='CODO'){const c=(gal[0]/365*2.5)*(p.wcDays-3)*-1;wc[0]=c;wc[Y-1]=-(p.wcDays+c);B_wc=p.wcDays;}
+  else{B_wc=-p.wc*n;wc[Y-1]=-B_wc;}
+  const B=B_wc+(-P)+(-p.unams)+(-P*p.closing);const cf=[B];
+  for(let i=0;i<Y;i++){priceRow[i]=i===Y-1?ebitda[i]*p.exit:0;cf.push(ebitda[i]+it[i]+maint[i]+tax[i]+wc[i]+priceRow[i]);}
+  out.cf=cf;out.irr=irrOf(cf);out.npv=npvOf(0.15,cf);out.cashIn=-(B-(ch==='CODO'?p.wcDays:0));
+  out.sellerEBITDA=fuelM[0]+insM[0]+rentInc[0]+opex[0];
+  out.ebitda1=ebitda[0];out.ours=ebitda[0];out.oursLabel='Year-1 EBITDA with synergies';out.synergy1=syn[0]+insSyn[0]+opexSyn[0];
+  return out;
+}
+function priceForIRR(ch,p,target){
+  const f=P=>npvOf(target,runChannel(ch,Object.assign({},p,{price:P})).cf);
+  let lo=0,hi=2e9;if(f(lo)<0)return null;if(f(hi)>0)return hi;
+  for(let k=0;k<42;k++){const m=(lo+hi)/2;if(f(m)>0)lo=m;else hi=m;}   // 2e9 / 2^42 is under half a dollar
+  return lo;
+}
+// ===== ENGINE END =====
+
+</script>
+
+<script>
+(function () {
+  'use strict';
+  var CH = ['COOP', 'COAG', 'CODO', 'DODO', 'COCM'];
+  var MINUS = '−';
+
+  /* cv: pct = percent to fraction, neg = cost entered positive, volg = percent change to multiplier */
+  var G = [
+    { t: 'Deal', open: true, items: [
+      { k: 'n', l: 'Sites', dec: 0, def: 10 },
+      { k: 'price', l: 'Asking price', pre: '$', dec: 0, def: 8400000 },
+      { k: 'unams', l: 'Unamortized costs', pre: '$', dec: 0, def: 100000 },
+      { k: 'closing', l: 'Closing costs, share of price', suf: '%', dec: 1, def: 2, cv: 'pct' },
+      { k: 'exit', l: 'Exit multiple', suf: 'x', dec: 1, def: 6 },
+      { k: 'tax', l: 'Tax rate', suf: '%', dec: 1, def: 25, cv: 'pct' }
+    ]},
+    { t: 'Fuel', open: true, items: [
+      { k: 'gallons', l: 'Year-1 gallons, all sites', dec: 0, def: 12000000 },
+      { k: 'volg', l: 'Annual volume change', suf: '%', dec: 1, def: -1, cv: 'volg', neg: true },
+      { k: 'cpg', l: 'Fuel margin', suf: '¢/gal', dec: 1, def: 20 },
+      { k: 'cpgg', l: 'Annual margin change', suf: '¢/gal', dec: 2, def: 0, neg: true },
+      { k: 'fsyn', l: 'Fuel synergy', suf: '¢/gal', dec: 1, def: 2 }
+    ]},
+    { t: 'Inside sales and other', open: false, items: [
+      { k: 'inside', l: 'Inside sales', pre: '$', dec: 0, def: 9000000 },
+      { k: 'insg', l: 'Inside sales growth', suf: '%', dec: 1, def: 2, cv: 'pct', neg: true },
+      { k: 'inmar', l: 'Inside margin', suf: '%', dec: 1, def: 30, cv: 'pct' },
+      { k: 'inssyn', l: 'Inside synergy, share of sales', suf: '%', dec: 2, def: 1, cv: 'pct' },
+      { k: 'other', l: 'Other income', pre: '$', dec: 0, def: 300000 },
+      { k: 'otherg', l: 'Other income growth', suf: '%', dec: 1, def: 2, cv: 'pct', neg: true }
+    ]},
+    { t: 'Operating costs and rent', open: false, items: [
+      { k: 'opex', l: 'Operating expenses', pre: '$', dec: 0, def: 3600000, cv: 'neg' },
+      { k: 'opexg', l: 'Expense growth', suf: '%', dec: 1, def: 2.5, cv: 'pct', neg: true },
+      { k: 'opsyn', l: 'Expense synergy, share of opex', suf: '%', dec: 1, def: 5, cv: 'pct' },
+      { k: 'draw', l: 'Draw, per site per year', pre: '$', dec: 0, def: 0, cv: 'neg' },
+      { k: 'drawRefund', l: 'Refund the first-year draw at close', chk: true, def: false },
+      { k: 'field', l: 'Field support, per site per year', pre: '$', dec: 0, def: 15000, cv: 'neg' },
+      { k: 'rent', l: 'Rent expense', pre: '$', dec: 0, def: 500000, cv: 'neg' },
+      { k: 'rentg', l: 'Rent expense growth', suf: '%', dec: 1, def: 2, cv: 'pct', neg: true },
+      { k: 'rentInc', l: 'Rent income (non-COOP)', pre: '$', dec: 0, def: 500000 },
+      { k: 'rentIncg', l: 'Rent income growth', suf: '%', dec: 1, def: 2, cv: 'pct', neg: true }
+    ]},
+    { t: 'Capital and working capital', open: false, items: [
+      { k: 'it', l: 'IT setup, per site, once', pre: '$', dec: 0, def: 15000, cv: 'neg' },
+      { k: 'maintY1', l: 'Maintenance year 1, per site', pre: '$', dec: 0, def: 10000, cv: 'neg' },
+      { k: 'maintOn', l: 'Maintenance from year 2, per site', pre: '$', dec: 0, def: 20000, cv: 'neg' },
+      { k: 'tank', l: 'Tank work, per site, years 10 and 13', pre: '$', dec: 0, def: 60000, cv: 'neg' },
+      { k: 'growthSites', l: 'Growth sites ($90,000 each)', dec: 0, def: 0 },
+      { k: 'wc', l: 'Working capital, per site', pre: '$', dec: 0, def: 20000 },
+      { k: 'wcDays', l: 'Working-capital days (CODO, DODO)', dec: 0, def: 7 }
+    ]},
+    { t: 'COAG terms', open: false, items: [
+      { k: 'ppg', l: 'Average retail price', pre: '$', suf: '/gal', dec: 2, def: 3.2 },
+      { k: 'sunShare', l: 'Sunoco share of card fees', suf: '%', dec: 0, def: 50, cv: 'pct' },
+      { k: 'commission', l: 'Commission', suf: '¢/gal', dec: 1, def: 5 },
+      { k: 'ptax', l: 'Property tax, per site per year', pre: '$', dec: 0, def: 12000 },
+      { k: 'ptaxg', l: 'Property tax growth', suf: '%', dec: 1, def: 2, cv: 'pct', neg: true },
+      { k: 'mop', l: 'MOP, per site per year', pre: '$', dec: 0, def: 8000 },
+      { k: 'mopg', l: 'MOP growth', suf: '%', dec: 1, def: 2.5, cv: 'pct', neg: true }
+    ]},
+    { t: 'DODO renewals', open: false, items: [
+      { k: 'renewals', l: 'Renewal row, years 1 to 15 (comma separated)', text: true, def: '0,0,0,0,0,0,0,0,0,0,0,0,0,0,0' }
+    ]}
+  ];
+  var TARGET_DEF = 13;
+
+  var FLAT = [];
+  G.forEach(function (g) { g.items.forEach(function (f) { FLAT.push(f); }); });
+  var BY_ID = {};
+  FLAT.forEach(function (f) { BY_ID['f-' + f.k] = f; });
+
+  var S = {};
+  var sel = 'COOP';
+  var last = null;
+
+  function $(id) { return document.getElementById(id); }
+  function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;'); }
+
+  /* formatting */
+  function usd(v) {
+    if (v == null || !isFinite(v)) return '—';
+    var r = Math.round(v);
+    return (r < 0 ? MINUS : '') + '$' + Math.abs(r).toLocaleString('en-US');
+  }
+  function pct(v, d) {
+    if (v == null || !isFinite(v)) return 'n/a';
+    var s = (v * 100).toFixed(d == null ? 1 : d) + '%';
+    return s.charAt(0) === '-' ? MINUS + s.slice(1) : s;
+  }
+  function kf(v) {
+    if (v == null || !isFinite(v)) return '';
+    var r = Math.round(v / 1000);
+    var s = Math.abs(r).toLocaleString('en-US');
+    return r < 0 ? '(' + s + ')' : s;
+  }
+  function numStr(v, dec) {
+    return v.toLocaleString('en-US', { minimumFractionDigits: dec, maximumFractionDigits: dec });
+  }
+  function parseNum(s) {
+    var v = parseFloat(String(s).replace(/[,$%\s¢x−]/g, function (m) { return m === '−' ? '-' : ''; }));
+    return isFinite(v) ? v : 0;
+  }
+
+  /* inputs */
+  function buildInputs() {
+    var html = '';
+    G.forEach(function (g) {
+      html += '<details' + (g.open ? ' open' : '') + '><summary>' + esc(g.t) + '</summary><div class="fields">';
+      g.items.forEach(function (f) {
+        var id = 'f-' + f.k;
+        if (f.chk) {
+          html += '<label class="chk" for="' + id + '"><input type="checkbox" id="' + id + '"><span>' + esc(f.l) + '</span></label>';
+        } else if (f.text) {
+          html += '<label class="fld wide" for="' + id + '"><span class="lbl">' + esc(f.l) + '</span><span class="in"><input id="' + id + '" type="text" autocomplete="off" spellcheck="false"></span></label>';
+        } else {
+          html += '<label class="fld" for="' + id + '"><span class="lbl">' + esc(f.l) + '</span><span class="in">' +
+            (f.pre ? '<span class="u pre">' + f.pre + '</span>' : '') +
+            '<input id="' + id + '" type="text" inputmode="' + (f.neg ? 'text' : 'decimal') + '" autocomplete="off">' +
+            (f.suf ? '<span class="u">' + f.suf + '</span>' : '') + '</span></label>';
+        }
+      });
+      html += '</div></details>';
+    });
+    $('groups').innerHTML = html;
+  }
+  function setInputValues() {
+    FLAT.forEach(function (f) {
+      var el = $('f-' + f.k);
+      if (f.chk) el.checked = !!S[f.k];
+      else if (f.text) el.value = S[f.k];
+      else el.value = numStr(S[f.k], f.dec);
+    });
+    $('f-target').value = numStr(S.target, 1);
+  }
+  function resetState() {
+    FLAT.forEach(function (f) { S[f.k] = f.def; });
+    S.target = TARGET_DEF;
+  }
+
+  /* engine params */
+  function params() {
+    var p = {};
+    FLAT.forEach(function (f) {
+      var v = S[f.k];
+      if (f.chk) { p[f.k] = v ? 1 : 0; return; }
+      if (f.text) return;
+      if (f.cv === 'pct') v = v / 100;
+      else if (f.cv === 'neg') v = -v;
+      else if (f.cv === 'volg') v = 1 + v / 100;
+      p[f.k] = v;
+    });
+    var r = String(S.renewals).split(',').map(function (x) { return parseNum(x); });
+    p.renewals = [];
+    for (var i = 0; i < 15; i++) p.renewals.push(r[i] || 0);
+    return p;
+  }
+
+  function compute() {
+    var p = params();
+    var t = Math.min(1, Math.max(0.001, S.target / 100));
+    var R = {};
+    CH.forEach(function (ch) {
+      var o = null, tp = null;
+      try { o = runChannel(ch, p); tp = priceForIRR(ch, p, t); } catch (e) { o = null; }
+      R[ch] = { o: o, tp: tp };
+    });
+    return { p: p, t: t, R: R };
+  }
+
+  /* chart */
+  function niceStep(range, ticks) {
+    var raw = range / ticks;
+    var mag = Math.pow(10, Math.floor(Math.log10(raw)));
+    var n = raw / mag;
+    var s = n <= 1 ? 1 : n <= 2 ? 2 : n <= 2.5 ? 2.5 : n <= 5 ? 5 : 10;
+    return s * mag;
+  }
+  function axisFmt(v, step) {
+    var a = Math.abs(v), sign = v < 0 ? MINUS : '';
+    if (a === 0) return '$0';
+    if (a >= 1e6) {
+      var m = a / 1e6;
+      return sign + '$' + (step % 1e6 === 0 ? m.toFixed(0) : m.toFixed(1)) + 'M';
+    }
+    if (a >= 1e3) return sign + '$' + Math.round(a / 1e3) + 'K';
+    return sign + '$' + Math.round(a);
+  }
+  function drawChart(cf) {
+    var el = $('chart');
+    if (!cf) { el.innerHTML = ''; return; }
+    var w = Math.max(260, el.clientWidth || 600);
+    var h = w < 480 ? 210 : 250;
+    var m = { l: 50, r: 6, t: 10, b: 26 };
+    var lo = Math.min.apply(null, cf.concat([0])), hi = Math.max.apply(null, cf.concat([0]));
+    var step = niceStep((hi - lo) || 1, 4);
+    var tmin = Math.floor(lo / step) * step, tmax = Math.ceil(hi / step) * step;
+    if (tmax === tmin) tmax = tmin + step;
+    var ph = h - m.t - m.b;
+    var y = function (v) { return m.t + (tmax - v) / (tmax - tmin) * ph; };
+    var bw = (w - m.l - m.r) / cf.length;
+    var barW = Math.max(4, bw * 0.66);
+    var s = '<svg width="' + w + '" height="' + h + '" viewBox="0 0 ' + w + ' ' + h + '" role="img" aria-label="Net cash flow by year for ' + sel + '">';
+    var nt = Math.round((tmax - tmin) / step);
+    for (var k = 0; k <= nt; k++) {
+      var tv = tmin + k * step, ty = y(tv);
+      s += '<line class="c-grid" x1="' + m.l + '" x2="' + (w - m.r) + '" y1="' + ty.toFixed(1) + '" y2="' + ty.toFixed(1) + '"/>';
+      s += '<text class="c-txt" x="' + (m.l - 6) + '" y="' + (ty + 4).toFixed(1) + '" text-anchor="end">' + axisFmt(tv, step) + '</text>';
+    }
+    var y0 = y(0);
+    s += '<line class="c-zero" x1="' + m.l + '" x2="' + (w - m.r) + '" y1="' + y0.toFixed(1) + '" y2="' + y0.toFixed(1) + '"/>';
+    var skip = bw >= 26 ? 1 : 2;
+    cf.forEach(function (v, i) {
+      var x = m.l + i * bw + (bw - barW) / 2;
+      var yv = y(v);
+      var top = Math.min(y0, yv), hh = Math.max(1, Math.abs(yv - y0));
+      s += '<rect class="' + (v < 0 ? 'c-neg' : 'c-bar') + '" x="' + x.toFixed(1) + '" y="' + top.toFixed(1) + '" width="' + barW.toFixed(1) + '" height="' + hh.toFixed(1) + '"><title>Year ' + i + ': ' + usd(v) + '</title></rect>';
+      if (i % skip === 0 || i === cf.length - 1) {
+        s += '<text class="c-txt" x="' + (m.l + i * bw + bw / 2).toFixed(1) + '" y="' + (h - 8) + '" text-anchor="middle">' + i + '</text>';
+      }
+    });
+    s += '</svg>';
+    el.innerHTML = s;
+  }
+
+  /* render */
+  function render() {
+    last = compute();
+    var R = last.R, t = last.t, p = last.p;
+    var tl = pct(t, 1);
+    var coop = R.COOP.o;
+
+    $('f-target').setAttribute('aria-label', 'Target IRR in percent');
+    $('sb-t').textContent = tl;
+    $('th-price').textContent = 'Price at ' + tl;
+
+    /* sign */
+    var offer = R.COOP.tp;
+    var offerEl = $('offer'), sub = $('offer-sub');
+    if (!coop) {
+      offerEl.textContent = '—'; sub.textContent = 'These inputs do not produce a result. Check for blank or extreme values.';
+    } else if (offer == null) {
+      offerEl.textContent = 'No price';
+      sub.textContent = 'Even a price of $0 does not reach ' + tl + ' on COOP with these inputs.';
+    } else if (offer >= 2e9) {
+      offerEl.textContent = 'No ceiling';
+      sub.textContent = 'COOP clears ' + tl + ' at any price the model tests.';
+    } else {
+      offerEl.textContent = usd(offer);
+      var per = p.n > 0 ? usd(offer / p.n) + ' per site' : '';
+      var mult = coop.ours > 0 ? (offer / coop.ours).toFixed(1) + 'x Year-1 EBITDAR' : '';
+      sub.textContent = [per, mult].filter(Boolean).join(' · ') + (per || mult ? ' · ' : '') + 'highest price that earns ' + tl;
+    }
+    var sbOffer = (offer != null && offer < 2e9) ? usd(offer) : '—';
+    $('sb-offer').textContent = sbOffer;
+    $('sb-irr').textContent = coop ? pct(coop.irr) : '—';
+
+    if (coop) {
+      $('st-irr').textContent = pct(coop.irr);
+      $('st-irr-sub').textContent = (coop.irr != null ? (coop.irr >= t ? 'Meets the target' : 'Below the target of ' + tl) : '') + ' at ' + usd(p.price);
+      if (offer != null && offer < 2e9) {
+        var gap = p.price - offer;
+        var share = p.price > 0 ? Math.abs(gap) / p.price : 0;
+        $('st-gap').textContent = (gap > 0 ? '' : MINUS) + usd(Math.abs(gap)).replace(MINUS, '');
+        $('st-gap-sub').textContent = gap > 0 ? 'Ask is above the offer by ' + pct(share) + ' of the ask' : gap < 0 ? 'Ask is below the offer, room of ' + pct(share) + ' of the ask' : 'Ask equals the offer';
+      } else { $('st-gap').textContent = '—'; $('st-gap-sub').textContent = ''; }
+      $('st-eb').textContent = usd(coop.ours);
+      $('st-eb-sub').textContent = 'Seller reports ' + usd(coop.sellerEBITDA) + ' EBITDA';
+    }
+
+    /* comparison */
+    var rows = '';
+    CH.forEach(function (ch) {
+      var o = R[ch].o, tp = R[ch].tp;
+      if (!o) { rows += '<tr><td><button type="button" class="chan" data-ch="' + ch + '">' + ch + '</button></td><td colspan="5">No result</td></tr>'; return; }
+      var meets = o.irr != null && o.irr >= t;
+      var tpTxt = tp == null ? 'None' : tp >= 2e9 ? 'No ceiling' : usd(tp);
+      rows += '<tr class="' + (ch === sel ? 'sel' : '') + '">' +
+        '<td><button type="button" class="chan" data-ch="' + ch + '">' + ch + '</button>' + (ch === 'COOP' ? '<span class="tag">Offer basis</span>' : '') + '</td>' +
+        '<td>' + pct(o.irr) + '<span class="pill ' + (meets ? 'ok' : 'no') + '">' + (meets ? 'Meets' : 'Below') + '</span></td>' +
+        '<td>' + usd(o.npv) + '</td><td>' + usd(o.ours) + '</td><td>' + usd(o.cashIn) + '</td>' +
+        '<td class="price-col">' + tpTxt + '</td></tr>';
+    });
+    $('cmp-body').innerHTML = rows;
+
+    renderDetail();
+  }
+
+  function tile(label, val, cls) {
+    return '<div class="tile"><span>' + esc(label) + '</span><b' + (cls ? ' class="' + cls + '"' : '') + '>' + val + '</b></div>';
+  }
+
+  function renderDetail() {
+    if (!last) return;
+    var o = last.R[sel].o, t = last.t;
+    var pk = '';
+    CH.forEach(function (ch) { pk += '<button type="button" data-ch="' + ch + '" aria-pressed="' + (ch === sel) + '">' + ch + '</button>'; });
+    $('picker').innerHTML = pk;
+    $('chart-title').textContent = 'Net cash flow, ' + sel;
+    if (!o) { $('tiles').innerHTML = ''; $('yr').innerHTML = ''; drawChart(null); return; }
+
+    var t1 = tile('IRR at asking price', pct(o.irr), o.irr != null ? (o.irr >= t ? 'good' : 'bad') : '') +
+      tile('NPV at 15%', usd(o.npv), o.npv >= 0 ? 'good' : 'bad') +
+      tile('Cash in at close', usd(o.cashIn)) +
+      tile(o.oursLabel, usd(o.ours)) +
+      tile('Seller Year-1 EBITDA', usd(o.sellerEBITDA)) +
+      tile('Year-1 synergies', usd(o.synergy1));
+    if (sel === 'COOP' && o.coop) t1 += tile('IRR with rent capitalized at 6.5%', pct(o.coop.leaseIrr));
+    if (sel === 'COAG') t1 += tile('Dealer Year-1 earnings', usd(o.dealer1)) + tile('Commission paid, Year 1', usd(o.comm1));
+    $('tiles').innerHTML = t1;
+
+    drawChart(o.cf);
+
+    /* year table */
+    var cum = [], run = 0;
+    o.cf.forEach(function (v) { run += v; cum.push(run); });
+    var rowsDef = [
+      { l: 'Net cash flow', v: o.cf, off: 0, key: true },
+      { l: 'Cumulative', v: cum, off: 0, key: true },
+      { l: 'Gallons (000)', v: o.gal, off: 1 },
+      { l: 'Fuel margin', v: o.fuelM, off: 1 },
+      { l: 'Fuel synergy', v: o.syn, off: 1 },
+      { l: 'Inside sales', v: o.ins, off: 1 }
+    ];
+    if ((sel === 'COOP' || sel === 'COAG') && o.coop) {
+      var sfx = sel === 'COAG' ? ' (COOP basis)' : '';
+      rowsDef.push({ l: 'EBITDAR' + sfx, v: o.coop.ebitdar, off: 1 });
+      rowsDef.push({ l: 'EBITDA' + sfx, v: o.coop.ebitda, off: 1 });
+      rowsDef.push({ l: 'Tax' + sfx, v: o.coop.tax, off: 1 });
+    }
+    var th = '<thead><tr><th scope="col" style="text-align:left;position:sticky;left:0;background:var(--surface);z-index:1">Year</th>';
+    for (var y = 0; y <= 15; y++) th += '<th scope="col">' + y + '</th>';
+    th += '</tr></thead>';
+    var tb = '<tbody>';
+    rowsDef.forEach(function (r) {
+      tb += '<tr class="' + (r.key ? 'key' : '') + '"><th scope="row">' + esc(r.l) + '</th>';
+      for (var y2 = 0; y2 <= 15; y2++) {
+        var idx = y2 - r.off;
+        var v = idx >= 0 ? r.v[idx] : null;
+        var txt = v == null ? '' : kf(v);
+        tb += '<td class="' + (v != null && v < -499 ? 'neg' : '') + '">' + txt + '</td>';
+      }
+      tb += '</tr>';
+    });
+    tb += '</tbody>';
+    $('yr').innerHTML = th + tb;
+  }
+
+  /* events */
+  document.addEventListener('input', function (e) {
+    var id = e.target.id;
+    if (id === 'f-target') { S.target = parseNum(e.target.value); render(); return; }
+    var f = BY_ID[id];
+    if (!f) return;
+    if (f.chk) S[f.k] = e.target.checked;
+    else if (f.text) S[f.k] = e.target.value;
+    else S[f.k] = parseNum(e.target.value);
+    render();
+  });
+  document.addEventListener('focusout', function (e) {
+    var id = e.target.id;
+    if (id === 'f-target') { e.target.value = numStr(S.target, 1); return; }
+    var f = BY_ID[id];
+    if (f && !f.chk && !f.text) e.target.value = numStr(S[f.k], f.dec);
+  });
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest ? e.target.closest('[data-ch]') : null;
+    if (b) { sel = b.getAttribute('data-ch'); render(); return; }
+  });
+  $('reset').addEventListener('click', function () { resetState(); setInputValues(); render(); });
+
+  var rt = null;
+  function onResize() { if (last && last.R[sel].o) drawChart(last.R[sel].o.cf); }
+  if (window.ResizeObserver) { new ResizeObserver(function () { clearTimeout(rt); rt = setTimeout(onResize, 60); }).observe($('chart')); }
+  else window.addEventListener('resize', onResize);
+
+  buildInputs();
+  resetState();
+  setInputValues();
+  render();
+})();
+</script>
+
+</body></html>
