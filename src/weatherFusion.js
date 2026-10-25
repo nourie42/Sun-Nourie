@@ -27,6 +27,7 @@ import path from 'node:path';
 import { createDirectModels, enhanceForecast, refreshCalendarConfidence } from './weatherFusionDirect.js';
 import {createWeatherNextBlendSource} from './weatherFusionWeatherNext.js';
 import {validateCurrentConditions} from './weatherFusionCurrent.js';
+import {createFeelsConfigLoader} from './weatherFeelsConfig.js';
 import {applyObservedSky} from './weatherFusionObservedSky.js';
 import {addSnowOutlook,createWpcWinterService} from './weatherFusionSnow.js';
 import {createWinterModelService} from './weatherFusionWinterModels.js';
@@ -311,7 +312,7 @@ export class Cache {
 export function withoutAviation(text=''){
  return text.replace(/(^|\n)\.(?:AVIATION)[^\n]*\n[\s\S]*?(?=\n\.[A-Z][A-Z /]*(?:\.\.\.|\s)|$)/gi,'').trim();
 }
-export function buildForecast({ location, point, forecast, hourly, grid, discussion, observation, alerts, specialDiscussions, precipitationDiscussions, riskOutlooks, snowModels, winterModels, wpcWinter, exposureWeather, airQuality, models, feeds, now }) {
+export function buildForecast({ location, point, forecast, hourly, grid, discussion, observation, alerts, specialDiscussions, precipitationDiscussions, riskOutlooks, snowModels, winterModels, wpcWinter, exposureWeather, airQuality, models, feeds, now, feelsConfig=null }) {
   const zone = point?.timeZone || exposureWeather?.timezone || models.ecmwf?.timezone || 'America/New_York';
   const today = dateKey(now, zone);
   const rows = Object.fromEntries(Object.entries(models).map(([key, value]) => [key, normalizeModel(value, now, key === 'hrrr' ? 48 : 240)]));
@@ -389,7 +390,8 @@ export function buildForecast({ location, point, forecast, hourly, grid, discuss
       sunset: models.ecmwf?.daily?.sunset?.[solarIndex] ? iso(models.ecmwf.daily.sunset[solarIndex] * 1000) : null },
     methodology: 'NWS temperatures, conditions and precipitation probabilities are primary. NWS grid precipitation is integrated over local 7 AM–7 AM windows. Model guidance is supplementary and not a verified skill-weighted forecast. Model high/low comparisons use calendar days; the NWS low is overnight. Precipitation includes liquid-equivalent snow/ice. Daily forecast confidence is a relative index, not a probability; it uses lead time, NWS/model high-temperature spread, rainfall-guidance spread, usable guidance coverage, and NWS day/night availability.' };
   enhanceForecast(output, { models, grid, periods: forecast?.periods || [], hourlyPeriods: hourly?.periods || [], now, gridQpf, localTime, nextDate, dateKey });
-  output.current=validateCurrentConditions(output.current,output.hours,rows,now);
+  output.current=validateCurrentConditions(output.current,output.hours,rows,now,{currentConditionsSource:feelsConfig?.currentConditionsSource});
+  if(feelsConfig)output.feelsMethod={currentConditionsSource:feelsConfig.currentConditionsSource,status:feelsConfig.status,checkedAt:feelsConfig.checkedAt};
   Object.assign(output.current,resolveCurrentWeather(output.current,output.hours,now,gridSample(grid,'skyCover',now,'percent')));
   applyObservedSky(output,observation?.skyObservations,now);
   addExperience(output, {models, grid, periods:forecast?.periods || [], now, solarTimes, nextDate});
@@ -426,6 +428,7 @@ export function createWeatherService({ fetchImpl = globalThis.fetch, env = proce
   const userAgent = env.WEATHER_FUSION_USER_AGENT || 'Sun-Nourie-WeatherFusion/1.0 (https://github.com/nourie42/Sun-Nourie)';
   const direct = createDirectModels({ fetchImpl, now });
   const loadWeatherNext = createWeatherNextBlendSource({fetchImpl,now});
+  const loadFeelsConfig=createFeelsConfigLoader({fetchImpl,now});
   async function request(url, { text = false, body = null, timeout = 12000, revalidate = false } = {}) {
     const u = new URL(url);
     const allowed = ['api.weather.gov', 'api.open-meteo.com', 'air-quality-api.open-meteo.com', 'geocoding-api.open-meteo.com', 'opengeo.ncep.noaa.gov', 'api.openai.com', 'mapservices.weather.noaa.gov', 'www.spc.noaa.gov', 'www.wpc.ncep.noaa.gov'];
@@ -537,7 +540,8 @@ export function createWeatherService({ fetchImpl = globalThis.fetch, env = proce
       const values = Object.fromEntries(await Promise.all(Object.entries(jobs).map(async ([id, promise]) => [id, await promise])));
       const data = Object.fromEntries(Object.entries(values).map(([id, f]) => [id, id==='alerts'||Array.isArray(f.meta)?f.value:(f.meta.status === 'ready'||f.meta.recovered===true ? f.value : null)]));
       const feedMeta=[pointFeed.meta,...Object.values(values).flatMap(f=>Array.isArray(f.meta)?f.meta:[f.meta])];
-      const result = buildForecast({ ...data, point, location, models: { hrrr: data.hrrr, ecmwf: data.ecmwf, nbm: data.nbm, wn:data.wn }, feeds: feedMeta, now: now() });
+      const feelsConfig = await loadFeelsConfig.get();
+      const result = buildForecast({ ...data, point, location, feelsConfig, models: { hrrr: data.hrrr, ecmwf: data.ecmwf, nbm: data.nbm, wn:data.wn }, feeds: feedMeta, now: now() });
       // Access never exposes the provider credential or a made-up model run timestamp.
       result.aiConfigured = !!env.OPENAI_API_KEY;
       result.integrityVersion='weather-nourie-integrity-v1';

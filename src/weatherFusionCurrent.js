@@ -19,8 +19,11 @@ function modelAt(modelRows,id,epoch){
  * Rejected observations remain visible as provenance but cannot drive current
  * temperature, moisture, wind, pressure, or feels-like calculations.
  */
-export function validateCurrentConditions(current,hours=[],modelRows={},now=Date.now()){
+export function validateCurrentConditions(current,hours=[],modelRows={},now=Date.now(),options={}){
  if(current?.type!=='observation'||!finite(current.stationDistanceKm))return current;
+ // Shared feels-like method setting (weather-config branch). Only an explicit
+ // "hourly-blend" changes behavior; callers that pass nothing keep the station-when-accepted rules.
+ const blendEverywhere=options?.currentConditionsSource==='hourly-blend';
  const epoch=Math.floor(now/HOUR)*HOUR;
  const currentHour=hours.find(hour=>{const start=Date.parse(hour.time);return finite(start)&&start<=now&&now<start+HOUR;})||hours[0];
  const selected=modelAt(modelRows,'nbm',epoch)||modelAt(modelRows,'hrrr',epoch)||modelAt(modelRows,'ecmwf',epoch);
@@ -30,8 +33,11 @@ export function validateCurrentConditions(current,hours=[],modelRows={},now=Date
  const close=current.stationDistanceKm<=MAX_DIRECT_STATION_DISTANCE_KM;
  const differenceF=finite(localTemperature)&&finite(current.temperature)?round(Math.abs(current.temperature-localTemperature),1):null;
  const agrees=current.stationDistanceKm<=ALWAYS_TRUST_STATION_DISTANCE_KM||!finite(differenceF)||differenceF<=MAX_STATION_GUIDANCE_DIFFERENCE_F;
- const accepted=fresh&&close&&agrees;
- const checks={accepted,stationDistanceKm:current.stationDistanceKm,stationAgeMinutes:finite(ageMs)?round(ageMs/60000,1):null,
+ const stationUsable=fresh&&close&&agrees;
+ // The blend is used for every location, but never at the cost of showing nothing:
+ // with no blend temperature available, a usable station is still the better answer.
+ const accepted=stationUsable&&(!blendEverywhere||!finite(localTemperature));
+ const checks={accepted,methodSetting:blendEverywhere?'hourly-blend':'station-when-accepted',stationDistanceKm:current.stationDistanceKm,stationAgeMinutes:finite(ageMs)?round(ageMs/60000,1):null,
   stationVsLocalGuidanceF:differenceF,limits:{distanceKm:MAX_DIRECT_STATION_DISTANCE_KM,ageMinutes:MAX_STATION_AGE_MS/60000,differenceF:MAX_STATION_GUIDANCE_DIFFERENCE_F,unconditionalDistanceKm:ALWAYS_TRUST_STATION_DISTANCE_KM}};
  if(accepted)return {...current,sourceValidation:checks};
  if(!finite(localTemperature))return {type:'unavailable',temperature:null,condition:'Current conditions unavailable',conditionSource:'No accepted local source',time:iso(epoch),station:null,stationName:null,stationDistanceKm:null,
@@ -42,6 +48,7 @@ export function validateCurrentConditions(current,hours=[],modelRows={},now=Date
  if(!fresh)reasons.push('the station report is too old');
  if(!close)reasons.push('the station is more than 10 miles away');
  if(!agrees)reasons.push('the station differs too much from selected-location guidance');
+ if(blendEverywhere&&stationUsable)reasons.push('this site shows the hourly forecast blend as current conditions in every location');
  const reason=`The station was not used because ${reasons.join(' and ')}.`;
  // Observed sky beats forecast wording: if a fresh station within ~25 miles reports its sky cover
  // (and good visibility), use it instead of e.g. "Patchy Fog" in the current-hour forecast.
