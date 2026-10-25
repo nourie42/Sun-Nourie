@@ -1,7 +1,7 @@
-import {test as nodeTest} from 'node:test';import {readProtectedModelFile} from '../src/dealLensRoutes.js';
-const modelKey=process.env.DEAL_LENS_MODEL_KEY,test=modelKey?nodeTest:nodeTest.skip;import assert from 'node:assert/strict';import fs from 'node:fs';import vm from 'node:vm';
+import {test as nodeTest} from 'node:test';import {readModelFile,isModelConfigured} from '../src/dealLensModelAssets.js';
+const modelAvailable=isModelConfigured(),test=modelAvailable?nodeTest:nodeTest.skip;import assert from 'node:assert/strict';import fs from 'node:fs';import vm from 'node:vm';
 const c=vm.createContext({Intl,console,fetch:()=>assert.fail('Local intake must not call a model')});c.window=c;
-if(modelKey)for(const f of ['intake-state.js','model.js','original-model-data.js','original-engine.js','original-model.js','roster.js','plain-intake.js','paste-intake.js','evidence-state.js'])vm.runInContext(f==='original-model-data.js'?readProtectedModelFile(f,modelKey).toString('utf8'):fs.readFileSync('public/deal-lens/'+f,'utf8'),c);
+if(modelAvailable)for(const f of ['intake-state.js','model.js','original-model-data.js','original-engine.js','original-model.js','roster.js','plain-intake.js','paste-intake.js','evidence-state.js'])vm.runInContext(f==='original-model-data.js'?readModelFile(f).toString('utf8'):fs.readFileSync('public/deal-lens/'+f,'utf8'),c);
 const parse=s=>c.DealPaste.parse(s),apply=s=>{const d={fields:{},sites:[],evidence:{}};c.DealPaste.apply(d,parse(s));return d;};
 const roster=`| Asset ID | Asset name | Address | City | State | Zip | Division | RE control | RE owner | Source |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |

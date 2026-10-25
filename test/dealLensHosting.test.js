@@ -11,12 +11,12 @@ import { registerWeatherSiteAccess, isProtectedWeatherPath, isPublicWeatherPath 
 async function fixture(t) {
   const app=express();
   registerWeatherSiteAccess(app,{env:{WEATHER_SITE_PASSWORD:'local-test-password'},secret:'local-test-cookie-secret'});
-  const modelKey=crypto.randomBytes(32),modelDirectory=fs.mkdtempSync(path.join(os.tmpdir(),'deal-lens-test-'));
+  const modelDirectory=fs.mkdtempSync(path.join(os.tmpdir(),'deal-lens-test-'));
   for(const [name,data] of [['original-model-data.js',Buffer.from('globalThis.OriginalModelData={synthetic:true};')],['original-model.xlsx',fixtureModel]]){
-    const iv=crypto.randomBytes(12),cipher=crypto.createCipheriv('aes-256-gcm',modelKey,iv);cipher.setAAD(Buffer.from(name));const encrypted=Buffer.concat([cipher.update(data),cipher.final()]);fs.writeFileSync(path.join(modelDirectory,name+'.enc'),Buffer.concat([Buffer.from('DLME1'),iv,cipher.getAuthTag(),encrypted]));
+    fs.writeFileSync(path.join(modelDirectory,name),data);
   }
   t.after(()=>fs.rmSync(modelDirectory,{recursive:true,force:true}));
-  registerDealLensRoutes(app,{modelKey:modelKey.toString('base64'),modelDirectory});
+  registerDealLensRoutes(app,{modelDirectory});
   const server=app.listen(0,'127.0.0.1');await new Promise(resolve=>server.once('listening',resolve));
   t.after(()=>new Promise(resolve=>server.close(resolve)));
   const base='http://127.0.0.1:'+server.address().port;

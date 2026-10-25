@@ -25,6 +25,7 @@ import { registerAiCouncilRoutes } from "./src/aiCouncil.js";
 import { registerDealDeskRoutes } from "./src/dealDeskRoutes.js";
 import { registerHouseholdPLRoutes } from "./src/householdPLRoutes.js";
 import { registerDealLensRoutes } from "./src/dealLensRoutes.js";
+import { isModelConfigured } from "./src/dealLensModelAssets.js";
 import { registerDealIntelligenceRoutes } from "./src/dealIntelligenceRoutes.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -227,7 +228,7 @@ app.get("/health", (_req, res) => {
     dealDesk: true,
     dealIntelligence: true,
     dealLens: true,
-    dealLensModelConfigured: Boolean(process.env.DEAL_LENS_MODEL_KEY),
+    dealLensModelConfigured: isModelConfigured(),
     dealLensVersion: "copy-paste-local-v1",
     dealIntelligenceAiConfigured: Boolean(process.env.OPENAI_API_KEY),
     dealDeskAiConfigured: Boolean(process.env.ANTHROPIC_API_KEY),

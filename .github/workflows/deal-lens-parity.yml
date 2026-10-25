@@ -1,7 +1,7 @@
 name: Deal Lens parity report
 
-# Runs only on the deal-lens-parity branch (or by hand). Needs the repository secret
-# DEAL_LENS_MODEL_KEY. Without it the report says so and nothing is decrypted.
+# Runs only on deal-lens-parity. The company workbook is mounted on Render,
+# outside this public repository. Local and Render checks need no encryption key.
 on:
   push:
     branches: [deal-lens-parity]
@@ -9,6 +9,7 @@ on:
       - scripts/dealLensParityReport.mjs
       - public/deal-lens/**
       - src/dealLensRoutes.js
+      - src/dealLensModelAssets.js
       - src/weatherSiteAccess.js
       - data/deal-lens/**
       - test/dealLens*.test.js
@@ -33,8 +34,6 @@ jobs:
       - name: Run Deal Lens and access regressions
         run: node --test test/dealLens*.test.js test/weatherSiteAccess.test.js
       - name: Run parity report (synthetic numbers only)
-        env:
-          DEAL_LENS_MODEL_KEY: ${{ secrets.DEAL_LENS_MODEL_KEY }}
         run: node scripts/dealLensParityReport.mjs docs/deal-lens-parity-status.json
       - name: Save the report on this branch
         run: |

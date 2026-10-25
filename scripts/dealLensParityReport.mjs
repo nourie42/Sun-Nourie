@@ -1,37 +1,25 @@
 // Reports how the Deal Lens workbook engine treats the year-1 operator contribution (COOP!C29).
 // Uses made-up round numbers only: no seller data. Output is numbers, no model text.
-// Run: DEAL_LENS_MODEL_KEY=<key> node scripts/dealLensParityReport.mjs [output.json]
+// Run with the mounted workbook file, or set DEAL_LENS_MODEL_FILE to a local package.
 import fs from 'node:fs';
 import path from 'node:path';
 import vm from 'node:vm';
-import { createDecipheriv } from 'node:crypto';
-
-// Same decryption as src/dealLensRoutes.js, repeated here so this script needs no npm packages.
-function readProtectedModelFile(name, key64) {
-  const key = Buffer.from(key64 || '', 'base64');
-  if (key.length !== 32) throw Error('Original model key is not configured.');
-  const payload = fs.readFileSync(path.join('data/deal-lens', name + '.enc'));
-  if (payload.subarray(0, 5).toString() !== 'DLME1') throw Error('Invalid model asset.');
-  const d = createDecipheriv('aes-256-gcm', key, payload.subarray(5, 17));
-  d.setAAD(Buffer.from(name)); d.setAuthTag(payload.subarray(17, 33));
-  return Buffer.concat([d.update(payload.subarray(33)), d.final()]);
-}
+import {readModelFile,isModelConfigured} from '../src/dealLensModelAssets.js';
 
 const out = process.argv[2] || 'docs/deal-lens-parity-status.json';
-const modelKey = process.env.DEAL_LENS_MODEL_KEY;
 function write(o) {
   fs.mkdirSync(path.dirname(out), { recursive: true });
   fs.writeFileSync(out, JSON.stringify(o, null, 2) + '\n');
   console.log(JSON.stringify(o, null, 2));
 }
-if (!modelKey) { write({ status: 'no-key', note: 'DEAL_LENS_MODEL_KEY is not set, so the model cannot be opened.' }); process.exit(0); }
+if (!isModelConfigured()) { console.log(JSON.stringify({status:'no-workbook',note:'The workbook file is not mounted here. No model key is required. The last verified report is preserved.'})); process.exit(0); }
 
 try {
   const ctx = vm.createContext({ Intl, console, Blob, Buffer });
   ctx.window = ctx;
   for (const name of ['intake-state.js', 'model.js', 'original-model-data.js', 'original-engine.js', 'original-model.js']) {
     const src = name === 'original-model-data.js'
-      ? readProtectedModelFile(name, modelKey).toString('utf8')
+      ? readModelFile(name).toString('utf8')
       : fs.readFileSync('public/deal-lens/' + name, 'utf8');
     vm.runInContext(src, ctx);
   }
@@ -67,8 +55,12 @@ try {
     };
   }
   const cases={ten_sites:run(10),four_sites:run(4),zero_addback:run(10,0),custom_addback:run(10,25000)};
-  const passed=Object.values(cases).every(c=>c.checks&&Object.values(c.checks).every(Boolean));
-  write({ status: passed?'ok':'mismatch', generated: new Date().toISOString(), note: 'Synthetic inputs only. These inputs do not establish parity with an unprovided RomeoTest baseline.', ...cases });
+  const baselineChanges={'COOP!C2':10,'COOP!B29':-9500000},baselineEngine=ctx.OriginalModel.compute(baselineChanges);
+  const solveBaseline=cell=>{let lo=0,hi=3e7;for(let i=0;i<65;i++){const price=(lo+hi)/2,irr=ctx.OriginalModel.compute({...baselineChanges,'COOP!B29':-price}).get('COOP',cell);if(irr>.13)lo=price;else hi=price;}return (lo+hi)/2;};
+  const baseline={source:ctx.OriginalModelData.source,sites:10,purchasePrice:9500000,irrB34:baselineEngine.get('COOP','B34'),irrB38:baselineEngine.get('COOP','B38'),priceAt13B34:solveBaseline('B34'),priceAt13B38:solveBaseline('B38')};
+  baseline.matchesRequestedTargets=Math.abs(baseline.irrB34-.129075)<.000001&&Math.abs(baseline.irrB38-.12385)<.000002&&Math.abs(baseline.priceAt13B34-9443627)<1&&Math.abs(baseline.priceAt13B38-9089579)<1;
+  const passed=baseline.matchesRequestedTargets&&Object.values(cases).every(c=>c.checks&&Object.values(c.checks).every(Boolean));
+  write({ status: passed?'ok':'mismatch', generated: new Date().toISOString(), note: 'RomeoTest baseline plus synthetic contribution checks. No encryption key is used.',baseline, ...cases });
   if(!passed)process.exitCode=1;
 } catch (err) {
   // Formula-engine errors can contain private formula text. Do not publish it.

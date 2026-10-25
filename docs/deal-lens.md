@@ -9,15 +9,15 @@ Intake uses local Excel/OCR reading and a generated prompt with pasted readable
 AI results. This route never calls an AI provider. `/deal-lens/api/status` reports
 `paidEnabled: false`; `/deal-lens/api/analyze` is disabled.
 
-The reference model and its formula data are encrypted with AES-256-GCM in
-`data/deal-lens/`. Only the runtime `DEAL_LENS_MODEL_KEY` in Render can unlock
-them. Do not commit a plaintext model, its decrypted data, or the key. Original
+The reference workbook and formula data are mounted as an ordinary file on Render,
+with no application encryption or model key. See [workbook hosting](deal-lens-hosting.md).
+Do not commit company workbook data to this public repository. Original
 model values are served to the public Deal Lens page at runtime. The browser export
 preserves all 22 tabs and non-input formulas and updates yellow/orange inputs.
 
-`test/dealLensHosting.test.js` tests the route with synthetic encrypted assets.
-Model and intake regressions run when `DEAL_LENS_MODEL_KEY` is present; they skip
-when the private fixture cannot be unlocked. No provider requests are required.
+`test/dealLensHosting.test.js` tests the route with synthetic files.
+Model and intake regressions run where the workbook file is mounted; they skip
+where that source is unavailable. No provider requests are required.
 
 Saved deals remain in browser storage. Existing records from another origin can
 be moved with the existing Export Deal Lens backup / Import Deal Lens backup
@@ -55,10 +55,9 @@ zero overrides, and reports the B34 basis. It is not the live page's engine.
 
 Run `node --test test/dealLensParity.test.js` without a key. These synthetic
 regressions cover timing, scaling, overrides, basis reconciliation and price
-solves. The existing private workbook/export tests require the runtime key.
-`node scripts/dealLensParityReport.mjs` verifies the encrypted model when that
-key is provided securely in the process environment. It reports `no-key` when
-unavailable, fails on mismatches, and does not print model text or the key.
+solves. The workbook/export tests require the mounted workbook file.
+`node scripts/dealLensParityReport.mjs` verifies that source, reports `no-workbook`
+when unavailable, and fails on mismatches without printing model text.
 
 A fresh download can be checked without the key:
 `node scripts/inspectDealLensWorkbook.mjs /private/path/download.xlsx`.
@@ -68,10 +67,8 @@ the currently deployed version. Never commit the downloaded workbook.
 
 The supplied RomeoTest acceptance targets at ten sites and $9.5M are B34
 12.9075% / $9,443,627 at 13%, and B38 12.385% / $9,089,579 at 13%.
-Those remain unverified until the exact current RomeoTest workbook and its full
-input set are available. The parity report's round synthetic operating inputs
-are a separate test case and must not be represented as that baseline.
+Those match the exact RomeoTest workbook found in the user's Training folder.
+The parity report checks this baseline separately from synthetic operating inputs.
 
 The separate `deal-desk/` app in this checkout is a ten-year pretax screen. It
-was not changed as part of the clarified `/deal-lens/` scope. The encrypted
-assets are unchanged pending verification of the deployed workbook.
+was not changed as part of the clarified `/deal-lens/` scope.

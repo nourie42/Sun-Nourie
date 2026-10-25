@@ -1,4 +1,271 @@
 {
-  "status": "no-key",
-  "note": "DEAL_LENS_MODEL_KEY is not set, so the model cannot be opened."
+  "status": "ok",
+  "generated": "2026-10-25T09:20:33.687Z",
+  "note": "RomeoTest baseline plus synthetic contribution checks. No encryption key is used.",
+  "baseline": {
+    "source": "Copy of RomeoTest Simple Model.xlsx",
+    "sites": 10,
+    "purchasePrice": 9500000,
+    "irrB34": 0.12907539318104147,
+    "irrB38": 0.12385118830143052,
+    "priceAt13B34": 9443626.66258943,
+    "priceAt13B38": 9089578.748059202,
+    "matchesRequestedTargets": true
+  },
+  "ten_sites": {
+    "sites": 10,
+    "operatorPerSiteInput": 50000,
+    "year1": {
+      "C18": -500000,
+      "C19": -100000,
+      "C20": 1530000,
+      "C21": -100000,
+      "C22": 1430000,
+      "C23": -70000,
+      "C24": -200000,
+      "C25": 0,
+      "C26": 0,
+      "C27": 0,
+      "C28": null,
+      "C29": 500000,
+      "C32": 1660000
+    },
+    "year15": {
+      "Q29_exit": 8867363.746561,
+      "Q32": 10124034.68855
+    },
+    "year0": {
+      "B28": -500000,
+      "B29": -9500000,
+      "B31": -142500,
+      "B32": -10142500
+    },
+    "irr": {
+      "COOP_B34": 0.100792,
+      "COOP_B38": 0.097903,
+      "Combined_B7": 0.100792
+    },
+    "return_bases": {
+      "COOP!B34": {
+        "label": "Without capitalized lease",
+        "irr": 0.100792,
+        "price_at_13_percent": 7807694.428197,
+        "npv_at_13_percent": -1717690.15538
+      },
+      "COOP!B38": {
+        "label": "With capitalized lease",
+        "irr": 0.097903,
+        "price_at_13_percent": 7466954.782028,
+        "npv_at_13_percent": -2063540.896242
+      }
+    },
+    "display": {
+      "year1_contribution": 500000,
+      "year1_exit": 0,
+      "year15_exit": 8867363.746561147
+    },
+    "checks": {
+      "c29_formula_is_minus_c18": true,
+      "draw_matches_operator_input": true,
+      "year1_contribution_matches_operator_input": true,
+      "year1_flow_includes_contribution": true,
+      "lease_flow_includes_contribution": true,
+      "display_contribution_matches_cell": true,
+      "contribution_only_in_year1": true,
+      "exit_only_in_year15": true,
+      "prices_solve_their_own_basis": true
+    }
+  },
+  "four_sites": {
+    "sites": 4,
+    "operatorPerSiteInput": 50000,
+    "year1": {
+      "C18": -200000,
+      "C19": -40000,
+      "C20": 1890000,
+      "C21": -100000,
+      "C22": 1790000,
+      "C23": -28000,
+      "C24": -80000,
+      "C25": 0,
+      "C26": 0,
+      "C27": 0,
+      "C28": null,
+      "C29": 200000,
+      "C32": 1882000
+    },
+    "year15": {
+      "Q29_exit": 11521544.827048,
+      "Q32": 13084272.953548
+    },
+    "year0": {
+      "B28": -200000,
+      "B29": -9500000,
+      "B31": -142500,
+      "B32": -9842500
+    },
+    "irr": {
+      "COOP_B34": 0.165323,
+      "COOP_B38": 0.157215,
+      "Combined_B7": 0.165323
+    },
+    "return_bases": {
+      "COOP!B34": {
+        "label": "Without capitalized lease",
+        "irr": 0.165323,
+        "price_at_13_percent": 11664520.482649,
+        "npv_at_13_percent": 2196988.289889
+      },
+      "COOP!B38": {
+        "label": "With capitalized lease",
+        "irr": 0.157215,
+        "price_at_13_percent": 11323780.836479,
+        "npv_at_13_percent": 1851137.549026
+      }
+    },
+    "display": {
+      "year1_contribution": 200000,
+      "year1_exit": 0,
+      "year15_exit": 11521544.827047553
+    },
+    "checks": {
+      "c29_formula_is_minus_c18": true,
+      "draw_matches_operator_input": true,
+      "year1_contribution_matches_operator_input": true,
+      "year1_flow_includes_contribution": true,
+      "lease_flow_includes_contribution": true,
+      "display_contribution_matches_cell": true,
+      "contribution_only_in_year1": true,
+      "exit_only_in_year15": true,
+      "prices_solve_their_own_basis": true
+    }
+  },
+  "zero_addback": {
+    "sites": 10,
+    "operatorPerSiteInput": 0,
+    "year1": {
+      "C18": 0,
+      "C19": -100000,
+      "C20": 2030000,
+      "C21": -100000,
+      "C22": 1930000,
+      "C23": -70000,
+      "C24": -200000,
+      "C25": 0,
+      "C26": 0,
+      "C27": 0,
+      "C28": null,
+      "C29": 0,
+      "C32": 1660000
+    },
+    "year15": {
+      "Q29_exit": 12367363.746561,
+      "Q32": 14124034.68855
+    },
+    "year0": {
+      "B28": -500000,
+      "B29": -9500000,
+      "B31": -142500,
+      "B32": -10142500
+    },
+    "irr": {
+      "COOP_B34": 0.154938,
+      "COOP_B38": 0.148048,
+      "Combined_B7": 0.154938
+    },
+    "return_bases": {
+      "COOP!B34": {
+        "label": "Without capitalized lease",
+        "irr": 0.154938,
+        "price_at_13_percent": 11106540.902031,
+        "npv_at_13_percent": 1630639.015561
+      },
+      "COOP!B38": {
+        "label": "With capitalized lease",
+        "irr": 0.148048,
+        "price_at_13_percent": 10765801.255861,
+        "npv_at_13_percent": 1284788.274699
+      }
+    },
+    "display": {
+      "year1_contribution": 0,
+      "year1_exit": 0,
+      "year15_exit": 12367363.746561147
+    },
+    "checks": {
+      "c29_formula_is_minus_c18": true,
+      "draw_matches_operator_input": true,
+      "year1_contribution_matches_operator_input": true,
+      "year1_flow_includes_contribution": true,
+      "lease_flow_includes_contribution": true,
+      "display_contribution_matches_cell": true,
+      "contribution_only_in_year1": true,
+      "exit_only_in_year15": true,
+      "prices_solve_their_own_basis": true
+    }
+  },
+  "custom_addback": {
+    "sites": 10,
+    "operatorPerSiteInput": 25000,
+    "year1": {
+      "C18": -250000,
+      "C19": -100000,
+      "C20": 1780000,
+      "C21": -100000,
+      "C22": 1680000,
+      "C23": -70000,
+      "C24": -200000,
+      "C25": 0,
+      "C26": 0,
+      "C27": 0,
+      "C28": null,
+      "C29": 250000,
+      "C32": 1660000
+    },
+    "year15": {
+      "Q29_exit": 10617363.746561,
+      "Q32": 12124034.68855
+    },
+    "year0": {
+      "B28": -500000,
+      "B29": -9500000,
+      "B31": -142500,
+      "B32": -10142500
+    },
+    "irr": {
+      "COOP_B34": 0.129302,
+      "COOP_B38": 0.12427,
+      "Combined_B7": 0.129302
+    },
+    "return_bases": {
+      "COOP!B34": {
+        "label": "Without capitalized lease",
+        "irr": 0.129302,
+        "price_at_13_percent": 9457117.665114,
+        "npv_at_13_percent": -43525.569909
+      },
+      "COOP!B38": {
+        "label": "With capitalized lease",
+        "irr": 0.12427,
+        "price_at_13_percent": 9116378.018944,
+        "npv_at_13_percent": -389376.310772
+      }
+    },
+    "display": {
+      "year1_contribution": 250000,
+      "year1_exit": 0,
+      "year15_exit": 10617363.746561147
+    },
+    "checks": {
+      "c29_formula_is_minus_c18": true,
+      "draw_matches_operator_input": true,
+      "year1_contribution_matches_operator_input": true,
+      "year1_flow_includes_contribution": true,
+      "lease_flow_includes_contribution": true,
+      "display_contribution_matches_cell": true,
+      "contribution_only_in_year1": true,
+      "exit_only_in_year15": true,
+      "prices_solve_their_own_basis": true
+    }
+  }
 }
