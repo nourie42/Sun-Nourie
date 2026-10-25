@@ -11,6 +11,11 @@ test('ordinary sentences and bullets fill financial model without JSON',()=>{
  const d=apply('Deal name: Plain test\nThe asking price is $8 million and annual EBITDA is $2,000,000.\n- Annual fuel gallons: 10m gallons\n- Site count: 2 count');
  const m=c.OriginalModel.calculate(d);assert.equal(d.fields.name,'Plain test');assert.equal(m.inputs.price,8e6);assert.equal(m.inputs.base,2e6);assert.equal(m.inputs.gallons,10e6);assert.equal(m.inputs.sites,2);assert.ok(m.result);
 });
+
+test('intake recognizes the model form labels for annual rent and other annual income',()=>{
+ const d=apply('Site count: 10\nAsking price: $9,500,000\nAnnual fuel gallons: 11,000,000 gallons\nFuel gross margin: 37 cents per gallon\nAnnual inside sales: $8,000,000\nInside gross margin: 30%\nOther annual income: $500,000\nOperating expenses: $6,800,000\nAnnual rent: $100,000');
+ const m=c.OriginalModel.calculate(d);assert.equal(d.aiReview.facts.length,9);assert.equal(m.items.otherIncome.value,500000);assert.equal(m.items.otherIncome.status,'document');assert.equal(m.items.rent.value,100000);assert.equal(m.items.rent.status,'document');
+});
 test('readable table retains financial periods, negatives, full precision and segment scope',()=>{
  const p=parse(`| Metric | Value | Period | Scope | Source | Status |
 | --- | --- | --- | --- | --- | --- |
