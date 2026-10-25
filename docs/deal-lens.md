@@ -1,8 +1,9 @@
 # Deal Lens on the existing website
 
 The tracker runs at `/deal-lens/` in the existing Express service. Experimental
-weather links to that same-site path, and the tracker links back. It uses the
-existing weather sign-in and private, uncached responses for every asset.
+weather links to that same-site path, and the tracker links back. Deal Lens opens
+without a password, as requested. Responses remain uncached and marked noindex.
+The access requirements of the other sites are unchanged.
 
 Intake uses local Excel/OCR reading and a generated prompt with pasted readable
 AI results. This route never calls an AI provider. `/deal-lens/api/status` reports
@@ -11,7 +12,7 @@ AI results. This route never calls an AI provider. `/deal-lens/api/status` repor
 The reference model and its formula data are encrypted with AES-256-GCM in
 `data/deal-lens/`. Only the runtime `DEAL_LENS_MODEL_KEY` in Render can unlock
 them. Do not commit a plaintext model, its decrypted data, or the key. Original
-model values are served only after weather authentication. The browser export
+model values are served to the public Deal Lens page at runtime. The browser export
 preserves all 22 tabs and non-input formulas and updates yellow/orange inputs.
 
 `test/dealLensHosting.test.js` tests the route with synthetic encrypted assets.
@@ -21,6 +22,22 @@ when the private fixture cannot be unlocked. No provider requests are required.
 Saved deals remain in browser storage. Existing records from another origin can
 be moved with the existing Export Deal Lens backup / Import Deal Lens backup
 actions. No account data or uploaded seller files are committed to the repository.
+
+## Reliability audit
+
+The copy actions try the Clipboard API and a selected-text copy fallback. If the
+browser blocks both, the prompt or brief stays selected with manual-copy guidance.
+Intake remains usable when the workbook asset fails to load; calculations and
+workbook downloads show an unavailable state until the page is reloaded.
+
+Manual source corrections feed the workbook calculation. Manually entered deals
+count as saved work when starting a new import. Deal identity, next actions,
+evidence, source corrections, and table review remain accessible in the UI.
+Workbook exports capture the selected deal before asynchronous work begins.
+
+Formula recalculation follows a precomputed dependency graph and caches the most
+recent numeric results. Source labels and confirmation status resolve separately.
+The branch workflow runs the Deal Lens regressions and the shared access tests.
 
 ## Workbook parity on `deal-lens-parity`
 

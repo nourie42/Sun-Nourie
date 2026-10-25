@@ -20,19 +20,21 @@ async function fixture(t) {
   const server=app.listen(0,'127.0.0.1');await new Promise(resolve=>server.once('listening',resolve));
   t.after(()=>new Promise(resolve=>server.close(resolve)));
   const base='http://127.0.0.1:'+server.address().port;
-  const login=await fetch(base+'/weather-fusion/login',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({password:'local-test-password',returnTo:'/deal-lens/'}),redirect:'manual'});
-  assert.equal(login.status,303);assert.equal(login.headers.get('location'),'/deal-lens/');
-  return {base,cookie:login.headers.get('set-cookie').split(';')[0]};
+  return {base};
 }
-test('new tracker path, files and API remain behind the existing weather sign-in',async t=>{
+test('Deal Lens opens without a password while other sites keep their existing gate',async t=>{
   const {base}=await fixture(t);
-  for(const p of ['/deal-lens','/deal-lens/','/deal-lens/app.js','/deal-lens/original-model.xlsx','/deal-lens/api/status','/deal-lens/vendor/ocr/eng.traineddata']){
+  for(const p of ['/deal-lens/','/deal-lens/app.js','/deal-lens/original-model.xlsx','/deal-lens/api/status','/deal-lens/vendor/ocr/eng.traineddata']){
+    assert.equal(isProtectedWeatherPath(p),false);
+    const r=await fetch(base+p);assert.equal(r.status,200,p);assert.equal(r.headers.get('cache-control'),'private, no-store');
+  }
+  for(const p of ['/weather-fusion/experimental-weather.html','/weathernext/','/whats-up/','/deal-intelligence/']){
     assert.equal(isProtectedWeatherPath(p),true);assert.equal(isPublicWeatherPath(p),false);
-    const r=await fetch(base+p,{redirect:'manual'});assert.equal(r.status,401,p);assert.match(await r.text(),/Nourie Weather/);assert.equal(r.headers.get('cache-control'),'private, no-store');
+    const r=await fetch(base+p);assert.equal(r.status,401,p);assert.match(await r.text(),/Nourie Weather/);
   }
 });
 test('the mounted page and every initial script/style load from the same host',async t=>{
-  const {base,cookie}=await fixture(t),headers={Cookie:cookie};
+  const {base}=await fixture(t),headers={};
   const canonical=await fetch(base+'/deal-lens',{headers,redirect:'manual'});assert.equal(canonical.headers.get('location'),'/deal-lens/');
   const page=await fetch(base+'/deal-lens/',{headers});assert.equal(page.status,200);const html=await page.text();assert.match(html,/Copy prompt\. Paste results/);assert.match(html,/href="\/weather-fusion\/experimental-weather.html"/);
   assert.ok(!html.includes('chatgpt.site'));assert.ok(!html.includes('ai-intake.js'));
@@ -41,7 +43,7 @@ test('the mounted page and every initial script/style load from the same host',a
   for(const asset of assets){const r=await fetch(new URL(asset,base+'/deal-lens/'),{headers});assert.equal(r.status,200,asset);assert.equal(r.headers.get('cache-control'),'private, no-store');if(asset.endsWith('.js'))assert.match(r.headers.get('content-type'),/javascript/);}
 });
 test('original XLSX download bytes survive hosting and paid extraction stays disabled',async t=>{
-  const {base,cookie}=await fixture(t),headers={Cookie:cookie};
+  const {base}=await fixture(t),headers={};
   const r=await fetch(base+'/deal-lens/original-model.xlsx',{headers});assert.equal(r.status,200);const hash=b=>crypto.createHash('sha256').update(b).digest('hex');assert.equal(hash(Buffer.from(await r.arrayBuffer())),hash(fixtureModel));
   const status=await (await fetch(base+'/deal-lens/api/status',{headers})).json();assert.equal(status.paidEnabled,false);
   const disabled=await fetch(base+'/deal-lens/api/analyze',{method:'POST',headers});assert.equal(disabled.status,410);assert.equal((await disabled.json()).code,'DIRECT_API_DISABLED');

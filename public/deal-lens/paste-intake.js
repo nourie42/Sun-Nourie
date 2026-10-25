@@ -6,6 +6,33 @@
   const clean=(s,max=2000)=>typeof s==='string'?s.trim().slice(0,max):'';
   const number=v=>{if(typeof v==='number')return Number.isFinite(v)?v:null;if(typeof v!=='string'||!v.trim())return null;let s=v.trim().replace(/[$%\s]/g,'').toLowerCase(),factor=1;if(s.includes(',')&&!/^-?\(?\d{1,3}(?:,\d{3})+(?:\.\d+)?\)?(?:million|thousand|mm|m|k)?$/.test(s))return null;s=s.replace(/,/g,'');if(/(?:million|mm|m)$/.test(s)){factor=1e6;s=s.replace(/(?:million|mm|m)$/,'');}else if(/(?:thousand|k)$/.test(s)){factor=1e3;s=s.replace(/(?:thousand|k)$/,'');}if(/^\(.*\)$/.test(s))s='-'+s.slice(1,-1);return /^-?(?:\d+\.?\d*|\.\d+)$/.test(s)?Number(s)*factor:null;};
   const prompt=options=>DealPlain.prompt(options);
+  function formatFact({key,value}){
+    if(!Number.isFinite(value))return '—';
+    const n=value.toLocaleString('en-US',{maximumFractionDigits:6});
+    if(key==='sites')return n+' sites';
+    if(key==='assetCount')return n+' assets';
+    if(key==='fuelMarginCpg')return n+' cents/gallon';
+    if(key==='insideMarginPct')return n+'%';
+    if(key==='gallons')return (value*1e6).toLocaleString('en-US',{maximumFractionDigits:6})+' gallons';
+    if(key==='siteMonthlyGallons')return n+' gallons/month';
+    return new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',maximumFractionDigits:0}).format(usd.has(key)?value:mm.has(key)?value*1e6:value);
+  }
+  async function copyText(value){
+    const text=String(value??'');
+    if(!text)return false;
+    try{if(globalThis.navigator?.clipboard?.writeText){await navigator.clipboard.writeText(text);return true;}}catch{}
+    // Clipboard permissions vary between browsers and embedded tabs. Keep a
+    // selection-based copy path before asking the user to copy manually.
+    const doc=globalThis.document;if(!doc?.body||typeof doc.execCommand!=='function')return false;
+    const focused=doc.activeElement,selection=doc.getSelection?.(),ranges=[];
+    for(let i=0;i<(selection?.rangeCount||0);i++)ranges.push(selection.getRangeAt(i).cloneRange());
+    const field=doc.createElement('textarea');field.value=text;field.readOnly=true;field.tabIndex=-1;
+    Object.assign(field.style,{position:'fixed',top:'0',left:'0',width:'1px',height:'1px',opacity:'0'});
+    doc.body.appendChild(field);
+    try{field.focus({preventScroll:true});field.select();field.setSelectionRange?.(0,text.length);return doc.execCommand('copy')===true;}
+    catch{return false;}
+    finally{field.remove();focused?.focus?.({preventScroll:true});if(selection&&ranges.length){selection.removeAllRanges();for(const range of ranges)selection.addRange(range);}}
+  }
   function parse(raw){
     if(typeof raw!=='string'||!raw.trim())throw Error('Paste the AI response first.');
     if(raw.length>1500000)throw Error('The response is too large. Paste the financial summary and site table only.');
@@ -52,5 +79,5 @@
     DealRoster.merge(deal,parsed.sites);
     deal.pasteDraft='';return deal;
   }
-  globalThis.DealPaste={prompt,parse,apply,number};
+  globalThis.DealPaste={prompt,parse,apply,number,copyText,formatFact};
 })();

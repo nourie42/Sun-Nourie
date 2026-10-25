@@ -74,6 +74,10 @@ test('workbook adapter distinguishes contribution from exit and keeps both cash-
   assert.equal(m.calculate(workbookDeal({operatorPerSite:0})).result.years[0].contribution,0);
   assert.equal(m.calculate(workbookDeal({operatorPerSite:25000})).result.years[0].contribution,250000);
   assert.equal(m.calculate(d).result,r,'Unchanged inputs reuse the cached calculation');
+  const copied=JSON.parse(JSON.stringify(d));copied.fields.name='Renamed deal';copied.originalConfirmed={price:true};
+  const copiedModel=m.calculate(copied);
+  assert.equal(copiedModel.result,r,'Equivalent input values reuse results across intake preview and saved deal');
+  assert.equal(copiedModel.items.price.status,'confirmed','Numeric reuse does not reuse stale evidence metadata');
   d.originalInputs.operatorPerSite=10000;
   assert.equal(m.calculate(d).result.years[0].contribution,100000,'Editing S18 invalidates the cache');
 });
@@ -83,4 +87,49 @@ test('workbook display reads the actual C29 and does not conceal an older missin
   const r=load(data).OriginalModel.calculate(workbookDeal()).result;
   assert.equal(r.years[0].contribution,0);
   assert.equal(r.years[0].exit,0);
+});
+
+test('missing workbook data leaves intake definitions available and blocks fabricated calculations',()=>{
+  const ctx=load();vm.runInContext(fs.readFileSync('public/deal-lens/original-model.js','utf8'),ctx);
+  const m=ctx.OriginalModel,d=workbookDeal(),result=m.calculate(d);
+  assert.equal(m.available,false);assert.equal(result.available,false);assert.equal(result.result,null);
+  assert.ok(m.definitions.length>0);assert.equal(result.inputs.price,null);assert.equal(result.inputs.base,null);
+  assert.match(result.errors[0],/original workbook could not load/i);
+  assert.throws(()=>m.compute({}),/original workbook could not load/i);
+});
+
+test('workbook dependency propagation includes transitive and cross-sheet formulas only',()=>{
+  const {OriginalFormulaEngine:e}=load(),compute=e.create({sheets:{A:{A1:{v:1},A2:{f:'=A1+1',v:2},A3:{f:'=A2+1',v:3},B1:{f:'=20+1',v:21}},B:{A1:{f:'=A!A3*2',v:6}}}}),result=compute({'A!A1':7});
+  assert.equal(result.get('B','A1'),18);assert.equal(result.get('A','B1'),21);
+  assert.deepEqual(new Set(result.dirty),new Set(['A!A1','A!A2','A!A3','B!A1']));
+  const snapshot=result.snapshot();assert.equal(snapshot['A!A2'],8);assert.equal(snapshot['A!A3'],9);
+  assert.equal(compute({'A!A2':20}).get('B','A1'),42,'An overridden formula remains an input');
+  assert.equal(compute({'A!A1':2}).get('B','A1'),8,'Separate recalculations do not leak cached values');
+});
+
+test('manual and selected source corrections change the workbook and retain explicit zero',()=>{
+  const {OriginalModel:m}=load(syntheticWorkbook()),d={fields:{gallons:'12',normEbitda:'2',sites:'4'},fieldOrigin:{gallons:'manual',normEbitda:'manual',sites:'manual'},reportedFacts:[{key:'gallons',value:11},{key:'normEbitda',value:1.2},{key:'sites',value:10}]};
+  let r=m.calculate(d);assert.equal(r.inputs.gallons,12000000);assert.equal(r.inputs.sites,4);close(r.inputs.base,2000000);assert.equal(r.items.gallons.status,'manual');
+  d.fields.gallons='0';r=m.calculate(d);assert.equal(r.inputs.gallons,0,'A zero correction cannot fall back to a source value');
+  d.fields.gallons='9';d.fieldOrigin.gallons='selected source';r=m.calculate(d);assert.equal(r.inputs.gallons,9000000);assert.match(r.items.gallons.basis,/selected source/);
+  const sourceOnly=m.calculate({fields:{normEbitda:'1.5'},fieldOrigin:{normEbitda:'manual'}});assert.ok(sourceOnly.result);close(sourceOnly.inputs.base,1500000);
+});
+
+test('gross-profit composition keeps supplied gallons, inside sales, and other income',()=>{
+  const {OriginalModel:m}=load(syntheticWorkbook()),d={fields:{},reportedFacts:[{key:'sellerGrossProfitUsd',value:4000000},{key:'sellerExpensesUsd',value:2500000},{key:'gallons',value:11},{key:'insideSales',value:8},{key:'otherIncomeUsd',value:100000}]};
+  let r=m.calculate(d);assert.ok(r.result);assert.equal(r.inputs.gallons,11000000);assert.equal(r.inputs.inside,8000000);assert.equal(r.inputs.otherIncome,100000);close(r.inputs.base,1500000);assert.equal(r.items.gallons.status,'document');assert.equal(r.items.inside.status,'document');
+  d.fields.normEbitda='2';d.fieldOrigin={normEbitda:'manual'};r=m.calculate(d);close(r.inputs.base,2000000);assert.match(r.items.opex.basis,/override takes precedence/);
+  d.fields.opex='0';d.fieldOrigin.opex='manual';r=m.calculate(d);assert.equal(r.inputs.opex,0);assert.equal(r.items.opex.status,'manual');
+});
+
+test('invalid entries cannot yield model results and rebrand counts stay within the portfolio',()=>{
+  const {OriginalModel:m}=load(syntheticWorkbook());
+  for(const override of [{price:'bad'},{sites:0},{sites:1.5},{operatorPerSite:-1},{insideMargin:101},{savings:101},{rebrandSites:1.5},{rebrandSites:11}]){
+    const r=m.calculate(workbookDeal(override));assert.equal(r.result,null,JSON.stringify(override));assert.ok(r.errors.length);
+  }
+});
+
+test('uncertain rent and observed volumes are retained when estimating the missing operating mix',()=>{
+  const {OriginalModel:m}=load(syntheticWorkbook()),d={fields:{},reportedFacts:[{key:'sellerEbitdaUsd',value:2000000},{key:'gallons',value:1},{key:'rentUsd',value:100000,confidence:'low'}]};
+  const r=m.calculate(d);assert.ok(r.result);assert.equal(r.inputs.gallons,1000000);assert.equal(r.inputs.rent,100000);assert.equal(r.items.rent.status,'estimated');close(r.inputs.base,2000000);
 });

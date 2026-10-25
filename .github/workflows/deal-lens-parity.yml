@@ -7,13 +7,12 @@ on:
     branches: [deal-lens-parity]
     paths:
       - scripts/dealLensParityReport.mjs
-      - public/deal-lens/model.js
-      - public/deal-lens/original-model.js
-      - public/deal-lens/original-engine.js
-      - public/deal-lens/intake-model-ui.js
-      - public/deal-lens/app.js
+      - public/deal-lens/**
+      - src/dealLensRoutes.js
+      - src/weatherSiteAccess.js
       - data/deal-lens/**
-      - test/dealLensParity.test.js
+      - test/dealLens*.test.js
+      - test/weatherSiteAccess.test.js
       - .github/workflows/deal-lens-parity.yml
   workflow_dispatch:
 
@@ -29,8 +28,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      - name: Run public synthetic parity regressions
-        run: node --test test/dealLensParity.test.js
+      - name: Install dependencies
+        run: npm ci
+      - name: Run Deal Lens and access regressions
+        run: node --test test/dealLens*.test.js test/weatherSiteAccess.test.js
       - name: Run parity report (synthetic numbers only)
         env:
           DEAL_LENS_MODEL_KEY: ${{ secrets.DEAL_LENS_MODEL_KEY }}

@@ -31,10 +31,16 @@
     switch(ast.fn){case 'SUM':return flat.reduce((s,n)=>s+(typeof n==='number'?n:0),0);case 'COUNT':return flat.filter(n=>typeof n==='number').length;case 'AVERAGE':{const a=flat.filter(n=>typeof n==='number');return a.length?a.reduce((s,n)=>s+n,0)/a.length:ERR('#DIV/0!');}case 'MIN':return Math.min(...flat.filter(n=>typeof n==='number'));case 'MAX':return Math.max(...flat.filter(n=>typeof n==='number'));case 'NPV':return flatten(values[1]).reduce((s,n,i)=>s+number(n)/(1+number(values[0]))**(i+1),0);case 'IRR':return excelIrr(flat.filter(x=>typeof x==='number'));case 'ROUND':return Math.round(number(values[0])*10**number(values[1]))/10**number(values[1]);case 'ROUNDUP':return Math.sign(number(values[0]))*Math.ceil(Math.abs(number(values[0]))*10**number(values[1]))/10**number(values[1]);case 'ISNUMBER':return typeof values[0]==='number';default:throw Error('Unsupported changed formula function '+ast.fn);}
   }
   function create(data){
-    const graph={},asts=new Map();for(const [sheet,cells] of Object.entries(data.sheets))for(const [address,c] of Object.entries(cells))if(c.f)graph[sheet+'!'+address]=references(c.f,sheet);
+    const dependents=new Map(),asts=new Map();
+    for(const [sheet,cells] of Object.entries(data.sheets))for(const [address,c] of Object.entries(cells))if(c.f){
+      const key=sheet+'!'+address;
+      for(const ref of new Set(references(c.f,sheet))){if(!dependents.has(ref))dependents.set(ref,[]);dependents.get(ref).push(key);}
+    }
     return function calculate(changes){
-      const dirty=new Set(Object.keys(changes)),values=new Map(Object.entries(changes)),visiting=new Set();let more=true;
-      while(more){more=false;for(const [key,refs] of Object.entries(graph))if(!dirty.has(key)&&refs.some(r=>dirty.has(r))){dirty.add(key);more=true;}}
+      const dirty=new Set(Object.keys(changes)),values=new Map(Object.entries(changes)),visiting=new Set(),queue=[...dirty];
+      // Follow only the formulas affected by an input. Price solving repeats this
+      // calculation; rescanning every workbook formula made each edit stall.
+      for(let i=0;i<queue.length;i++)for(const key of dependents.get(queue[i])||[])if(!dirty.has(key)){dirty.add(key);queue.push(key);}
       function get(sheet,address){const key=sheet+'!'+address;if(values.has(key))return values.get(key);const cell=data.sheets[sheet]?.[address];if(!cell)return null;if(!dirty.has(key)||!cell.f)return cell.v;
         if(visiting.has(key))throw Error('Circular changed formula '+key);visiting.add(key);try{let ast=asts.get(cell.f);if(!ast){ast=parse(cell.f);asts.set(cell.f,ast);}const value=evaluate(ast,sheet,get);values.set(key,value);return value;}catch(e){if(e.excel){values.set(key,e.message);return e.message;}throw e;}finally{visiting.delete(key);}}
       function snapshot(){for(const key of dirty){const p=key.lastIndexOf('!');get(key.slice(0,p),key.slice(p+1));}return Object.fromEntries(values);}

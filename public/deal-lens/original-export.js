@@ -9,7 +9,14 @@
   }
   async function make(d,bytes){
     const model=OriginalModel.calculate(d);if(!model.result)throw Error(model.errors[0]||'Read the deal materials before exporting. No empty model will be downloaded.');
-    const template=bytes||await (await fetch('./original-model.xlsx')).arrayBuffer(),zip=await JSZip.loadAsync(template),values=model.result.engine.snapshot(),sheets=new Map();
+    let template=bytes;
+    if(!template){
+      let response;try{response=await fetch('./original-model.xlsx');}catch{throw Error('The workbook download could not connect. Check your connection and try again.');}
+      if(!response.ok)throw Error('The original workbook is unavailable. Reload the page and try the download again.');
+      template=await response.arrayBuffer();
+    }
+    let zip;try{zip=await JSZip.loadAsync(template);}catch{throw Error('The workbook download was incomplete or invalid. Please try again.');}
+    const values=model.result.engine.snapshot(),sheets=new Map();
     for(const [key,value] of Object.entries(values)){const p=key.lastIndexOf('!'),sheet=key.slice(0,p),cell=key.slice(p+1),input=Object.hasOwn(model.changes,key);if(input&&!OriginalModel.data.allowed[sheet]?.includes(cell))throw Error('Blocked non-yellow/orange edit: '+key);if(!sheets.has(sheet))sheets.set(sheet,await zip.file(OriginalModel.data.sheetPaths[sheet]).async('string'));sheets.set(sheet,patchCell(sheets.get(sheet),cell,value,input));}
     for(const [sheet,xml] of sheets)zip.file(OriginalModel.data.sheetPaths[sheet],xml);
     // Input formulas may have been replaced by values. Excel must rebuild its calculation chain.

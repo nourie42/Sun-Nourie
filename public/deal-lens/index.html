@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#0b1422">
-  <meta name="description" content="A private, browser-based workspace to screen, analyze, and brief Sunoco fuel and convenience deals.">
+  <meta name="description" content="A browser-based workspace to screen, analyze, and brief Sunoco fuel and convenience deals. Deal entries are saved on your device.">
   <title>Deal Lens | Strategic M&A workspace</title>
   <link rel="stylesheet" href="./style.css">
   <script src="./vendor/jszip.min.js" defer></script>
@@ -39,7 +39,7 @@
         <button class="nav-btn" data-tab="brief"><span>05</span> Brief for Chip</button>
       </nav>
       <div class="rail-bottom">
-        <div class="privacy"><span class="dot"></span> Private deal workspace</div>
+        <div class="privacy"><span class="dot"></span> Saved in this browser</div>
         <p>Your entries stay in this browser. Export a backup to move them to another device.</p>
       </div>
     </aside>
@@ -50,7 +50,7 @@
           <label class="sr-only" for="dealPicker">Choose deal</label>
           <select id="dealPicker" aria-label="Choose deal"></select>
           <button class="button primary" id="newDeal" type="button">+ New deal</button>
-          <div class="more-wrap"><button class="button icon" id="moreButton" aria-label="More actions" aria-expanded="false">⋯</button><div id="moreMenu" class="more-menu" hidden><button id="exportDeal">Export Deal Lens backup (.json)</button><button id="importDeal">Import Deal Lens backup (.json)</button><button id="deleteDeal">Delete current deal</button></div></div>
+          <div class="more-wrap"><button class="button icon" id="moreButton" aria-label="More actions" aria-expanded="false">⋯</button><div id="moreMenu" class="more-menu" hidden><button id="exportDeal">Export Deal Lens backup (.json)</button><button id="importDeal">Import Deal Lens backup (.json)</button><button id="exportRecovery" hidden>Download recovery backup (.json)</button><button id="deleteDeal">Delete current deal</button></div></div>
           <input type="file" id="importFile" accept="application/json,.json" hidden>
         </div>
       </header>
@@ -71,7 +71,7 @@
             <div class="card intake-card"><div class="section-head"><div><h2>Use your AI chat</h2><p id="uploadDestination">Prepare a prompt for this deal.</p></div></div>
               <fieldset class="upload-intent"><legend>These results belong to</legend><label><input type="radio" name="uploadIntent" value="new" checked> A new deal</label><label><input type="radio" name="uploadIntent" value="current"> Add to this deal</label></fieldset>
               <label class="upload-zone" for="dealFiles"><span class="upload-icon">1</span><strong>Choose files for the prompt (optional)</strong><small>Files stay on your device. Attach the same PDF, Excel, Word, CSV or photos in your AI chat. Excel asset rosters are read automatically on this device. Selecting files makes no API requests.</small></label>
-              <input id="dealFiles" type="file" multiple hidden>
+              <input id="dealFiles" class="sr-only" type="file" multiple aria-label="Choose files for the AI prompt">
               <div id="fileQueue" class="file-queue">No files selected · you can still copy the prompt</div>
               <details class="prompt-context"><summary>Add context or instructions (optional)</summary><label class="full-label">Deal context<textarea id="rawDealText" rows="3" placeholder="Deal name, asking price, or what you want the AI to focus on"></textarea></label></details>
               <div class="prompt-copy-row"><button class="button primary" id="copyAiPrompt" type="button">2. Copy AI prompt</button><span id="promptCopyStatus" role="status">Paste it into your AI chat and attach your files.</span></div>
