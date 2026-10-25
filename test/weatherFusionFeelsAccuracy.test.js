@@ -29,8 +29,8 @@ test('the reported sunny 65 F afternoon keeps correct inputs and raises the high
   assert.equal(estimate.windChillFloor,false,'NWS wind chill is not extrapolated into this 65 F case');
  }
  assert.ok(Math.abs(shade.value-reference.shade)<1e-8);
- assert.ok(Math.abs(outdoor.value-utciF(input.temperature,outdoor.tr,input.wind,outdoor.rh))<1e-8,'the UTCI equation stays unchanged at the revised estimated MRT');
- assert.ok(outdoor.value>reference.outdoor+2&&outdoor.value<reference.outdoor+5,'the requested midday solar adjustment raises this example moderately');
+ assert.ok(Math.abs(outdoor.valueBeforeSunFloor-utciF(input.temperature,outdoor.tr,input.wind,outdoor.rh))<1e-8,'the UTCI equation stays unchanged at the revised estimated MRT (before the separate sun floor)');
+ assert.ok(outdoor.valueBeforeSunFloor>reference.outdoor+2&&outdoor.valueBeforeSunFloor<reference.outdoor+5,'the requested midday solar adjustment raises this example moderately');
  assert.ok(outdoor.tr>shade.tr,'direct sunlight increases the estimated radiant temperature');
  assert.ok(outdoor.value>shade.value+7,'sunlight is included rather than silently using shade');
  assert.ok(tier3FeelsLike({...input,wind:6},place,time,'outdoors').value>65,'a lighter breeze can feel warmer than air');

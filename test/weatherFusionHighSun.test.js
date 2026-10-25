@@ -26,12 +26,12 @@ test('11 AM–3 PM sunshine increases the modeled outdoor estimate without chang
 test('night, low sun and full overcast get no additional sunlight warming',()=>{
  for(const [iso,cloud] of [['2026-10-20T03:00:00Z',10],['2026-10-19T12:00:00Z',10],['2026-10-19T17:00:00Z',100]]) {
   const sample={...input,skyCover:cloud},time=Date.parse(iso);
-  assert.equal(tier3FeelsLike(sample,place,time,'outdoors').value,baseline(sample,time));
+  assert.equal(tier3FeelsLike(sample,place,time,'outdoors').valueBeforeSunFloor,baseline(sample,time));
  }
 });
 test('cloud attenuation reduces the extra warming and solar position wins over timezone labels',()=>{
  const time=Date.parse('2026-10-19T17:00:00Z');
- const extra=cloud=>{const sample={...input,skyCover:cloud};return tier3FeelsLike(sample,place,time,'outdoors').value-baseline(sample,time);};
+ const extra=cloud=>{const sample={...input,skyCover:cloud};return tier3FeelsLike(sample,place,time,'outdoors').valueBeforeSunFloor-baseline(sample,time);};
  assert.ok(extra(0)>extra(50));assert.ok(extra(50)>extra(90));assert.equal(extra(100),0);
  assert.deepEqual(tier3FeelsLike(input,place,time,'outdoors'),tier3FeelsLike(input,{...place,timeZone:'Asia/Tokyo'},time,'outdoors'));
  assert.equal(tier3FeelsLike({...input,wind:null},place,time,'outdoors').value,null);
@@ -40,7 +40,7 @@ test('cloud attenuation reduces the extra warming and solar position wins over t
 test('the sun adjustment remains continuous through the daytime without hourly jumps',()=>{
  let previous;
  for(let time=Date.parse('2026-10-19T11:00:00Z');time<=Date.parse('2026-10-20T00:00:00Z');time+=60000) {
-  const value=tier3FeelsLike(input,place,time,'outdoors').value-baseline(input,time);
+  const value=tier3FeelsLike(input,place,time,'outdoors').valueBeforeSunFloor-baseline(input,time);
   if(previous!==undefined)assert.ok(Math.abs(value-previous)<.15);
   previous=value;
  }

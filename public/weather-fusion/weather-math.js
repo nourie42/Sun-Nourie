@@ -5,6 +5,14 @@ import {utciF} from './utci.js?v=clear-weather-daygraph-v3';
 export const EXPERIENCE_VERSION = 'weather-nourie-friendly-v1';
 export const finite = n => typeof n === 'number' && Number.isFinite(n);
 export const TONIGHT_START_HOUR = 18;
+/** Site-wide rule for the "feels like in the sun" number, used by the server and the browser alike
+ * (the browser re-checks every hourly card against this same math, so this is the only place to edit).
+ * In direct sun the feels-like temperature is never lower than the air temperature unless it is windy:
+ * the rule is fully on below calmWindMph and fades smoothly to nothing at windyMph and above, so there
+ * is no sudden jump. It also fades in over the first 5 degrees of sun height, and out as cloud cover
+ * passes the partly-cloudy range (62%), matching the site's no-sudden-change contract.
+ * Set enabled:false to turn the rule off. */
+export const SUN_FEELS_LIKE_RULE = Object.freeze({enabled:true, calmWindMph:10, windyMph:15});
 const fToC = f => (f - 32) / 1.8;
 const cToF = c => c * 1.8 + 32;
 const sat = t => 6.112 * Math.exp(17.67 * t / (t + 243.5));
@@ -190,7 +198,19 @@ export function tier3FeelsLike(current,location,now,exposure='shade') {
   const elevation=solarElevation(now,location?.latitude,location?.longitude),deltaC=estimatedMrtDelta(current,elevation,exposure);
   const tr=current.temperature+deltaC*1.8,rawValue=utciF(current.temperature,tr,current.wind,rh);
   const value=coldWindChillBlend(current.temperature,current.wind,rawValue);
-  return {value,method:finite(value)?'UTCI Tier-3 fallback with estimated mean radiant temperature':'UTCI outside supported range',rh,tr,deltaMrtC:deltaC,
+  // Direct sun cannot make a calm or lightly breezy spot feel colder than the air itself. The lift fades in
+  // with sun height, fades out with cloud beyond the partly-cloudy range, and fades out as wind rises from
+  // calmWindMph to windyMph, so no input change can cause a sudden jump.
+  const smooth=x=>{const v=Math.max(0,Math.min(1,x));return v*v*(3-2*v);};
+  const rule=SUN_FEELS_LIKE_RULE,sky=radiationSky(current);
+  const cloudFade=finite(sky.cover)?(sky.cover<=62?1:Math.max(0,(100-sky.cover)/38)):(sky.known&&(sky.kind==='clear'||sky.kind==='partly-cloudy')?1:0);
+  const heightFade=finite(elevation)&&elevation>0?smooth(elevation*180/Math.PI/5):0;
+  const windFade=Math.max(0,Math.min(1,(rule.windyMph-current.wind)/(rule.windyMph-rule.calmWindMph)));
+  const sunWeight=rule.enabled&&exposure==='outdoors'?cloudFade*heightFade*windFade:0;
+  const lift=finite(value)&&value<current.temperature?(current.temperature-value)*sunWeight:0;
+  const sunFloorApplied=lift>.001;
+  const finalValue=finite(value)?value+lift:value;
+  return {value:finalValue,sunFloorApplied,valueBeforeSunFloor:value,method:finite(value)?`UTCI Tier-3 fallback with estimated mean radiant temperature${sunFloorApplied?' and sun-never-below-air-temperature floor':''}`:'UTCI outside supported range',rh,tr,deltaMrtC:deltaC,
     windUsedMps:Math.max(.5,current.wind*.44704),warmerResultOverride:false,
     windChillFloor:finite(value)&&finite(rawValue)&&value>rawValue+.001};
 }
@@ -208,7 +228,7 @@ export function thermalComfort(current, location, now) {
   const wet=wetBulb(current.temperature,rh);
   const shadeValue=finite(shade.value)?Math.round(shade.value):null,outdoorValue=finite(outdoor.value)?Math.round(outdoor.value):null;
   return {rawShade:shade.value,rawOutdoors:outdoor.value,
-    inputEvidence:{temperature:current.temperature,dewpoint:current.dewpoint,humidity:rh,windMph:current.wind,windUsedMps:outdoor.windUsedMps,skyCover:weather.cover,skySource:weather.source,meanRadiantTemperatureF:outdoor.tr,sourceTime:current.time||null,station:current.station||null,stationDistanceKm:current.stationDistanceKm??null,
+    inputEvidence:{sunFloorApplied:outdoor.sunFloorApplied===true,temperature:current.temperature,dewpoint:current.dewpoint,humidity:rh,windMph:current.wind,windUsedMps:outdoor.windUsedMps,skyCover:weather.cover,skySource:weather.source,meanRadiantTemperatureF:outdoor.tr,sourceTime:current.time||null,station:current.station||null,stationDistanceKm:current.stationDistanceKm??null,
       windPolicy:current.wind*.44704<.5?'Calm-wind approximation: UTCI minimum 0.5 m/s':'Source wind; no observation-to-forecast adjustment',
       radiationBasis:daylight===false?'No solar load at night; unmeasured mean radiant temperature assumed equal to air':'Radiation estimated from the same-hour sky and solar elevation; not measured'},
     radiantCondition:weather.condition,shade:shadeValue,sun:daylight&&(weather.kind==='clear'||weather.kind==='partly-cloudy')?outdoorValue:null,outdoors:outdoorValue,
