@@ -113,8 +113,19 @@ button { font: inherit; color: inherit; }
   flex-wrap: wrap;
 }
 .strip-name { font-family: var(--f-display); font-weight: 700; font-size: 18px; letter-spacing: .06em; text-transform: uppercase; }
-.strip-kv { display: flex; gap: 6px 22px; flex-wrap: wrap; font-size: 13px; color: var(--muted); }
-.strip-kv b { color: var(--ink); font-family: var(--f-mono); font-weight: 500; font-size: 14px; }
+.strip-main { display: flex; gap: 4px 26px; flex-wrap: wrap; align-items: flex-end; }
+.sk { display: flex; flex-direction: column; line-height: 1.1; }
+.sk i { font-style: normal; font-size: 10.5px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+.sk b { font-family: var(--f-display); font-weight: 700; font-size: 26px; font-variant-numeric: tabular-nums; color: var(--ink); }
+.sk b.irr-good { color: var(--good); }
+.sk b.irr-bad { color: var(--bad); }
+.strip-ch { width: 100%; display: flex; flex-wrap: wrap; gap: 2px 16px; font-size: 12px; color: var(--muted); padding-top: 4px; border-top: 1px solid var(--line); }
+.strip-ch b { font-family: var(--f-mono); font-weight: 500; color: var(--ink); }
+.strip-ch b.irr-good { color: var(--good); }
+.strip-ch b.irr-bad { color: var(--bad); }
+.hbtns { display: flex; gap: 6px; flex-wrap: wrap; }
+.btn.danger { border-color: var(--bad); color: var(--bad); }
+.btn.danger:hover { background: var(--bad-bg); }
 
 .wrap { max-width: 1240px; margin: 0 auto; }
 .intro { padding: 28px 0 22px; display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px 24px; }
@@ -134,7 +145,7 @@ h1 { margin: 0; font-family: var(--f-display); font-weight: 700; font-size: clam
 .layout { display: grid; gap: 20px; grid-template-columns: minmax(0, 1fr); align-items: start; }
 @media (min-width: 1020px) {
   .layout { grid-template-columns: minmax(300px, 370px) minmax(0, 1fr); gap: 28px; }
-  .inputs { order: -1; position: sticky; top: calc(env(safe-area-inset-top, 0px) + 56px); max-height: calc(100vh - 76px); overflow-y: auto; }
+  .inputs { position: sticky; top: calc(env(safe-area-inset-top, 0px) + var(--strip-h, 90px) + 10px); max-height: calc(100vh - var(--strip-h, 90px) - 30px); overflow-y: auto; }
 }
 .results { display: grid; gap: 20px; min-width: 0; }
 
@@ -147,6 +158,7 @@ h1 { margin: 0; font-family: var(--f-display); font-weight: 700; font-size: clam
   padding: 20px clamp(16px, 3vw, 28px) 22px;
 }
 .sign-top { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px 20px; }
+.sign .tgt-txt { font-size: 13px; color: var(--sign-dim); }
 .sign-label { font-size: 12px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--sign-dim); }
 .sign .tgt { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--sign-dim); }
 .sign .in { background: var(--sign-field); border-color: var(--sign-line); color: var(--sign-text); width: 108px; }
@@ -221,7 +233,7 @@ table { border-collapse: collapse; width: 100%; }
 
 /* inputs */
 .inputs { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; min-width: 0; }
-.inputs-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 14px 16px 10px; }
+.inputs-head { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; padding: 14px 16px 10px; }
 .inputs-head h2 { margin: 0; font-family: var(--f-display); font-weight: 700; font-size: 24px; letter-spacing: .02em; text-transform: uppercase; }
 .inputs-sub { margin: 0; padding: 0 16px 12px; font-size: 13px; color: var(--muted); border-bottom: 1px solid var(--line); }
 details { border-bottom: 1px solid var(--line); }
@@ -248,6 +260,11 @@ details[open] > summary::after { transform: rotate(-135deg); }
 .foot { margin: 22px 0 0; max-width: 78ch; font-size: 13px; color: var(--muted); }
 
 @media (max-width: 520px) {
+  .strip-name { display: none; }
+  .strip-main { gap: 2px 16px; }
+  .sk b { font-size: 20px; }
+  .sk.gap { display: none; }
+  .strip-ch { font-size: 11px; gap: 0 10px; }
   .fld { grid-template-columns: minmax(0, 1fr) minmax(0, 120px); }
   .sign-stats dd { font-size: 24px; }
 }
@@ -257,10 +274,13 @@ details[open] > summary::after { transform: rotate(-135deg); }
 <header class="strip" id="strip">
   <div class="strip-in">
     <span class="strip-name">Deal Model</span>
-    <span class="strip-kv">
-      <span>COOP IRR at ask <b id="sb-irr">—</b></span>
-      <span>Offer at <span id="sb-t">13.0%</span> <b id="sb-offer">—</b></span>
+    <span class="strip-main">
+      <span class="sk"><i>COOP IRR at ask</i><b id="sb-irr">—</b></span>
+      <span class="sk"><i>Target IRR</i><b id="sb-tgt">—</b></span>
+      <span class="sk"><i>Offer at <span id="sb-t">13.0%</span></i><b id="sb-offer">—</b></span>
+      <span class="sk gap"><i>Ask vs offer</i><b id="sb-gap">—</b></span>
     </span>
+    <span class="strip-ch" id="sb-ch"></span>
   </div>
 </header>
 
@@ -270,19 +290,21 @@ details[open] > summary::after { transform: rotate(-135deg); }
       <a class="back" href="./">&larr; Back to Deal Lens</a>
       <p class="eyebrow">Fuel &amp; convenience acquisitions</p>
       <h1>Deal Model Tool</h1>
-      <p class="lede">Fifteen-year returns for COOP, COAG, CODO, DODO and COCM, with the price that earns your target IRR on each. The numbers shown are an example deal; replace them with the seller's.</p>
+      <p class="lede">Fifteen-year returns for COOP, COAG, CODO, DODO and COCM, with the price that earns your target IRR on each. Enter the seller's numbers on the left, in the same order as the COOP tab. The IRR and offer price stay pinned at the top.</p>
     </div>
-    <button class="btn" type="button" id="reset">Reset to example</button>
   </div>
 
   <div class="layout">
+    <aside class="inputs" aria-labelledby="in-h">
+      <div class="inputs-head"><h2 id="in-h">Inputs</h2><div class="hbtns"><button class="btn danger" type="button" id="reset0">Reset all to 0</button><button class="btn" type="button" id="reset">Load example</button></div></div>
+      <p class="inputs-sub">In the order they appear on the COOP tab. Per-site items are multiplied by the number of sites. Reset clears every entry to 0 and leaves the formulas as they are.</p>
+      <div id="groups"></div>
+    </aside>
     <main class="results">
       <section class="sign" aria-labelledby="sign-h">
         <div class="sign-top">
           <span class="sign-label" id="sign-h">Offer price · COOP</span>
-          <label class="tgt" for="f-target">Target IRR
-            <span class="in"><input id="f-target" type="text" inputmode="decimal" autocomplete="off"><span class="u">%</span></span>
-          </label>
+          <span class="tgt-txt">Target IRR <b id="sign-tgt">—</b></span>
         </div>
         <div class="sign-price" id="offer">—</div>
         <p class="sign-sub" id="offer-sub"></p>
@@ -319,11 +341,6 @@ details[open] > summary::after { transform: rotate(-135deg); }
       <p class="foot">Costs are entered as positive numbers and the model treats them as outflows. The calculation is the COOP, COAG, CODO, DODO and COCM engine from ModelExample.xlsx, used as written.</p>
     </main>
 
-    <aside class="inputs" aria-labelledby="in-h">
-      <div class="inputs-head"><h2 id="in-h">Inputs</h2></div>
-      <p class="inputs-sub">Per-site items are multiplied by the number of sites.</p>
-      <div id="groups"></div>
-    </aside>
   </div>
 </div>
 
@@ -454,22 +471,17 @@ function priceForIRR(ch,p,target){
 
   /* cv: pct = percent to fraction, neg = cost entered positive, volg = percent change to multiplier */
   var G = [
-    { t: 'Deal', open: true, items: [
-      { k: 'n', l: 'Sites', dec: 0, def: 10 },
-      { k: 'price', l: 'Asking price', pre: '$', dec: 0, def: 8400000 },
-      { k: 'unams', l: 'Unamortized costs', pre: '$', dec: 0, def: 100000 },
-      { k: 'closing', l: 'Closing costs, share of price', suf: '%', dec: 1, def: 2, cv: 'pct' },
-      { k: 'exit', l: 'Exit multiple', suf: 'x', dec: 1, def: 6 },
-      { k: 'tax', l: 'Tax rate', suf: '%', dec: 1, def: 25, cv: 'pct' }
+    { t: '1 · Sites', open: true, items: [
+      { k: 'n', l: 'Sites', dec: 0, def: 10 }
     ]},
-    { t: 'Fuel', open: true, items: [
+    { t: '2 · Fuel', open: true, items: [
       { k: 'gallons', l: 'Year-1 gallons, all sites', dec: 0, def: 12000000 },
       { k: 'volg', l: 'Annual volume change', suf: '%', dec: 1, def: -1, cv: 'volg', neg: true },
       { k: 'cpg', l: 'Fuel margin', suf: '¢/gal', dec: 1, def: 20 },
       { k: 'cpgg', l: 'Annual margin change', suf: '¢/gal', dec: 2, def: 0, neg: true },
       { k: 'fsyn', l: 'Fuel synergy', suf: '¢/gal', dec: 1, def: 2 }
     ]},
-    { t: 'Inside sales and other', open: false, items: [
+    { t: '3 · Inside sales and other income', open: true, items: [
       { k: 'inside', l: 'Inside sales', pre: '$', dec: 0, def: 9000000 },
       { k: 'insg', l: 'Inside sales growth', suf: '%', dec: 1, def: 2, cv: 'pct', neg: true },
       { k: 'inmar', l: 'Inside margin', suf: '%', dec: 1, def: 30, cv: 'pct' },
@@ -477,28 +489,38 @@ function priceForIRR(ch,p,target){
       { k: 'other', l: 'Other income', pre: '$', dec: 0, def: 300000 },
       { k: 'otherg', l: 'Other income growth', suf: '%', dec: 1, def: 2, cv: 'pct', neg: true }
     ]},
-    { t: 'Operating costs and rent', open: false, items: [
+    { t: '4 · Operating expenses', open: true, items: [
       { k: 'opex', l: 'Operating expenses', pre: '$', dec: 0, def: 3600000, cv: 'neg' },
       { k: 'opexg', l: 'Expense growth', suf: '%', dec: 1, def: 2.5, cv: 'pct', neg: true },
       { k: 'opsyn', l: 'Expense synergy, share of opex', suf: '%', dec: 1, def: 5, cv: 'pct' },
       { k: 'draw', l: 'Draw, per site per year', pre: '$', dec: 0, def: 0, cv: 'neg' },
       { k: 'drawRefund', l: 'Refund the first-year draw at close', chk: true, def: false },
-      { k: 'field', l: 'Field support, per site per year', pre: '$', dec: 0, def: 15000, cv: 'neg' },
+      { k: 'field', l: 'Field support, per site per year', pre: '$', dec: 0, def: 15000, cv: 'neg' }
+    ]},
+    { t: '5 · Rent', open: true, items: [
       { k: 'rent', l: 'Rent expense', pre: '$', dec: 0, def: 500000, cv: 'neg' },
       { k: 'rentg', l: 'Rent expense growth', suf: '%', dec: 1, def: 2, cv: 'pct', neg: true },
       { k: 'rentInc', l: 'Rent income (non-COOP)', pre: '$', dec: 0, def: 500000 },
       { k: 'rentIncg', l: 'Rent income growth', suf: '%', dec: 1, def: 2, cv: 'pct', neg: true }
     ]},
-    { t: 'Capital and working capital', open: false, items: [
+    { t: '6 · Capital, tax and working capital', open: true, items: [
       { k: 'it', l: 'IT setup, per site, once', pre: '$', dec: 0, def: 15000, cv: 'neg' },
       { k: 'maintY1', l: 'Maintenance year 1, per site', pre: '$', dec: 0, def: 10000, cv: 'neg' },
       { k: 'maintOn', l: 'Maintenance from year 2, per site', pre: '$', dec: 0, def: 20000, cv: 'neg' },
       { k: 'tank', l: 'Tank work, per site, years 10 and 13', pre: '$', dec: 0, def: 60000, cv: 'neg' },
       { k: 'growthSites', l: 'Growth sites ($90,000 each)', dec: 0, def: 0 },
+      { k: 'tax', l: 'Tax rate', suf: '%', dec: 1, def: 25, cv: 'pct' },
       { k: 'wc', l: 'Working capital, per site', pre: '$', dec: 0, def: 20000 },
       { k: 'wcDays', l: 'Working-capital days (CODO, DODO)', dec: 0, def: 7 }
     ]},
-    { t: 'COAG terms', open: false, items: [
+    { t: '7 · Purchase', open: true, items: [
+      { k: 'price', l: 'Asking price', pre: '$', dec: 0, def: 8400000 },
+      { k: 'unams', l: 'Unamortized costs', pre: '$', dec: 0, def: 100000 },
+      { k: 'closing', l: 'Closing costs, share of price', suf: '%', dec: 1, def: 2, cv: 'pct' },
+      { k: 'exit', l: 'Exit multiple', suf: 'x', dec: 1, def: 6 }
+    ]},
+    { t: '8 · Target return', open: true, target: true, items: [] },
+    { t: '9 · COAG terms', open: false, items: [
       { k: 'ppg', l: 'Average retail price', pre: '$', suf: '/gal', dec: 2, def: 3.2 },
       { k: 'sunShare', l: 'Sunoco share of card fees', suf: '%', dec: 0, def: 50, cv: 'pct' },
       { k: 'commission', l: 'Commission', suf: '¢/gal', dec: 1, def: 5 },
@@ -507,7 +529,7 @@ function priceForIRR(ch,p,target){
       { k: 'mop', l: 'MOP, per site per year', pre: '$', dec: 0, def: 8000 },
       { k: 'mopg', l: 'MOP growth', suf: '%', dec: 1, def: 2.5, cv: 'pct', neg: true }
     ]},
-    { t: 'DODO renewals', open: false, items: [
+    { t: '10 · DODO renewals', open: false, items: [
       { k: 'renewals', l: 'Renewal row, years 1 to 15 (comma separated)', text: true, def: '0,0,0,0,0,0,0,0,0,0,0,0,0,0,0' }
     ]}
   ];
@@ -568,6 +590,7 @@ function priceForIRR(ch,p,target){
             (f.suf ? '<span class="u">' + f.suf + '</span>' : '') + '</span></label>';
         }
       });
+      if (g.target) html += '<label class="fld" for="f-target"><span class="lbl">Target IRR</span><span class="in"><input id="f-target" type="text" inputmode="decimal" autocomplete="off"><span class="u">%</span></span></label>';
       html += '</div></details>';
     });
     $('groups').innerHTML = html;
@@ -584,6 +607,10 @@ function priceForIRR(ch,p,target){
   function resetState() {
     FLAT.forEach(function (f) { S[f.k] = f.def; });
     S.target = TARGET_DEF;
+  }
+  function resetZero() {
+    FLAT.forEach(function (f) { S[f.k] = f.chk ? false : f.text ? '0,0,0,0,0,0,0,0,0,0,0,0,0,0,0' : 0; });
+    S.target = 0;
   }
 
   /* engine params */
@@ -677,16 +704,20 @@ function priceForIRR(ch,p,target){
     var R = last.R, t = last.t, p = last.p;
     var tl = pct(t, 1);
     var coop = R.COOP.o;
+    var blank = !coop || coop.cf.every(function (v) { return v === 0; });
 
     $('f-target').setAttribute('aria-label', 'Target IRR in percent');
-    $('sb-t').textContent = tl;
+    $('sb-t').textContent = blank ? '—' : tl;
     $('th-price').textContent = 'Price at ' + tl;
+    $('sign-tgt').textContent = tl;
+    $('sb-tgt').textContent = blank ? '—' : tl;
 
     /* sign */
     var offer = R.COOP.tp;
     var offerEl = $('offer'), sub = $('offer-sub');
-    if (!coop) {
-      offerEl.textContent = '—'; sub.textContent = 'These inputs do not produce a result. Check for blank or extreme values.';
+    if (blank) {
+      offerEl.textContent = '—';
+      sub.textContent = coop ? 'Enter the deal on the left to see returns.' : 'These inputs do not produce a result. Check for blank or extreme values.';
     } else if (offer == null) {
       offerEl.textContent = 'No price';
       sub.textContent = 'Even a price of $0 does not reach ' + tl + ' on COOP with these inputs.';
@@ -699,11 +730,24 @@ function priceForIRR(ch,p,target){
       var mult = coop.ours > 0 ? (offer / coop.ours).toFixed(1) + 'x Year-1 EBITDAR' : '';
       sub.textContent = [per, mult].filter(Boolean).join(' · ') + (per || mult ? ' · ' : '') + 'highest price that earns ' + tl;
     }
-    var sbOffer = (offer != null && offer < 2e9) ? usd(offer) : '—';
+    var sbOffer = (!blank && offer != null && offer < 2e9) ? usd(offer) : '—';
     $('sb-offer').textContent = sbOffer;
-    $('sb-irr').textContent = coop ? pct(coop.irr) : '—';
+    $('sb-irr').textContent = blank ? '—' : pct(coop.irr);
+    var sbi = $('sb-irr');
+    sbi.className = (!blank && coop.irr != null) ? (coop.irr >= t ? 'irr-good' : 'irr-bad') : '';
+    var gapTxt = '—';
+    if (!blank && offer != null && offer < 2e9) { var g0 = p.price - offer; gapTxt = (g0 > 0 ? '+' : g0 < 0 ? MINUS : '') + usd(Math.abs(g0)).replace(MINUS, ''); }
+    $('sb-gap').textContent = gapTxt;
+    var chips = '';
+    CH.forEach(function (ch) {
+      var o2 = R[ch].o;
+      var txt = (blank || !o2) ? '—' : pct(o2.irr);
+      var cls = (!blank && o2 && o2.irr != null) ? (o2.irr >= t ? 'irr-good' : 'irr-bad') : '';
+      chips += '<span>' + ch + ' <b class="' + cls + '">' + txt + '</b></span>';
+    });
+    $('sb-ch').innerHTML = '<span>IRR at ask:</span>' + chips;
 
-    if (coop) {
+    if (coop && !blank) {
       $('st-irr').textContent = pct(coop.irr);
       $('st-irr-sub').textContent = (coop.irr != null ? (coop.irr >= t ? 'Meets the target' : 'Below the target of ' + tl) : '') + ' at ' + usd(p.price);
       if (offer != null && offer < 2e9) {
@@ -716,12 +760,14 @@ function priceForIRR(ch,p,target){
       $('st-eb-sub').textContent = 'Seller reports ' + usd(coop.sellerEBITDA) + ' EBITDA';
     }
 
+    if (blank) { ['st-irr','st-gap','st-eb'].forEach(function (id) { $(id).textContent = '—'; $(id + '-sub').textContent = ''; }); }
     /* comparison */
     var rows = '';
     CH.forEach(function (ch) {
       var o = R[ch].o, tp = R[ch].tp;
       if (!o) { rows += '<tr><td><button type="button" class="chan" data-ch="' + ch + '">' + ch + '</button></td><td colspan="5">No result</td></tr>'; return; }
       var meets = o.irr != null && o.irr >= t;
+      if (blank) { rows += '<tr><td><button type="button" class="chan" data-ch="' + ch + '">' + ch + '</button></td><td>—</td><td>—</td><td>—</td><td>—</td><td class="price-col">—</td></tr>'; return; }
       var tpTxt = tp == null ? 'None' : tp >= 2e9 ? 'No ceiling' : usd(tp);
       rows += '<tr class="' + (ch === sel ? 'sel' : '') + '">' +
         '<td><button type="button" class="chan" data-ch="' + ch + '">' + ch + '</button>' + (ch === 'COOP' ? '<span class="tag">Offer basis</span>' : '') + '</td>' +
@@ -816,12 +862,15 @@ function priceForIRR(ch,p,target){
     if (b) { sel = b.getAttribute('data-ch'); render(); return; }
   });
   $('reset').addEventListener('click', function () { resetState(); setInputValues(); render(); });
+  $('reset0').addEventListener('click', function () { resetZero(); setInputValues(); render(); });
 
   var rt = null;
   function onResize() { if (last && last.R[sel].o) drawChart(last.R[sel].o.cf); }
   if (window.ResizeObserver) { new ResizeObserver(function () { clearTimeout(rt); rt = setTimeout(onResize, 60); }).observe($('chart')); }
   else window.addEventListener('resize', onResize);
 
+  function setStripH() { var h = $('strip').offsetHeight; document.documentElement.style.setProperty('--strip-h', h + 'px'); }
+  if (window.ResizeObserver) new ResizeObserver(setStripH).observe($('strip')); else window.addEventListener('resize', setStripH);
   buildInputs();
   resetState();
   setInputValues();
