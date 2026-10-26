@@ -1,0 +1,79 @@
+name: WeatherNext forecast map frames
+# Builds Google WeatherNext 3 ensemble-mean map overlays for the contiguous United
+# States from the linked BigQuery table and publishes them to weather-fusion-data.
+#
+# MANUAL ONLY at first. Run it once with dry_run=true (free: it only asks BigQuery
+# for a byte estimate), then with dry_run=false. After one successful real run, the
+# schedule below can be switched on.
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Only estimate BigQuery bytes; bill nothing and publish nothing'
+        type: boolean
+        default: true
+      force:
+        description: 'Rebuild even if this initialization is already published'
+        type: boolean
+        default: false
+  # schedule:
+  #   # Main 00/06/12/18 UTC runs reach BigQuery about 8h10m later.
+  #   - cron: '55 2,8,14,20 * * *'
+permissions:
+  contents: write
+  id-token: write
+concurrency:
+  group: weathernext-maps-data
+  cancel-in-progress: false
+jobs:
+  maps:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: google-github-actions/auth@v3
+        with:
+          project_id: homeassist-470415
+          workload_identity_provider: projects/269512183833/locations/global/workloadIdentityPools/github-actions/providers/sun-nourie
+      - run: pip install 'google-cloud-bigquery>=3.25,<4' 'numpy<3' 'scipy<2' 'Pillow<13'
+      - name: Check the generator without credentials or billed queries
+        run: python scripts/test_weathernext_maps.py
+      - name: Open isolated forecast data worktree
+        run: |
+          DATA="$RUNNER_TEMP/weathernext-maps-publish"
+          git fetch --depth=1 origin weather-fusion-data
+          git worktree add --detach "$DATA" FETCH_HEAD
+          git -C "$DATA" config user.name 'github-actions[bot]'
+          git -C "$DATA" config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          echo "WEATHER_DATA_DIR=$DATA" >> "$GITHUB_ENV"
+      - name: Build WeatherNext map frames
+        run: |
+          ARGS=""
+          if [ "${{ inputs.dry_run }}" = "true" ]; then ARGS="$ARGS --dry-run"; fi
+          if [ "${{ inputs.force }}" = "true" ]; then ARGS="$ARGS --force"; fi
+          python -u scripts/weather_weathernext_maps.py --table homeassist-470415.weathernext_3.weathernext_3_0_0_0p1deg --output "$WEATHER_DATA_DIR" $ARGS | tee "$RUNNER_TEMP/maps-run.log"
+          {
+            echo '### WeatherNext map frames'
+            echo '```json'
+            tail -n 5 "$RUNNER_TEMP/maps-run.log"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Publish frames, catalog and any cost-stop record
+        if: always() && inputs.dry_run != true && env.WEATHER_DATA_DIR != ''
+        run: |
+          cd "$WEATHER_DATA_DIR"
+          for item in weathernext-maps models/weathernext-maps.json models/weathernext-maps-cost-stop.json; do
+            if test -e "$item"; then git add -A -- "$item"; fi
+          done
+          git diff --cached --quiet && exit 0
+          git commit -m 'Update WeatherNext forecast map frames'
+          for attempt in 1 2 3 4 5; do
+            git fetch origin weather-fusion-data
+            git rebase FETCH_HEAD
+            if git push origin HEAD:weather-fusion-data; then exit 0; fi
+            sleep 3
+          done
+          exit 1

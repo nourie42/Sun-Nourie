@@ -11,6 +11,7 @@ import {ensembleConfidence,fetchComparisonCompanions,addComparisonCompanions} fr
 import express from 'express';
 import {createWeatherNextAccess} from './weatherNextAccess.js';
 import {createWeatherNextLocationProvider,locationPoint} from './weatherNextLocation.js';
+import {createWeatherNextMapSource} from './weatherNextMaps.js';
 const root=fileURLToPath(new URL('../public/weather-fusion/',import.meta.url));
 const version='air-hero-v1';
 const mean=a=>{const v=a.filter(finite);return v.length?v.reduce((a,b)=>a+b,0)/v.length:null;};
@@ -76,7 +77,7 @@ export function comparisonApp(original,config){
  s=replaceOnce(s,'\nstartDeviceLocation();',"\nif(COMPARE.explicitLocation)chooseLocation({...COMPARE.point,source:'comparison'});else startDeviceLocation();");
  return s;
 }
-export function registerWeatherComparisonRoutes(app,{fetchImpl=globalThis.fetch,now=Date.now,feedProvider,companionProvider,accessOptions={},locationProvider}={}){
+export function registerWeatherComparisonRoutes(app,{fetchImpl=globalThis.fetch,now=Date.now,feedProvider,companionProvider,accessOptions={},locationProvider,mapsProvider}={}){
  const cache=new Cache(12,now);
  const access=createWeatherNextAccess(app,{now,...accessOptions});
  const provider=locationProvider||createWeatherNextLocationProvider({fetchImpl,now});
@@ -122,8 +123,11 @@ export function registerWeatherComparisonRoutes(app,{fetchImpl=globalThis.fetch,
   res.set('Cache-Control','no-store, no-cache, max-age=0, must-revalidate').set('Pragma','no-cache').set('Expires','0').set('X-Weather-Nourie-Page','nvidia-location-refresh-20260927').type('html').send(html);
  }catch(e){fail(res,e);}});
  app.get(['/weather-fusion/compare','/weather-fusion/compare/','/weather-fusion/compare.html'],(_req,res)=>res.set('Cache-Control','no-cache').type('html').sendFile(root+'compare.html'));
- for(const name of ['compare.css','compare.js','compare-bridge.js','weathernext-access.js'])app.get('/weather-fusion/'+name,(_req,res)=>res.set('Cache-Control','no-cache').sendFile(root+name));
+ for(const name of ['compare.css','compare.js','compare-bridge.js','weathernext-access.js','weathernext-maps.js','weathernext-maps.css'])app.get('/weather-fusion/'+name,(_req,res)=>res.set('Cache-Control','no-cache').sendFile(root+name));
  app.get('/api/weather-fusion/compare/locations',async(_req,res)=>{try{res.set('Cache-Control','no-store').json({points:googlePoints(await getFeed())});}catch(e){fail(res,e);}});
+ // WeatherNext-only forecast map frames for the Google WeatherNext page. Validated; never another model's maps.
+ const weatherNextMaps=mapsProvider||createWeatherNextMapSource({fetchImpl,now});
+ app.get('/api/weather-fusion/weathernext-maps',async(_req,res)=>{try{res.set('Cache-Control','no-store').json(await weatherNextMaps());}catch(e){fail(res,e);}});
  async function resolveForecast(query){
   const requested=query.latitude!==undefined||query.longitude!==undefined?locationPoint(query):null;
   let feed=null;

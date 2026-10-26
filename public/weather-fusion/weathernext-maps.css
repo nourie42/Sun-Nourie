@@ -1,0 +1,47 @@
+/* WeatherNext forecast map panel. Scoped to .wn-maps so no other page element is restyled. */
+.wn-maps{display:block}
+.wn-maps .section-top h2{font-size:10px}
+.wn-maps .wn-tabs{display:flex;gap:3px;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}
+.wn-maps .wn-tabs::-webkit-scrollbar{display:none}
+.wn-maps .wn-tabs button{flex:1 0 auto;min-height:36px;padding:7px 11px;font-size:11px}
+.wn-maps .wn-tabs{background:#042e5450;border:1px solid #49b8eb2e;border-radius:9px;padding:4px;margin:13px 0}
+.wn-maps .wn-tabs button{background:none;border:0;border-radius:6px;color:#c0d0e5}
+.wn-maps .wn-tabs button.selected{background:#2aaee834;color:#fff}
+.wn-maps .wn-tabs button:focus-visible,.wn-maps .wn-controls :is(button,select,input):focus-visible,.wn-maps .text-button:focus-visible{outline:3px solid #e7dcff;outline-offset:2px}
+.wn-maps .wn-stage{height:360px}
+.wn-maps #wn-map{width:100%;height:100%;border:0;background:#14283d}
+.wn-maps .wn-message{inset:auto 12px 12px;z-index:1000}
+.wn-maps .wn-controls{flex-wrap:wrap;row-gap:8px}
+.wn-maps .wn-controls .play-button{width:36px;min-width:36px;min-height:36px;font-size:14px;border-radius:50%;background:#2aaee834;color:#fff;padding:0;border:0}
+.wn-maps .wn-controls .play-button:disabled{opacity:.4}
+.wn-maps .wn-controls input[type=range]{flex:1 1 140px;width:auto;height:32px;min-width:90px}
+.wn-maps .wn-controls #wn-stamp{font-size:11px;min-width:0;white-space:normal;flex:1 1 150px}
+.wn-maps .wn-controls select{max-width:150px;min-height:36px;font-size:11px;padding:4px 6px}
+.wn-maps .section-top .text-button{min-height:36px;padding:0 8px}
+.wn-maps .wn-us{min-height:36px;padding:0 10px;border:1px solid #d9e7ff24;border-radius:8px}
+.wn-maps .wn-legend{display:block;font-size:11px;margin-top:10px}
+.wn-maps .wn-legend-title{display:block;color:#d3dff0;margin-bottom:5px}
+.wn-maps .wn-swatches{display:flex;flex-wrap:wrap;gap:4px 10px}
+.wn-maps .wn-swatch{display:inline-flex;align-items:center;gap:4px;white-space:nowrap}
+.wn-maps .wn-swatch i{display:inline-block;width:16px;height:10px;border-radius:2px;border:1px solid #ffffff55}
+.wn-maps .wn-swatch b{font-weight:500;font-size:10px;color:#c9d8ea}
+.wn-maps .wn-caption{font-size:10px;line-height:1.55}
+.wn-maps .wn-caption>span:last-child{display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end}
+.wn-maps .wn-caption [data-status=stale],.wn-maps .wn-caption [data-status=last-verified]{color:#ffe3b6}
+.wn-maps .wn-empty{padding:16px 6px;font-size:12px;line-height:1.6;color:#d4e6f6}
+.wn-maps .wn-empty strong{display:block;font-size:13px;color:#fff;margin-bottom:4px}
+.wn-maps .wn-empty p{margin:0 0 6px}
+.wn-maps .wn-empty a{display:inline-block;color:#c7f2ff;text-decoration:underline;font-weight:750;margin-top:4px}
+.wn-maps [hidden]{display:none!important}
+/* Expanded view: fills the visible frame, even inside the side-by-side comparison. */
+.wn-maps.wn-expanded{position:fixed;inset:0;z-index:2000;display:flex;flex-direction:column;background:#152940;color:#f5f7ff;padding:16px;overflow:auto;height:100dvh}
+.wn-maps.wn-expanded #wn-body{display:flex;flex-direction:column;flex:1;min-height:0}
+.wn-maps.wn-expanded .wn-stage{height:auto;flex:1;min-height:260px}
+html.wn-map-open,html.wn-map-open body{overflow:hidden}
+@media(max-width:600px){
+ .wn-maps .wn-stage{height:300px}
+ .wn-maps .wn-caption{flex-direction:column;gap:6px}
+ .wn-maps .wn-caption>span:last-child{justify-content:flex-start}
+ .wn-maps .wn-controls select{max-width:none;flex:1 1 110px}
+}
+@media(prefers-reduced-motion:reduce){.wn-maps *{transition:none!important;animation:none!important}}

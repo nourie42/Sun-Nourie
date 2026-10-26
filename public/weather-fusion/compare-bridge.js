@@ -9,6 +9,19 @@ export function installComparisonPane(config,actions){
  const embedded=window.parent!==window;
  const post=payload=>{if(embedded)parent.postMessage({...payload,source:config.source,location:config.point.id},location.origin);};
  function addNotice(id,title,text){const root=$(id);if(!root)return;let note=root.querySelector('.google-unavailable');if(!note){note=document.createElement('div');note.className='google-unavailable';root.append(note);}note.innerHTML=`<strong>${esc(title)}</strong>${esc(text)}`;}
+ // Loaded on demand so a map-panel problem can never stop the forecast page itself.
+ let mapsModule=null;
+ async function installMaps(data){
+  const panel=$('map-panel');if(!panel)return;
+  const place={latitude:Number(data.location?.latitude),longitude:Number(data.location?.longitude),timeZone:data.location?.timeZone};
+  try{
+   mapsModule=mapsModule||await import('/weather-fusion/weathernext-maps.js?v=wn-maps-v1');
+   mapsModule.installWeatherNextMaps(panel,place);
+  }catch(error){
+   console.error('WeatherNext map panel failed',error);
+   if(!panel.querySelector('.wn-maps'))addNotice('map-panel','Google WeatherNext forecast maps','The map panel could not start. Use Google Weather Lab for interactive WeatherNext maps.');
+  }
+ }
  function googleLabels(data){
   document.title='NVIDIA Forecast · Weather Nourie';
   $('observation-label').textContent='Model forecast · valid '+new Intl.DateTimeFormat('en-US',{timeZone:data.location.timeZone,month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}).format(new Date(data.current.time))+' · not a live station reading';
@@ -24,7 +37,7 @@ export function installComparisonPane(config,actions){
   }
   addNotice('nws-bulletins','Official alerts','This experimental model does not provide official warnings. Check the main Fusion page or the official NWS link above.');
   if(!data.airQuality)addNotice('air-quality','Air quality temporarily unavailable','The supplemental air-quality feed could not be refreshed.');else $('air-quality')?.querySelector('.google-unavailable')?.remove();
-  const mapRoot=$('map-panel');if(mapRoot){let note=mapRoot.querySelector('.google-unavailable');if(!note){note=document.createElement('div');note.className='google-unavailable';mapRoot.append(note);}note.innerHTML='<strong>NVIDIA WeatherNext forecast maps</strong>Explore forecast layers and valid times on the interactive global map. These are model forecasts, not observed radar. <a class="weathernext-map-link" href="https://deepmind.google.com/science/weatherlab" target="_blank" rel="noopener noreferrer">Open NVIDIA forecast maps ↗</a>';}
+  void installMaps(data);
   let science=$('compare-google-science');if(!science){science=document.createElement('div');science.id='compare-google-science';science.className='google-science';$('scientific-stuff').append(science);}
   science.innerHTML=`<p><strong>Source policy</strong><br>${esc(data.methodology)}</p>${(data.comparison?.runs||[]).map(r=>`<p><strong>${r.id==='interimSurface'?'Short-range hourly run':r.id==='previousSurface'?'Previous main run':'Main run'}</strong><br>Initialized ${esc(r.runAt)}<br>Collected ${esc(r.fetchedAt||'not supplied')}<br>Status: ${esc(r.status)}</p>`).join('')}<p>Rain probability comes from NWS; UV and AQI use independently attributed supplemental feeds. Gusts and live radar are not inferred. Forecast confidence is a relative temperature-ensemble indicator. Cloud/precipitation scenes are display categories. The ensemble's hourly temperature spread is not a calibrated confidence percentage. Daily highs/lows summarize available hourly mean values—not an extreme-temperature ensemble distribution. Sunrise/sunset are astronomical calculations.</p><p><a href="https://deepmind.google.com/science/weatherlab" target="_blank" rel="noopener noreferrer">Open NVIDIA forecast maps ↗</a></p>`;
   let coverage=$('google-coverage-note');if(!coverage){coverage=document.createElement('p');coverage.id='google-coverage-note';coverage.className='google-coverage-note';$('today-forecast').after(coverage);}coverage.textContent=(data.days[0]?.detail||'Forecast coverage is unavailable.').split(' Rain chances are supplemental')[0].replaceAll('Google ','');
