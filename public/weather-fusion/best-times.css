@@ -1,0 +1,44 @@
+/* Best times to be outside: opened from the "Best Times" button in the top row. Everything is scoped to
+ * #best-times, and the colors are tokens on that panel only, so no other part of the page is restyled. */
+#best-times{--bt-c3:#3c6cb8;--bt-c2:#5f97d8;--bt-c1:#9ccbee;--bt-n:#72bd8f;--bt-w1:#efb48f;--bt-w2:#e4824e;--bt-w3:#c64a2f;
+ --bt-gold:#ffdc95;--bt-none:rgba(255,255,255,.07);--bt-line:rgba(255,255,255,.22);--bt-ink:#f5f7ff;--bt-ink-2:#cbd6e8;--bt-ink-3:#a9b8cf;
+ width:min(100%,760px);margin:18px auto 24px;color:var(--bt-ink)}
+#best-times[hidden]{display:none!important}
+#best-times .section-top{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap}
+#best-times .section-top h2{margin:0;letter-spacing:.14em;text-transform:uppercase;font-size:clamp(11px,3.2vw,14px)}
+#best-times .section-top span{font-size:13px;color:var(--bt-ink-2)}
+#best-times .lead{margin:12px 0 14px;font-size:15px;line-height:1.5;color:var(--bt-ink-2)}
+#best-times .bt-status{margin:6px 0;font-size:14px;color:var(--bt-ink-2)}
+#best-times .bt-status[hidden],#best-times .bt-detail[hidden]{display:none}
+#best-times .bt-grid{position:relative}
+#best-times .bt-grid svg{display:block;width:100%}
+#best-times .bt-grid text{font-size:12px;fill:var(--bt-ink-3)}
+#best-times .bt-grid .bt-row-label{fill:var(--bt-ink-2);font-weight:620}
+#best-times .bt-cell{stroke:rgba(9,20,40,.6);stroke-width:1.5;cursor:pointer}
+#best-times .bt-cell.selected{stroke:var(--bt-ink);stroke-width:2.5}
+#best-times .bt-detail{margin:12px 0 0;padding:10px 12px;border-radius:12px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.14);font-size:14px;line-height:1.5;color:var(--bt-ink-2)}
+#best-times .bt-detail strong{color:var(--bt-ink)}
+#best-times .bt-legend{display:flex;flex-wrap:wrap;gap:8px 14px;margin:14px 0 0;font-size:13px;color:var(--bt-ink-2)}
+#best-times .bt-key{display:inline-flex;align-items:center;gap:7px}
+#best-times .bt-key i{display:inline-block;width:13px;height:13px;border-radius:3px;position:relative}
+#best-times .bt-key i.perfect{background:var(--bt-gold)}
+#best-times .bt-key i.rain{background:var(--bt-none)}
+#best-times .bt-key i.rain::after{content:'';position:absolute;left:4px;top:4px;width:5px;height:5px;border-radius:50%;background:var(--bt-ink)}
+#best-times .bt-windows{margin-top:18px}
+#best-times .bt-windows h3{margin:0 0 6px;font-size:17px;line-height:1.3;font-weight:650;color:var(--bt-ink)}
+#best-times .bt-windows p{margin:0;font-size:15px;color:var(--bt-ink-2)}
+#best-times .bt-windows ul{margin:4px 0 0;padding:0;list-style:none;display:grid;gap:8px}
+#best-times .bt-windows li{display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px;padding:12px 14px;border-radius:14px;background:rgba(255,220,149,.13);border:1px solid rgba(255,220,149,.25)}
+#best-times .bt-span{font-weight:650;color:var(--bt-ink)}
+#best-times .bt-why{flex:1 1 220px;color:var(--bt-ink-2);font-size:14.5px}
+#best-times .bt-science{margin-top:14px}
+#best-times .bt-science summary{cursor:pointer;font-size:14px;color:var(--bt-ink-2);min-height:32px;display:flex;align-items:center}
+#best-times .bt-science div{display:grid;gap:10px;max-width:70ch;padding:6px 0 4px;font-size:14px;line-height:1.55;color:var(--bt-ink-2)}
+#best-times .bt-science p{margin:0}
+#best-times .bt-science strong{color:var(--bt-ink)}
+@media(max-width:600px){#best-times{width:100%;margin:14px auto 20px}}
+
+/* Nine buttons in the top row: nine across on a wide screen, three by three on a phone. */
+html body .weather-jump-nav:has(#open-best-times){grid-template-columns:repeat(9,minmax(0,1fr))!important;max-width:720px}
+@media(max-width:800px){html body .weather-jump-nav:has(#open-best-times){grid-template-columns:repeat(3,minmax(0,1fr))!important;max-width:320px}}
+html body .weather-jump-card.jump-best-times{font-family:inherit;cursor:pointer}
