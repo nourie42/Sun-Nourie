@@ -5,7 +5,7 @@
  * Atmos page uses (atmos-model.js), so the colors and the gold hours match it exactly. The calculation is
  * loaded only the first time the panel is opened, so this file costs the page almost nothing until then and
  * a problem here can never stop the forecast from loading. */
-const MODEL_URL='./atmos-model.js?v=atmos-v5';
+const MODEL_URL='./atmos-model.js?v=atmos-v2';
 const $=id=>document.getElementById(id);
 const finite=v=>typeof v==='number'&&Number.isFinite(v);
 const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -38,7 +38,7 @@ if(panel&&button){
  }
 
  function cellDetail(cell){
-  const verdict=cell.perfect?'Perfect hour (outdoor feels-like, dry daylight)':cell.bin?.label||'';
+  const verdict=cell.perfect?`Perfect hour (${cell.perfect==='A'?'calm and dry':'pleasant breeze'})`:cell.bin?.label||'';
   const day=model.longDayLabel(cell.time,zone).slice(0,3),hour=model.hourLabel(cell.time,zone);
   const rain=finite(cell.rain)?(cell.rain<5?'under 5%':`${Math.round(cell.rain)}%`):'–';
   return `<strong>${esc(`${day} ${hour}`)}</strong> · ${esc(verdict)}. Feels like ${deg(cell.feels)}, thermometer ${deg(cell.temperature)}, dew point ${deg(cell.dewpoint)}, wind ${finite(cell.wind)?Math.round(cell.wind)+' mph':'–'}, rain chance ${rain}${cell.condition?`, ${esc(cell.condition)}`:''}.`;
@@ -53,7 +53,7 @@ if(panel&&button){
   if(!grid.some(row=>row.cells.some(Boolean))){setStatus('The hourly feels-like forecast for the week is not available right now.');clear();return;}
   setStatus('');
   renderedWidth=width;
-  const {PERFECT_RULES:r,COMFORT_BINS,perfectWindows,localParts,clockLabel,longDayLabel}=model;
+  const {PERFECT_RULES:r,COMFORT_BINS,perfectWindows,localParts,hourLabel,longDayLabel}=model;
   const label=width<520?46:64,headerH=20,rowH=width<520?24:30,gap=2,cols=24,cellW=(width-label)/cols,height=headerH+grid.length*(rowH+gap);
   const header=[0,6,12,18].map(h=>`<text x="${(label+cellW*h).toFixed(1)}" y="13">${h===0?'12a':h===12?'12p':h<12?`${h}a`:`${h-12}p`}</text>`).join('');
   const rows=grid.map((row,ri)=>{
@@ -75,18 +75,19 @@ if(panel&&button){
 
   const windows=perfectWindows(grid);
   const describe=w=>{
+   const kind=w.rules.includes('A')&&w.rules.includes('B')?'Calm to breezy':w.rules.includes('A')?'Calm and dry':'Pleasant breeze';
    const temps=finite(w.low)?(Math.round(w.low)===Math.round(w.high)?deg(w.low):`${Math.round(w.low)}–${deg(w.high)}`):'';
-   return `Dry daylight${temps?`, feels like ${temps} outdoors`:''}${finite(w.dewpoint)?`, dew point ${deg(w.dewpoint)}`:''}`;
+   return `${kind}${temps?`, ${temps}`:''}${w.rules.includes('A')&&finite(w.dewpoint)?`, dew point ${deg(w.dewpoint)}`:''}`;
   };
   const list=windows.slice(0,4).map(w=>{
    const crossesDay=localParts(w.end,zone).date!==localParts(w.start,zone).date;
-   const span=`${longDayLabel(w.start,zone)} ${clockLabel(w.start,zone)} to ${crossesDay?`${longDayLabel(w.end,zone).slice(0,3)} `:''}${clockLabel(w.end,zone)}`;
-   return `<li><span class="bt-span">${esc(span)}</span><span class="bt-why">${esc(describe(w))}, ${w.hours} forecast hour${w.hours===1?'':'s'}</span></li>`;
+   const span=`${longDayLabel(w.start,zone)} ${hourLabel(w.start,zone)} to ${crossesDay?`${longDayLabel(w.end,zone).slice(0,3)} `:''}${hourLabel(w.end,zone)}`;
+   return `<li><span class="bt-span">${esc(span)}</span><span class="bt-why">${esc(describe(w))}, ${w.hours} hour${w.hours===1?'':'s'}</span></li>`;
   }).join('');
-  $('best-times-windows').innerHTML=windows.length?`<h3>Coming up</h3><ul>${list}</ul>`:`<h3>No perfect hours in the next ${r.horizonDays} days</h3><p>No available hour meets the same rules as the main page. The seven-day colors still show how the remaining hours are forecast to feel.</p>`;
+  $('best-times-windows').innerHTML=windows.length?`<h3>Coming up</h3><ul>${list}</ul>`:'<h3>No perfect hours this week</h3><p>None of the next seven days has an hour that meets the rules. The colors still show the most comfortable stretches.</p>';
 
-  $('best-times-science').innerHTML=`<p><strong>A perfect hour</strong> has an outdoor feels-like of ${r.band.min}–${r.band.max}°, dew point at most ${r.dewpoint}°, cloud cover at most ${r.cloud}%, rain likelihood at most ${r.rain}%, and less than ${r.precipitation.toFixed(2)} inch of forecast precipitation. It must be daylight without rain, fog or other adverse conditions. Gold uses the main page's exact qualifying hours for the next ${r.horizonDays} local dates.</p>
-   <p><strong>Every other hour</strong> is colored by its custom feels-like temperature. Comfortable is 65–79°, centered on the ${r.ideal}° ideal. The warm side applies UTCI-derived heat-stress thresholds (78.8°, 89.6° and 100.4°F) to that estimate; the cold side steps down through cool, cold and freezing.</p>
+  $('best-times-science').innerHTML=`<p><strong>A perfect hour</strong> is ${r.band.min}–${r.band.max}° with wind at ${r.calm} mph or less and a dew point under ${r.dewpoint}°, or ${r.breezyBand.min}–${r.breezyBand.max}° with an ${r.breeze.min}–${r.breeze.max} mph breeze. Either way the sky has to be clear or partly cloudy, with no storm risk. These are the same rules the main page uses.</p>
+   <p><strong>Every other hour</strong> is colored by its feels-like temperature. Comfortable is 65–79°, centered on the ${r.ideal}° ideal. The warm side follows the UTCI heat-stress limits (78.8°, 89.6° and 100.4°F); the cold side steps down through cool, cold and freezing.</p>
    <p>A dot marks an hour with a rain chance of 50% or more.</p>`;
 
   const picked=grid.flatMap(row=>row.cells).find(cell=>cell&&cell.time===selectedTime);

@@ -17,8 +17,8 @@ test('the panel reuses the Atmos calculation and loads it only when opened',()=>
  assert.match(js,/comfortGrid\(data/);
  assert.match(js,/perfectWindows\(grid\)/);
  const atmos=readFileSync('public/weather-fusion/atmos.js','utf8');
- assert.match(atmos,/atmos-model\.js\?v=atmos-v5/,'same module URL as Atmos, so one copy is shared');
- assert.match(js,/atmos-model\.js\?v=atmos-v5/);
+ assert.match(atmos,/atmos-model\.js\?v=atmos-v2/,'same module URL as Atmos, so one copy is shared');
+ assert.match(js,/atmos-model\.js\?v=atmos-v2/);
 });
 
 test('every id the panel writes is its own, and its styles are scoped to it',()=>{

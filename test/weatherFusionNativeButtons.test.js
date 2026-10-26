@@ -20,7 +20,7 @@ test('native shortcut labels retain their actual anchor or panel relationships',
  const html=read('index.html'),nav=html.match(/<nav class="weather-jump-nav"[\s\S]*?<\/nav>/)?.[0];
  assert.ok(nav);
  const links=[...nav.matchAll(/<(a|button)\b([^>]*)>[\s\S]*?<span class="jump-label">([^<]+)<\/span>[\s\S]*?<\/(?:a|button)>/g)];
- assert.deepEqual(links.map(match=>match[3]),['Map','Your Day','7-Day','AQI','Car Wash','Feel Meter','Snow','Compare']);
+ assert.deepEqual(links.map(match=>match[3]),['Map','Your Day','7-Day','AQI','Car Wash','Feel Meter','Snow','Compare','Best Times']);
  for(const [,tag,attrs] of links){
   const href=attrs.match(/href="#([^"]+)"/)?.[1];
   if(tag==='a'){assert.ok(href);if(href==='dewpoint-gross-meter')assert.match(attrs,/aria-controls="dewpoint-gross-meter"/);else assert.ok(html.includes(`id="${href}"`),`${href} is a real native section`);}
