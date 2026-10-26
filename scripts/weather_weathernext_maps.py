@@ -183,8 +183,9 @@ class Queries:
         # BigQuery checks this cap against the pre-execution estimate, which for a clustered table is a
         # pessimistic upper bound (it counted ~190 GB for a query that bills a small fraction). A cap below
         # the estimate would reject the query before it runs, so the cap is the estimate that already passed
-        # the ceiling above. Actual billing is checked after the run (pause_if_expensive).
-        cap = 3_000_000_000 if discovery else max(self.max_billed, estimate)
+        # the ceiling above, plus 10% because the estimate BigQuery checks at execution runs a hair above the
+        # dry-run figure (190,151,020,800 vs 190,151,917,568 bytes). Actual billing is checked after the run (pause_if_expensive).
+        cap = 3_000_000_000 if discovery else max(self.max_billed, int(estimate * 1.1))
         job = self.client.query(sql, job_config=self.make_config(params, max_bytes=cap), location='US')
         rows = list(job.result(timeout=600))
         billed = int(job.total_bytes_billed or 0)
