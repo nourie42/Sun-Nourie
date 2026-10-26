@@ -82,3 +82,157 @@ Add `--as-displayed` for a picture that already shows its final lighting, such a
 |  | `snow-day` | Day · heavy winter clothes · playing in the snow with the poodle |
 |  | `snow-dawn` | Dawn/dusk/night · heavy winter clothes · playing in the snow with the poodle |
 
+## Ready-to-paste prompts
+
+**`night-cold-night`**
+
+Pixar-style 3D cartoon illustration, square 1:1 image. A young woman with dark curly hair in a high ponytail, medium-brown skin, big brown eyes and a warm smile, walking left to right on a park path with her apricot toy poodle on a blue leash (blue collar). Full body visible, the dog fully in frame. Keep her face, hair and the dog identical to the reference picture. She wears a cream puffer coat with a fur-trimmed hood, a knit beanie, a blue scarf, gloves, jeans and brown boots; the poodle wears a blue knit sweater. A night park path under a full moon with glowing street lamps; dry pavement.
+
+**`night-cold-carry-umbrella`**
+
+Pixar-style 3D cartoon illustration, square 1:1 image. A young woman with dark curly hair in a high ponytail, medium-brown skin, big brown eyes and a warm smile, walking left to right on a park path with her apricot toy poodle on a blue leash (blue collar). Full body visible, the dog fully in frame. Keep her face, hair and the dog identical to the reference picture. She wears a cream puffer coat with a fur-trimmed hood, a knit beanie, a blue scarf, gloves, jeans and brown boots; the poodle wears a blue knit sweater. A night park path, cloudy moonlit sky, damp pavement; she carries a closed pink umbrella in her free hand.
+
+**`night-cold-rain`**
+
+Pixar-style 3D cartoon illustration, square 1:1 image. A young woman with dark curly hair in a high ponytail, medium-brown skin, big brown eyes and a warm smile, walking left to right on a park path with her apricot toy poodle on a blue leash (blue collar). Full body visible, the dog fully in frame. Keep her face, hair and the dog identical to the reference picture. She wears a yellow hooded raincoat over her winter clothes, scarf and brown boots; the poodle wears a blue knit sweater. A night park path in steady rain, wet reflective pavement; she holds an open pink umbrella; the poodle shakes off water.
+
+**`night-cold-fog`**
+
+Pixar-style 3D cartoon illustration, square 1:1 image. A young woman with dark curly hair in a high ponytail, medium-brown skin, big brown eyes and a warm smile, walking left to right on a park path with her apricot toy poodle on a blue leash (blue collar). Full body visible, the dog fully in frame. Keep her face, hair and the dog identical to the reference picture. She wears a cream puffer coat with a fur-trimmed hood, a knit beanie, a blue scarf, gloves, jeans and brown boots; the poodle wears a blue knit sweater. A night park path in thick fog around glowing street lamps, soft moonlight; dry pavement.
+
+**`night-cool-night`**
+
+Pixar-style 3D cartoon illustration, square 1:1 image. A young woman with dark curly hair in a high ponytail, medium-brown skin, big brown eyes and a warm smile, walking left to right on a park path with her apricot toy poodle on a blue leash (blue collar). Full body visible, the dog fully in frame. Keep her face, hair and the dog identical to the reference picture. She wears a teal puffer jacket, jeans and white sneakers. A night park path under a full moon with glowing street lamps; dry pavement.
+
+**`night-cool-carry-umbrella`**
+
+Pixar-style 3D cartoon illustration, square 1:1 image. A young woman with dark curly hair in a high ponytail, medium-brown skin, big brown eyes and a warm smile, walking left to right on a park path with her apricot toy poodle on a blue leash (blue collar). Full body visible, the dog fully in frame. Keep her face, hair and the dog identical to the reference picture. She wears a teal puffer jacket, jeans and white sneakers. A night park path, cloudy moonlit sky, damp pavement; she carries a closed pink umbrella in her free hand.
+
+**`night-cool-rain`**
+
+Pixar-style 3D cartoon illustration, square 1:1 image. A young woman with dark curly hair in a high ponytail, medium-brown skin, big brown eyes and a warm smile, walking left to right on a park path with her apricot toy poodle on a blue leash (blue collar). Full body visible, the dog fully in frame. Keep her face, hair and the dog identical to the reference picture. She wears a yellow raincoat, jeans and rubber rain boots. A night park path in steady rain, wet reflective pavement; she holds an open pink umbrella; the poodle shakes off water.
+
+**`night-cool-fog`**
+
+Pixar-style 3D cartoon illustration, square 1:1 image. A young woman with dark curly hair in a high ponytail, medium-brown skin, big brown eyes and a warm smile, walking left to right on a park path with her apricot toy poodle on a blue leash (blue collar). Full body visible, the dog fully in frame. Keep her face, hair and the dog identical to the reference picture. She wears a teal puffer jacket, jeans and white sneakers. A night park path in thick fog around glowing street lamps, soft moonlight; dry pavement.
+
+**`night-mild-night`**
+
+Pixar-style 3D cartoon illustration, square 1:1 image. A young woman with dark curly hair in a high ponytail, medium-brown skin, big brown eyes and a warm smile, walking left to right on a park path with her apricot toy poodle on a blue leash (blue collar). Full body visible, the dog fully in frame. Keep her face, hair and the dog identical to the reference picture. She wears a cyan tank top, blue jeans and white sneakers. A night park path under a full moon with glowing street lamps; dry pavement.
+
+**`night-mild-carry-umbrella`**
+
+Pixar-style 3D cartoon illustration, square 1:1 image. A young woman with dark curly hair in a high ponytail, medium-brown skin, big brown eyes and a warm smile, walking left to right on a park path with her apricot toy poodle on a blue leash (blue collar). Full body visible, the dog fully in frame. Keep her face, hair and the dog identical to the reference picture. She wears a cyan tank top, blue jeans and white sneakers. A night park path, cloudy moonlit sky, damp pavement; she carries a closed pink umbrella in her free hand.
+
+**`night-mild-rain`**
+
+Pixar-style 3D cartoon illustration, square 1:1 image. A young woman with dark curly hair in a high ponytail, medium-brown skin, big brown eyes and a warm smile, walking left to right on a park path with her apricot toy poodle on a blue leash (blue collar). Full body visible, the dog fully in frame. Keep her face, hair and the dog identical to the reference picture. She wears a yellow raincoat, jeans and rubber rain boots. A night park path in steady rain, wet reflective pavement; she holds an open pink umbrella; the poodle shakes off water.
+
+**`night-mild-fog`**
+
+Pixar-style 3D cartoon illustration, square 1:1 image. A young woman with dark curly hair in a high ponytail, medium-brown skin, big brown eyes and a warm smile, walking left to right on a park path with her apricot toy poodle on a blue leash (blue collar). Full body visible, the dog fully in frame. Keep her face, hair and the dog identical to the reference picture. She wears a cyan tank top, blue jeans and white sneakers. A night park path in thick fog around glowing street lamps, soft moonlight; dry pavement.
+
+**`night-warm-night`**
+
+Pixar-style 3D cartoon illustration, square 1:1 image. A young woman with dark curly hair in a high ponytail, medium-brown skin, big brown eyes and a warm smile, walking left to right on a park path with her apricot toy poodle on a blue leash (blue collar). Full body visible, the dog fully in frame. Keep her face, hair and the dog identical to the reference picture. She wears a light tank top, shorts and white sneakers. A night park path under a full moon with glowing street lamps; dry pavement.
+
+**`night-warm-carry-umbrella`**
+
+Pixar-style 3D cartoon illustration, square 1:1 image. A young woman with dark curly hair in a high ponytail, medium-brown skin, big brown eyes and a warm smile, walking left to right on a park path with her apricot toy poodle on a blue leash (blue collar). Full body visible, the dog fully in frame. Keep her face, hair and the dog identical to the reference picture. She wears a light tank top, shorts and white sneakers. A night park path, cloudy moonlit sky, damp pavement; she carries a closed pink umbrella in her free hand.
+
+**`night-warm-rain`**
+
+Pixar-style 3D cartoon illustration, square 1:1 image. A young woman with dark curly hair in a high ponytail, medium-brown skin, big brown eyes and a warm smile, walking left to right on a park path with her apricot toy poodle on a blue leash (blue collar). Full body visible, the dog fully in frame. Keep her face, hair and the dog identical to the reference picture. She wears a yellow raincoat over a cyan top, blue shorts and white sneakers. A night park path in steady rain, wet reflective pavement; she holds an open pink umbrella; the poodle shakes off water.
+
+**`night-warm-fog`**
+
+Pixar-style 3D cartoon illustration, square 1:1 image. A young woman with dark curly hair in a high ponytail, medium-brown skin, big brown eyes and a warm smile, walking left to right on a park path with her apricot toy poodle on a blue leash (blue collar). Full body visible, the dog fully in frame. Keep her face, hair and the dog identical to the reference picture. She wears a light tank top, shorts and white sneakers. A night park path in thick fog around glowing street lamps, soft moonlight; dry pavement.
+
+**`day-cold-normal`**
+
+Pixar-style 3D cartoon illustration, square 1:1 image. A young woman with dark curly hair in a high ponytail, medium-brown skin, big brown eyes and a warm smile, walking left to right on a park path with her apricot toy poodle on a blue leash (blue collar). Full body visible, the dog fully in frame. Keep her face, hair and the dog identical to the reference picture. She wears a cream puffer coat with a fur-trimmed hood, a knit beanie, a blue scarf, gloves, jeans and brown boots; the poodle wears a blue knit sweater. A bright sunny day, blue sky, green park, paved path.
+
+**`day-cold-watch`**
+
+Pixar-style 3D cartoon illustration, square 1:1 image. A young woman with dark curly hair in a high ponytail, medium-brown skin, big brown eyes and a warm smile, walking left to right on a park path with her apricot toy poodle on a blue leash (blue collar). Full body visible, the dog fully in frame. Keep her face, hair and the dog identical to the reference picture. She wears a cream puffer coat with a fur-trimmed hood, a knit beanie, a blue scarf, gloves, jeans and brown boots; the poodle wears a blue knit sweater. A cloudy day, soft gray-white sky, no rain gear needed.
+
+**`day-cold-fog`**
+
+Pixar-style 3D cartoon illustration, square 1:1 image. A young woman with dark curly hair in a high ponytail, medium-brown skin, big brown eyes and a warm smile, walking left to right on a park path with her apricot toy poodle on a blue leash (blue collar). Full body visible, the dog fully in frame. Keep her face, hair and the dog identical to the reference picture. She wears a cream puffer coat with a fur-trimmed hood, a knit beanie, a blue scarf, gloves, jeans and brown boots; the poodle wears a blue knit sweater. A foggy day, soft diffuse light and no direct sunlight.
+
+**`day-cold-rain`**
+
+Pixar-style 3D cartoon illustration, square 1:1 image. A young woman with dark curly hair in a high ponytail, medium-brown skin, big brown eyes and a warm smile, walking left to right on a park path with her apricot toy poodle on a blue leash (blue collar). Full body visible, the dog fully in frame. Keep her face, hair and the dog identical to the reference picture. She wears a yellow hooded raincoat over her winter clothes, scarf and brown boots; the poodle wears a blue knit sweater. A rainy day, steady rain, wet pavement; she holds an open pink umbrella; the poodle shakes off water.
+
+**`day-cold-carry-umbrella`**
+
+Pixar-style 3D cartoon illustration, square 1:1 image. A young woman with dark curly hair in a high ponytail, medium-brown skin, big brown eyes and a warm smile, walking left to right on a park path with her apricot toy poodle on a blue leash (blue collar). Full body visible, the dog fully in frame. Keep her face, hair and the dog identical to the reference picture. She wears a cream puffer coat with a fur-trimmed hood, a knit beanie, a blue scarf, gloves, jeans and brown boots; the poodle wears a blue knit sweater. A cloudy day, rain possible; she carries a closed pink umbrella in her free hand.
+
+**`day-cool-normal`**
+
+Pixar-style 3D cartoon illustration, square 1:1 image. A young woman with dark curly hair in a high ponytail, medium-brown skin, big brown eyes and a warm smile, walking left to right on a park path with her apricot toy poodle on a blue leash (blue collar). Full body visible, the dog fully in frame. Keep her face, hair and the dog identical to the reference picture. She wears a teal puffer jacket, jeans and white sneakers. A bright sunny day, blue sky, green park, paved path.
+
+**`day-cool-watch`**
+
+Pixar-style 3D cartoon illustration, square 1:1 image. A young woman with dark curly hair in a high ponytail, medium-brown skin, big brown eyes and a warm smile, walking left to right on a park path with her apricot toy poodle on a blue leash (blue collar). Full body visible, the dog fully in frame. Keep her face, hair and the dog identical to the reference picture. She wears a teal puffer jacket, jeans and white sneakers. A cloudy day, soft gray-white sky, no rain gear needed.
+
+**`day-cool-fog`**
+
+Pixar-style 3D cartoon illustration, square 1:1 image. A young woman with dark curly hair in a high ponytail, medium-brown skin, big brown eyes and a warm smile, walking left to right on a park path with her apricot toy poodle on a blue leash (blue collar). Full body visible, the dog fully in frame. Keep her face, hair and the dog identical to the reference picture. She wears a teal puffer jacket, jeans and white sneakers. A foggy day, soft diffuse light and no direct sunlight.
+
+**`day-cool-rain`**
+
+Pixar-style 3D cartoon illustration, square 1:1 image. A young woman with dark curly hair in a high ponytail, medium-brown skin, big brown eyes and a warm smile, walking left to right on a park path with her apricot toy poodle on a blue leash (blue collar). Full body visible, the dog fully in frame. Keep her face, hair and the dog identical to the reference picture. She wears a yellow raincoat, jeans and rubber rain boots. A rainy day, steady rain, wet pavement; she holds an open pink umbrella; the poodle shakes off water.
+
+**`day-cool-carry-umbrella`**
+
+Pixar-style 3D cartoon illustration, square 1:1 image. A young woman with dark curly hair in a high ponytail, medium-brown skin, big brown eyes and a warm smile, walking left to right on a park path with her apricot toy poodle on a blue leash (blue collar). Full body visible, the dog fully in frame. Keep her face, hair and the dog identical to the reference picture. She wears a teal puffer jacket, jeans and white sneakers. A cloudy day, rain possible; she carries a closed pink umbrella in her free hand.
+
+**`day-mild-normal`**
+
+Pixar-style 3D cartoon illustration, square 1:1 image. A young woman with dark curly hair in a high ponytail, medium-brown skin, big brown eyes and a warm smile, walking left to right on a park path with her apricot toy poodle on a blue leash (blue collar). Full body visible, the dog fully in frame. Keep her face, hair and the dog identical to the reference picture. She wears a cyan tank top, blue jeans and white sneakers. A bright sunny day, blue sky, green park, paved path.
+
+**`day-mild-watch`**
+
+Pixar-style 3D cartoon illustration, square 1:1 image. A young woman with dark curly hair in a high ponytail, medium-brown skin, big brown eyes and a warm smile, walking left to right on a park path with her apricot toy poodle on a blue leash (blue collar). Full body visible, the dog fully in frame. Keep her face, hair and the dog identical to the reference picture. She wears a cyan tank top, blue jeans and white sneakers. A cloudy day, soft gray-white sky, no rain gear needed.
+
+**`day-mild-fog`**
+
+Pixar-style 3D cartoon illustration, square 1:1 image. A young woman with dark curly hair in a high ponytail, medium-brown skin, big brown eyes and a warm smile, walking left to right on a park path with her apricot toy poodle on a blue leash (blue collar). Full body visible, the dog fully in frame. Keep her face, hair and the dog identical to the reference picture. She wears a cyan tank top, blue jeans and white sneakers. A foggy day, soft diffuse light and no direct sunlight.
+
+**`day-mild-carry-umbrella`**
+
+Pixar-style 3D cartoon illustration, square 1:1 image. A young woman with dark curly hair in a high ponytail, medium-brown skin, big brown eyes and a warm smile, walking left to right on a park path with her apricot toy poodle on a blue leash (blue collar). Full body visible, the dog fully in frame. Keep her face, hair and the dog identical to the reference picture. She wears a cyan tank top, blue jeans and white sneakers. A cloudy day, rain possible; she carries a closed pink umbrella in her free hand.
+
+**`day-warm-normal`**
+
+Pixar-style 3D cartoon illustration, square 1:1 image. A young woman with dark curly hair in a high ponytail, medium-brown skin, big brown eyes and a warm smile, walking left to right on a park path with her apricot toy poodle on a blue leash (blue collar). Full body visible, the dog fully in frame. Keep her face, hair and the dog identical to the reference picture. She wears a light tank top, shorts and white sneakers. A bright sunny day, blue sky, green park, paved path.
+
+**`day-warm-watch`**
+
+Pixar-style 3D cartoon illustration, square 1:1 image. A young woman with dark curly hair in a high ponytail, medium-brown skin, big brown eyes and a warm smile, walking left to right on a park path with her apricot toy poodle on a blue leash (blue collar). Full body visible, the dog fully in frame. Keep her face, hair and the dog identical to the reference picture. She wears a light tank top, shorts and white sneakers. A cloudy day, soft gray-white sky, no rain gear needed.
+
+**`day-warm-fog`**
+
+Pixar-style 3D cartoon illustration, square 1:1 image. A young woman with dark curly hair in a high ponytail, medium-brown skin, big brown eyes and a warm smile, walking left to right on a park path with her apricot toy poodle on a blue leash (blue collar). Full body visible, the dog fully in frame. Keep her face, hair and the dog identical to the reference picture. She wears a light tank top, shorts and white sneakers. A foggy day, soft diffuse light and no direct sunlight.
+
+**`day-warm-rain`**
+
+Pixar-style 3D cartoon illustration, square 1:1 image. A young woman with dark curly hair in a high ponytail, medium-brown skin, big brown eyes and a warm smile, walking left to right on a park path with her apricot toy poodle on a blue leash (blue collar). Full body visible, the dog fully in frame. Keep her face, hair and the dog identical to the reference picture. She wears a yellow raincoat over a cyan top, blue shorts and white sneakers. A rainy day, steady rain, wet pavement; she holds an open pink umbrella; the poodle shakes off water.
+
+**`day-warm-carry-umbrella`**
+
+Pixar-style 3D cartoon illustration, square 1:1 image. A young woman with dark curly hair in a high ponytail, medium-brown skin, big brown eyes and a warm smile, walking left to right on a park path with her apricot toy poodle on a blue leash (blue collar). Full body visible, the dog fully in frame. Keep her face, hair and the dog identical to the reference picture. She wears a light tank top, shorts and white sneakers. A cloudy day, rain possible; she carries a closed pink umbrella in her free hand.
+
+**`day-hot-normal`**
+
+Pixar-style 3D cartoon illustration, square 1:1 image. A young woman with dark curly hair in a high ponytail, medium-brown skin, big brown eyes and a warm smile, walking left to right on a park path with her apricot toy poodle on a blue leash (blue collar). Full body visible, the dog fully in frame. Keep her face, hair and the dog identical to the reference picture. She wears a light tank top, short shorts and white sneakers. A blazing hot sunny day with heat haze; she wipes her brow and looks sweaty and uncomfortable; the poodle pants.
+
+**`snow-day`**
+
+Pixar-style 3D cartoon illustration, square 1:1 image. A young woman with dark curly hair in a high ponytail, medium-brown skin, big brown eyes and a warm smile, walking left to right on a park path with her apricot toy poodle on a blue leash (blue collar). Full body visible, the dog fully in frame. Keep her face, hair and the dog identical to the reference picture. She wears a cream puffer coat with a fur-trimmed hood, a knit beanie, a blue scarf, gloves, jeans and brown boots; the poodle wears a blue knit sweater. A snowy park with falling snow; she plays in the snow with the poodle, smiling.
+
+**`snow-dawn`**
+
+Pixar-style 3D cartoon illustration, square 1:1 image. A young woman with dark curly hair in a high ponytail, medium-brown skin, big brown eyes and a warm smile, walking left to right on a park path with her apricot toy poodle on a blue leash (blue collar). Full body visible, the dog fully in frame. Keep her face, hair and the dog identical to the reference picture. She wears a cream puffer coat with a fur-trimmed hood, a knit beanie, a blue scarf, gloves, jeans and brown boots; the poodle wears a blue knit sweater. A snowy park at dawn in soft blue-pink light, falling snow; she plays in the snow with the poodle, smiling.
+
