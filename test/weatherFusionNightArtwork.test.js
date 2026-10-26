@@ -32,7 +32,17 @@ test('3 AM screenshot: 38-degree chance showers, feels 13, uses closed-umbrella 
  const html=sunShadeHTML({shade:13,outdoors:13,daylight:false,weatherKind:'rain',radiantCondition:condition},location,Date.parse(selectedTime),{...context,pavement});
  const illustrations=html.match(/<svg\b[^>]*class="reference-scene[\s\S]*?<\/svg>/g)||[];
  assert.equal(illustrations.length,3,'shade, outdoor and pet cards all retain the selected hour');
- illustrations.forEach((markup,panel)=>assertSingleNightScene(markup,{panel,asset:'comfort-night-cold-dry-chance.webp',row:1,key:'carry-umbrella',outfit:'cold'}));
+ illustrations.slice(0,2).forEach((markup,panel)=>assertSingleNightScene(markup,{panel,asset:'comfort-night-cold-dry-chance.webp',row:1,key:'carry-umbrella',outfit:'cold'}));
+ const pet=illustrations[2];
+ assert.equal((pet.match(/<image\b/g)||[]).length,1);
+ assert.match(pet,/pet-walker-night-cold-carry-umbrella\.webp/);
+ assert.match(pet,/data-walker-slot="night-cold-carry-umbrella"/);
+ assert.match(pet,/data-scene="carry-umbrella"/);
+ assert.match(pet,/data-visible-outfit="cold"/);
+ assert.match(pet,/data-daylight="false"/);
+ assert.match(pet,/x="0" y="0" width="300" height="300"/);
+ assert.match(pet,/style="filter:none"/,'generated night art retains its finished lighting');
+ assert.doesNotMatch(pet,/<(?:filter|path|g|rect|clipPath|circle|ellipse)\b/);
  assert.match(html,/<span class="exposure-label">Night<\/span>/);
  assert.match(html,/13°/);
  assert.match(html,/Asphalt 42°/);

@@ -1,5 +1,5 @@
 import {weatherState} from './weather-state.js?v=current-rain-20261017-v3';
-import {PET_WALKER_ART,PET_WALKER_VERSION,PET_WALKER_FILES} from './pet-walker-art.js?v=walker-3';
+import {PET_WALKER_ART,PET_WALKER_VERSION,PET_WALKER_FILES} from './pet-walker-art.js?v=walker-20261026-all';
 const finite=v=>typeof v==='number'&&Number.isFinite(v);
 export const COMFORT_ART_VERSION='true-night-art-v6';
 export {PET_WALKER_FILES};
