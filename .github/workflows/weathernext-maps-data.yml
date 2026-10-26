@@ -2,9 +2,11 @@ name: WeatherNext forecast map frames
 # Builds Google WeatherNext 3 ensemble-mean map overlays for the contiguous United
 # States from the linked BigQuery table and publishes them to weather-fusion-data.
 #
-# MANUAL ONLY at first. Run it once with dry_run=true (free: it only asks BigQuery
-# for a byte estimate), then with dry_run=false. After one successful real run, the
-# schedule below can be switched on.
+# Runs twice a day for the 00Z and 12Z initializations (about 14.6 GB of BigQuery
+# processing, roughly $0.09, and about 2 MB of new frames per run). Add hours 2 and 14 to the
+# hours below to follow the 06Z and 18Z runs too. A run that bills more than 30 GB writes
+# models/weathernext-maps-cost-stop.json, which pauses later runs until it is deleted.
+# Manual runs: dry_run=true only asks BigQuery for a byte estimate.
 on:
   workflow_dispatch:
     inputs:
@@ -16,9 +18,9 @@ on:
         description: 'Rebuild even if this initialization is already published'
         type: boolean
         default: false
-  # schedule:
-  #   # Main 00/06/12/18 UTC runs reach BigQuery about 8h10m later.
-  #   - cron: '55 2,8,14,20 * * *'
+  schedule:
+    # The main 00 and 12 UTC runs reach BigQuery about 8h10m later; GitHub may delay scheduled jobs.
+    - cron: '55 8,20 * * *'
 permissions:
   contents: write
   id-token: write
