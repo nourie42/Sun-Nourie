@@ -238,7 +238,7 @@ class Collection(unittest.TestCase):
             q = maps.Queries(client, Path(tmp) / maps.STOP_FILE, 250_000_000_000, 12_000_000_000, 30_000_000_000, make_config=spy)
             maps.collect(q, TABLE, tmp, NOW, layers=['temperature'], max_hours=6)
         real = [cap for dry, cap in seen if not dry and cap is not None and cap > 3_000_000_000]
-        self.assertTrue(real and all(cap >= 190_000_000_000 for cap in real), seen)
+        self.assertTrue(real and all(cap >= 190_000_000_000 * 1.05 for cap in real), seen)
         self.assertFalse((Path(tmp) / maps.STOP_FILE).exists())
 
     def test_unexpectedly_large_bill_publishes_once_then_pauses_future_runs(self):
