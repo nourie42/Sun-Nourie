@@ -1,5 +1,5 @@
 import {finite,solarElevation,thermalHumidity,wetBulb} from './weather-math.js?v=current-rain-20261017-v3';
-import {clothingForFeels,referenceScene,precipitationActivity,winterSceneExpected} from './exposure-scene.js?v=current-rain-20261017-v3';
+import {clothingForFeels,dogWalkerScene,precipitationActivity,winterSceneExpected} from './exposure-scene.js?v=current-rain-20261017-v3';
 import {thermalRisk} from './thermal-risk.js?v=weather-art-labels-v10';
 import {weatherShapes} from './weather-display.js?v=low-rain-display-v1';
 import {weatherState} from './weather-state.js?v=current-rain-20261017-v3';
@@ -134,7 +134,7 @@ export function pavementHTML(result,feels,context={}){
   ? `<rect width="300" height="360" fill="url(#pet-night-sky)"/><g class="pet-stars" fill="#dcecff" opacity=".86"><circle cx="28" cy="34" r="2"/><circle cx="73" cy="66" r="1.7"/><circle cx="126" cy="35" r="1.5"/><circle cx="169" cy="73" r="2"/><circle cx="223" cy="38" r="1.5"/><circle cx="270" cy="84" r="1.8"/><circle cx="246" cy="124" r="1.2"/><circle cx="105" cy="116" r="1.2"/></g><path class="pet-moon" d="M238 54A28 28 0 1 0 262 96A31 31 0 0 1 238 54Z" fill="#eef3ff"/>`
   : `<rect width="300" height="360" fill="url(#pet-day-sky)"/><g class="sky-sun" transform="translate(238 67)"><circle r="42" fill="#ffe680" opacity=".18"/><g stroke="#ffda63" stroke-width="7" stroke-linecap="round"><path d="M0-49V-37M0 49V37M-49 0H-37M49 0H37M-35-35L-26-26M35 35L26 26M-35 35L-26 26M35-35L26-26"/></g><circle r="27" fill="#ffe56f"/></g>`;
  if(context.condition&&weatherState(context.condition).kind!=='clear')sky=`<rect width="300" height="360" fill="url(#pet-${night?'night':'day'}-sky)"/><g transform="translate(205 35) scale(1.6)">${weatherShapes(context.condition,!night)}</g>`;
- const illustrated=referenceScene(2,!night,context.condition||'Clear',feels,context);
+ const illustrated=dogWalkerScene(!night,context.condition||'Clear',feels,context);
  const horizon=night?'#173d4c':'#2d9b5d';
  const subtitle=context.rainExpected&&result?.status==='estimated'?'Rain forecast · check pavement':winter?(context.snowForecastOnly||result?.snowForecastOnly?'Snow forecast · protect paws':'Snow & ice · protect paws'):activelyWet&&result?.status==='estimated'?'Wet pavement estimate':petSurfaceSubtitle(result);
  const reading=winter?'<strong class="winter-paw-reading">Cold paws</strong><small>Snow / ice · keep outings short</small><small>Check toes · rinse off deicer</small>':`<strong>${value(result.concrete)}</strong><small class="pavement-secondary">Asphalt ${value(result.asphalt)}</small><small>${activelyWet&&result?.status==='estimated'?'Est. wet surface temp':result?.status==='estimated'?'Est. surface temp':'Estimate unavailable'} · °F</small>${activelyWet?`<small>${context.forecast?'Rain forecast':'Wet conditions'}</small>`:''}`;

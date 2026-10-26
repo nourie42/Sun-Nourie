@@ -32,7 +32,7 @@ import {addSnowOutlook,createWpcWinterService} from './weatherFusionSnow.js';
 import {createWinterModelService} from './weatherFusionWinterModels.js';
 import {createModelSnowMapService} from './weatherFusionModelSnowMap.js';
 import {retainOfficialFeed,criticalOfficialUrl,validateOfficialPayload} from './weatherFusionOfficialRecovery.js';
-import {COMFORT_SCENE_ASSETS} from '../public/weather-fusion/exposure-scene.js';
+import {COMFORT_SCENE_ASSETS,PET_WALKER_FILES} from '../public/weather-fusion/exposure-scene.js';
 import {recoverForecastHours,recoverDailyConditions} from './weatherFusionFallback.js';
 
 export const PRESETS = [
@@ -824,6 +824,8 @@ export function registerWeatherFusionRoutes(app, options = {}) {
     'wn-blend.js',
     'wn-compare.js',
     'forecast-windows.js','forecast-window-banners.js','forecast-window-banners.css','forecast-status.js','forecast-refresh.js','live-alerts.js','urgent-alerts.css',
+    ...PET_WALKER_FILES,
+    'pet-walker-art.js',
     'seven-day.js','seven-day.css','seven-day-art.css',
     'request-deadline.js','weather-changes.js','air-quality.js','alert-banners.js','app.js','bulletin-facts.js','bulletins.js','car-wash.js','car-wash.css','car-wash-background.webp','car-wash-corvette-hood.webp',
     'model-explanation.js','model-explanation.css','weathernext-site.html','weathernext-site.css','weathernext-site.js','weathernext-data.js','weathernext-catalog.json',
