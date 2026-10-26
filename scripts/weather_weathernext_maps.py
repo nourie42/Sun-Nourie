@@ -180,7 +180,11 @@ class Queries:
         ceiling = 3_000_000_000 if discovery else self.max_estimate
         if estimate > ceiling:
             raise EstimateCeiling(f'Query estimate {estimate} bytes exceeds the {ceiling} byte ceiling; it was not executed.')
-        cap = 3_000_000_000 if discovery else self.max_billed
+        # BigQuery checks this cap against the pre-execution estimate, which for a clustered table is a
+        # pessimistic upper bound (it counted ~190 GB for a query that bills a small fraction). A cap below
+        # the estimate would reject the query before it runs, so the cap is the estimate that already passed
+        # the ceiling above. Actual billing is checked after the run (pause_if_expensive).
+        cap = 3_000_000_000 if discovery else max(self.max_billed, estimate)
         job = self.client.query(sql, job_config=self.make_config(params, max_bytes=cap), location='US')
         rows = list(job.result(timeout=600))
         billed = int(job.total_bytes_billed or 0)
@@ -427,10 +431,11 @@ def main():
     ap.add_argument('--max-hours', type=int, default=DEFAULT_MAX_HOURS)
     ap.add_argument('--dry-run', action='store_true', help='Print the BigQuery byte estimate and exit without billing a query')
     ap.add_argument('--force', action='store_true', help='Rebuild even when this initialization is already published')
-    ap.add_argument('--max-estimate-bytes', type=int, default=700_000_000_000,
-                    help='Pre-execution ceiling. Clustered-table estimates are pessimistic upper bounds.')
-    ap.add_argument('--max-billed-bytes', type=int, default=12_000_000_000, help='Hard billing cap sent to BigQuery for each query')
-    ap.add_argument('--review-billed-bytes', type=int, default=6_000_000_000,
+    ap.add_argument('--max-estimate-bytes', type=int, default=250_000_000_000,
+                    help='Pre-execution ceiling and so the most one run can ever bill. Clustered-table estimates are pessimistic upper bounds.')
+    ap.add_argument('--max-billed-bytes', type=int, default=12_000_000_000,
+                    help='Billing cap sent to BigQuery; raised to the passed estimate because BigQuery checks the cap against the estimate')
+    ap.add_argument('--review-billed-bytes', type=int, default=30_000_000_000,
                     help='A run that bills more than this publishes, then pauses automatic runs until a person reviews it')
     a = ap.parse_args()
     out = Path(a.output)
