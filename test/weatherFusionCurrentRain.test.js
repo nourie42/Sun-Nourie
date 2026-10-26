@@ -34,7 +34,8 @@ test('all three current panels show night rain gear and forecast-qualified capti
  const html=sunShadeHTML(s.comfort,f.location,now,{...context,pavement:pavementHTML(surface,s.feels,context)});
  assert.equal((html.match(/data-scene="rain"/g)||[]).length,3);
  assert.equal((html.match(/data-daylight="false" data-weather="rain"/g)||[]).length,3);
- assert.equal((html.match(/comfort-night-cool-rain-fog\.webp/g)||[]).length,3);
+ assert.equal((html.match(/comfort-night-cool-rain-fog\.webp/g)||[]).length,2);
+ assert.equal((html.match(/pet-walker-night-cool-rain\.webp/g)||[]).length,1);
  assert.match(html,/Rain forecast · take an umbrella/);assert.doesNotMatch(html,/Rain outside/);
  assert.match(html,/Asphalt 67°/);
 });
