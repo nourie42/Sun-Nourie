@@ -50,17 +50,34 @@ jobs:
           git -C "$DATA" config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           echo "WEATHER_DATA_DIR=$DATA" >> "$GITHUB_ENV"
       - name: Build WeatherNext map frames
+        id: build
+        shell: bash
         run: |
+          # pipefail: a generator failure must fail this step even though its output goes through tee.
+          set -o pipefail
           ARGS=""
           if [ "${{ inputs.dry_run }}" = "true" ]; then ARGS="$ARGS --dry-run"; fi
           if [ "${{ inputs.force }}" = "true" ]; then ARGS="$ARGS --force"; fi
-          python -u scripts/weather_weathernext_maps.py --table homeassist-470415.weathernext_3.weathernext_3_0_0_0p1deg --output "$WEATHER_DATA_DIR" $ARGS | tee "$RUNNER_TEMP/maps-run.log"
+          python -u scripts/weather_weathernext_maps.py --table homeassist-470415.weathernext_3.weathernext_3_0_0_0p1deg --output "$WEATHER_DATA_DIR" $ARGS 2>&1 | tee "$RUNNER_TEMP/maps-run.log"
+      - name: Report the result
+        if: always()
+        shell: bash
+        run: |
+          LOG="$RUNNER_TEMP/maps-run.log"
+          test -f "$LOG" || exit 0
           {
             echo '### WeatherNext map frames'
-            echo '```json'
-            tail -n 5 "$RUNNER_TEMP/maps-run.log"
+            echo '```'
+            tail -n 40 "$LOG"
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
+          # Annotations are readable through the checks API without downloading logs.
+          TEXT=$(tail -n 40 "$LOG" | cut -c1-1500 | sed -e 's/%/%25/g' | awk 'BEGIN{ORS="%0A"}{print}')
+          if [ "${{ steps.build.outcome }}" = "success" ]; then
+            echo "::notice title=WeatherNext map frames::${TEXT}"
+          else
+            echo "::error title=WeatherNext map frames failed::${TEXT}"
+          fi
       - name: Publish frames, catalog and any cost-stop record
         if: always() && inputs.dry_run != true && env.WEATHER_DATA_DIR != ''
         run: |
