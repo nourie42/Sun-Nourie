@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {existsSync,readFileSync,statSync} from 'node:fs';
 import {registerWeatherFusionRoutes} from '../src/weatherFusion.js';
+import {PET_WALKER_FILES} from '../public/weather-fusion/exposure-scene.js';
 
 const read = name => readFileSync(new URL(`../public/weather-fusion/${name}`,import.meta.url),'utf8');
 const html = read('index.html');
@@ -87,6 +88,8 @@ test('the explicit server allowlist covers the weather shell dependency closure'
   const routeList = serverSource.match(/for \(const name of \[([\s\S]*?)\]\) app\.get\(`\/weather-fusion\/\$\{name\}`/);
   assert.ok(routeList,'weather assets must use an auditable explicit route list');
   const allowed = new Set([...routeList[1].matchAll(/'([^']+)'/g)].map(match=>match[1]));
+  // Replacement dog-walker pictures are registered from the manifest by this spread.
+  if(/\.\.\.PET_WALKER_FILES/.test(routeList[1]))for(const name of PET_WALKER_FILES)allowed.add(name);
   const required = new Set();
   const pending = [];
   const supported = /\.(?:js|css|png|webp|jpe?g|svg)$/i;

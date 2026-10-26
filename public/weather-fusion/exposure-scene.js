@@ -1,6 +1,8 @@
 import {weatherState} from './weather-state.js?v=current-rain-20261017-v3';
+import {PET_WALKER_ART,PET_WALKER_VERSION,PET_WALKER_FILES} from './pet-walker-art.js?v=walker-3';
 const finite=v=>typeof v==='number'&&Number.isFinite(v);
 export const COMFORT_ART_VERSION='true-night-art-v6';
+export {PET_WALKER_FILES};
 
 /** A precise NWS clock clause can rule out a coarse snow allocation before
  * the stated transition. Null means no timed phase evidence is available.
@@ -89,6 +91,29 @@ export function comfortSceneState(daylight=true,condition='Clear',feels=null,con
  }
  return {key,asset};
 }
+/** Every distinct picture of the dog walker, by the weather it shows. A slot names one
+ * panel of one scene sheet, so it also names the clothes (night-cool-rain = a cool-weather
+ * outfit with rain gear at night). Used to look up replacement art and to list what is left. */
+const WALKER_NIGHT_KEYS=[['night','dry, clear night'],['carry-umbrella','rain possible, carrying a closed umbrella'],['rain','steady rain'],['fog','fog']];
+const WALKER_DAY_KEYS=[['normal','clear or partly cloudy'],['watch','cloudy'],['fog','fog'],['rain','steady rain'],['carry-umbrella','rain possible, carrying a closed umbrella']];
+const WALKER_OUTFITS={cold:'cold-weather clothes (heavy coat, scarf, hat, boots)',cool:'cool-weather clothes (light jacket, long pants)',mild:'mild-weather clothes (top and long pants)',warm:'warm-weather clothes (tank top, shorts or light pants)',hot:'very hot weather clothes'};
+export const WALKER_SLOTS=[
+ ...['cold','cool','mild','warm'].flatMap(outfit=>WALKER_NIGHT_KEYS.map(([key,what])=>({slot:`night-${outfit}-${key}`,time:'night',outfit,weather:what,description:`Night · ${WALKER_OUTFITS[outfit]} · ${what}`}))),
+ ...['cold','cool','mild'].flatMap(outfit=>WALKER_DAY_KEYS.filter(([key])=>!(outfit==='mild'&&key==='rain')).map(([key,what])=>({slot:`day-${outfit}-${key}`,time:'day',outfit,weather:what,description:`Day · ${WALKER_OUTFITS[outfit]} · ${what}`}))),
+ ...WALKER_DAY_KEYS.map(([key,what])=>({slot:`day-warm-${key}`,time:'day',outfit:'warm',weather:what,description:`Day · ${WALKER_OUTFITS.warm} (also used when the feels-like temperature is unavailable) · ${what}`})),
+ {slot:'day-hot-normal',time:'day',outfit:'hot',weather:'extreme heat',description:`Day · ${WALKER_OUTFITS.hot} · visibly reacting to extreme heat`},
+ {slot:'snow-day',time:'day',outfit:'cold',weather:'snow',description:'Day · heavy winter clothes · playing in the snow with the poodle'},
+ {slot:'snow-dawn',time:'night',outfit:'cold',weather:'snow',description:'Dawn/dusk/night · heavy winter clothes · playing in the snow with the poodle'},
+];
+/** Which replacement slot (if any) the chosen scene sheet belongs to. */
+export function walkerSlot(scene,daylight=true){
+ if(!scene)return null;
+ if(scene.key==='snow')return daylight?'snow-day':'snow-dawn';
+ if(!daylight){const match=/^comfort-night-(cold|cool|mild|warm)-/.exec(scene.asset);return match?`night-${match[1]}-${scene.key}`:null;}
+ const integrated=/^comfort-integrated-(cold|cool|mild)-(.+)\.webp$/.exec(scene.asset);
+ if(integrated)return `day-${integrated[1]}-${integrated[2]}`;
+ return scene.key==='hot'?'day-hot-normal':`day-warm-${scene.key}`;
+}
 const comfortSceneUrl=asset=>`/weather-fusion/${asset}?v=${COMFORT_ART_VERSION}`;
 /** Preload only requested scenes; fetching every clothing/sky combination
  * would download several megabytes this visit might never display. */
@@ -114,6 +139,17 @@ export function referenceScene(panel,daylight=true,condition='Clear',feels=null,
  if(!daylight)label+='; nighttime illustration with no daylight';
  const garment=outfit==='cold'?'heavy-coat-and-trousers':outfit==='cool'?'jacket-and-trousers':scene.key==='rain'?'rainwear-and-trousers':outfit==='mild'?'long-trousers':'light-clothing';
  return `<svg class="reference-scene${scene.key==='snow'?' snow-play-scene':''}${panel===2?' poodle-scene':''}" viewBox="0 0 300 300" preserveAspectRatio="xMidYMid slice" role="img" aria-label="${label}" data-scene="${scene.key}" data-outfit="${outfit}" data-visible-outfit="${outfit}" data-garment="${garment}" data-artwork="complete-image" data-daylight="${daylight}" data-weather="${scene.key==='snow'?'snow':weather.kind}"><image class="reference-art" href="${comfortSceneUrl(scene.asset)}" x="${-300*panel}" y="${-300*(scene.row||0)}" width="900" height="${300*(scene.rows||1)}" preserveAspectRatio="none"/></svg>`;
+}
+/** The "For Pets" scene: the original woman-and-poodle panel, unless replacement art has been
+ * installed for this exact weather/outfit combination (see pet-walker-art.js). A replacement is a
+ * single square picture drawn like any other panel, so nothing else about the scene changes. */
+export function dogWalkerScene(daylight=true,condition='Clear',feels=null,context={}){
+ const base=referenceScene(2,daylight,condition,feels,context);
+ if(!base)return base;
+ const slot=walkerSlot(comfortSceneState(daylight,condition,feels,context),daylight),art=slot?PET_WALKER_ART[slot]:null;
+ if(!art)return base;
+ const image=`<image class="reference-art" href="/weather-fusion/${art.file}?v=${PET_WALKER_VERSION}" x="0" y="0" width="300" height="300" preserveAspectRatio="none"${art.asDisplayed?' style="filter:none"':''}/>`;
+ return base.replace(/<image class="reference-art"[^>]*\/>/,()=>image).replace('data-artwork="complete-image"',()=>`data-artwork="complete-image" data-walker="replacement" data-walker-slot="${slot}"`);
 }
 export function exposureScene(sun,daylight=true,condition='Clear',feels=null,context={}){
  return referenceScene(sun?1:0,daylight,condition,feels,context);
