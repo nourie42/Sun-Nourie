@@ -43,44 +43,44 @@ Add `--as-displayed` for a picture that already shows its final lighting, such a
 
 | Done | Slot | Picture to make |
 |---|---|---|
-|  | `night-cold-night` | Night · cold-weather clothes (heavy coat, scarf, hat, boots) · dry, clear night |
-|  | `night-cold-carry-umbrella` | Night · cold-weather clothes (heavy coat, scarf, hat, boots) · rain possible, carrying a closed umbrella |
-|  | `night-cold-rain` | Night · cold-weather clothes (heavy coat, scarf, hat, boots) · steady rain |
-|  | `night-cold-fog` | Night · cold-weather clothes (heavy coat, scarf, hat, boots) · fog |
-|  | `night-cool-night` | Night · cool-weather clothes (light jacket, long pants) · dry, clear night |
-|  | `night-cool-carry-umbrella` | Night · cool-weather clothes (light jacket, long pants) · rain possible, carrying a closed umbrella |
-|  | `night-cool-rain` | Night · cool-weather clothes (light jacket, long pants) · steady rain |
-|  | `night-cool-fog` | Night · cool-weather clothes (light jacket, long pants) · fog |
+| yes | `night-cold-night` | Night · cold-weather clothes (heavy coat, scarf, hat, boots) · dry, clear night |
+| yes | `night-cold-carry-umbrella` | Night · cold-weather clothes (heavy coat, scarf, hat, boots) · rain possible, carrying a closed umbrella |
+| yes | `night-cold-rain` | Night · cold-weather clothes (heavy coat, scarf, hat, boots) · steady rain |
+| yes | `night-cold-fog` | Night · cold-weather clothes (heavy coat, scarf, hat, boots) · fog |
+| yes | `night-cool-night` | Night · cool-weather clothes (light jacket, long pants) · dry, clear night |
+| yes | `night-cool-carry-umbrella` | Night · cool-weather clothes (light jacket, long pants) · rain possible, carrying a closed umbrella |
+| yes | `night-cool-rain` | Night · cool-weather clothes (light jacket, long pants) · steady rain |
+| yes | `night-cool-fog` | Night · cool-weather clothes (light jacket, long pants) · fog |
 | yes | `night-mild-night` | Night · mild-weather clothes (top and long pants) · dry, clear night |
-|  | `night-mild-carry-umbrella` | Night · mild-weather clothes (top and long pants) · rain possible, carrying a closed umbrella |
-|  | `night-mild-rain` | Night · mild-weather clothes (top and long pants) · steady rain |
-|  | `night-mild-fog` | Night · mild-weather clothes (top and long pants) · fog |
-|  | `night-warm-night` | Night · warm-weather clothes (tank top, shorts or light pants) · dry, clear night |
-|  | `night-warm-carry-umbrella` | Night · warm-weather clothes (tank top, shorts or light pants) · rain possible, carrying a closed umbrella |
-|  | `night-warm-rain` | Night · warm-weather clothes (tank top, shorts or light pants) · steady rain |
-|  | `night-warm-fog` | Night · warm-weather clothes (tank top, shorts or light pants) · fog |
-|  | `day-cold-normal` | Day · cold-weather clothes (heavy coat, scarf, hat, boots) · clear or partly cloudy |
-|  | `day-cold-watch` | Day · cold-weather clothes (heavy coat, scarf, hat, boots) · cloudy |
-|  | `day-cold-fog` | Day · cold-weather clothes (heavy coat, scarf, hat, boots) · fog |
-|  | `day-cold-rain` | Day · cold-weather clothes (heavy coat, scarf, hat, boots) · steady rain |
-|  | `day-cold-carry-umbrella` | Day · cold-weather clothes (heavy coat, scarf, hat, boots) · rain possible, carrying a closed umbrella |
-|  | `day-cool-normal` | Day · cool-weather clothes (light jacket, long pants) · clear or partly cloudy |
-|  | `day-cool-watch` | Day · cool-weather clothes (light jacket, long pants) · cloudy |
-|  | `day-cool-fog` | Day · cool-weather clothes (light jacket, long pants) · fog |
-|  | `day-cool-rain` | Day · cool-weather clothes (light jacket, long pants) · steady rain |
-|  | `day-cool-carry-umbrella` | Day · cool-weather clothes (light jacket, long pants) · rain possible, carrying a closed umbrella |
-|  | `day-mild-normal` | Day · mild-weather clothes (top and long pants) · clear or partly cloudy |
-|  | `day-mild-watch` | Day · mild-weather clothes (top and long pants) · cloudy |
-|  | `day-mild-fog` | Day · mild-weather clothes (top and long pants) · fog |
-|  | `day-mild-carry-umbrella` | Day · mild-weather clothes (top and long pants) · rain possible, carrying a closed umbrella |
-|  | `day-warm-normal` | Day · warm-weather clothes (tank top, shorts or light pants) (also used when the feels-like temperature is unavailable) · clear or partly cloudy |
-|  | `day-warm-watch` | Day · warm-weather clothes (tank top, shorts or light pants) (also used when the feels-like temperature is unavailable) · cloudy |
-|  | `day-warm-fog` | Day · warm-weather clothes (tank top, shorts or light pants) (also used when the feels-like temperature is unavailable) · fog |
-|  | `day-warm-rain` | Day · warm-weather clothes (tank top, shorts or light pants) (also used when the feels-like temperature is unavailable) · steady rain |
-|  | `day-warm-carry-umbrella` | Day · warm-weather clothes (tank top, shorts or light pants) (also used when the feels-like temperature is unavailable) · rain possible, carrying a closed umbrella |
-|  | `day-hot-normal` | Day · very hot weather clothes · visibly reacting to extreme heat |
-|  | `snow-day` | Day · heavy winter clothes · playing in the snow with the poodle |
-|  | `snow-dawn` | Dawn/dusk/night · heavy winter clothes · playing in the snow with the poodle |
+| yes | `night-mild-carry-umbrella` | Night · mild-weather clothes (top and long pants) · rain possible, carrying a closed umbrella |
+| yes | `night-mild-rain` | Night · mild-weather clothes (top and long pants) · steady rain |
+| yes | `night-mild-fog` | Night · mild-weather clothes (top and long pants) · fog |
+| yes | `night-warm-night` | Night · warm-weather clothes (tank top, shorts or light pants) · dry, clear night |
+| yes | `night-warm-carry-umbrella` | Night · warm-weather clothes (tank top, shorts or light pants) · rain possible, carrying a closed umbrella |
+| yes | `night-warm-rain` | Night · warm-weather clothes (tank top, shorts or light pants) · steady rain |
+| yes | `night-warm-fog` | Night · warm-weather clothes (tank top, shorts or light pants) · fog |
+| yes | `day-cold-normal` | Day · cold-weather clothes (heavy coat, scarf, hat, boots) · clear or partly cloudy |
+| yes | `day-cold-watch` | Day · cold-weather clothes (heavy coat, scarf, hat, boots) · cloudy |
+| yes | `day-cold-fog` | Day · cold-weather clothes (heavy coat, scarf, hat, boots) · fog |
+| yes | `day-cold-rain` | Day · cold-weather clothes (heavy coat, scarf, hat, boots) · steady rain |
+| yes | `day-cold-carry-umbrella` | Day · cold-weather clothes (heavy coat, scarf, hat, boots) · rain possible, carrying a closed umbrella |
+| yes | `day-cool-normal` | Day · cool-weather clothes (light jacket, long pants) · clear or partly cloudy |
+| yes | `day-cool-watch` | Day · cool-weather clothes (light jacket, long pants) · cloudy |
+| yes | `day-cool-fog` | Day · cool-weather clothes (light jacket, long pants) · fog |
+| yes | `day-cool-rain` | Day · cool-weather clothes (light jacket, long pants) · steady rain |
+| yes | `day-cool-carry-umbrella` | Day · cool-weather clothes (light jacket, long pants) · rain possible, carrying a closed umbrella |
+| yes | `day-mild-normal` | Day · mild-weather clothes (top and long pants) · clear or partly cloudy |
+| yes | `day-mild-watch` | Day · mild-weather clothes (top and long pants) · cloudy |
+| yes | `day-mild-fog` | Day · mild-weather clothes (top and long pants) · fog |
+| yes | `day-mild-carry-umbrella` | Day · mild-weather clothes (top and long pants) · rain possible, carrying a closed umbrella |
+| yes | `day-warm-normal` | Day · warm-weather clothes (tank top, shorts or light pants) (also used when the feels-like temperature is unavailable) · clear or partly cloudy |
+| yes | `day-warm-watch` | Day · warm-weather clothes (tank top, shorts or light pants) (also used when the feels-like temperature is unavailable) · cloudy |
+| yes | `day-warm-fog` | Day · warm-weather clothes (tank top, shorts or light pants) (also used when the feels-like temperature is unavailable) · fog |
+| yes | `day-warm-rain` | Day · warm-weather clothes (tank top, shorts or light pants) (also used when the feels-like temperature is unavailable) · steady rain |
+| yes | `day-warm-carry-umbrella` | Day · warm-weather clothes (tank top, shorts or light pants) (also used when the feels-like temperature is unavailable) · rain possible, carrying a closed umbrella |
+| yes | `day-hot-normal` | Day · very hot weather clothes · visibly reacting to extreme heat |
+| yes | `snow-day` | Day · heavy winter clothes · playing in the snow with the poodle |
+| yes | `snow-dawn` | Dawn/dusk/night · heavy winter clothes · playing in the snow with the poodle |
 
 ## Ready-to-paste prompts
 

@@ -37,19 +37,21 @@ test('slot names match the clothes the scene sheet actually shows',()=>{
  assert.equal(pick(false,'Light Snow',25),'snow-dawn');
 });
 
-test('only her panel is replaced, only for slots that have new art',()=>{
- const slot='night-mild-night';
- assert.ok(PET_WALKER_ART[slot],'the supplied night/mild picture is installed');
- const walker=dogWalkerScene(false,'Clear',68,{});
- assert.match(walker,/data-walker="replacement" data-walker-slot="night-mild-night"/);
- assert.match(walker,/pet-walker-night-mild-night\.webp/);
- assert.doesNotMatch(walker,/comfort-night-mild-dry-chance/);
- // The scene sheets (and so the boy panels) are untouched, and so is every other combination.
- for(const panel of [0,1,2])assert.match(referenceScene(panel,false,'Clear',68,{}),/comfort-night-mild-dry-chance\.webp/);
- assert.match(dogWalkerScene(false,'Clear',50,{}),/comfort-night-cool-dry-chance\.webp/);
- assert.match(dogWalkerScene(true,'Clear',68,{}),/comfort-integrated-mild-normal\.webp/);
- assert.doesNotMatch(dogWalkerScene(true,'Clear',68,{}),/data-walker=/);
- for(const [daylight,condition,feels] of [[false,'Clear',50],[true,'Rain',68],[true,'Light Snow',25],[false,'Fog',68]])assert.equal(dogWalkerScene(daylight,condition,feels,{pop:80}),referenceScene(2,daylight,condition,feels,{pop:80}),'uninstalled slots render exactly as before');
+test('every reachable weather selects its replacement pet art while the scene sheets stay unchanged',()=>{
+ assert.equal(Object.keys(PET_WALKER_ART).length,WALKER_SLOTS.length);
+ const reached=new Set();
+ for(const daylight of [true,false])for(const condition of conditions)for(const feels of feelsValues)for(const context of contexts){
+  const slot=walkerSlot(comfortSceneState(daylight,condition,feels,context),daylight);
+  const walker=dogWalkerScene(daylight,condition,feels,context);
+  reached.add(slot);
+  assert.ok(PET_WALKER_ART[slot],slot);
+  assert.ok(walker.includes(`data-walker-slot="${slot}"`),slot);
+  assert.ok(walker.includes(`/weather-fusion/pet-walker-${slot}.webp?`),slot);
+  assert.equal((walker.match(/<image\b/g)||[]).length,1,slot);
+  assert.match(walker,/style="filter:none"/);
+  for(const panel of [0,1])assert.doesNotMatch(referenceScene(panel,daylight,condition,feels,context),/pet-walker-|data-walker=/);
+ }
+ assert.deepEqual([...reached].sort(),[...slotNames].sort());
 });
 
 test('replacement art keeps the scene contract: one complete square image, same label and attributes',()=>{
@@ -76,13 +78,13 @@ test('every installed picture exists, is declared for the server, and is named l
  assert.match(server,/'pet-walker-art\.js'/);
 });
 
-test('the For Pets card shows her where art is installed and the original woman everywhere else',()=>{
+test('the For Pets card uses the new art across night, day and cool weather',()=>{
  const surface=daylight=>({status:'estimated',daylight,concrete:{value:60,low:55,high:65},asphalt:{value:62,low:55,high:70}});
  const night=pavementHTML(surface(false),68,{condition:'Clear',pop:0});
  assert.match(night,/data-walker-slot="night-mild-night"/);
  assert.match(night,/pet-walker-night-mild-night\.webp/);
  const cool=pavementHTML(surface(false),50,{condition:'Clear',pop:0});
- assert.doesNotMatch(cool,/data-walker=/);
- assert.match(cool,/comfort-night-cool-dry-chance\.webp/);
- assert.match(pavementHTML(surface(true),68,{condition:'Clear',pop:0}),/comfort-integrated-mild-normal\.webp/);
+ assert.match(cool,/data-walker-slot="night-cool-night"/);
+ assert.match(cool,/pet-walker-night-cool-night\.webp/);
+ assert.match(pavementHTML(surface(true),68,{condition:'Clear',pop:0}),/pet-walker-day-mild-normal\.webp/);
 });

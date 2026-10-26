@@ -22,7 +22,8 @@ test('Cortland selected Friday 10AM storms at 38% rain chance retain rainy art i
  const pavement=pavementHTML({status:'estimated',daylight:true,concrete:{value:56},asphalt:{value:57}},sample.feels,context);
  const html=sunShadeHTML({shade:44,outdoors:45,daylight:true,weatherKind:'storm',radiantCondition:condition},data.location,Date.parse(time),{...context,pavement});
  assert.equal((html.match(/data-scene="rain"/g)||[]).length,3,'shade, outdoor and pets use the same selected-hour rainy scene');
- assert.equal((html.match(/comfort-integrated-cool-rain\.webp/g)||[]).length,3,'the complete raincoat scenes match the chilly feels-like temperature');
+ assert.equal((html.match(/comfort-integrated-cool-rain\.webp/g)||[]).length,2,'both human raincoat scenes match the chilly feels-like temperature');
+ assert.equal((html.match(/pet-walker-day-cool-rain\.webp/g)||[]).length,1,'the pet card uses the new cool-weather raincoat image');
  assert.equal((html.match(/data-weather="storm"/g)||[]).length,5,'the weather state is retained through both human and pet illustration paths');
  assert.doesNotMatch(html,/data-scene="(?:normal|hot|snow)"|comfort-integrated-cool-normal|snow-play-scene/);
  assert.match(html,/Rain forecast/,'forecast rain is not described as an observation');
