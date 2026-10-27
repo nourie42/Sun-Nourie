@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#ffffff">
   <meta name="color-scheme" content="light">
   <title>My AIs</title>
-  <link rel="stylesheet" href="/ai-council/grok.css?v=3">
+  <link rel="stylesheet" href="/ai-council/grok.css?v=4">
 </head>
 <body>
 <div class="grok-app">
@@ -27,6 +27,9 @@
     <div class="grok-hist" id="history">
       <div class="grok-hist-title">Recent</div>
       <div id="histList"></div>
+    </div>
+    <div class="grok-side-foot">
+      <button class="grok-bots-link" id="balancesBtn" type="button">💰 <span>Balances</span></button>
     </div>
   </aside>
   <div class="grok-scrim" id="scrim"></div>
@@ -80,6 +83,17 @@
   </div>
 </div>
 
-<script type="module" src="/ai-council/grok.js?v=3"></script>
+<div class="sheet-scrim hidden" id="balanceScrim"></div>
+<section class="sheet hidden" id="balanceSheet" role="dialog" aria-modal="true" aria-labelledby="balanceTitle">
+  <div class="sheet-head">
+    <h2 id="balanceTitle">Money left</h2>
+    <button class="grok-icon" id="balanceClose" type="button" aria-label="Close">✕</button>
+  </div>
+  <p class="sheet-help">ChatGPT, Claude and Muse don't let other sites read your balance. Type what each billing page shows once, and each bot counts down as you chat. These are estimates, and only messages sent from this page are counted.</p>
+  <div id="balanceRows"></div>
+  <p class="sheet-help" id="balanceStorage"></p>
+</section>
+
+<script type="module" src="/ai-council/grok.js?v=4"></script>
 </body>
 </html>

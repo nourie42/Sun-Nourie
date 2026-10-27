@@ -13,6 +13,7 @@ const LOOK = {
 
 let bots = [];
 let roomMaxTurns = 12;
+let balanceStorage = 'server';
 let convos = loadJson(CONVO_KEY, []);
 let view = loadJson(VIEW_KEY, { mode: 'bot', bot: 'xai' });
 let convo = null;
@@ -46,6 +47,27 @@ function renderMarkdown(text) {
   return html.replace(/\u0000(\d+)\u0000/g, (_m, i) => blocks[Number(i)]);
 }
 
+/* Money */
+function fmtUsd(n) { return `${n < 0 ? '-' : ''}$${Math.abs(n).toFixed(2)}`; }
+function fmtCost(usd, exact) {
+  if (!Number.isFinite(usd)) return '';
+  const text = usd < 0.01 ? `${(usd * 100).toFixed(usd < 0.001 ? 2 : 1)}¢` : fmtUsd(usd);
+  return `${exact ? '' : '≈ '}${text}`;
+}
+function balanceText(b) {
+  if (!b?.configured) return 'Not connected';
+  const bal = b.balance;
+  if (!bal || bal.source === 'unset' || !Number.isFinite(bal.remainingUsd)) return 'Set balance';
+  return `${bal.source === 'live' ? '' : '≈ '}${fmtUsd(bal.remainingUsd)} left`;
+}
+function balanceLow(b) { return Number.isFinite(b?.balance?.remainingUsd) && b.balance.remainingUsd < 1; }
+function applyBalance(botId, balance) {
+  const b = botById(botId);
+  if (b && balance) b.balance = balance;
+  renderSidebar();
+  renderHeader();
+}
+
 function botById(id) { return bots.find((b) => b.id === id); }
 function botName(id) { return botById(id)?.name || 'AI'; }
 function readyBots() { return bots.filter((b) => b.configured); }
@@ -72,7 +94,7 @@ function renderSidebar() {
       <div class="bot-avatar" style="background:${LOOK[b.id].color}">${LOOK[b.id].icon}</div>
       <div class="bot-info">
         <div class="bot-name">${escapeHtml(b.name)}</div>
-        <div class="bot-desc"><span class="status-dot ${b.configured ? 'on' : 'off'}"></span>${b.configured ? escapeHtml(b.maker) : 'Not connected'}</div>
+        <div class="bot-desc"><span class="status-dot ${b.configured ? 'on' : 'off'}"></span><span class="money${balanceLow(b) ? ' low' : ''}">${escapeHtml(balanceText(b))}</span></div>
       </div>
     </button>`).join('');
   $('groupItem').classList.toggle('active', view.mode === 'group');
@@ -97,7 +119,8 @@ function renderHeader() {
     avatar.style.background = LOOK[view.bot]?.color || '#000';
     avatar.textContent = LOOK[view.bot]?.icon || '✦';
     $('curBotName').textContent = b?.name || 'AI';
-    $('curBotModel').textContent = b ? (b.configured ? (deepOn ? b.deepModel : b.fastModel) : 'Not connected') : '';
+    $('curBotModel').innerHTML = !b ? '' : !b.configured ? 'Not connected'
+      : `${escapeHtml(deepOn ? b.deepModel : b.fastModel)} · <button class="balance-link money${balanceLow(b) ? ' low' : ''}" type="button" data-open-balances>${escapeHtml(balanceText(b))}</button>`;
   }
   $('groupBar').classList.toggle('hidden', view.mode !== 'group');
   $('webBtn').classList.toggle('hidden', view.mode === 'group');
@@ -159,6 +182,7 @@ function messageEl(m) {
     div.className = 'msg-ai';
     div.innerHTML = `<div class="who"><div class="dot" style="background:${look.color}">${look.icon}</div><span>${escapeHtml(botName(m.bot))}${m.deep ? ' · 🧠 deep' : ''}</span></div><div class="body md"></div>`;
     div.querySelector('.body').innerHTML = renderMarkdown(m.text);
+    if (Number.isFinite(m.costUsd)) div.insertAdjacentHTML('beforeend', `<div class="msg-cost">${escapeHtml(fmtCost(m.costUsd, m.costExact))}</div>`);
   }
   return div;
 }
@@ -200,7 +224,8 @@ async function sendToBot(text) {
     .map((m) => ({ role: m.role, content: m.text }));
   try {
     const data = await post('/api/ai-council/hub/chat', { bot: botId, messages: history, deep: deepOn, web: webOn });
-    convo.messages.push({ role: 'assistant', bot: botId, text: data.text, deep: deepOn });
+    convo.messages.push({ role: 'assistant', bot: botId, text: data.text, deep: deepOn, costUsd: data.costUsd, costExact: data.costExact });
+    applyBalance(botId, data.balance);
   } catch (e) {
     if (e.name !== 'AbortError') convo.messages.push({ role: 'error', bot: botId, text: e.message || 'No answer.' });
   }
@@ -221,7 +246,8 @@ async function sendToGroup(text) {
         .map((m) => ({ speaker: m.role === 'user' ? 'Owner' : botName(m.bot), text: m.text }));
       try {
         const data = await post('/api/ai-council/hub/room-turn', { bot: botId, members: list, transcript, deep: deepOn });
-        convo.messages.push({ role: 'assistant', bot: botId, text: data.text, deep: deepOn });
+        convo.messages.push({ role: 'assistant', bot: botId, text: data.text, deep: deepOn, costUsd: data.costUsd, costExact: data.costExact });
+        applyBalance(botId, data.balance);
       } catch (e) {
         if (e.name === 'AbortError') break;
         convo.messages.push({ role: 'error', bot: botId, text: e.message || 'No answer.' });
@@ -298,6 +324,60 @@ function openConvo(id) {
   closeSidebar();
 }
 
+/* Balances sheet */
+function renderBalances() {
+  $('balanceRows').innerHTML = bots.map((b) => {
+    const bal = b.balance || {};
+    const look = LOOK[b.id];
+    const link = bal.billingUrl ? `<a href="${escapeHtml(bal.billingUrl)}" target="_blank" rel="noopener">Open ${escapeHtml(b.maker)} billing ↗</a>` : `Check your ${escapeHtml(b.maker)} developer dashboard`;
+    let amount = 'Not set';
+    let sub = `${link}, then type the balance it shows.`;
+    if (bal.source === 'live') {
+      amount = `${fmtUsd(bal.remainingUsd)} left`;
+      sub = 'Live from your xAI account.';
+    } else if (bal.source === 'estimate') {
+      amount = `≈ ${fmtUsd(bal.remainingUsd)} left`;
+      sub = `You set ${fmtUsd(bal.startUsd)} on ${new Date(bal.setAt).toLocaleDateString()}; about ${fmtUsd(bal.spentUsd)} used here since. ${link} to correct it.`;
+    }
+    const form = bal.source === 'live' ? '' : `
+      <form class="balance-form" data-bot="${b.id}">
+        <input name="usd" inputmode="decimal" placeholder="e.g. 18.50" aria-label="${escapeHtml(b.name)} balance in dollars">
+        <button type="submit">Save</button>
+      </form><div class="balance-msg" data-msg="${b.id}"></div>`;
+    return `<div class="balance-row">
+      <div class="bot-avatar" style="background:${look.color}">${look.icon}</div>
+      <div><strong>${escapeHtml(b.name)}</strong>${b.configured ? '' : ' · <span class="balance-sub">not connected</span>'}
+        <div class="balance-amount money${balanceLow(b) ? ' low' : ''}">${escapeHtml(amount)}</div>
+        <div class="balance-sub">${sub}</div>${form}</div>
+    </div>`;
+  }).join('');
+  $('balanceStorage').textContent = balanceStorage === 'server'
+    ? 'Saved on your server, so your phone and computer show the same numbers.'
+    : 'Saved on your server, but it resets when the server restarts. Set DATA_DIR on the server to keep it.';
+}
+function openBalances() {
+  renderBalances();
+  closeSidebar();
+  $('balanceScrim').classList.remove('hidden');
+  $('balanceSheet').classList.remove('hidden');
+}
+function closeBalances() {
+  $('balanceScrim').classList.add('hidden');
+  $('balanceSheet').classList.add('hidden');
+}
+async function saveBalance(form) {
+  const botId = form.dataset.bot;
+  const msg = document.querySelector(`[data-msg="${botId}"]`);
+  msg.textContent = 'Saving…';
+  try {
+    const data = await post('/api/ai-council/hub/balance', { bot: botId, usd: form.elements.usd.value });
+    applyBalance(botId, data.balance);
+    renderBalances();
+  } catch (e) {
+    msg.textContent = e.message || 'Could not save.';
+  }
+}
+
 function closeSidebar() {
   $('sidebar').classList.remove('open');
   $('scrim').classList.remove('show');
@@ -326,6 +406,13 @@ $('memberChips').onclick = (e) => {
 };
 $('roundChips').onclick = (e) => { const chip = e.target.closest('.round-chip'); if (chip) { rounds = Number(chip.dataset.r); renderGroupBar(); } };
 
+$('balancesBtn').onclick = openBalances;
+$('balanceClose').onclick = closeBalances;
+$('balanceScrim').onclick = closeBalances;
+$('balanceRows').addEventListener('submit', (e) => { e.preventDefault(); saveBalance(e.target); });
+document.addEventListener('click', (e) => { if (e.target.closest('[data-open-balances]')) openBalances(); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeBalances(); });
+
 /* Init */
 try { $('accessCode').value = sessionStorage.getItem(CODE_KEY) || ''; } catch {}
 fetch('/api/ai-council/hub/status', { cache: 'no-store' })
@@ -333,6 +420,7 @@ fetch('/api/ai-council/hub/status', { cache: 'no-store' })
   .then((data) => {
     bots = Array.isArray(data.bots) ? data.bots : [];
     roomMaxTurns = Number(data.roomMaxTurns) || roomMaxTurns;
+    balanceStorage = data.balanceStorage || balanceStorage;
     members = new Set(readyBots().map((b) => b.id));
     if (view.mode !== 'group' && !botById(view.bot)) view = { mode: 'bot', bot: (readyBots()[0] || bots[0])?.id };
     newConvo();

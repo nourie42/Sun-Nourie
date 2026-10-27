@@ -5,24 +5,52 @@ import {
   fetchJson,
   providerErrorMessage,
   providerKey,
-  requireCouncilAccess,
 } from "./aiCouncil.js";
+import { createBalanceStore, responseCost } from "./aiHubBalances.js";
 
 // "My AIs": Grok, Muse, Claude and ChatGPT in the Grok-style chat page.
 // Cost rules: no availability probes, web search only when the user turns it on,
 // a fast/cheap model by default and the top model only when "Deep" is selected.
 const HUB_BOTS = [
-  { id: "xai", name: "Grok", maker: "xAI", fast: "grok-4.3", deep: "grok-4.7" },
-  { id: "muse", name: "Muse", maker: "Meta", fast: "muse-spark-1.1", deep: "muse-spark-1.1" },
-  { id: "anthropic", name: "Claude", maker: "Anthropic", fast: "claude-sonnet-5-5", deep: "claude-opus-5-5" },
-  { id: "openai", name: "ChatGPT", maker: "OpenAI", fast: "gpt-5.6-terra", deep: "gpt-5.6" },
+  { id: "xai", name: "Grok bot", maker: "xAI", fast: "grok-4.3", deep: "grok-4.7" },
+  { id: "muse", name: "Muse bot", maker: "Meta", fast: "muse-spark-1.1", deep: "muse-spark-1.1" },
+  { id: "anthropic", name: "Claude bot", maker: "Anthropic", fast: "claude-sonnet-5-5", deep: "claude-opus-5-5" },
+  { id: "openai", name: "ChatGPT bot", maker: "OpenAI", fast: "gpt-5.6-terra", deep: "gpt-5.6-sol" },
 ];
 
 const MAX_HISTORY = 40;
 const ROOM_MAX_TURNS = 12;
+const requestBuckets = new Map();
 
 function cleanText(value, max = 12000) {
   return String(value || "").replace(/\u0000/g, "").trim().slice(0, max);
+}
+
+// Same owner check as the AI Council, with its own hourly cap: one group-chat message alone can use up to 12 requests.
+function allowRequest(req, res, accessCode, { limited = true } = {}) {
+  if (!req.privatePageAuthenticated && !accessCode) {
+    res.status(503).json({ ok: false, error: "My AIs is locked until AI_COUNCIL_ACCESS_CODE is configured on the server." });
+    return false;
+  }
+  if (!req.privatePageAuthenticated && cleanText(req.headers["x-ai-council-code"], 200) !== accessCode) {
+    res.status(401).json({ ok: false, error: "Incorrect access code." });
+    return false;
+  }
+  if (!limited) return true;
+  const limit = Math.max(10, Math.min(1000, Number(process.env.MY_AIS_RATE_LIMIT || 100)));
+  const key = String(req.headers["x-forwarded-for"] || "").split(",")[0].trim() || req.socket?.remoteAddress || "unknown";
+  const now = Date.now();
+  const bucket = requestBuckets.get(key);
+  if (!bucket || now - bucket.startedAt >= 60 * 60 * 1000) {
+    requestBuckets.set(key, { startedAt: now, count: 1 });
+    return true;
+  }
+  if (bucket.count >= limit) {
+    res.status(429).json({ ok: false, error: `You've hit the limit of ${limit} AI replies this hour. Try again later.` });
+    return false;
+  }
+  bucket.count += 1;
+  return true;
 }
 
 function findBot(id) {
@@ -105,7 +133,7 @@ async function callBot(bot, { system, messages, deep, web, maxTokens }) {
       headers: { Authorization: `Bearer ${hubKey(bot.id)}`, "Content-Type": "application/json" },
       body: JSON.stringify(body),
     }, timeoutMs);
-    return { model, text: extractResponsesText(data) };
+    return { model, data, text: extractResponsesText(data) };
   }
 
   if (bot.id === "anthropic") {
@@ -124,7 +152,7 @@ async function callBot(bot, { system, messages, deep, web, maxTokens }) {
       headers: { ...anthropicHeaders(), "anthropic-beta": "server-side-fallback-2026-07-01" },
       body: JSON.stringify(body),
     }, timeoutMs);
-    return { model, text: anthropicText(data) };
+    return { model, data, text: anthropicText(data) };
   }
 
   if (bot.id === "muse") {
@@ -135,34 +163,58 @@ async function callBot(bot, { system, messages, deep, web, maxTokens }) {
     }, timeoutMs);
     const content = data?.choices?.[0]?.message?.content;
     const text = Array.isArray(content) ? content.map((part) => part?.text || "").join("") : String(content || "");
-    return { model, text: text.trim() };
+    return { model, data, text: text.trim() };
   }
 
   throw new Error("Unknown assistant");
 }
 
-function respondWithBot(res, bot, call) {
+async function respondWithBot(res, bot, balances, call) {
   const started = Date.now();
-  return call()
-    .then((result) => {
-      if (!result.text) throw new Error("No text returned by provider");
-      res.json({ ok: true, bot: bot.id, model: result.model, text: result.text, latencyMs: Date.now() - started });
-    })
-    .catch((error) => {
-      console.error(`My AIs ${bot.name} request failed:`, error?.message || error);
-      res.status(502).json({ ok: false, error: providerErrorMessage(error) });
-    });
+  let result;
+  try {
+    result = await call();
+  } catch (error) {
+    console.error(`My AIs ${bot.name} request failed:`, error?.message || error);
+    return res.status(502).json({ ok: false, error: providerErrorMessage(error) });
+  }
+  // A reply that came back is billed even if it has no text, so record its cost either way.
+  const cost = responseCost(bot.id, result.model, result.data);
+  let balance = null;
+  try {
+    balance = await balances.recordSpend(bot.id, cost.usd);
+  } catch (error) {
+    console.error("My AIs could not save spending:", error?.message || error);
+  }
+  if (!result.text) return res.status(502).json({ ok: false, error: "No text returned by provider", costUsd: cost.usd, balance });
+  return res.json({
+    ok: true,
+    bot: bot.id,
+    model: result.model,
+    text: result.text,
+    costUsd: cost.usd,
+    costExact: cost.exact,
+    balance,
+    latencyMs: Date.now() - started,
+  });
 }
 
-export function registerAiHubRoutes(app) {
+export function registerAiHubRoutes(app, { balances = createBalanceStore() } = {}) {
   const json = express.json({ limit: "2mb" });
   const accessCode = cleanText(process.env.AI_COUNCIL_ACCESS_CODE, 200);
 
-  app.get("/api/ai-council/hub/status", (_req, res) => {
+  app.get("/api/ai-council/hub/status", async (_req, res) => {
     res.setHeader("Cache-Control", "no-store");
+    let money = {};
+    try {
+      money = await balances.all(HUB_BOTS.map((bot) => bot.id));
+    } catch (error) {
+      console.error("My AIs could not read balances:", error?.message || error);
+    }
     res.json({
       ok: true,
       roomMaxTurns: ROOM_MAX_TURNS,
+      balanceStorage: balances.durable ? "server" : "temporary",
       bots: HUB_BOTS.map((bot) => ({
         id: bot.id,
         name: bot.name,
@@ -170,14 +222,32 @@ export function registerAiHubRoutes(app) {
         fastModel: hubModel(bot, false),
         deepModel: hubModel(bot, true),
         configured: hubConfigured(bot.id),
+        balance: money[bot.id] || null,
       })),
     });
+  });
+
+  // The owner types the balance shown on the provider's billing page; spending counts down from there.
+  app.post("/api/ai-council/hub/balance", json, async (req, res) => {
+    res.setHeader("Cache-Control", "no-store");
+    if (!allowRequest(req, res, accessCode, { limited: false })) return;
+    const bot = findBot(req.body?.bot);
+    if (!bot) return res.status(400).json({ ok: false, error: "Unknown assistant." });
+    const usd = Number(String(req.body?.usd ?? "").replace(/[$,\s]/g, ""));
+    if (!Number.isFinite(usd) || usd < 0 || usd > 1000000) return res.status(400).json({ ok: false, error: "Enter the balance in dollars, like 18.50." });
+    try {
+      const balance = await balances.setStart(bot.id, Math.round(usd * 100) / 100);
+      return res.json({ ok: true, bot: bot.id, balance });
+    } catch (error) {
+      console.error("My AIs could not save a balance:", error?.message || error);
+      return res.status(500).json({ ok: false, error: "The balance could not be saved." });
+    }
   });
 
   // One-on-one chat with a single AI.
   app.post("/api/ai-council/hub/chat", json, async (req, res) => {
     res.setHeader("Cache-Control", "no-store");
-    if (!requireCouncilAccess(req, res, accessCode)) return;
+    if (!allowRequest(req, res, accessCode)) return;
 
     const bot = findBot(req.body?.bot);
     if (!bot) return res.status(400).json({ ok: false, error: "Unknown assistant." });
@@ -189,7 +259,7 @@ export function registerAiHubRoutes(app) {
     }
     const deep = req.body?.deep === true;
     const web = req.body?.web === true;
-    await respondWithBot(res, bot, () => callBot(bot, {
+    await respondWithBot(res, bot, balances, () => callBot(bot, {
       system: chatSystem(bot, web),
       messages,
       deep,
@@ -201,7 +271,7 @@ export function registerAiHubRoutes(app) {
   // One turn in a group chat. The page runs the turns one at a time so each reply shows up as it lands.
   app.post("/api/ai-council/hub/room-turn", json, async (req, res) => {
     res.setHeader("Cache-Control", "no-store");
-    if (!requireCouncilAccess(req, res, accessCode)) return;
+    if (!allowRequest(req, res, accessCode)) return;
 
     const bot = findBot(req.body?.bot);
     if (!bot) return res.status(400).json({ ok: false, error: "Unknown assistant." });
@@ -221,7 +291,7 @@ export function registerAiHubRoutes(app) {
       `Now it's your turn, ${bot.name}.`,
     ].join("\n\n");
     const deep = req.body?.deep === true;
-    await respondWithBot(res, bot, () => callBot(bot, {
+    await respondWithBot(res, bot, balances, () => callBot(bot, {
       system: roomSystem(bot, others.length ? others : ["the others"]),
       messages: [{ role: "user", content: prompt }],
       deep,
