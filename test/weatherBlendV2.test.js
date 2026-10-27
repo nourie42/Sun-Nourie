@@ -73,3 +73,10 @@ test('V2 rain amounts stay official through day two, then average the models wit
  assert.notEqual(sunday.value,.527,'the blend no longer copies NBM');
 });
 function round4(v){return Math.round(v*10000)/10000;}
+test('WeatherNext 3 survives one late collector run but not a genuinely old collection',()=>{
+ const f=feed(),point=f.points[0],location={latitude:point.latitude,longitude:point.longitude};
+ const generated=Date.parse(f.generatedAt);
+ // The short fixture has no hours left by then; only staleness matters here.
+ assert.throws(()=>validateWeatherNext3(f,location,generated+9*H),error=>!/stale/.test(error.message));
+ assert.throws(()=>validateWeatherNext3(f,location,generated+15*H),/stale/);
+});

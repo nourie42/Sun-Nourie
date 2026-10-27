@@ -32,3 +32,11 @@ test('rate-limited model requests recover the fresh native grid sample for the s
  assert.ok(loaded.value);assert.equal(loaded.meta.status,'ready');assert.equal(loaded.meta.contributes,true);
  assert.equal(loaded.value.longitude,-78.4806);
 });
+test('a GPS location inside the saved sample\'s native grid cell uses that cell; one outside it does not',()=>{
+ const raw=snapshot();for(const p of raw.points)p.gridPoint={latitude:35.773103,longitude:-78.471221};
+ // About 1 km from the HRRR grid point, so inside the same 3 km cell.
+ const inside=validateSnapshot(raw,'hrrr',{latitude:35.7731,longitude:-78.482},testInputs.now);
+ assert.equal(inside.status,'ready');assert.equal(inside.value.latitude,35.787);
+ // About 3 km from the grid point, so in a neighbouring cell.
+ assert.equal(validateSnapshot(raw,'hrrr',{latitude:35.80,longitude:-78.471221},testInputs.now).status,'not-covered');
+});
