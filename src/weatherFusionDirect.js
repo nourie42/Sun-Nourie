@@ -435,7 +435,7 @@ export function enhanceForecast(out, { models, grid, periods = [], hourlyPeriods
       cursor=stop;
     }
     const sources=Object.keys(totals).map(id=>({id,weight:round(durations[id]/covered,6),value:round(sourceTotals[id],8),coverageHours:round(sourceCoverage[id]/H,1)}));
-    const comparisonSources=out.blendV2?.enabled?Object.entries(sourceTotals).filter(([id])=>sourceCoverage[id]>=end-start).map(([id,value])=>({id,value:round(value,8),weight:averagedPrecipitationAmountPolicy(forecastDayIndex(start,now,out.location.timeZone))[id]||0,runAt:sourceRun(id,end)})):undefined;
+    const comparisonSources=out.blendV2?.enabled?Object.entries(sourceTotals).filter(([id])=>sourceCoverage[id]>=end-start).map(([id,value])=>({id,value:round(value,8),weight:averagedPrecipitationAmountPolicy(forecastDayIndex(start,now,out.location.timeZone))[id]||1,runAt:sourceRun(id,end)})):undefined;
     const complete=end>start&&covered===end-start;
     return {value:complete?round(total,8):null,sources:complete?sources:[],...(comparisonSources?{comparisonSources}:{}),calibrated:false,start:iso(start),end:iso(end),
       sourceValues:Object.fromEntries(['nws',...active].map(id=>[id,sourceCoverage[id]>=end-start?round(sourceTotals[id],8):null])),

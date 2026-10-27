@@ -62,11 +62,11 @@ test('GEFS adapter requires the real 31-member ensemble and independent initiali
  assert.throws(()=>validateGefs(data,meta,{latitude:40,longitude:-90},issuedAt+H));assert.throws(()=>validateGefs(data,meta,place,issuedAt+30*H));
  const gap=structuredClone(data);gap.hourly.temperature_2m_member01[1]=null;assert.equal(validateGefs(gap,meta,place,issuedAt+H).hourly.temperature_2m[1],null);
 });
-test('V2 rain amounts are an equal-weight average with one shared Google vote and same-day HRRR',async()=>{
+test('V2 rain amounts stay official through day two, then average the models with one shared Google vote',async()=>{
  const {averagedPrecipitationAmountPolicy}=await import('../src/weatherFusionPolicy.js');
  const {weighted}=await import('../src/weatherFusionDirect.js');
- assert.deepEqual(averagedPrecipitationAmountPolicy(0),{nws:1,hrrr:1,nbm:1,ecmwf:1,gefs:1,wn:.5,weathernext3:.5});
- assert.equal(averagedPrecipitationAmountPolicy(4).hrrr,undefined);
+ for(const day of [0,1,2])assert.deepEqual(averagedPrecipitationAmountPolicy(day),{nws:1});
+ assert.deepEqual(averagedPrecipitationAmountPolicy(3),{nws:1,nbm:1,ecmwf:1,gefs:1,wn:.5,weathernext3:.5});
  // Sunday Nov 1 Knightdale: NWS beyond its grid, NBM .527, ECMWF 0, GEFS .4918, both Google feeds near zero.
  const sunday=weighted({nws:null,nbm:.527,ecmwf:0,gefs:.4918,wn:.0065,weathernext3:.0062},averagedPrecipitationAmountPolicy(5));
  assert.equal(sunday.value,round4((.527+0+.4918+.00635)/4));

@@ -60,10 +60,10 @@ test('supplemental requests cannot consume reserved forecast capacity; total cei
  assert.doesNotThrow(()=>use('https://api.open-meteo.com/v1/forecast'));
 });
 
-test('missing official rainfall amount averages the available model amounts instead of hiding them',()=>{
+test('missing official rainfall amount retains real model comparison without publishing a partial total',()=>{
  const x=structuredClone(inputs);x.grid.quantitativePrecipitation.values=[];
  const base=x.models.ecmwf;x.models={ecmwf:{...base,verifiedModel:true,runAt:new Date(now).toISOString(),precipitationIntervals:base.hourly.time.slice(1).map(t=>({start:t-3600,end:t,value:.02}))}};
  const f=buildForecast({...x,blendV2:true}),row=f.rainTimeline.find(r=>r.precipitationBlend.comparisonSources?.some(s=>s.id==='ecmwf'));
- assert.ok(row);assert.equal(row.precipitationBlend.value,.02);assert.deepEqual(row.precipitationBlend.sources.map(s=>s.id),['ecmwf']);
+ assert.ok(row);assert.equal(row.precipitationBlend.value,null);assert.deepEqual(row.precipitationBlend.sources,[]);
  assert.equal(row.precipitationBlend.comparisonSources.find(s=>s.id==='ecmwf').value,.02);
 });

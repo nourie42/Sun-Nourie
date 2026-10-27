@@ -34,11 +34,13 @@ export function temperaturePolicy(index, weatherNext = false) {
 export function precipitationPolicy(index, weatherNext = false) {
   return weatherNextRainPolicy(index === 0 ? SAME_DAY_WEIGHTS : EXTENDED_RAIN_WEIGHTS, weatherNext);
 }
-// Blend V2 rain amounts: an equal-weight average of every available source.
-// Google's two WeatherNext feeds share one vote, and HRRR votes only on the
-// current local day. weighted() renormalizes over sources that have data.
+// Blend V2 rain amounts: official NWS for the first three local days (NBM
+// fills any gap), then an equal-weight average of every available source.
+// Google's two WeatherNext feeds share one vote. weighted() renormalizes over
+// sources that have data.
+export const AVERAGED_QPF_FIRST_DAY = 3;
 export function averagedPrecipitationAmountPolicy(index) {
-  return {nws:1, ...(index === 0 ? {hrrr:1} : {}), nbm:1, ecmwf:1, gefs:1, wn:.5, weathernext3:.5};
+  return index < AVERAGED_QPF_FIRST_DAY ? {nws:1} : {nws:1, nbm:1, ecmwf:1, gefs:1, wn:.5, weathernext3:.5};
 }
 export function precipitationAmountPolicy(index, weatherNext = false) {
   return weatherNextPolicy(index === 0 ? SAME_DAY_WEIGHTS : EXTENDED_QPF_WEIGHTS, weatherNext);
