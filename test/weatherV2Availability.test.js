@@ -10,7 +10,7 @@ test('official NWS published QPF and probability do not discard available model 
  assert.notEqual(weather.key,'unavailable');assert.ok(weather.evidence.rain.comparedHours>0);
  assert.ok(weather.evidence.rain.completeSources.includes('hrrr'));
  const rain=f.rainTimeline.find(r=>r.precipitationBlend.comparisonSources?.length>=3);
- assert.ok(rain);assert.equal(rain.precipitationBlend.sources.length,1,'published QPF is still official NWS');
+ assert.ok(rain);assert.ok(rain.precipitationBlend.sources.length>=3,'published QPF averages NWS with the available models');assert.ok(rain.precipitationBlend.sources.some(s=>s.id==='nws'));
  assert.ok(rain.precipitationBlend.comparisonSources.length>=3,'raw model amounts independently establish agreement');
  assert.equal(rain.rainLikelihood.value,rain.officialPop);assert.equal(weather.evidence.rain.fallbackHours,0,'deliberate official probability does not imply missing model amounts');
 });

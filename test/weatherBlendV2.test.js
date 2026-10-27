@@ -62,3 +62,14 @@ test('GEFS adapter requires the real 31-member ensemble and independent initiali
  assert.throws(()=>validateGefs(data,meta,{latitude:40,longitude:-90},issuedAt+H));assert.throws(()=>validateGefs(data,meta,place,issuedAt+30*H));
  const gap=structuredClone(data);gap.hourly.temperature_2m_member01[1]=null;assert.equal(validateGefs(gap,meta,place,issuedAt+H).hourly.temperature_2m[1],null);
 });
+test('V2 rain amounts are an equal-weight average with one shared Google vote and same-day HRRR',async()=>{
+ const {averagedPrecipitationAmountPolicy}=await import('../src/weatherFusionPolicy.js');
+ const {weighted}=await import('../src/weatherFusionDirect.js');
+ assert.deepEqual(averagedPrecipitationAmountPolicy(0),{nws:1,hrrr:1,nbm:1,ecmwf:1,gefs:1,wn:.5,weathernext3:.5});
+ assert.equal(averagedPrecipitationAmountPolicy(4).hrrr,undefined);
+ // Sunday Nov 1 Knightdale: NWS beyond its grid, NBM .527, ECMWF 0, GEFS .4918, both Google feeds near zero.
+ const sunday=weighted({nws:null,nbm:.527,ecmwf:0,gefs:.4918,wn:.0065,weathernext3:.0062},averagedPrecipitationAmountPolicy(5));
+ assert.equal(sunday.value,round4((.527+0+.4918+.00635)/4));
+ assert.notEqual(sunday.value,.527,'the blend no longer copies NBM');
+});
+function round4(v){return Math.round(v*10000)/10000;}
