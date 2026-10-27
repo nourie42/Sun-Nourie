@@ -9,6 +9,11 @@ import {todaySkyProfile,confidenceBannerHTML} from '../public/weather-fusion/tod
 import {precipitationActivity,comfortSceneState} from '../public/weather-fusion/exposure-scene.js';
 
 const close=(a,b)=>Math.abs(a-b)<1e-8;
+const directSource=readFileSync(fileURLToPath(new URL('../src/weatherFusionDirect.js',import.meta.url)),'utf8');
+const forecastSource=readFileSync(fileURLToPath(new URL('../src/weatherFusion.js',import.meta.url)),'utf8');
+assert.match(directSource,/const rainLikelihood=publishedPrecipitationLikelihood\(officialPop,precipitationBlend,policy\)/,'active hourly path must use the required tiered rain score');
+assert.doesNotMatch(directSource,/out\.blendV2\?\.enabled\s*\?\s*officialRainV2/,'Blend V2 must not bypass the required tiered rain score');
+assert.match(forecastSource,/NWS probability fills its fixed 40-point share proportionally/,'published Blend V2 policy must describe the active 40-point NWS share');
 
 assert.equal(deterministicRainSignal(0),0);
 assert.ok(close(deterministicRainSignal(0.004),100/3));
