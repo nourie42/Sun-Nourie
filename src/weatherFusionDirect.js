@@ -1,4 +1,4 @@
-import {temperatureV2,officialRainV2} from './weatherFusionBlendV2.js';
+import {temperatureV2} from './weatherFusionBlendV2.js';
 import {createHrrrMapSource} from './weatherFusionHrrrMap.js';
 import {createPointModels} from './weatherFusionPointModels.js';
 /** Direct, decoded NOAA/ECMWF model snapshots. No provider key and no webpage scraping. */
@@ -468,7 +468,7 @@ export function enhanceForecast(out, { models, grid, periods = [], hourlyPeriods
       ?sourceCondition.trim():null;
     const precipitationBlend=sourceQpf(time,time+H);
     const policy=precipitationPolicy(forecastDayIndex(time,now,out.location.timeZone),finite(precipitationBlend.sourceValues?.wn));
-    const rainLikelihood=out.blendV2?.enabled?officialRainV2(officialPop):publishedPrecipitationLikelihood(officialPop,precipitationBlend,policy);
+    const rainLikelihood=publishedPrecipitationLikelihood(officialPop,precipitationBlend,policy);
     rainLikelihood.sources=rainLikelihood.sources.map(source=>({...source,runAt:sourceRun(source.id,time+H)}));
     precipitationBlend.sources=precipitationBlend.sources.map(source=>({...source,runAt:sourceRun(source.id,time+H)}));
     out.rainTimeline.push({time:iso(time),end:iso(time+H),officialPop,rainLikelihood,
