@@ -38,3 +38,10 @@ test('a valid complete AI discussion summary keeps its wording and internal tran
  const summary='Rain arrives Saturday. However, Sunday should be cooler.';
  assert.equal(danTakeDisplay({signature:f.signature,mode:'ai',danSummary:summary},f,now),summary);
 });
+test('the newer AFD layout summarizes its .DISCUSSION narrative instead of the point forecast',()=>{
+ const issued=new Date(now-H),text=`.WHAT HAS CHANGED...\n\n* No major changes.\n\n&&\n\n.KEY MESSAGES...\nAs of 645 PM Friday...\n\n1) Dry weekend ahead.\n\n&&\n\n.DISCUSSION...\nAs of 645 PM Friday...\n\nKEY MESSAGE 1...  Dry weekend ahead.\n\nHigh pressure will keep skies mostly clear through the weekend. Clouds will increase Monday, but rain is not expected.\n\n&&\n\n.AVIATION /00Z SATURDAY THROUGH WEDNESDAY/...\nVFR conditions are expected.\n\n&&`;
+ const f={signature:'new-afd-layout',location:{office:'RAH',latitude:35.787,longitude:-78.4806,timeZone:'America/New_York'},feeds:[{id:'afd',status:'ready'}],days:[{detail:'Sunny, with a high near 74.'}],discussion:{id:'new-afd-layout',office:'RAH',issuanceTime:issued.toISOString(),text}};
+ const display=danTakeDisplay(null,f,now);
+ assert.match(display,/^High pressure will keep skies mostly clear through the weekend\. Clouds will increase Monday, but rain is not expected\./);
+ assert.doesNotMatch(display,/KEY MESSAGE|Sunny, with a high near/);
+});

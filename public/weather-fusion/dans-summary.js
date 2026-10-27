@@ -38,11 +38,14 @@ export function danOverview(briefing,forecast,now=Date.now()){
  if(evidence.source){
   // Prefer the office's overview. If it contains only referrals or fragments,
   // use still-current weather sentences from its narrative forecast sections.
-  const sections=[...forecast.discussion.text.matchAll(/^\.(SYNOPSIS|KEY MESSAGES|NEAR TERM|SHORT TERM)[^\n]*\n([\s\S]*?)(?=^\.[A-Z]|^&&|\$\$|(?![\s\S]))/gm)].sort((a,b)=>['SYNOPSIS','NEAR TERM','KEY MESSAGES','SHORT TERM'].indexOf(a[1])-['SYNOPSIS','NEAR TERM','KEY MESSAGES','SHORT TERM'].indexOf(b[1]));
+  // Offices using the newer AFD layout put the narrative in a single
+  // .DISCUSSION section after KEY MESSAGES instead of NEAR/SHORT TERM.
+  const order=['SYNOPSIS','NEAR TERM','KEY MESSAGES','SHORT TERM','DISCUSSION'];
+  const sections=[...forecast.discussion.text.matchAll(/^\.(SYNOPSIS|KEY MESSAGES|NEAR TERM|SHORT TERM|DISCUSSION)[^\n]*\n([\s\S]*?)(?=^\.[A-Z]|^&&|\$\$|(?![\s\S]))/gm)].sort((a,b)=>order.indexOf(a[1])-order.indexOf(b[1]));
   const issued=Date.parse(evidence.source.issuedAt);
   for(const [,section,body] of sections){
    const anchor=sectionAnchor(body,issued,zone);
-   const synopsis=Number.isFinite(anchor)&&issued-anchor<=86400000?body.replace(/^\s*(?:As of|Issued at)[^\n]*(?:\n|$)/gmi,'').replace(/^\s*(?:\d+[).]|[-*])\s*/gm,''):'';
+   const synopsis=Number.isFinite(anchor)&&issued-anchor<=86400000?body.replace(/^\s*(?:As of|Issued at)[^\n]*(?:\n|$)/gmi,'').replace(/^\s*KEY MESSAGE \d+\.{3}\s*/gmi,'').replace(/^\s*(?:\d+[).]|[-*])\s*/gm,''):'';
    const sentences=weatherOnlyProse(synopsis).match(/[^.!?]+[.!?]+|[^.!?]+$/g)||[];
    const currentSentences=sentences.filter(s=>{
     if(section!=='SYNOPSIS'&&(!/\b(?:will|may|could|is|are|remains?|continues?|expected|possible|likely|can|should|becomes?|develops?)\b/i.test(s)||hasDanJargon(s)))return false;
