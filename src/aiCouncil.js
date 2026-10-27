@@ -20,12 +20,12 @@ function cleanText(value, max = 6000) {
   return String(value || "").replace(/\u0000/g, "").trim().slice(0, max);
 }
 
-function providerModel(id) {
+export function providerModel(id) {
   const envName = `AI_COUNCIL_${id.toUpperCase()}_MODEL`;
   return cleanText(process.env[envName], 120) || PROVIDERS.find((provider) => provider.id === id)?.defaultModel || "";
 }
 
-function providerKey(id) {
+export function providerKey(id) {
   if (id === "openai") return process.env.OPENAI_API_KEY || "";
   if (id === "anthropic") return process.env.ANTHROPIC_API_KEY || "";
   if (id === "gemini") return process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_API_KEY || "";
@@ -37,7 +37,7 @@ function anthropicWorkspaceId() {
   return cleanText(process.env.ANTHROPIC_WORKSPACE_ID, 200);
 }
 
-function anthropicHeaders() {
+export function anthropicHeaders() {
   const headers = {
     "x-api-key": providerKey("anthropic"),
     "anthropic-version": "2023-06-01",
@@ -68,7 +68,7 @@ function rateLimit(req) {
   return { allowed: true, remaining: limit - bucket.count };
 }
 
-function requireCouncilAccess(req, res, accessCode) {
+export function requireCouncilAccess(req, res, accessCode) {
   if (!req.privatePageAuthenticated && !accessCode) {
     res.status(503).json({ ok: false, error: "AI Council is locked until AI_COUNCIL_ACCESS_CODE is configured on the server." });
     return false;
@@ -86,14 +86,14 @@ function requireCouncilAccess(req, res, accessCode) {
   return true;
 }
 
-function providerErrorMessage(error) {
+export function providerErrorMessage(error) {
   if (error?.name === "AbortError") return "Provider request timed out";
   const raw = cleanText(error?.message || error || "Unknown provider error", 320);
   if (!raw) return "Provider request failed";
   return `Provider request failed — ${raw}`;
 }
 
-async function fetchJson(url, init, timeoutMs = 90000) {
+export async function fetchJson(url, init, timeoutMs = 90000) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
@@ -125,7 +125,7 @@ async function fetchJson(url, init, timeoutMs = 90000) {
   }
 }
 
-function extractResponsesText(data) {
+export function extractResponsesText(data) {
   if (typeof data?.output_text === "string" && data.output_text.trim()) return data.output_text.trim();
   const parts = [];
   for (const item of Array.isArray(data?.output) ? data.output : []) {

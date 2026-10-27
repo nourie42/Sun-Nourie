@@ -22,6 +22,7 @@ import { registerWeatherSiteAccess, weatherSiteCookieSecret } from "./src/weathe
 import { registerWhatsUpRoutes } from "./src/whatsUpRoutes.js";
 import { registerAiAgentRoutes } from "./src/aiAgent.js";
 import { registerAiCouncilRoutes } from "./src/aiCouncil.js";
+import { registerAiHubRoutes } from "./src/aiHub.js";
 import { registerDealDeskRoutes } from "./src/dealDeskRoutes.js";
 import { registerHouseholdPLRoutes } from "./src/householdPLRoutes.js";
 import { registerDealLensRoutes } from "./src/dealLensRoutes.js";
@@ -94,6 +95,7 @@ registerWeatherComparisonRoutes(app);
 const weatherFusion = registerWeatherFusionRoutes(app);
 registerWhatsUpRoutes(app, { getForecast: (query) => weatherFusion.getForecast(query) });
 registerAiAgentRoutes(app);
+registerAiHubRoutes(app);
 registerAiCouncilRoutes(app);
 registerDealDeskRoutes(app);
 registerHouseholdPLRoutes(app);
