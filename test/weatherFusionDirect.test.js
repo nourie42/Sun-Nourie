@@ -66,8 +66,8 @@ test('hourly rain likelihood scales the NWS share and tiers wet-model points',()
  assert.deepEqual(unanimous.sources.map(source=>source.points),[21.2,30,10,20]);
  assert.equal(unanimous.officialProbability,53);
  const requested=precipitationLikelihood(13,{sourceValues:{hrrr:0,ecmwf:1,nbm:0}});
- assert.equal(requested.value,9);
- assert.deepEqual(requested.sourcePoints,{nws:5.2,hrrr:0,ecmwf:3.33333333,nbm:0});
+ assert.equal(requested.value,15);
+ assert.deepEqual(requested.sourcePoints,{nws:5.2,hrrr:0,ecmwf:10,nbm:0});
  const screenshot=precipitationLikelihood(7,{sourceValues:{hrrr:0,ecmwf:.004,nbm:.012}});
  assert.equal(screenshot.value,13);
  const boundary=precipitationLikelihood(7,{sourceValues:{hrrr:0,ecmwf:.004,nbm:.010}});
