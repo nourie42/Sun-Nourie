@@ -72,3 +72,32 @@ The parity report checks this baseline separately from synthetic operating input
 
 The separate `deal-desk/` app in this checkout is a ten-year pretax screen. It
 was not changed as part of the clarified `/deal-lens/` scope.
+
+## Simple COOP model and deal summary PDF
+
+Deal Lens (intake and Model & returns) and the Deal Model Tool each offer two
+more downloads, built in the browser by `public/deal-lens/coop-simple.js`:
+
+- **Simple COOP model (.xlsx)** has one COOP tab, in the original row layout
+  (B34 and B38 mean the same as in the full workbook), plus an About tab.
+  Yellow cells with blue text are inputs; every other figure is a live Excel
+  formula with a cached value. Prices at the target IRR (B50/B51) are solved
+  at export; use Goal Seek on B29 to re-solve after edits.
+- **Deal summary PDF** is one landscape page with the asking price, both IRRs,
+  the price at target and NPV. It also shows a 15-year cash-flow chart, cash at
+  closing, the year-1 earnings build and key assumptions. From Deal Lens it adds the
+  recommendation, thesis, next action, gate count and estimates to review. From the
+  Model Tool it adds the five-channel comparison.
+
+The cached values come from evaluating the written formulas with the same
+formula engine as the full workbook. In Deal Lens the export reads the
+original workbook's calculated COOP inputs. It refuses to download if its
+funds flows (rows 32 and 37) differ from the original workbook by more than a
+cent. In the Model Tool it must match the page's COOP cash flows.
+`test/dealLensSimpleExport.test.js` covers both. With the workbook mounted, it
+also checks the RomeoTest baseline (B34 12.9075%, B38 12.3851%, $9,443,627 and
+$9,089,579 at 13%).
+
+The Model Tool's COOP engine reproduces the original COOP tab exactly. Its
+tank-capital input applies in years 11 and 14; the label previously said
+years 10 and 13.

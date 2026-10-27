@@ -18,7 +18,8 @@
   <script src="./original-engine.js?v=16" defer></script>
   <script src="./original-model.js?v=18" defer></script>
   <script src="./original-export.js?v=16" defer></script>
-  <script src="./intake-model-ui.js?v=17" defer></script>
+  <script src="./coop-simple.js?v=1" defer></script>
+  <script src="./intake-model-ui.js?v=18" defer></script>
   <script src="./plain-intake.js?v=18" defer></script>
   <script src="./evidence-state.js?v=18" defer></script>
   <script src="./paste-intake.js?v=18" defer></script>
@@ -120,7 +121,7 @@
         </section>
         <section id="numbers" class="panel" aria-label="Model and returns"><p>Loading model…</p></section>
         <section id="brief" class="panel" aria-label="Brief for Chip">
-          <div class="eyebrow">05 / DECISION NOTE</div><div class="page-title"><div><h1>Walk in with a point of view.</h1><p>A one-page discussion brief that leads with your recommendation and the proof.</p></div><div class="title-actions"><button id="copyBrief" class="button primary">Copy brief</button><button id="printBrief" class="button subtle">Print / PDF</button></div></div>
+          <div class="eyebrow">05 / DECISION NOTE</div><div class="page-title"><div><h1>Walk in with a point of view.</h1><p>A one-page discussion brief that leads with your recommendation and the proof.</p></div><div class="title-actions"><button id="copyBrief" class="button primary">Copy brief</button><button id="printBrief" class="button subtle">Print / PDF</button><button class="button subtle" data-simple-export="pdf">Deal summary PDF ↓</button></div></div>
           <div class="brief-layout"><div class="card brief-editor"><h2>Shape the message</h2><p>Write in plain language. These prompts are the questions Chip is likely to ask.</p>
             <label>Recommended move<select data-field="recommendation"><option value="Clarify before pricing">Clarify before pricing</option><option value="Pursue">Pursue</option><option value="Pause">Pause</option><option value="Pass">Pass</option></select></label>
             <label>One sentence thesis<textarea data-field="thesis" rows="3" placeholder="We should [action] because Sunoco can [specific value] if [conditions]."></textarea></label>

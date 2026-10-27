@@ -141,6 +141,12 @@ h1 { margin: 0; font-family: var(--f-display); font-weight: 700; font-size: clam
   cursor: pointer;
 }
 .btn:hover { border-color: var(--accent); }
+.btn:disabled { opacity: .55; cursor: default; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.exports { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px; }
+.exports label { display: grid; gap: 3px; font-size: 12px; color: var(--muted); }
+.exports input { font: inherit; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; width: min(220px, 100%); }
+.exports .status { flex-basis: 100%; font-size: 12px; color: var(--muted); min-height: 1em; margin: 0; }
 
 .layout { display: grid; gap: 20px; grid-template-columns: minmax(0, 1fr); align-items: start; }
 @media (min-width: 1020px) {
@@ -292,6 +298,12 @@ details[open] > summary::after { transform: rotate(-135deg); }
       <h1>Deal Model Tool</h1>
       <p class="lede">Fifteen-year returns for COOP, COAG, CODO, DODO and COCM, with the price that earns your target IRR on each. Enter the seller's numbers on the left, in the same order as the COOP tab. The IRR and offer price stay pinned at the top.</p>
     </div>
+    <div class="exports" aria-label="Export">
+      <label for="deal-name">Deal name<input id="deal-name" type="text" autocomplete="off" placeholder="Untitled deal"></label>
+      <button class="btn primary" type="button" id="export-xlsx" title="The COOP tab with live Excel formulas">Export COOP model (.xlsx)</button>
+      <button class="btn" type="button" id="export-pdf" title="One-page visual summary of the deal">Deal summary (PDF)</button>
+      <p class="status" id="export-status" role="status"></p>
+    </div>
   </div>
 
   <div class="layout">
@@ -344,6 +356,11 @@ details[open] > summary::after { transform: rotate(-135deg); }
   </div>
 </div>
 
+<script src="./vendor/jszip.min.js"></script>
+<script src="./vendor/pdf-lib.min.js"></script>
+<script src="./model.js?v=14"></script>
+<script src="./original-engine.js?v=16"></script>
+<script src="./coop-simple.js?v=1"></script>
 <script>
 // ===== ENGINE START (mirrors COOP / COAG / CODO / DODO / COCM tabs of ModelExample.xlsx) =====
 function irrOf(cf){
@@ -507,7 +524,7 @@ function priceForIRR(ch,p,target){
       { k: 'it', l: 'IT setup, per site, once', pre: '$', dec: 0, def: 15000, cv: 'neg' },
       { k: 'maintY1', l: 'Maintenance year 1, per site', pre: '$', dec: 0, def: 10000, cv: 'neg' },
       { k: 'maintOn', l: 'Maintenance from year 2, per site', pre: '$', dec: 0, def: 20000, cv: 'neg' },
-      { k: 'tank', l: 'Tank work, per site, years 10 and 13', pre: '$', dec: 0, def: 60000, cv: 'neg' },
+      { k: 'tank', l: 'Tank work, per site, years 11 and 14', pre: '$', dec: 0, def: 60000, cv: 'neg' },
       { k: 'growthSites', l: 'Growth sites ($90,000 each)', dec: 0, def: 0 },
       { k: 'tax', l: 'Tax rate', suf: '%', dec: 1, def: 25, cv: 'pct' },
       { k: 'wc', l: 'Working capital, per site', pre: '$', dec: 0, def: 20000 },
@@ -861,6 +878,44 @@ function priceForIRR(ch,p,target){
     var b = e.target.closest ? e.target.closest('[data-ch]') : null;
     if (b) { sel = b.getAttribute('data-ch'); render(); return; }
   });
+  /* exports: the COOP channel as a simple COOP workbook, and a one-page PDF */
+  function simpleParams(p, t) {
+    var tank = [];
+    for (var i = 0; i < 15; i++) tank.push(i === 10 || i === 13 ? p.tank * p.n : 0);
+    return { name: $('deal-name').value.trim() || 'Untitled deal', sites: p.n, gallons: p.gallons, volumeRate: p.volg, cpg: p.cpg, cpgGrowth: p.cpgg,
+      fuelSynergyCpg: p.fsyn, inside: p.inside, insideGrowth: p.insg, insideMargin: p.inmar, insideSynergy: p.inssyn, other: p.other, otherGrowth: p.otherg,
+      opex: p.opex, opexGrowth: p.opexg, opexSynergy: p.opsyn, drawPerSite: p.draw, addBackDraw: !!p.drawRefund, fieldPerSite: p.field, rent: p.rent, rentGrowth: p.rentg,
+      itPerSite: p.it, maintYear1PerSite: p.maintY1, maintPerSite: p.maintOn, tank: tank, laterGrowthCapital: [], growthSites: p.growthSites, taxRate: p.tax,
+      wcPerSite: p.wc, price: p.price, unams: p.unams, closingRate: p.closing, exitMultiple: p.exit, target: t };
+  }
+  function exportSimple(kind) {
+    var status = $('export-status'), buttons = [$('export-xlsx'), $('export-pdf')];
+    if (!last || !last.R.COOP.o || last.R.COOP.o.cf.every(function (v) { return v === 0; })) { status.textContent = 'Enter the deal before exporting.'; return; }
+    buttons.forEach(function (b) { b.disabled = true; });
+    status.textContent = kind === 'pdf' ? 'Preparing the PDF…' : 'Preparing the COOP model…';
+    var snap = last;
+    // Let the status paint before the price solve runs.
+    setTimeout(function () {
+      Promise.resolve().then(function () {
+        var params = simpleParams(snap.p, snap.t), model = CoopSimple.calculate(params), cf = snap.R.COOP.o.cf;
+        if (model.flows.some(function (v, i) { return !(Math.abs(v - cf[i]) <= 0.01); })) throw Error('The export does not match the COOP results on this page.');
+        if (kind === 'xlsx') return CoopSimple.workbook(model, { name: params.name, title: 'Simple COOP model', source: 'Deal Model Tool inputs' });
+        var table = { title: 'Channels compared at the asking price', head: ['Channel', 'IRR at ask', 'NPV at 15%', 'Year-1 basis', 'Price at ' + pct(snap.t, 1)], rows: CH.map(function (ch) {
+          var o = snap.R[ch].o, tp = snap.R[ch].tp;
+          return o ? [ch, pct(o.irr), usd(o.npv).replace(MINUS, '-'), usd(o.ours).replace(MINUS, '-'), tp == null ? 'None' : tp >= 2e9 ? 'No ceiling' : usd(tp)] : [ch, 'No result', '', '', ''];
+        }) };
+        return CoopSimple.pdf(model, { name: params.name, subtitle: params.sites + ' sites · Deal Model Tool', table: table });
+      }).then(function (blob) {
+        CoopSimple.download(blob, CoopSimple.fileName($('deal-name').value.trim(), kind === 'pdf' ? '-deal-summary.pdf' : '-simple-coop-model.xlsx'));
+        status.textContent = kind === 'pdf' ? 'Deal summary downloaded.' : 'COOP model downloaded. Yellow cells are inputs; everything else recalculates in Excel.';
+      }).catch(function (err) {
+        console.error(err);
+        status.textContent = 'Download failed: ' + err.message;
+      }).then(function () { buttons.forEach(function (b) { b.disabled = false; }); });
+    }, 30);
+  }
+  $('export-xlsx').addEventListener('click', function () { exportSimple('xlsx'); });
+  $('export-pdf').addEventListener('click', function () { exportSimple('pdf'); });
   $('reset').addEventListener('click', function () { resetState(); setInputValues(); render(); });
   $('reset0').addEventListener('click', function () { resetZero(); setInputValues(); render(); });
 

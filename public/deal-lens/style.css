@@ -51,3 +51,4 @@
 @media print{.weather-return{display:none!important}.paper{overflow-wrap:anywhere}}
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}#toast{transition:none}}
 .tool-link{display:flex;gap:13px;align-items:center;margin-top:6px;padding:13px 14px;border-radius:7px;color:#a4b5c2;font-weight:700;text-decoration:none}.tool-link span{font:800 10px Manrope;color:#668293}.tool-link:hover,.tool-link:focus-visible{background:#1a2b3e;color:#fff}@media(max-width:800px){.tool-link{padding:9px 10px;font-size:11px;margin-top:5px}}
+.result-title .title-actions,.page-title .title-actions{flex-wrap:wrap;justify-content:flex-end}
