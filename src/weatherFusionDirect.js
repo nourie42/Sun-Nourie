@@ -21,6 +21,7 @@ const LEGACY_REGIONAL_MAP_BOUNDS = '[[32.5,-85],[38,-74]]';
 // Native collector contract: temperatures in Fahrenheit, speeds in mph,
 // visibility in miles and pressure in inHg. Optional invalid measurements are
 // missing; they must not discard otherwise valid temperature/rain guidance.
+const NATIVE_HALF_CELL_KM={hrrr:1.5,nbm:1.25};
 const NATIVE_CORE_RANGES={temperature_2m:[-160,160],precipitation:[0,100],wind_speed_10m:[0,300]};
 const NATIVE_OPTIONAL_FIELDS={dew_point_2m:['°F',-160,160],relative_humidity_2m:['%',0,100],wind_gusts_10m:['mp/h',0,350],wind_direction_10m:['°',0,360],cloud_cover:['%',0,100],visibility:['mi',0,200],pressure_msl:['inHg',20,35],apparent_temperature:['°F',-250,250],reflectivity:['dBZ',-100,100],nearby_reflectivity:['dBZ',-100,100],weather_code:['wmo code',0,99]};
 export function modelStatus(model, runAt, validUntil, now = Date.now()) {
@@ -33,10 +34,19 @@ export function validateSnapshot(data, id, location, now) {
   const status = modelStatus(id, data.runAt, data.validUntil, now);
   if (status !== 'ready') return { value: null, status, message: 'The model run is too old or has expired; it is excluded from the forecast.' };
   // GPS rounding must not reject the same neighborhood's native grid sample.
-  // Keep the published sample coordinates and reject points beyond 100 metres.
+  // Keep the published sample coordinates; a sample within 100 metres is preferred.
   const distance=p=>Math.hypot((p.latitude-location.latitude)*111.2,(p.longitude-location.longitude)*111.2*Math.cos(location.latitude*Math.PI/180));
-  const point = data.points.filter(p=>finite(p.latitude)&&finite(p.longitude)&&distance(p)<=.1).sort((a,b)=>distance(a)-distance(b))[0];
-  if (!point) return { value: null, status: 'not-covered', message: 'Direct model collection currently covers the two saved locations. No saved native grid sample is within 100 metres of this location.' };
+  // A model has one value per grid cell, so any location inside the saved
+  // sample's native cell receives identical model data. Use a radius of half
+  // the grid spacing (or the half-cell box on ECMWF's lat/lon grid) so the
+  // location is always inside that same cell, never a neighbouring city's.
+  const cellDistance=p=>Math.hypot((p.gridPoint.latitude-location.latitude)*111.2,(p.gridPoint.longitude-location.longitude)*111.2*Math.cos(location.latitude*Math.PI/180));
+  const sameCell=p=>finite(p.gridPoint?.latitude)&&finite(p.gridPoint?.longitude)&&(id==='ecmwf'
+    ?Math.abs(p.gridPoint.latitude-location.latitude)<=.125&&Math.abs(p.gridPoint.longitude-location.longitude)<=.125
+    :cellDistance(p)<=(NATIVE_HALF_CELL_KM[id]??0));
+  const point = data.points.filter(p=>finite(p.latitude)&&finite(p.longitude)&&distance(p)<=.1).sort((a,b)=>distance(a)-distance(b))[0]
+    || data.points.filter(p=>finite(p.latitude)&&finite(p.longitude)&&sameCell(p)).sort((a,b)=>distance(a)-distance(b))[0];
+  if (!point) return { value: null, status: 'not-covered', message: 'Direct model collection currently covers the two saved locations. This location is outside the native model grid cells of the saved samples.' };
   const h = point.hourly, u = point.hourly_units, run = Date.parse(data.runAt)/1000;
   if (!Array.isArray(h?.time) || h.time.length < 12 || h.time.length > 500 || u?.temperature_2m !== '°F' || u.precipitation !== 'inch' || u.wind_speed_10m !== 'mp/h') throw new Error('Invalid model units or time axis.');
   if (h.time.some((t,i) => !finite(t) || t < run || (i > 0 && t-h.time[i-1] !== 3600))) throw new Error('The model time axis is not a continuous hourly axis.');

@@ -1,9 +1,13 @@
 const H=3600000,finite=v=>typeof v==='number'&&Number.isFinite(v);
+// The collector is scheduled every 6 hours, but GitHub often starts scheduled
+// runs hours late. Allow one late or missed collection; the 36-hour run age
+// still rejects a genuinely old forecast.
+const WN3_MAX_COLLECTION_AGE=14*H;
 export const WN3_URL='https://raw.githubusercontent.com/nourie42/Sun-Nourie/weather-fusion-data/models/weathernext3.json';
 export function validateWeatherNext3(feed,location,now){
  const run=Date.parse(feed?.runAt),generated=Date.parse(feed?.generatedAt);
  if(feed?.schema!=='weather-nourie-weathernext3-v1'||feed.model!=='Google WeatherNext 3'||!String(feed.sourceTable).endsWith('.weathernext_3_0_0_0p1deg')||feed.status!=='ready'||feed.units?.temperature!=='degF'||feed.timeStepHours!==1||feed.ensembleMembers<2)throw Error('Unverified WeatherNext 3 provenance or temperature units');
- if(!finite(run)||!finite(generated)||run>now+300000||generated>now+300000||now-run>36*H||now-generated>6*H)throw Error('WeatherNext 3 is stale');
+ if(!finite(run)||!finite(generated)||run>now+300000||generated>now+300000||now-run>36*H||now-generated>WN3_MAX_COLLECTION_AGE)throw Error('WeatherNext 3 is stale');
  const point=feed.points?.find(p=>finite(p.latitude)&&finite(p.longitude)&&Math.abs(p.latitude-location.latitude)<=.1&&Math.abs(p.longitude-location.longitude)<=.1);
  if(!point)throw Error('WeatherNext 3 does not cover this location');
  const rows=point.hourly||[],seen=new Set(),times=[],temperatures=[];
