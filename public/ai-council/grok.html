@@ -5,26 +5,28 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#ffffff">
   <meta name="color-scheme" content="light">
-  <title>My Bots</title>
-  <link rel="stylesheet" href="/ai-council/grok.css?v=2">
+  <title>My AIs</title>
+  <link rel="stylesheet" href="/ai-council/grok.css?v=3">
 </head>
 <body>
 <div class="grok-app">
   <!-- Sidebar -->
   <aside class="grok-side" id="sidebar">
     <div class="grok-side-head">
-      <button class="grok-new" id="newChatBtn"><span class="plus">＋</span> New chat</button>
+      <button class="grok-new" id="newChatBtn" type="button"><span class="plus">＋</span> New chat</button>
     </div>
     <div class="bot-list">
-      <div class="bot-list-title">My Bots</div>
+      <div class="bot-list-title">My AIs</div>
       <div id="botList"></div>
+      <div class="bot-list-title">Together</div>
+      <button class="bot-item" id="groupItem" type="button">
+        <div class="bot-avatar group-avatar">👥</div>
+        <div class="bot-info"><div class="bot-name">Group chat</div><div class="bot-desc">Your AIs talk to each other</div></div>
+      </button>
     </div>
     <div class="grok-hist" id="history">
       <div class="grok-hist-title">Recent</div>
       <div id="histList"></div>
-    </div>
-    <div class="grok-side-foot">
-      <a class="grok-bots-link" href="/ai-council/bots/">🤖 <span>My Bots</span></a>
     </div>
   </aside>
   <div class="grok-scrim" id="scrim"></div>
@@ -33,42 +35,44 @@
   <div class="grok-main">
     <header class="grok-top">
       <div class="grok-top-left">
-        <button class="grok-menu-btn" id="menuBtn" aria-label="Menu">☰</button>
-        <div class="grok-current-bot" id="currentBot">
-          <div class="bot-avatar" id="curBotAvatar" style="background:#000">✦</div>
-          <div class="bot-name" id="curBotName">AI Assistant</div>
+        <button class="grok-menu-btn" id="menuBtn" type="button" aria-label="Menu">☰</button>
+        <div class="grok-current-bot">
+          <div class="bot-avatar" id="curBotAvatar">✦</div>
+          <div class="bot-info">
+            <div class="bot-name" id="curBotName">My AIs</div>
+            <div class="bot-desc" id="curBotModel"></div>
+          </div>
         </div>
-      </div>
-      <div class="grok-actions">
-        <button class="grok-icon" id="shareBtn" aria-label="Share">⤴</button>
       </div>
     </header>
 
-    <div class="grok-messages" id="messages">
-      <div class="grok-empty" id="emptyState">
-        <div class="mark">✦</div>
-        <h1>What do you want to know?</h1>
-        <p>Ask anything. I'll pick the best AI for your question.</p>
-        <div class="grok-suggest">
-          <button data-q="Explain something complex simply">Explain something complex<small>Pick a topic, I'll break it down</small></button>
-          <button data-q="Help me write something">Help me write<small>Emails, docs, messages</small></button>
-          <button data-q="What happened in the news today?">Today's news<small>Catch me up quickly</small></button>
-          <button data-q="Give me an interesting fact">Surprise me<small>Something I didn't know</small></button>
-        </div>
-      </div>
-    </div>
+    <div class="grok-messages" id="messages"></div>
 
     <div class="grok-composer">
       <div class="grok-compose-inner">
+        <div class="group-bar hidden" id="groupBar">
+          <div class="group-row" id="memberChips"></div>
+          <div class="group-row">
+            <span class="group-label">Rounds</span>
+            <span id="roundChips"></span>
+            <span class="group-cost" id="groupCost"></span>
+          </div>
+        </div>
         <div class="grok-input">
-          <textarea id="prompt" rows="1" placeholder="Ask anything"></textarea>
-          <button class="grok-send" id="sendBtn" disabled>↑</button>
+          <textarea id="prompt" rows="1" placeholder="Ask anything" aria-label="Message"></textarea>
+          <button class="grok-send" id="sendBtn" type="button" aria-label="Send" disabled>↑</button>
+          <button class="grok-send stop hidden" id="stopBtn" type="button" aria-label="Stop">■</button>
         </div>
         <div class="grok-input-bar">
           <div class="grok-tools">
-            <button class="grok-toggle on" id="webBtn">🌐 Web</button>
-            <button class="grok-toggle" id="thinkBtn">🧠 Think</button>
+            <button class="grok-tool" id="webBtn" type="button" aria-pressed="false" title="Search the web for this message (costs more)">🌐 Web</button>
+            <button class="grok-tool" id="thinkBtn" type="button" aria-pressed="false" title="Use each AI's smartest model and let it think longer (slower, costs more)">🧠 Deep</button>
           </div>
+          <div class="mode-note" id="modeNote">Fast mode</div>
+        </div>
+        <div class="code-row hidden" id="codeRow">
+          <label for="accessCode">Owner access code</label>
+          <input id="accessCode" type="password" autocomplete="off">
         </div>
         <div class="grok-fine">AI can make mistakes. Verify important info.</div>
       </div>
@@ -76,8 +80,6 @@
   </div>
 </div>
 
-
-
-<script type="module" src="/ai-council/grok.js"></script>
+<script type="module" src="/ai-council/grok.js?v=3"></script>
 </body>
 </html>

@@ -137,3 +137,39 @@ button,input,textarea{font-family:inherit}
   .grok-suggest{grid-template-columns:1fr}
   .grok-empty h1{font-size:25px}
 }
+
+/* My AIs additions */
+.hidden{display:none!important}
+.status-dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:6px;vertical-align:1px;background:#c2c2c9}
+.status-dot.on{background:#10a37f}
+.status-dot.off{background:#e5484d}
+.group-avatar{background:#6e6e80;font-size:18px}
+.hist-empty{padding:10px 12px;font-size:12px;color:var(--text-faint)}
+.grok-hist-item.active{background:var(--bg-hover);color:var(--text)}
+.grok-current-bot .bot-desc{font-size:11px}
+.grok-tool.hidden{display:none}
+.mode-note{font-size:11px;color:var(--text-faint)}
+.grok-send.stop{background:#e5484d}
+.msg-error{background:#fff1f1;border:1px solid #f6c9c9;color:#b42318;border-radius:12px;padding:10px 14px;font-size:13px;line-height:1.5}
+.md code{background:var(--bg-soft);border:1px solid var(--border-soft);border-radius:6px;padding:1px 5px;font-size:.9em}
+.md pre{background:#0f0f0f;color:#f2f2f2;border-radius:12px;padding:12px 14px;overflow-x:auto;white-space:pre;margin:6px 0}
+.md pre code{background:transparent;border:0;padding:0;color:inherit}
+.md a{color:#0866ff}
+.md .md-h{display:inline-block;font-size:1.05em;margin-top:4px}
+.group-bar{display:flex;flex-direction:column;gap:8px;margin-bottom:10px}
+.group-row{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.group-label{font-size:12px;color:var(--text-soft);margin-right:2px}
+.member-chip,.round-chip{border:1px solid var(--border);background:var(--bg);color:var(--text-soft);border-radius:999px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer}
+.member-chip.on{background:var(--chip);border-color:var(--chip);color:#fff}
+.member-chip:disabled{opacity:.35;cursor:not-allowed}
+.round-chip{padding:5px 11px;margin-right:2px}
+.round-chip.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.group-cost{font-size:11px;color:var(--text-faint);margin-left:6px}
+.code-row{display:flex;align-items:center;gap:8px;margin-top:8px;font-size:12px;color:var(--text-soft)}
+.code-row input{flex:1;max-width:240px;border:1px solid var(--border);border-radius:10px;padding:8px 10px;font-size:14px;outline:0}
+@media(max-width:860px){
+  .grok-top{padding:10px 12px}
+  .grok-composer{padding:10px 12px max(12px,env(safe-area-inset-bottom))}
+  .msg-user,.msg-ai{padding:0 14px}
+  .grok-input textarea{font-size:16px}
+}

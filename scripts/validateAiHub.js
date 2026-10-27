@@ -1,23 +1,21 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
-import vm from "node:vm";
 
-const html = fs.readFileSync("public/ai-council/hub.html", "utf8");
+const html = fs.readFileSync("public/ai-council/grok.html", "utf8");
+const client = fs.readFileSync("public/ai-council/grok.js", "utf8");
 const server = fs.readFileSync("src/aiHub.js", "utf8");
 
 assert.match(html, /<title>My AIs<\/title>/);
-assert.match(html, /my-ais-hub-v1/);
-assert.match(html, /\/api\/ai-council\/hub\/status/);
-assert.match(html, /\/api\/ai-council\/hub\/chat/);
-assert.match(html, /x-ai-council-code/);
+for (const id of ["botList", "groupItem", "messages", "prompt", "sendBtn", "stopBtn", "webBtn", "thinkBtn", "accessCode", "memberChips", "roundChips"]) {
+  assert.match(html, new RegExp(`id="${id}"`), `grok.html is missing #${id}`);
+}
+assert.match(client, /\/api\/ai-council\/hub\/status/);
+assert.match(client, /\/api\/ai-council\/hub\/chat/);
+assert.match(client, /\/api\/ai-council\/hub\/room-turn/);
+assert.match(client, /let webOn = false;/, "web search must be off by default");
+assert.match(client, /let deepOn = false;/, "deep thinking must be off by default");
 for (const name of ["Grok", "Muse", "Claude", "ChatGPT"]) assert.match(server, new RegExp(`name: "${name}"`));
-assert.match(server, /MUSE_API_KEY/);
+assert.doesNotMatch(server, /probeProvider|Reply only with OK/, "My AIs must not send availability probes");
 assert.match(server, /MUSE_BASE_URL/);
 
-const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((match) => match[1]);
-assert.ok(scripts.length > 0, "My AIs page must contain client JavaScript");
-for (const [index, source] of scripts.entries()) {
-  new vm.Script(source, { filename: `public/ai-council/hub.html#script-${index + 1}` });
-}
-
-console.log("My AIs hub validation passed.");
+console.log("My AIs page validation passed.");
