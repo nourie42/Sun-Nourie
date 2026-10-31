@@ -189,7 +189,7 @@ class Collection(unittest.TestCase):
             self.assertEqual(first['time'], '2026-10-25T15:00:00Z')
             on_disk = json.loads((Path(tmp) / maps.CATALOG).read_text())
             self.assertEqual(on_disk['layers'].keys(), catalog['layers'].keys())
-            self.assertEqual([q['dry_run'] for q in client.queries if 'main_run' not in q['sql']], [True, False])
+            self.assertEqual([q['dry_run'] for q in client.queries if 'main_run' not in q['sql']], [True, True, False])
 
     def test_a_layer_without_enough_cells_is_reported_not_drawn(self):
         hours = maps.lead_hours(6)
@@ -265,5 +265,85 @@ class Collection(unittest.TestCase):
             self.assertTrue(names['2026102412'].exists() and names['2026102500'].exists())
 
 
+class BatchSafety(unittest.TestCase):
+    def client(self, billed=2_000_000_000, mismatch=False, oversized=False):
+        class Client(FakeClient):
+            def query(self, sql, job_config=None, location=None):
+                if 'main_run' in sql:
+                    return super().query(sql, job_config, location)
+                dry = job_config['dry_run']
+                self.queries.append({'sql': sql, 'dry_run': dry, 'cap': job_config['max_bytes']})
+                count = sql.count('_mean`')
+                estimate = 752_512_550_400 if count > 1 or oversized else 190_000_000_000
+                rows = [SimpleNamespace(lat=35, lon=-78, lead_hours=3,
+                                        temperature_2m=293.15, total_cloud_cover=.5)]
+                if mismatch and 'total_cloud_cover_mean' in sql:
+                    rows[0].lon = -79
+                return FakeJob([] if dry else rows, estimate, 0 if dry else billed)
+        return Client([], columns=['temperature_2m_mean', 'total_cloud_cover_mean'])
+
+    def collect(self, client, tmp, review=30_000_000_000):
+        q = maps.Queries(client, Path(tmp)/maps.STOP_FILE, 250_000_000_000,
+                         12_000_000_000, review, make_config=config)
+        with patch.object(maps, 'query_params', return_value=[]), \
+             patch.object(maps, 'rows_to_cubes', return_value={}), \
+             patch.object(maps, 'write_maps', return_value={'runAt': maps.iso(RUN), 'missingLayers': [], 'layers': {'temperature': {'frames': []}}}), \
+             patch.object(maps, 'prune', return_value=0):
+            return maps.collect(q, TABLE, tmp, NOW, layers=['temperature', 'clouds'])
+
+    def test_752gb_query_splits_and_preserves_partition_filter(self):
+        c = self.client()
+        with tempfile.TemporaryDirectory() as tmp:
+            self.collect(c, tmp)
+            real = [x for x in c.queries if not x['dry_run'] and 'main_run' not in x['sql']]
+            self.assertEqual(len(real), 2)
+            for x in real:
+                self.assertIn('t.init_time=@init_time', x['sql'])
+                self.assertEqual(x['sql'].count('_mean`'), 1)
+                self.assertLessEqual(x['cap'], 250_000_000_000)
+
+    def test_review_stop_blocks_second_batch_without_publication(self):
+        c = self.client(billed=31_000_000_000)
+        with tempfile.TemporaryDirectory() as tmp:
+            with self.assertRaises(maps.CostStop):
+                self.collect(c, tmp)
+            self.assertTrue((Path(tmp)/maps.STOP_FILE).exists())
+            self.assertFalse((Path(tmp)/maps.CATALOG).exists())
+            self.assertEqual(len([x for x in c.queries if not x['dry_run'] and 'main_run' not in x['sql']]), 1)
+
+    def test_remaining_budget_blocks_second_batch(self):
+        c = self.client(billed=100_000_000_000)
+        with tempfile.TemporaryDirectory() as tmp:
+            with self.assertRaises(maps.EstimateCeiling):
+                self.collect(c, tmp, review=250_000_000_000)
+            self.assertFalse((Path(tmp)/maps.CATALOG).exists())
+
+    def test_single_oversized_field_executes_no_map_queries(self):
+        c = self.client(oversized=True)
+        with tempfile.TemporaryDirectory() as tmp:
+            with self.assertRaises(maps.EstimateCeiling):
+                self.collect(c, tmp)
+            self.assertTrue(all(x['dry_run'] for x in c.queries if 'main_run' not in x['sql']))
+
+    def test_mismatched_coverage_does_not_publish(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            with self.assertRaisesRegex(RuntimeError, 'coverage'):
+                self.collect(self.client(mismatch=True), tmp)
+            self.assertFalse((Path(tmp)/maps.CATALOG).exists())
+
+    def test_result_failure_still_persists_known_expensive_bill(self):
+        c = FakeClient([])
+        job = FakeJob([], 2_000_000_000, 31_000_000_000)
+        job.result = lambda **kwargs: (_ for _ in ()).throw(RuntimeError('failed result'))
+        with tempfile.TemporaryDirectory() as tmp:
+            q = maps.Queries(c, Path(tmp)/maps.STOP_FILE, 250_000_000_000,
+                             12_000_000_000, 30_000_000_000, make_config=config)
+            with patch.object(c, 'query', return_value=job):
+                with self.assertRaisesRegex(RuntimeError, 'failed result'):
+                    q.run('SELECT test')
+            self.assertTrue((Path(tmp)/maps.STOP_FILE).exists())
+
+
 if __name__ == '__main__':
     unittest.main()
+
