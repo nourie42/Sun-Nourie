@@ -45,7 +45,7 @@ test('every reachable weather selects a complete replacement or the original pet
   reached.add(slot);
   if(PET_WALKER_ART[slot]){
    assert.ok(walker.includes(`data-walker-slot="${slot}"`),slot);
-   assert.ok(walker.includes(`/weather-fusion/pet-walker-${slot}.webp?`),slot);
+   assert.ok(walker.includes(`/weather-fusion/${PET_WALKER_ART[slot].file}?`),slot);
    assert.match(walker,/style="filter:none"/);
   }else{
    assert.equal(walker,referenceScene(2,daylight,condition,feels,context),`${slot} keeps the original woman and dog`);
@@ -68,11 +68,15 @@ test('replacement art keeps the scene contract: one complete square image, same 
 });
 
 test('every installed picture exists, is declared for the server, and is named like its slot',()=>{
+ assert.deepEqual(Object.keys(PET_WALKER_ART).sort(),[...slotNames].sort(),'every weather slot keeps the new walker');
  for(const [slot,art] of Object.entries(PET_WALKER_ART)){
   assert.ok(slotNames.has(slot),`${slot} is not a real slot`);
-  assert.equal(art.file,`pet-walker-${slot}.webp`);
+  assert.match(art.file,new RegExp(`^pet-walker-${slot}\\.(?:webp|jpg)$`));
   assert.ok(existsSync(`public/weather-fusion/${art.file}`),art.file);
   assert.ok(statSync(`public/weather-fusion/${art.file}`).size>10000,`${art.file} must contain an image, not an empty file`);
+  const bytes=readFileSync(`public/weather-fusion/${art.file}`);
+  if(art.file.endsWith('.jpg'))assert.deepEqual([...bytes.subarray(0,2)],[0xff,0xd8],`${art.file} must be a JPEG`);
+  else assert.equal(bytes.toString('ascii',8,12),'WEBP',`${art.file} must be a WebP`);
   assert.ok(art.width>=300&&art.height>=300,'too small to display sharply');
   assert.equal(art.width,art.height,'replacement pictures are square, like the original panels');
  }
@@ -91,9 +95,9 @@ test('the For Pets card uses the new art across night, day and cool weather',()=
  assert.match(cool,/data-walker-slot="night-cool-night"/);
  assert.match(cool,/pet-walker-night-cool-night\.webp/);
  const mild=pavementHTML(surface(true),68,{condition:'Clear',pop:0});
- assert.match(mild,/comfort-integrated-mild-normal\.webp/);
- assert.doesNotMatch(mild,/pet-walker-day-mild-normal\.webp|data-walker="replacement"/);
+ assert.match(mild,/data-walker-slot="day-mild-normal"/);
+ assert.match(mild,/pet-walker-day-mild-normal\.jpg/);
  const coldRain=pavementHTML(surface(true),30,{condition:'Rain',pop:90});
- assert.match(coldRain,/comfort-integrated-cold-rain\.webp/);
- assert.doesNotMatch(coldRain,/pet-walker-day-cold-rain\.webp|data-walker="replacement"/);
+ assert.match(coldRain,/data-walker-slot="day-cold-rain"/);
+ assert.match(coldRain,/pet-walker-day-cold-rain\.jpg/);
 });
