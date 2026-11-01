@@ -49,7 +49,7 @@ test('the hourly signal boundaries follow dry, one-third and full-credit tiers e
  assert.equal(backed.reductionReasons.ecmwf,undefined);
  assert.equal(backed.sourcePoints.ecmwf,10);
  const missing=publishedPrecipitationLikelihood(40,{sourceValues:{hrrr:0,ecmwf:0,nbm:null}});
- assert.equal(missing.value,40);assert.equal(missing.mode,'nws-fallback');
+ assert.equal(missing.value,16);assert.equal(missing.mode,'partial-blend');assert.deepEqual(missing.missingModels,['nbm']);
 });
 
 test('QPF above .010 receives the model full share without corroboration',()=>{

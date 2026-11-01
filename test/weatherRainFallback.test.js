@@ -4,12 +4,24 @@ import {publishedPrecipitationLikelihood,precipitationLikelihood,validateSnapsho
 import {precipitationPolicy} from '../src/weatherFusionPolicy.js';
 import {snapshot,testInputs} from './weatherFusion.fixtures.js';
 
-test('failed model feeds cannot turn official 57% into a misleading 18% chance',()=>{
+test('a missing model no longer erases the models that did report',()=>{
+ // Owner decision 2026-11-01: every available model contributes to the
+ // published chance. ECMWF and NBM are missing here, but WeatherNext
+ // reports a full wet signal, so the published value is the partial
+ // blend (NWS 22.8 points + WeatherNext 10 points), not NWS alone.
  const policy=precipitationPolicy(1,true),amount={sourceValues:{hrrr:null,ecmwf:null,nbm:null,wn:.05}};
  const published=publishedPrecipitationLikelihood(57,amount,policy);
- assert.equal(published.value,57);assert.equal(published.mode,'nws-fallback');assert.equal(published.partialBlend.value,33);
- assert.deepEqual(published.sources.map(s=>[s.id,s.weight]),[['nws',1]]);
+ assert.equal(published.value,33);assert.equal(published.mode,'partial-blend');assert.equal(published.partialBlend.value,33);
  assert.deepEqual(published.missingModels,['ecmwf','nbm']);
+ assert.ok(published.sources.some(s=>s.id==='wn'));
+ assert.match(published.source,/partial/);
+});
+test('when no model input is available at all, the official probability is the labeled fallback',()=>{
+ const policy=precipitationPolicy(1,true),amount={sourceValues:{hrrr:null,ecmwf:null,nbm:null,wn:null}};
+ const published=publishedPrecipitationLikelihood(57,amount,policy);
+ assert.equal(published.value,57);assert.equal(published.mode,'nws-fallback');
+ assert.deepEqual(published.sources.map(s=>[s.id,s.weight]),[['nws',1]]);
+ assert.deepEqual([...published.missingModels].sort(),['ecmwf','nbm','wn']);
 });
 test('complete model data retains the requested blend exactly',()=>{
  const amount={sourceValues:{hrrr:0,ecmwf:.02,nbm:.02}};
