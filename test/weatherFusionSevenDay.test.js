@@ -45,6 +45,19 @@ test('real zeros remain zero and missing inputs are never fabricated',()=>{
   assert.doesNotMatch(sevenDayCardHTML(missing),/aria-valuenow=/);
 });
 
+test('an unavailable daily rain chance has no NWS source badge',()=>{
+  const forecast=structuredClone(preview);
+  forecast.days[1].rainLikelihood.coverage.complete=false;
+  const day=sevenDayForecast(forecast,now)[1];
+  assert.equal(day.pop,null);
+  assert.equal(day.rainSourceFallback,false);
+  const missing=sevenDayCardHTML(day);
+  assert.match(missing,/Rain chance: —/);
+  assert.doesNotMatch(missing,/>NWS<\/small>/);
+  const available=sevenDayCardHTML(sevenDayForecast(preview,now)[1]);
+  assert.match(available,/>NWS<\/small>/);
+});
+
 test('observed rain follows the current-day policy and never spreads to later cards',()=>{
   const forecast=structuredClone(preview);
   forecast.current.radarPrecipitation={status:'ready',atLocation:true,time:new Date(now).toISOString()};

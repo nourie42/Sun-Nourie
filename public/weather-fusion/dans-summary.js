@@ -1,7 +1,6 @@
 import {forecastProseConflict} from './forecast-consistency.js?v=current-rain-20261017-v3';
 import {plainDanWording,hasDanJargon,collectDanTakeEvidence,visibleDanTakeItems,danTakeText,discussionPeriod,sectionAnchor,explicitForecastUncertainty} from './dans-take.js?v=audit-20261017-v1';
 import {bulletinFacts} from './bulletin-facts.js?v=county-warnings-v1';
-import {isTonightPeriod} from './weather-math.js?v=current-rain-20261017-v3';
 const norm=v=>String(v||'').replace(/\s+/g,' ').trim();
 const dateKey=(time,zone)=>new Intl.DateTimeFormat('en-CA',{timeZone:zone,year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(time));
 function anchoredText(text,anchor,zone,now){
@@ -28,6 +27,13 @@ export function directTakeWording(text){
 export function weatherOnlyProse(text){
  return norm(String(text||'').replace(/https?:\/{1,2}\S+|www\.\S+/gi,'').split('\n').filter(line=>!/(?:for (?:the )?(?:latest|more|additional)\b.*(?:messages|information|updates|details)|please\s+(?:visit|see)|(?:visit|refer to|check)\s+(?:the\s+)?(?:NWS|National Weather Service|weather\.gov|website))/i.test(line)).join('\n'));
 }
+function plainKeyMessage(text){
+ let message=plain(text).replace(/\bseasonable temperatures\b/gi,'temperatures near normal').replace(/\babundant high clouds\b/gi,'plenty of high clouds');
+ message=message.replace(/^Chance of (showers|storms|rain|snow)(\b.*)$/i,(_,weather,rest)=>`${weather[0].toUpperCase()+weather.slice(1)} ${/s$/.test(weather)?'are':'is'} possible${rest}`)
+  .replace(/^Continued very warm\b/i,'It will stay very warm')
+  .replace(/^Temperatures near normal,/i,'Expect temperatures near normal,');
+ return /[.!?]$/.test(message)?message:`${message}.`;
+}
 export function danOverview(briefing,forecast,now=Date.now()){
  if(!forecast)return {text:'Checking the latest forecast discussion…',source:'Updating'};
  const evidence=collectDanTakeEvidence(forecast,now);
@@ -40,22 +46,37 @@ export function danOverview(briefing,forecast,now=Date.now()){
   // use still-current weather sentences from its narrative forecast sections.
   // Offices using the newer AFD layout put the narrative in a single
   // .DISCUSSION section after KEY MESSAGES instead of NEAR/SHORT TERM.
-  const order=['SYNOPSIS','NEAR TERM','KEY MESSAGES','SHORT TERM','DISCUSSION'];
+  const order=['SYNOPSIS','KEY MESSAGES','NEAR TERM','SHORT TERM','DISCUSSION'];
   const sections=[...forecast.discussion.text.matchAll(/^\.(SYNOPSIS|KEY MESSAGES|NEAR TERM|SHORT TERM|DISCUSSION)[^\n]*\n([\s\S]*?)(?=^\.[A-Z]|^&&|\$\$|(?![\s\S]))/gm)].sort((a,b)=>order.indexOf(a[1])-order.indexOf(b[1]));
   const issued=Date.parse(evidence.source.issuedAt);
+  let oneKeyMessage='';
   for(const [,section,body] of sections){
    const anchor=sectionAnchor(body,issued,zone);
    const synopsis=Number.isFinite(anchor)&&issued-anchor<=86400000?body.replace(/^\s*(?:As of|Issued at)[^\n]*(?:\n|$)/gmi,'').replace(/^\s*KEY MESSAGE \d+\.{3}\s*/gmi,'').replace(/^\s*(?:\d+[).]|[-*])\s*/gm,''):'';
    const sentences=weatherOnlyProse(synopsis).match(/[^.!?]+[.!?]+|[^.!?]+$/g)||[];
+   if(section==='KEY MESSAGES'){
+    const messages=[];
+    for(const sentence of sentences){
+     const current=anchoredText(sentence,anchor,zone,now),period=discussionPeriod(sentence,anchor,zone);
+     if((period&&period.end<=now)||hasDanJargon(sentence)||forecastProseConflict(current,forecast,now)||!/(?:rain|shower|storm|snow|wind|cloud|temperature|warm|cold|cool|heat|fog|dry|sun)/i.test(sentence))continue;
+     const message=plainKeyMessage(current);
+     if(message.length>180||messages.join(' ').length+message.length>360)continue;
+     messages.push(message);
+     if(messages.length===3)break;
+    }
+    if(messages.length>=2)return {text:messages.join(' '),source:'Local NWS discussion key messages'};
+    oneKeyMessage=messages[0]||'';
+    continue;
+   }
    const currentSentences=sentences.filter(s=>{
     if(section!=='SYNOPSIS'&&(!/\b(?:will|may|could|is|are|remains?|continues?|expected|possible|likely|can|should|becomes?|develops?)\b/i.test(s)||hasDanJargon(s)))return false;
     const period=discussionPeriod(s,anchor,zone);return (!period||period.end>now)&&!forecastProseConflict(anchoredText(s,anchor,zone,now),forecast,now);
    }).join(' ');
    if(brief(currentSentences))return {text:plain(anchoredText(brief(currentSentences),anchor,zone,now)),source:'Local NWS discussion summary'};
   }
+  if(oneKeyMessage)return {text:oneKeyMessage,source:'Local NWS discussion key message'};
  }
- const day=forecast.days?.[0],text=brief(weatherOnlyProse((isTonightPeriod(now,zone)?day?.nightDetail:day?.detail)||day?.detail||''));
- return {text:text||'The weather summary is temporarily unavailable.',source:'NWS forecast · discussion summary unavailable'};
+ return {text:'The latest local forecast discussion is unavailable right now.',source:'Discussion unavailable'};
 }
 export function danTakeDisplay(briefing,forecast,now=Date.now()){
  if(forecast?.comparison?.source==='google')return 'Nourie Weather Take summarizes the NWS discussion on the regular weather page. This page shows the experimental model forecast.';
@@ -100,6 +121,7 @@ export function danCard(briefing,forecast,now=Date.now()){
   // Source-bound fallback states the explicit rain-coverage uncertainty, not
   // the technical mechanism. Unknown jargon is omitted, never pasted verbatim.
   if(/\bcoverage\b[^.!?]*\b(?:may|could|might)\b[^.!?]*\blimit/i.test(c.quote)&&/rain|shower|storm|convec/i.test(c.context)&&/subsidence|dry layer/i.test(c.quote))summary='Showers and storms may be less widespread than expected.';
+  if(/confidence remains low/i.test(c.quote)&&/spread in the models|kicking the can/i.test(c.quote)&&/\bshowers?\b/i.test(c.context))summary='The timing of the showers is uncertain.';
   // This exact source claim is about whether lingering wind will limit frost,
   // not whether a Frost Advisory has been issued. Keep that uncertainty clear.
   if(/\bfrost advisory\b/i.test(c.quote)&&/\buncertain\b/i.test(c.quote)&&/\bwinds?\b[^.!?]{0,35}\b(?:fully\s+)?decouple\b/i.test(c.quote)&&/\b(?:widespread|impacts)\b/i.test(c.quote))summary='Some spots may be cold enough for frost, but lingering wind could keep frost from becoming widespread.';

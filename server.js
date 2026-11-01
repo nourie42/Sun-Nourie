@@ -27,6 +27,7 @@ import { registerHouseholdPLRoutes } from "./src/householdPLRoutes.js";
 import { registerDealLensRoutes } from "./src/dealLensRoutes.js";
 import { isModelConfigured } from "./src/dealLensModelAssets.js";
 import { registerDealIntelligenceRoutes } from "./src/dealIntelligenceRoutes.js";
+import { clientIp } from "./src/clientIp.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -255,7 +256,7 @@ function copyHeaders(source, target, { dropLength = false } = {}) {
 
 function proxyToLegacy(req, res) {
   const isHome = req.method === "GET" && (req.path === "/" || req.path === "/index.html");
-  const headers = { ...req.headers, host: `127.0.0.1:${legacyPort}`, "accept-encoding": "identity" };
+  const headers = { ...req.headers, host: `127.0.0.1:${legacyPort}`, "accept-encoding": "identity", "cf-connecting-ip": clientIp(req) };
   delete headers.connection;
 
   const proxyRequest = http.request({

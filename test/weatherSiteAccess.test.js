@@ -145,6 +145,15 @@ test('failed password attempts are limited and recover after a minute', async t 
   assert.equal((await login('care')).status, 303);
 });
 
+test('failed sign-ins from one Render client do not lock out another client', async t => {
+  const {login} = await fixture(t, {env: {RENDER: 'true'}});
+  const first = {'CF-Connecting-IP': '192.0.2.10', 'X-Forwarded-For': '203.0.113.5, 198.51.100.1'};
+  const second = {'CF-Connecting-IP': '192.0.2.11', 'X-Forwarded-For': '203.0.113.5, 198.51.100.1'};
+  for (let i = 0; i < 10; i++) assert.equal((await login('wrong', '/weather-fusion/', first)).status, 401);
+  assert.equal((await login('care', '/weather-fusion/', first)).status, 429);
+  assert.equal((await login('care', '/weather-fusion/', second)).status, 303);
+});
+
 test('gateway and legacy processes accept the same signed cookie, but unrelated secrets do not', async t => {
   const first = await fixture(t), child = await fixture(t), other = await fixture(t, {secret: 'different-secret'});
   const cookie = (await first.login()).headers.get('set-cookie').split(';')[0];

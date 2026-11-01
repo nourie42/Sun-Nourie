@@ -596,7 +596,8 @@ document.addEventListener('fullscreenchange', () => { $('fullscreen').textConten
 let searchTimer;
 $('city-search').addEventListener('input', () => {
   clearTimeout(searchTimer); const id = ++searchGeneration, q = $('city-search').value.trim();
-  if (q.length < 2) { $('search-results').hidden = true; $('city-search').setAttribute('aria-expanded', 'false'); return; }
+  const box=$('search-results');box.replaceChildren();box.hidden=true;$('city-search').setAttribute('aria-expanded','false');
+  if (q.length < 2) return;
   searchTimer = setTimeout(async () => {
     try {
       const data = await api('search', new URLSearchParams({ q }));

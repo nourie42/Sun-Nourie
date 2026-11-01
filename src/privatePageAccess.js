@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 import path from 'node:path';
 import express from 'express';
+import {clientIp} from './clientIp.js';
 
 // Separate credentials and sessions leave existing weather access unchanged.
 const PASSWORD_SALT = 'nourie-private-pages-v1';
@@ -119,7 +120,7 @@ export function registerPrivatePageAccess(app, {
         setCookie(req, res, '', 0);
         return res.redirect(303, LOGIN);
       }
-      const ip = req.ip || req.socket.remoteAddress;
+      const ip = clientIp(req,env);
       for (const [key, attempt] of failures) if (attempt.reset <= now()) failures.delete(key);
       const attempt = failures.get(ip) || {count: 0, reset: now() + 60000};
       if (attempt.count >= 10 || failures.size >= 2000) {
