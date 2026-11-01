@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {existsSync,readFileSync} from 'node:fs';
+import {existsSync,readFileSync,statSync} from 'node:fs';
 import {comfortSceneState,referenceScene,dogWalkerScene,walkerSlot,WALKER_SLOTS,PET_WALKER_FILES} from '../public/weather-fusion/exposure-scene.js';
 import {PET_WALKER_ART} from '../public/weather-fusion/pet-walker-art.js';
 import {pavementHTML} from '../public/weather-fusion/pavement.js';
@@ -37,18 +37,21 @@ test('slot names match the clothes the scene sheet actually shows',()=>{
  assert.equal(pick(false,'Light Snow',25),'snow-dawn');
 });
 
-test('every reachable weather selects its replacement pet art while the scene sheets stay unchanged',()=>{
- assert.equal(Object.keys(PET_WALKER_ART).length,WALKER_SLOTS.length);
+test('every reachable weather selects a complete replacement or the original pet panel',()=>{
  const reached=new Set();
  for(const daylight of [true,false])for(const condition of conditions)for(const feels of feelsValues)for(const context of contexts){
   const slot=walkerSlot(comfortSceneState(daylight,condition,feels,context),daylight);
   const walker=dogWalkerScene(daylight,condition,feels,context);
   reached.add(slot);
-  assert.ok(PET_WALKER_ART[slot],slot);
-  assert.ok(walker.includes(`data-walker-slot="${slot}"`),slot);
-  assert.ok(walker.includes(`/weather-fusion/pet-walker-${slot}.webp?`),slot);
+  if(PET_WALKER_ART[slot]){
+   assert.ok(walker.includes(`data-walker-slot="${slot}"`),slot);
+   assert.ok(walker.includes(`/weather-fusion/pet-walker-${slot}.webp?`),slot);
+   assert.match(walker,/style="filter:none"/);
+  }else{
+   assert.equal(walker,referenceScene(2,daylight,condition,feels,context),`${slot} keeps the original woman and dog`);
+   assert.doesNotMatch(walker,/data-walker="replacement"/);
+  }
   assert.equal((walker.match(/<image\b/g)||[]).length,1,slot);
-  assert.match(walker,/style="filter:none"/);
   for(const panel of [0,1])assert.doesNotMatch(referenceScene(panel,daylight,condition,feels,context),/pet-walker-|data-walker=/);
  }
  assert.deepEqual([...reached].sort(),[...slotNames].sort());
@@ -69,6 +72,7 @@ test('every installed picture exists, is declared for the server, and is named l
   assert.ok(slotNames.has(slot),`${slot} is not a real slot`);
   assert.equal(art.file,`pet-walker-${slot}.webp`);
   assert.ok(existsSync(`public/weather-fusion/${art.file}`),art.file);
+  assert.ok(statSync(`public/weather-fusion/${art.file}`).size>10000,`${art.file} must contain an image, not an empty file`);
   assert.ok(art.width>=300&&art.height>=300,'too small to display sharply');
   assert.equal(art.width,art.height,'replacement pictures are square, like the original panels');
  }
@@ -86,5 +90,10 @@ test('the For Pets card uses the new art across night, day and cool weather',()=
  const cool=pavementHTML(surface(false),50,{condition:'Clear',pop:0});
  assert.match(cool,/data-walker-slot="night-cool-night"/);
  assert.match(cool,/pet-walker-night-cool-night\.webp/);
- assert.match(pavementHTML(surface(true),68,{condition:'Clear',pop:0}),/pet-walker-day-mild-normal\.webp/);
+ const mild=pavementHTML(surface(true),68,{condition:'Clear',pop:0});
+ assert.match(mild,/comfort-integrated-mild-normal\.webp/);
+ assert.doesNotMatch(mild,/pet-walker-day-mild-normal\.webp|data-walker="replacement"/);
+ const coldRain=pavementHTML(surface(true),30,{condition:'Rain',pop:90});
+ assert.match(coldRain,/comfort-integrated-cold-rain\.webp/);
+ assert.doesNotMatch(coldRain,/pet-walker-day-cold-rain\.webp|data-walker="replacement"/);
 });

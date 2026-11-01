@@ -4,6 +4,7 @@ import {createEnsembleSpread,ENSEMBLE_SPREAD_VERSION,publishedEnsembleSpread} fr
 import {BLEND_V2_VERSION,BLEND_V2_CONFIG} from './weatherFusionBlendV2.js';
 import {createWeatherNext3} from './weatherFusionWeatherNext3.js';
 import {forecastProseConflict} from '../public/weather-fusion/forecast-consistency.js';
+import {clientIp} from './clientIp.js';
 import { weatherDateTimeFormat } from './weatherDateTimeFormat.js';
 import {createDiscussionSource,DISCUSSION_SOURCE_VERSION} from './weatherFusionDiscussionSource.js';
 import {createExposureWeatherService,addExposureWeather} from './weatherFusionExposure.js';
@@ -757,7 +758,7 @@ export function registerWeatherFusionRoutes(app, options = {}) {
   const service = createWeatherService({env:{...process.env,WEATHER_NOURIE_BLEND_V2:process.env.WEATHER_NOURIE_BLEND_V2||'true'},...options});
   const counters = new Map();
   const route = (handler) => async (req, res) => {
-    const key = req.ip || req.socket?.remoteAddress || 'unknown', minute = Math.floor(Date.now() / MINUTE);
+    const key = clientIp(req,options.env||process.env), minute = Math.floor(Date.now() / MINUTE);
     const previous = counters.get(key), current = previous?.minute === minute ? previous : { minute, count: 0 };
     current.count += 1; counters.set(key, current);
     if (counters.size > 2000) for (const [id, v] of counters) if (v.minute < minute) counters.delete(id);

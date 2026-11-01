@@ -11,12 +11,11 @@
  *   asDisplayed: true  the picture already shows its final lighting, so the page's
  *                      night brightening is not applied a second time
  */
-export const PET_WALKER_VERSION='walker-3-v39';
+export const PET_WALKER_VERSION='walker-3-v40';
 export const PET_WALKER_ART={
  "day-cold-carry-umbrella":{file:"pet-walker-day-cold-carry-umbrella.webp",width:1024,height:1024,asDisplayed:true},
  "day-cold-fog":{file:"pet-walker-day-cold-fog.webp",width:1024,height:1024,asDisplayed:true},
  "day-cold-normal":{file:"pet-walker-day-cold-normal.webp",width:1024,height:1024,asDisplayed:true},
- "day-cold-rain":{file:"pet-walker-day-cold-rain.webp",width:1024,height:1024,asDisplayed:true},
  "day-cold-watch":{file:"pet-walker-day-cold-watch.webp",width:1024,height:1024,asDisplayed:true},
  "day-cool-carry-umbrella":{file:"pet-walker-day-cool-carry-umbrella.webp",width:1024,height:1024,asDisplayed:true},
  "day-cool-fog":{file:"pet-walker-day-cool-fog.webp",width:1024,height:1024,asDisplayed:true},
@@ -26,7 +25,6 @@ export const PET_WALKER_ART={
  "day-hot-normal":{file:"pet-walker-day-hot-normal.webp",width:1024,height:1024,asDisplayed:true},
  "day-mild-carry-umbrella":{file:"pet-walker-day-mild-carry-umbrella.webp",width:1024,height:1024,asDisplayed:true},
  "day-mild-fog":{file:"pet-walker-day-mild-fog.webp",width:1024,height:1024,asDisplayed:true},
- "day-mild-normal":{file:"pet-walker-day-mild-normal.webp",width:1024,height:1024,asDisplayed:true},
  "day-mild-watch":{file:"pet-walker-day-mild-watch.webp",width:1024,height:1024,asDisplayed:true},
  "day-warm-carry-umbrella":{file:"pet-walker-day-warm-carry-umbrella.webp",width:1024,height:1024,asDisplayed:true},
  "day-warm-fog":{file:"pet-walker-day-warm-fog.webp",width:1024,height:1024,asDisplayed:true},

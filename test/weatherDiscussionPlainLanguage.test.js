@@ -45,3 +45,24 @@ test('the newer AFD layout summarizes its .DISCUSSION narrative instead of the p
  assert.match(display,/^High pressure will keep skies mostly clear through the weekend\. Clouds will increase Monday, but rain is not expected\./);
  assert.doesNotMatch(display,/KEY MESSAGE|Sunny, with a high near/);
 });
+test('briefing fallback summarizes fragment-style key messages when AI is rate limited',()=>{
+ const clock=Date.parse('2026-11-01T18:30:00Z');
+ const f={signature:'key-messages-afd',location:{office:'RAH',latitude:35.787,longitude:-78.4806,timeZone:'America/New_York'},feeds:[{id:'afd',status:'ready'}],days:[{detail:'Sunny, with a high near 68.'}],discussion:{id:'key-messages-afd',office:'RAH',issuanceTime:'2026-11-01T17:54:00Z',text:'.KEY MESSAGES...\nAs of 125 AM Sunday...\n\n1) Seasonable temperatures, dry weather and abundant high clouds the rest of this weekend.\n2) Chance of showers from late Wednesday night through Friday night or Saturday. Continued very warm mid through late week.\n&&\n.DISCUSSION...\nThere is a chance of showers starting Wednesday night in the west. However, confidence remains low given the spread in the models and the seemingly endless "kicking the can" down the road on days 5-7.\n&&'}};
+ const display=danTakeDisplay({mode:'nws-summary',signature:f.signature},f,clock);
+ assert.match(display,/Expect temperatures near normal, dry weather and plenty of high clouds/);
+ assert.match(display,/Showers are possible from late Wednesday night through Friday night or Saturday/);
+ assert.match(display,/It will stay very warm mid through late week/);
+ assert.match(display,/The timing of the showers is uncertain/);
+ assert.doesNotMatch(display,/Sunny, with a high near|spread in the models|kicking the can|KEY MESSAGES/);
+});
+test('a missing or expired discussion is disclosed instead of showing point-forecast prose',()=>{
+ const f=forecast('Showers may arrive Monday.');
+ f.days=[{detail:'Sunny, with a high near 74.'}];
+ for(const clock of [now,now+13*H]){
+  const missing=structuredClone(f);
+  if(clock===now){missing.discussion=null;missing.feeds=[];}
+  const display=danTakeDisplay(null,missing,clock);
+  assert.match(display,/forecast discussion is unavailable/);
+  assert.doesNotMatch(display,/Sunny, with a high near/);
+ }
+});

@@ -239,7 +239,7 @@ export function tier3FeelsLike(current,location,now,exposure='shade') {
   const neutralUtci=utciF(current.temperature,current.temperature,current.wind,rh);
   const mildAdjustment=finite(rawValue)&&finite(shadeApparent)&&finite(neutralUtci)
     ? mildWeight*(shadeApparent-neutralUtci):0;
-  const value=coldWindChillBlend(current.temperature,current.wind,rawValue+mildAdjustment);
+  const value=finite(rawValue)?coldWindChillBlend(current.temperature,current.wind,rawValue+mildAdjustment):null;
   const adjusted=finite(value)&&finite(rawValue)&&value>rawValue+mildAdjustment+.001;
   const solarMethod=exposure==='outdoors'&&deltaC>0?' (ASHRAE-style standing-person solar projection)':'';
   return {value,method:finite(value)?`UTCI Tier-3 fallback with estimated mean radiant temperature${solarMethod}${mildWeight>0?' with a Steadman mild-weather baseline':''}${adjusted?' and custom cold-weather blend':''}`:'UTCI outside supported range',rh,tr,deltaMrtC:deltaC,
