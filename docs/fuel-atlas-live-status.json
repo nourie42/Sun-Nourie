@@ -2,17 +2,17 @@
   "ok": true,
   "classificationRule": "NAICS qualifies inclusion; explicit facility wording determines terminal or bulk-plant labels. Oil companies, wholesalers, suppliers and fuel dealers default to Distributor when no physical terminal/bulk wording is present. Heating-oil and propane dealers are also included in Distributor.",
   "filterVersion": "verified-distributor-categories-v3",
-  "verifiedAt": "2026-10-25T10:21:38.388Z",
-  "verifiedCommit": "acd4c680ab8caa8d9f0360fe245a28fc5f1100ad",
+  "verifiedAt": "2026-11-01T18:47:24.692Z",
+  "verifiedCommit": "c353ca21d3c135ac398608c43440a6fe8d861d16",
   "liveUrl": "https://sun-nourie-live.onrender.com",
   "successfulSearches": 8,
   "attemptedSearches": 8,
   "totalFacilities": 565,
   "categoryTotals": {
-    "distributor": 303,
+    "distributor": 302,
     "heating_oil": 3,
     "bulk_plant": 45,
-    "terminal": 217,
+    "terminal": 218,
     "propane": 7
   },
   "forbiddenFacilities": 0,
@@ -49,7 +49,7 @@
         "terminal": 1,
         "propane": 0
       },
-      "elapsedMs": 92,
+      "elapsedMs": 83,
       "sources": [
         "OpenStreetMap / Overpass",
         "EPA ECHO / FRS NAICS"
@@ -130,7 +130,7 @@
         "terminal": 15,
         "propane": 0
       },
-      "elapsedMs": 12805,
+      "elapsedMs": 12779,
       "sources": [
         "EPA ECHO / FRS NAICS"
       ],
@@ -387,7 +387,7 @@
         "terminal": 120,
         "propane": 5
       },
-      "elapsedMs": 12892,
+      "elapsedMs": 12891,
       "sources": [
         "EPA ECHO / FRS NAICS"
       ],
@@ -641,7 +641,7 @@
         "terminal": 12,
         "propane": 0
       },
-      "elapsedMs": 12806,
+      "elapsedMs": 12790,
       "sources": [
         "EPA ECHO / FRS NAICS"
       ],
@@ -732,21 +732,6 @@
           "categoryError": ""
         },
         {
-          "name": "ENERGY TRANSFER MKT & TERM LP/TANK FARM 2",
-          "codes": [
-            "424710"
-          ],
-          "primary": "terminal",
-          "categories": [
-            "terminal"
-          ],
-          "classificationBasis": "Explicit terminal, depot, tank-farm or storage-terminal role",
-          "qualification": "NAICS 424710",
-          "forbidden": false,
-          "qualified": true,
-          "categoryError": ""
-        },
-        {
           "name": "ENERGY TRANSFER PHILADELPHIA TERMINAL",
           "codes": [
             "213112",
@@ -811,6 +796,21 @@
         },
         {
           "name": "KINDER MORGAN POINT BREEZE TERMINAL",
+          "codes": [
+            "424710"
+          ],
+          "primary": "terminal",
+          "categories": [
+            "terminal"
+          ],
+          "classificationBasis": "Explicit terminal, depot, tank-farm or storage-terminal role",
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true,
+          "categoryError": ""
+        },
+        {
+          "name": "MARCUS HOOK TANK FARM 2",
           "codes": [
             "424710"
           ],
@@ -906,7 +906,7 @@
         "terminal": 25,
         "propane": 1
       },
-      "elapsedMs": 12817,
+      "elapsedMs": 12787,
       "sources": [
         "EPA ECHO / FRS NAICS"
       ],
@@ -998,6 +998,21 @@
         {
           "name": "GALENA PARK TERMINAL",
           "codes": [
+            "424710"
+          ],
+          "primary": "terminal",
+          "categories": [
+            "terminal"
+          ],
+          "classificationBasis": "Explicit terminal, depot, tank-farm or storage-terminal role",
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true,
+          "categoryError": ""
+        },
+        {
+          "name": "GALENA PARK TERMINAL",
+          "codes": [
             "424710",
             "486910",
             "493190"
@@ -1019,21 +1034,6 @@
             "424710",
             "493110",
             "493190"
-          ],
-          "primary": "terminal",
-          "categories": [
-            "terminal"
-          ],
-          "classificationBasis": "Explicit terminal, depot, tank-farm or storage-terminal role",
-          "qualification": "NAICS 424710",
-          "forbidden": false,
-          "qualified": true,
-          "categoryError": ""
-        },
-        {
-          "name": "GALENA PARK TERMINAL",
-          "codes": [
-            "424710"
           ],
           "primary": "terminal",
           "categories": [
@@ -1174,7 +1174,7 @@
         "terminal": 16,
         "propane": 0
       },
-      "elapsedMs": 12799,
+      "elapsedMs": 12787,
       "sources": [
         "EPA ECHO / FRS NAICS"
       ],
@@ -1438,7 +1438,7 @@
         "terminal": 4,
         "propane": 0
       },
-      "elapsedMs": 12814,
+      "elapsedMs": 12793,
       "sources": [
         "EPA ECHO / FRS NAICS"
       ],
@@ -1684,13 +1684,13 @@
       "unqualified": 0,
       "categoryErrors": 0,
       "categoryCounts": {
-        "distributor": 14,
+        "distributor": 13,
         "heating_oil": 0,
         "bulk_plant": 0,
-        "terminal": 24,
+        "terminal": 25,
         "propane": 1
       },
-      "elapsedMs": 12800,
+      "elapsedMs": 12781,
       "sources": [
         "EPA ECHO / FRS NAICS"
       ],
@@ -1872,6 +1872,22 @@
           "categoryError": ""
         },
         {
+          "name": "EQUILON ENTERPRISES LLC-CARSON TERMINAL",
+          "codes": [
+            "324110",
+            "424710"
+          ],
+          "primary": "terminal",
+          "categories": [
+            "terminal"
+          ],
+          "classificationBasis": "Explicit terminal, depot, tank-farm or storage-terminal role",
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true,
+          "categoryError": ""
+        },
+        {
           "name": "EQUILON SIGNAL HILL TERMINAL",
           "codes": [
             "424710"
@@ -1914,22 +1930,6 @@
           ],
           "classificationBasis": "NAICS 424720 petroleum-product merchant wholesaler",
           "qualification": "NAICS 424720",
-          "forbidden": false,
-          "qualified": true,
-          "categoryError": ""
-        },
-        {
-          "name": "KINDER MORGAN ENERGY PARTNERS, LP, ORANGE TERMINAL, SANTA FE PACIFIC PIPELINE",
-          "codes": [
-            "424710",
-            "493190"
-          ],
-          "primary": "terminal",
-          "categories": [
-            "terminal"
-          ],
-          "classificationBasis": "Explicit terminal, depot, tank-farm or storage-terminal role",
-          "qualification": "NAICS 424710",
           "forbidden": false,
           "qualified": true,
           "categoryError": ""
