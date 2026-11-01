@@ -81,20 +81,31 @@ function component(hours,window,scope){
  * forecast. Missing evidence and substantial disagreement prevent High ratings.
  * Lead time eases the combined rating so a settled near-term day can be High
  * while a later day steps down even when the ensemble is still fairly tight.
+ * Same-day exception (owner decision 2026-11-01): when the caller supplies a
+ * lead time of 0 days, sky agreement is not counted in the overall rating.
+ * Remaining-day cloud cover is directly observable and its models can split
+ * widely on the current hour, so a sky disagreement must not define today's
+ * rating. The sky score stays visible in components and in excludedComponents.
+ * A call that supplies no lead time is not treated as same-day.
  */
 export function overallForecastConfidence(temperature,weather){
  const sky=weather.evidence.sky,rain=weather.evidence.rain;
- const components={temperature:temperature.score,sky:sky.score,rain:rain.score};
- const available=Object.values(components).filter(finite),missingComponents=Object.keys(components).filter(key=>!finite(components[key]));
  const leadDays=Number.isFinite(weather.leadDays)?Math.max(0,Math.trunc(weather.leadDays)):0,leadTrim=ensembleLeadTrim(weather.leadDays);
+ const sameDay=Number.isFinite(weather.leadDays)&&leadDays===0;
+ const components={temperature:temperature.score,sky:sky.score,rain:rain.score};
+ const counted=sameDay?{temperature:components.temperature,rain:components.rain}:components;
+ const available=Object.values(counted).filter(finite),missingComponents=Object.keys(counted).filter(key=>!finite(counted[key]));
  let score=available.length>=2?Math.round(available.reduce((a,b)=>a+b,0)/available.length):null;
- const complete=missingComponents.length===0&&temperature.coverage?.temperature?.complete!==false&&sky.complete&&rain.complete&&sky.completeSources.length>=2&&rain.completeSources.length>=2&&temperature.sourceCount>=2;
+ const complete=sameDay
+  ?missingComponents.length===0&&temperature.coverage?.temperature?.complete!==false&&rain.complete&&rain.completeSources.length>=2&&temperature.sourceCount>=2
+  :missingComponents.length===0&&temperature.coverage?.temperature?.complete!==false&&sky.complete&&rain.complete&&sky.completeSources.length>=2&&rain.completeSources.length>=2&&temperature.sourceCount>=2;
  if(score!==null){score=Math.max(35,score-leadTrim);if(!complete)score=Math.min(score,80);if(Math.min(...available)<70)score=Math.min(score,84);if(Math.min(...available)<55)score=Math.min(score,54);score=Math.min(score,rain.probabilityConflictCap??100);}
  const key=score===null?'unavailable':score>=85?'high':score>=70?'moderate':'low';
- const factors=['Equal weighting of available temperature, sky cover and rain agreement','At least two components are required; a missing component caps overall confidence at Moderate','Missing inputs and substantial component disagreement limit the rating'];
+ const factors=[sameDay?'Equal weighting of temperature and rain agreement for the same-day rating':'Equal weighting of available temperature, sky cover and rain agreement','At least two components are required; a missing component caps overall confidence at Moderate','Missing inputs and substantial component disagreement limit the rating'];
+ if(sameDay)factors.push('Sky agreement is reported for context but is not counted in the same-day overall rating');
  if(leadTrim)factors.push(`${leadDays}-day lead time eases the combined rating`);
- return {scope:'overall',version:'weather-nourie-overall-confidence-v3',score,key,label:key[0].toUpperCase()+key.slice(1),sourceCount:weather.sourceCount,sourceIds:weather.sourceIds,components,missingComponents,leadDays,leadTrim,
-  summary:score===null?'Fewer than two forecast components have comparable evidence.':`Temperature agreement ${components.temperature??'unavailable'}; sky agreement ${components.sky??'unavailable'}; rain agreement ${components.rain??'unavailable'}.${leadTrim?` The ${leadDays}-day lead lowers this combined rating.`:''}`,
+ return {scope:'overall',version:'weather-nourie-overall-confidence-v4',score,key,label:key==='unavailable'?'Unavailable':key[0].toUpperCase()+key.slice(1),sourceCount:weather.sourceCount,sourceIds:weather.sourceIds,components,missingComponents,excludedComponents:sameDay?['sky']:[],leadDays,leadTrim,
+  summary:score===null?'Fewer than two forecast components have comparable evidence.':`Temperature agreement ${components.temperature??'unavailable'}; sky agreement ${components.sky??'unavailable'}; rain agreement ${components.rain??'unavailable'}.${sameDay?' Sky agreement is not counted in the same-day overall rating.':''}${leadTrim?` The ${leadDays}-day lead lowers this combined rating.`:''}`,
   factors,note:'Relative agreement index, not a calibrated probability or a measured accuracy percentage. Temperature uses ensemble member spread when that feed is available.'};
 }
 function ensembleDay(out,date){

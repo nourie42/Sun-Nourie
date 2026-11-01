@@ -53,7 +53,7 @@ test('bad ensemble payloads and fetch failures stay unavailable',async()=>{
  assert.equal(ready.value.status,'ready');assert.equal(ready.value.days[0].usable,true);
 });
 
-test('settled ensemble days are High early and lower later, while a real sky disagreement still blocks High',()=>{
+test('settled ensemble days are High early and lower later; a real sky disagreement blocks High only after today',()=>{
  const now=Date.parse('2026-10-24T16:00:00Z'),ids=['nws','ecmwf','nbm'];
  const sources=value=>ids.map(id=>({id,value,weight:1/ids.length}));
  const days=Array.from({length:7},(_,i)=>({date:`2026-10-${24+i}`,confidence:{score:60,key:'low',label:'Low',summary:'Hourly gap',factors:['gap'],temperatureSpread:8,temperatureSpreadExcludingGefs:2,
@@ -74,7 +74,11 @@ test('settled ensemble days are High early and lower later, while a real sky dis
  assert.ok(out.days[6].confidence.overall.score<out.days[3].confidence.overall.score);
  out.metricForecasts.series.feels.forEach(row=>{row.inputs.skySources[2].value=100;});
  addConditionConfidence(out,{now});
- assert.notEqual(out.days[0].confidence.overall.key,'high');
+ // Owner decision 2026-11-01: sky agreement is not counted in the same-day
+ // overall rating, so today's rating stays High on temperature and rain
+ // agreement alone; the same sky disagreement still blocks High later.
+ assert.equal(out.days[0].confidence.overall.key,'high');
+ assert.notEqual(out.days[3].confidence.overall.key,'high');
 });
 
 test('an overnight GEFS mean gap does not set the temperature rating when member spread is missing',()=>{

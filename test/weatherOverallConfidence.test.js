@@ -4,6 +4,14 @@ import {displayForecastConfidence,forecastConfidenceLabel,confidenceMeterPositio
 function rating(t=100,s=70,r=100){return overallForecastConfidence({score:t,sourceCount:5,coverage:{temperature:{complete:true}}},{sourceCount:5,evidence:{sky:{score:s,complete:true,completeSources:['nws','hrrr','nbm']},rain:{score:r,complete:true,completeSources:['nws','hrrr','nbm'],probabilityConflictCap:100}}});}
 test('the reported sunny dry days use overall forecast evidence rather than the cloud-only limiting component',()=>{assert.equal(rating().label,'High');assert.equal(rating(85).label,'High');assert.equal(rating().score,90);const c={overall:rating(),weather:{scope:'sky-and-rain',score:70,key:'moderate'}};assert.equal(displayForecastConfidence(c),c.overall);assert.equal(forecastConfidenceLabel(c),'Forecast confidence');assert.equal(confidenceMeterPosition(c.overall),100);});
 test('real component disagreement and missing data are not upgraded to High',()=>{assert.equal(rating(100,0,100).key,'low');assert.notEqual(rating(60).key,'high');assert.equal(rating(100,null).key,'moderate');assert.deepEqual(rating(100,null).missingComponents,['sky']);assert.equal(rating(100,null,null).key,'unavailable');assert.equal(rating(100,100,40).key,'low');});
+test('the same-day overall rating does not count sky agreement, while later days still do',()=>{
+ const at=(leadDays,t,s,r)=>overallForecastConfidence({score:t,sourceCount:5,coverage:{temperature:{complete:true}}},{sourceCount:5,leadDays,evidence:{sky:{score:s,complete:true,completeSources:['nws','hrrr','nbm']},rain:{score:r,complete:true,completeSources:['nws','hrrr','nbm'],probabilityConflictCap:100}}});
+ const today=at(0,95,58,100);
+ assert.equal(today.score,98);assert.equal(today.key,'high');assert.equal(today.components.sky,58);assert.deepEqual(today.excludedComponents,['sky']);assert.deepEqual(today.missingComponents,[]);
+ assert.match(today.summary,/not counted in the same-day overall rating/);
+ const noSky=at(0,95,null,100);assert.equal(noSky.key,'high');assert.deepEqual(noSky.missingComponents,[]);
+ const tomorrow=at(1,95,58,100);assert.equal(tomorrow.key,'moderate');assert.deepEqual(tomorrow.excludedComponents,[]);
+});
 test('a disagreed sky still blocks High, and lead time lowers an otherwise settled later day',()=>{
  const agreed=(leadDays,temperature=95)=>overallForecastConfidence({score:temperature,sourceCount:5,coverage:{temperature:{complete:true}}},{sourceCount:5,leadDays,evidence:{sky:{score:100,complete:true,completeSources:['nws','hrrr','nbm']},rain:{score:100,complete:true,completeSources:['nws','hrrr','nbm'],probabilityConflictCap:100}}});
  assert.equal(rating(100,62,100).key,'moderate');assert.equal(rating(100,62,100).score,84);
