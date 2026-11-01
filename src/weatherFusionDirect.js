@@ -2,7 +2,7 @@ import {temperatureV2} from './weatherFusionBlendV2.js';
 import {createHrrrMapSource} from './weatherFusionHrrrMap.js';
 import {createPointModels} from './weatherFusionPointModels.js';
 /** Direct, decoded NOAA/ECMWF model snapshots. No provider key and no webpage scraping. */
-import {SAME_DAY_WEIGHTS,EXTENDED_RAIN_WEIGHTS,EXTENDED_QPF_WEIGHTS,WEATHERNEXT_WEIGHT,weatherNextPolicy,temperaturePolicy as tempPolicy,precipitationPolicy,precipitationAmountPolicy,averagedPrecipitationAmountPolicy,rainChancePolicy,forecastDayIndex,eveningPeriod,REPAIR_VERSION} from './weatherFusionPolicy.js';
+import {SAME_DAY_WEIGHTS,EXTENDED_RAIN_WEIGHTS,EXTENDED_QPF_WEIGHTS,WEATHERNEXT_WEIGHT,weatherNextPolicy,temperaturePolicy as tempPolicy,precipitationPolicy,precipitationAmountPolicy,averagedPrecipitationAmountPolicy,forecastDayIndex,eveningPeriod,REPAIR_VERSION} from './weatherFusionPolicy.js';
 import {shadeFeelsLike} from '../public/weather-fusion/weather-math.js';
 import {forecastConfidence} from '../public/weather-fusion/forecast-confidence.js';
 import {calendarDayWindow} from '../public/weather-fusion/calendar-day.js';
@@ -455,7 +455,8 @@ export function enhanceForecast(out, { models, grid, periods = [], hourlyPeriods
       const values={nws:gridQpf(grid,cursor,stop,8)};
       for(const [id,m] of Object.entries(sourceModels))values[id]=intervalTotal(m.precipitationIntervals,cursor,stop,8);
       const dayIndex=forecastDayIndex(cursor,now,out.location.timeZone);
-      const policy=out.blendV2?.enabled?averagedPrecipitationAmountPolicy(dayIndex):precipitationAmountPolicy(dayIndex,finite(values.wn));
+      const weatherNext=finite(values.wn);
+      const policy=out.blendV2?.enabled?averagedPrecipitationAmountPolicy(dayIndex,weatherNext):precipitationAmountPolicy(dayIndex,weatherNext);
       let result=weighted(values,policy);
       if(result.value===null)result=weighted(values,{nbm:1});
       for(const [id,v] of Object.entries(values))if(finite(v)){sourceTotals[id]=(sourceTotals[id]||0)+v;sourceCoverage[id]=(sourceCoverage[id]||0)+span;}
@@ -465,7 +466,7 @@ export function enhanceForecast(out, { models, grid, periods = [], hourlyPeriods
       cursor=stop;
     }
     const sources=Object.keys(totals).map(id=>({id,weight:round(durations[id]/covered,6),value:round(sourceTotals[id],8),coverageHours:round(sourceCoverage[id]/H,1)}));
-    const comparisonSources=out.blendV2?.enabled?Object.entries(sourceTotals).filter(([id])=>sourceCoverage[id]>=end-start).map(([id,value])=>({id,value:round(value,8),weight:averagedPrecipitationAmountPolicy(forecastDayIndex(start,now,out.location.timeZone))[id]||1,runAt:sourceRun(id,end)})):undefined;
+    const comparisonSources=out.blendV2?.enabled?Object.entries(sourceTotals).filter(([id])=>sourceCoverage[id]>=end-start).map(([id,value])=>({id,value:round(value,8),weight:averagedPrecipitationAmountPolicy(forecastDayIndex(start,now,out.location.timeZone),finite(sourceTotals.wn))[id]||1,runAt:sourceRun(id,end)})):undefined;
     const complete=end>start&&covered===end-start;
     return {value:complete?round(total,8):null,sources:complete?sources:[],...(comparisonSources?{comparisonSources}:{}),calibrated:false,start:iso(start),end:iso(end),
       sourceValues:Object.fromEntries(['nws',...active].map(id=>[id,sourceCoverage[id]>=end-start?round(sourceTotals[id],8):null])),
@@ -499,7 +500,7 @@ export function enhanceForecast(out, { models, grid, periods = [], hourlyPeriods
       ?sourceCondition.trim():null;
     const precipitationBlend=sourceQpf(time,time+H);
     const dayIndex=forecastDayIndex(time,now,out.location.timeZone);
-    const policy=rainChancePolicy(dayIndex,precipitationBlend.sourceValues,{blendV2:!!out.blendV2?.enabled});
+    const policy=precipitationPolicy(dayIndex,finite(precipitationBlend.sourceValues?.wn));
     const nbmProbability=sample(sourceModels.nbm,time+H,'precipitation_probability');
     const rainLikelihood=publishedPrecipitationLikelihood(officialPop,precipitationBlend,policy,{nbmProbability});
     rainLikelihood.sources=rainLikelihood.sources.map(source=>({...source,runAt:sourceRun(source.id,time+H)}));

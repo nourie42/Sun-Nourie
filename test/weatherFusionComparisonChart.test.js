@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {buildSeries,CHART_DRAW_ORDER,CHART_LINE_STYLE,COLORS,nicePrecipitationTicks,comparisonReading} from '../public/weather-fusion/wn-blend.js';
 import {precipitationLikelihood,publishedPrecipitationLikelihood} from '../src/weatherFusionDirect.js';
-import {rainChancePolicy} from '../src/weatherFusionPolicy.js';
+import {precipitationPolicy,SAME_DAY_WEIGHTS,EXTENDED_RAIN_WEIGHTS} from '../src/weatherFusionPolicy.js';
 
 const H=3600000;
 const iso=time=>new Date(time).toISOString();
@@ -67,19 +67,23 @@ test('a partial final day keeps the blend and the model lines and records the sh
   assert.equal(built.partialDays[0],null);
 });
 
-test('the first three blend days publish the NWS chance while NBM probability stays available for the line',()=>{
-  assert.deepEqual(rainChancePolicy(1,{nws:0,ecmwf:.012,nbm:.2,wn:0},{blendV2:true}),{nws:1});
-  const later=rainChancePolicy(4,{nws:0,ecmwf:.2,nbm:.1,wn:.05,gefs:.2,weathernext3:.1},{blendV2:true});
-  assert.equal(later.nws,.4);
-  assert.equal(later.gefs,.1);
-  assert.equal(later.weathernext3,.1);
-  const scored=precipitationLikelihood(12,{sourceValues:{hrrr:0,ecmwf:.012,nbm:0}},{nws:1},{nbmProbability:47});
-  assert.equal(scored.value,12);
+test('rain chance keeps the owner weights and still records an NBM probability',()=>{
+  assert.deepEqual(precipitationPolicy(0),SAME_DAY_WEIGHTS);
+  assert.deepEqual(precipitationPolicy(1),EXTENDED_RAIN_WEIGHTS);
+  assert.deepEqual(precipitationPolicy(4),EXTENDED_RAIN_WEIGHTS);
+  const withWeatherNext=precipitationPolicy(1,true);
+  assert.equal(withWeatherNext.nws,.4);
+  assert.equal(withWeatherNext.wn,.1);
+  assert.equal(withWeatherNext.gefs,undefined);
+  assert.equal(withWeatherNext.weathernext3,undefined);
+  const scored=precipitationLikelihood(12,{sourceValues:{hrrr:0,ecmwf:.012,nbm:0}},SAME_DAY_WEIGHTS,{nbmProbability:47});
   assert.equal(scored.sourceValues.nbm,47);
   assert.equal(scored.sourceKinds.nbm,'probability');
-  assert.equal(scored.sourcePoints.ecmwf,null);
+  assert.equal(scored.sourcePoints.nbm,9.4);
   assert.equal(scored.reductionReasons.ecmwf,'uncorroborated');
-  assert.ok(Math.abs(scored.sourceValues.ecmwf-100/3)<1e-8);
+  assert.ok(Math.abs(scored.sourcePoints.ecmwf-10/3)<1e-6);
+  assert.equal(scored.sourcePoints.gefs,undefined);
+  assert.equal(scored.sourcePoints.weathernext3,undefined);
 });
 
 test('NBM published probability replaces the wet or dry signal when the hour is scored',()=>{

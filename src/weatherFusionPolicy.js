@@ -34,41 +34,16 @@ export function temperaturePolicy(index, weatherNext = false) {
 export function precipitationPolicy(index, weatherNext = false) {
   return weatherNextRainPolicy(index === 0 ? SAME_DAY_WEIGHTS : EXTENDED_RAIN_WEIGHTS, weatherNext);
 }
-// Blend V2 rain amounts: official NWS for the first three local days (NBM
-// fills any gap), then an equal-weight average of every available source.
-// Google's two WeatherNext feeds share one vote. weighted() renormalizes over
-// sources that have data.
+// The first three local days use the owner amount weights. weighted()
+// renormalizes over sources that have data. From day three, every available
+// source is averaged, and the two Google WeatherNext feeds share one vote.
 export const AVERAGED_QPF_FIRST_DAY = 3;
-export function averagedPrecipitationAmountPolicy(index) {
-  return index < AVERAGED_QPF_FIRST_DAY ? {nws:1} : {nws:1, nbm:1, ecmwf:1, gefs:1, wn:.5, weathernext3:.5};
+export function averagedPrecipitationAmountPolicy(index, weatherNext = false) {
+  if (index < AVERAGED_QPF_FIRST_DAY) return precipitationAmountPolicy(index, weatherNext);
+  return {nws:1, nbm:1, ecmwf:1, gefs:1, wn:.5, weathernext3:.5};
 }
 export function precipitationAmountPolicy(index, weatherNext = false) {
   return weatherNextPolicy(index === 0 ? SAME_DAY_WEIGHTS : EXTENDED_QPF_WEIGHTS, weatherNext);
-}
-const finiteWeight = value => typeof value === 'number' && Number.isFinite(value);
-/** Rain chance and precipitation use the same model family for a lead day.
- * Blend V2 precipitation for the first three local days is official NWS
- * guidance, so the published rain chance for those days is the official
- * probability too. A deterministic model's rainfall cannot move one blend
- * while the other ignores it. From day three, GEFS and WeatherNext 3 join
- * the rain score when their amounts exist, matching the precipitation average.
- */
-export function rainChancePolicy(index, sourceValues = {}, {blendV2 = false} = {}) {
-  if (blendV2 && index < AVERAGED_QPF_FIRST_DAY) return {nws: 1};
-  const base = precipitationPolicy(index, finiteWeight(sourceValues?.wn));
-  if (!(blendV2 && index >= AVERAGED_QPF_FIRST_DAY)) return base;
-  const extras = ['gefs', 'weathernext3'].filter(id => finiteWeight(sourceValues?.[id]));
-  if (!extras.length) return base;
-  const nws = finiteWeight(base.nws) ? base.nws : 0;
-  const rest = Object.entries(base).filter(([id, weight]) => id !== 'nws' && weight > 0);
-  const extraTotal = 0.1 * extras.length;
-  const room = Math.max(0, 1 - nws - extraTotal);
-  const restTotal = rest.reduce((sum, [, weight]) => sum + weight, 0) || 1;
-  const policy = {};
-  if (nws > 0) policy.nws = nws;
-  for (const [id, weight] of rest) policy[id] = Number((weight * room / restTotal).toFixed(8));
-  for (const id of extras) policy[id] = 0.1;
-  return policy;
 }
 /** Match the evening that starts on this date, not the pre-dawn period ending today. */
 export function eveningPeriod(periods, date, zone, now) {
