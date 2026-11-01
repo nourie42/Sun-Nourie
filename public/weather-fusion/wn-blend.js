@@ -1,5 +1,4 @@
 import {temperatureRangePrecision} from './forecast-confidence.js?v=confidence-evidence-v4';
-import {hideLowRainChance} from './rain-display.js?v=low-rain-display-v1';
 /** Compare the published Weather Nourie forecast with individual model guidance. */
 import {dailyForecastReadings} from './seven-day.js?v=low-rain-display-v1';
 import {calendarDayWindow} from './calendar-day.js?v=calendar-days-v1';
@@ -19,11 +18,45 @@ const VARIABLES = {
 };
 let curVar = 'temp';
 
-const COLORS = {
+export const COLORS = {
   nourie: '#ffffff',
   nws: '#7fd4ff', hrrr: '#ffb47d', nam: '#68e5dc', nbm: '#7de8a8', ecmwf: '#b48cff', wn: '#ffd479', gfs: '#ff8fc8',
-  weathernext3:'#f5cc66',gefs:'#ff8fc8',single: '#7fd4ff',
+  weathernext3:'#ff5a1f', gefs:'#d6ff4a', single: '#7fd4ff',
 };
+export const CHART_DRAW_ORDER = ['wn', 'weathernext3', 'nws', 'hrrr', 'nam', 'nbm', 'ecmwf', 'gefs', 'gfs', 'nourie', 'single'];
+export const CHART_LINE_STYLE = {
+  wn: { w: 2.5, dash: '6,4', op: 0.9 }, weathernext3: { w: 2.75, dash: '9,4', op: 0.95 },
+  nws: { w: 2.5, op: 0.85 }, hrrr: { w: 2.5, op: 0.85 }, nam: { w: 2.5, op: 0.85 }, nbm: { w: 2.5, op: 0.85 },
+  ecmwf: { w: 2.5, op: 0.85 }, gefs: { w: 2.75, dash: '2,3', op: 0.95 }, gfs: { w: 2.5, op: 0.85 },
+  nourie: { w: 4, op: 1 }, single: { w: 4, op: 1 },
+};
+/** Round a precipitation axis onto 1/2/2.5/5 × 10^n steps, including zero. */
+export function nicePrecipitationTicks(hi) {
+  const top = Math.max(finite(hi) ? hi : 0, 0.04);
+  const raw = top / 4, pow = 10 ** Math.floor(Math.log10(raw)), scaled = raw / pow;
+  const step = (scaled < 1.5 ? 1 : scaled < 3 ? 2 : scaled < 7 ? 5 : 10) * pow;
+  const end = Math.max(step, Math.ceil((top - 1e-9) / step) * step), ticks = [];
+  for (let value = 0; value <= end + step * 0.001 && ticks.length < 6; value += step) ticks.push(Number(value.toFixed(4)));
+  if (ticks[ticks.length - 1] < end - 1e-9) ticks.push(Number(end.toFixed(4)));
+  return ticks;
+}
+export function rainSignalKind(id, value, kind) {
+  if (kind === 'probability' || kind === 'deterministic') return kind;
+  if (id === 'nourie' || id === 'nws' || id === 'single') return 'probability';
+  if (!finite(value)) return 'deterministic';
+  if (value === 0 || value === 100 || Math.abs(value - 100 / 3) < 1e-4) return 'deterministic';
+  return 'probability';
+}
+/** Probabilities stay percentages, with values under 5% shown rather than dropped. Wet/dry model signals are not percentages. */
+export function comparisonReading(varId, id, value, kind, fmt) {
+  if (!finite(value)) return 'Unavailable';
+  if (varId === 'pop') {
+    if (rainSignalKind(id, value, kind) === 'deterministic') return value <= 0 ? 'Dry' : value < 50 ? 'Light' : 'Wet';
+    if (value >= 0 && value < 5) return '<5%';
+    return `${Math.round(value)}%`;
+  }
+  return fmt ? fmt(value) : String(value);
+}
 const K2F = (k) => (k - 273.15) * 9 / 5 + 32;
 const MS2MPH = (ms) => ms * 2.23694;
 const M2IN = (m) => m * 39.3701; // WeatherNext/ECMWF precipitation is in metres
@@ -198,7 +231,7 @@ export function buildSeries(fx, wn, varId, now = Date.now()) {
     return {start:varId!=='temp'&&finite(published?.start)?Math.max(calendar.start,published.start):calendar.start,
       end:varId==='temp'?calendar.end:finite(published?.end)?Math.min(calendar.end,published.end):calendar.end};
   });
-  const out = { sourceAvailability:Object.fromEntries((fx.feeds||[]).map(f=>[f.id,{status:f.status,message:f.message||''}])),nwsFallback:varId==='pop'&&readings.some(day=>day.rainSourceFallback&&finite(day.pop)),days, perModel: true, wnVals: days.map(() => null), modelMaps: days.map(() => ({})), forecastValues: days.map(() => null), windows,assembledAt:fx.assembledAt,timeZone:tz };
+  const out = { sourceAvailability:Object.fromEntries((fx.feeds||[]).map(f=>[f.id,{status:f.status,message:f.message||''}])),nwsFallback:varId==='pop'&&readings.some(day=>day.rainSourceFallback&&finite(day.pop)),days, perModel: true, wnVals: days.map(() => null), modelMaps: days.map(() => ({})), modelKinds: days.map(() => ({})), partialDays: days.map(() => null), forecastValues: days.map(() => null), windows,assembledAt:fx.assembledAt,timeZone:tz };
 
   if (varId === 'temp' || varId === 'rain') {
     out.forecastValues = readings.map(day => varId === 'temp' ? day.high : day.amount);
@@ -250,18 +283,32 @@ export function buildSeries(fx, wn, varId, now = Date.now()) {
       out.forecastValues[i]=values.nourie??null;delete values.nourie;out.modelMaps[i]=values;
     });
   } else if (varId === 'pop') {
-    // Per-model rain chance at each day's peak hour (from the server's rain-likelihood blend).
-    // NWS is a true probability; HRRR/NBM/ECMWF are each model's wet/dry rain signal. WeatherNext has no PoP field.
+    // Each model uses its own highest hourly signal inside the calendar day.
+    // Sampling every model at the blend's peak hour made dry models look wet and wet models look dry.
     days.forEach((d, i) => {
-      const day = fx.days[i] || {}, likelihood = day.rainLikelihood;
-      const peak=(fx.rainTimeline||[]).filter(row=>{
-        const start=Date.parse(row.time),end=Date.parse(row.end)||start+3600000;
-        return start<windows[i].end&&end>windows[i].start&&finite(row.rainLikelihood?.value);
-      })
-        .reduce((best,row)=>!best||row.rainLikelihood.value>best.rainLikelihood.value?row:best,null);
-      const sv = peak?.rainLikelihood?.sourceValues || likelihood?.peak?.sourceValues || {};
-      const src = {}; for (const [id, v] of Object.entries(sv)) if (finite(v)) src[id] = v;
+      const day = fx.days[i] || {};
+      const rows = (fx.rainTimeline || []).filter(row => {
+        const start = Date.parse(row.time), end = Date.parse(row.end) || start + 3600000;
+        return finite(start) && start < windows[i].end && end > windows[i].start;
+      });
+      const src = {}, kinds = {}, fallback = day.rainLikelihood?.peak?.sourceValues || {};
+      const ids = new Set([...Object.keys(fallback), ...rows.flatMap(row => Object.keys(row.rainLikelihood?.sourceValues || {}))]);
+      for (const id of ids) {
+        let best = null, kind = null, saw = false;
+        for (const row of rows) {
+          const value = row.rainLikelihood?.sourceValues?.[id];
+          if (!finite(value)) continue;
+          saw = true;
+          if (best === null || value > best) { best = value; kind = row.rainLikelihood?.sourceKinds?.[id] || null; }
+        }
+        if (!saw && finite(fallback[id])) {
+          best = fallback[id];
+          kind = day.rainLikelihood?.peak?.sourceKinds?.[id] || day.rainLikelihood?.sourceKinds?.[id] || null;
+        }
+        if (finite(best)) { src[id] = best; if (kind) kinds[id] = kind; }
+      }
       out.modelMaps[i] = src;
+      out.modelKinds[i] = kinds;
     });
     out.forecastValues = readings.map(day => day.pop);
   } else if (varId === 'wind' || varId === 'dewpoint' || varId === 'humidity') {
@@ -289,7 +336,27 @@ export function buildSeries(fx, wn, varId, now = Date.now()) {
     out.single = aqiDaily(fx.airQuality?.hours, days, tz);
   }
   out.forecastValues = out.forecastValues.map(value => finite(value) ? value : null);
+  alignPartialTail(out, fx, varId);
   return out;
+}
+/** The forecast tail often ends before local midnight. Keep every line on that partial day, and say so. */
+function alignPartialTail(out, fx, varId) {
+  if (varId !== 'pop' && varId !== 'rain') return;
+  const last = out.days.length - 1;
+  if (last < 1) return;
+  const coverage = fx.days?.[last]?.rainLikelihood?.coverage;
+  const available = coverage?.availableHours, expected = coverage?.expectedHours;
+  if (!coverage || coverage.complete !== false || !finite(available) || available <= 0 || !finite(expected) || expected <= available) return;
+  out.partialDays[last] = { availableHours: available, expectedHours: expected };
+  if (varId === 'pop') {
+    if (!finite(out.forecastValues[last]) && finite(fx.days[last]?.rainLikelihood?.availablePeak)) out.forecastValues[last] = fx.days[last].rainLikelihood.availablePeak;
+    return;
+  }
+  if (!finite(out.forecastValues[last])) {
+    out.modelMaps[last] = {};
+    if (Array.isArray(out.wnVals)) out.wnVals[last] = null;
+    if (Array.isArray(out.single)) out.single[last] = null;
+  }
 }
 
 const hiddenModels = new Set();
@@ -305,7 +372,7 @@ export function dailyHighComparison(built,index){
   };
   return {published:summarize(published),contributing:summarize(built.contributingHighs?.[index])};
 }
-function renderChart(container, built, varDef, varId) {
+export function renderChart(container, built, varDef, varId) {
   // A resize, variable switch or forecast refresh replaces the graph. Retire
   // its document/window handlers along with the old elements.
   container._wnTooltipAbort?.abort();
@@ -350,6 +417,8 @@ function renderChart(container, built, varDef, varId) {
   hi += pad;
   if (varDef.unit === '%') hi = Math.min(100, hi);
   if(varId==='cloud'){lo=0;hi=100;}
+  let precipitationTicks=null;
+  if(varId==='rain'){lo=0;precipitationTicks=nicePrecipitationTicks(hi);hi=precipitationTicks[precipitationTicks.length-1]||hi;}
   const n = days.length;
   const X = (i) => PL + (i / Math.max(1, n - 1)) * (W - PL - PR);
   const Y = (v) => PT + (1 - (v - lo) / (hi - lo)) * (H - PT - PB);
@@ -359,31 +428,34 @@ function renderChart(container, built, varDef, varId) {
     if (long) return `${d.tonight ? 'Tonight · ' : ''}${dt.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}`;
     return i === 0 ? (d.tonight ? (phone ? 'Tnt' : 'Tonight') : phone ? 'Tdy' : 'Today') : dt.toLocaleDateString('en-US', { weekday: 'short' }).slice(0, phone ? 2 : 3);
   };
-  const labels = days.map((d, i) => `<text x="${X(i).toFixed(0)}" y="${H - 10}" text-anchor="middle" font-size="${FS}" font-weight="600" fill="#d5e1f2">${dayName(d, i)}</text>`).join('');
-  const ticks = [0, 0.25, 0.5, 0.75, 1].map((f) => lo + f * (hi - lo));
+  const labels = days.map((d, i) => `<text x="${X(i).toFixed(0)}" y="${H - 10}" text-anchor="middle" font-size="${FS}" font-weight="600" fill="#d5e1f2">${dayName(d, i)}${built.partialDays?.[i]?'*':''}</text>`).join('');
+  const ticks = precipitationTicks || [0, 0.25, 0.5, 0.75, 1].map((f) => lo + f * (hi - lo));
   const ylabels = ticks.map((v) =>
     `<line x1="${PL}" x2="${W - PR}" y1="${Y(v).toFixed(1)}" y2="${Y(v).toFixed(1)}" stroke="rgba(255,255,255,.14)" stroke-width="1"/>`
     + `<text x="${PL - 6}" y="${(Y(v) + 4).toFixed(0)}" text-anchor="end" font-size="${FS}" fill="#d5e1f2">${varDef.fmt(v)}</text>`).join('');
-  const style = { wn: { w: 2.5, dash: '6,4', op: 0.9 }, nws: { w: 2.5, op: 0.85 }, hrrr: { w: 2.5, op: 0.85 }, nam: { w: 2.5, op: 0.85 }, nbm: { w: 2.5, op: 0.85 }, ecmwf: { w: 2.5, op: 0.85 }, gfs: { w: 2.5, op: 0.85 }, nourie: { w: 4, op: 1 }, single: { w: 4, op: 1 } };
-  const drawOrder = ['wn', 'nws', 'hrrr', 'nam', 'nbm', 'ecmwf', 'gfs', 'nourie', 'single'].filter((id) => visible.includes(id));
+  const style = CHART_LINE_STYLE;
+  const drawOrder = CHART_DRAW_ORDER.filter((id) => visible.includes(id));
   const lines = drawOrder.map((id) => { const s = style[id], d = path(series[id]); return d ? `<path data-series="${id}" d="${d}" fill="none" stroke="${COLORS[id]}" stroke-width="${s.w}"${s.dash ? ` stroke-dasharray="${s.dash}"` : ''} opacity="${s.op}" stroke-linecap="round" stroke-linejoin="round"/>` : ''; }).join('');
   const primaryId = visible.includes('nourie') ? 'nourie' : visible.includes('single') ? 'single' : visible[0];
   const dots = primaryId ? series[primaryId].map((v, i) => v == null ? '' :
     `<circle data-series="${primaryId}" data-date="${days[i].date}" data-index="${i}" data-value="${v}" cx="${X(i).toFixed(1)}" cy="${Y(v).toFixed(1)}" r="4" fill="${COLORS[primaryId]}"/>`
-    + ((phone && i % 2)||varId==='pop'&&hideLowRainChance(v) ? '' : `<text data-point-label="${i}" x="${X(i).toFixed(0)}" y="${(Y(v) - 11).toFixed(0)}" text-anchor="middle" font-size="${FS}" fill="#fff" font-weight="700" paint-order="stroke" stroke="rgba(0,0,0,.45)" stroke-width="3">${varDef.fmt(v)}</text>`)).join('') : '';
+    + ((phone && i % 2)||(varId==='rain'&&(v<0.005||Y(v)>H-PB-14)) ? '' : `<text data-point-label="${i}" x="${X(i).toFixed(0)}" y="${(Y(v) - 11).toFixed(0)}" text-anchor="middle" font-size="${FS}" fill="#fff" font-weight="700" paint-order="stroke" stroke="rgba(0,0,0,.45)" stroke-width="3">${escapeHTML(comparisonReading(varId,primaryId,v,built.modelKinds?.[i]?.[primaryId],varDef.fmt))}</text>`)).join('') : '';
   const chip = (id) => { const off = hiddenModels.has(id);
     const tag = id === 'nourie' ? 'span' : 'button';
-    return `<${tag}${tag === 'button' ? ` type="button" aria-pressed="${!off}"` : ''} class="wn-chip" data-model="${id}" style="display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:999px;border:1px solid ${off ? 'rgba(255,255,255,.12)' : COLORS[id] + '99'};background:${off ? 'transparent' : 'rgba(255,255,255,.10)'};font-family:inherit;font-size:11px;font-weight:600;line-height:1.4;color:${off ? '#7f8ca3' : '#e8eef8'};white-space:nowrap;cursor:${tag === 'button' ? 'pointer' : 'default'};${off ? 'text-decoration:line-through;' : ''}">`
-      + `<i style="width:12px;height:3px;border-radius:2px;background:${COLORS[id]};opacity:${off ? 0.3 : 1};display:inline-block"></i>${displayName(id)}</${tag}>`; };
+    const covered = series[id].filter(finite).length;
+    const limited = id !== 'nourie' && id !== 'single' && covered > 0 && covered < days.length;
+    const coverage = limited ? ` · ${covered}/${days.length}d` : '';
+    return `<${tag}${tag === 'button' ? ` type="button" aria-pressed="${!off}"` : ''} class="wn-chip" data-model="${id}"${limited?` title="${escapeHTML(displayName(id))} has data for ${covered} of ${days.length} days"`:''} style="display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:999px;border:1px solid ${off ? 'rgba(255,255,255,.12)' : COLORS[id] + '99'};background:${off ? 'transparent' : 'rgba(255,255,255,.10)'};font-family:inherit;font-size:11px;font-weight:600;line-height:1.4;color:${off ? '#7f8ca3' : '#e8eef8'};white-space:nowrap;cursor:${tag === 'button' ? 'pointer' : 'default'};${off ? 'text-decoration:line-through;' : ''}">`
+      + `<i style="width:12px;height:3px;border-radius:2px;background:${COLORS[id]};opacity:${off ? 0.3 : 1};display:inline-block"></i>${displayName(id)}${coverage}</${tag}>`; };
   const legend = built.perModel ? ids.map(chip).join('')
     : `<span style="font-size:11px;color:#d5deee">${varId === 'aqi' ? 'Daily max AQI (Open-Meteo / CAMS)' : varId === 'uv' ? 'Daily max UV index' : ''}</span>`;
   const snapshot=Date.parse(built.assembledAt),stamp=finite(snapshot)?new Intl.DateTimeFormat('en-US',{timeZone:built.timeZone,month:'short',day:'numeric',hour:'numeric',minute:'2-digit',timeZoneName:'short'}).format(new Date(snapshot)):null;
-  const note = built.perModel ? `<p style="font-size:11px;color:#c4d9ed;margin:6px 0 0">${built.nwsFallback?'Rain chance uses official NWS probabilities. Model rainfall amounts are available separately under Precipitation; they are not calibrated probabilities.':'Weather Nourie blend is the forecast shown on this page.'} Other lines show individual models. Tap a model to show/hide its line, or tap the graph for values.${varId === 'temp' ? ' Daily highs require every forecast hour in the displayed day. Incomplete model days are unavailable. The daily-high range includes all published model highs, including hidden lines, and excludes the blended forecast. Comparison-only models are labeled separately from contributing models. Confidence also checks same-hour disagreements, including overnight; that is a separate comparison from the daily-high range.'+(stamp?' Forecast updated '+stamp+'.':'') : varId === 'rain' ? ' Rain totals use the same local calendar dates as the daily tiles, ending at midnight.' : varId === 'wind' ? ' Wind shows the average over that forecast period.' : varId === 'cloud' ? ' Cloud cover is the average percentage across the same remaining daylight hours used for Sky/rain agreement, or remaining nighttime when daylight has ended. 0% means clear; 100% means overcast. Tap the graph to compare models. Incomplete model coverage stays unavailable.' : varId === 'dewpoint' ? ' Dew point shows the highest reading over that forecast period.' : varId === 'pop' ? ' Individual model rain signals are not calibrated probabilities.' : varId === 'snow' ? ' Snow totals are inches for the same local calendar date. HRRR and NAM stop at their published forecast range; missing coverage is Unavailable. Overlapping zero lines mean the models forecast no snow. WPC uses different accumulation periods, and WeatherNext does not publish snowfall depth, so neither is substituted into these daily model lines.' : ''}</p>` : '';
+  const note = built.perModel ? `<p style="font-size:11px;color:#c4d9ed;margin:6px 0 0">${built.nwsFallback?'Rain chance uses official NWS probabilities. Model rainfall amounts are available separately under Precipitation; they are not calibrated probabilities.':'Weather Nourie blend is the forecast shown on this page.'} Other lines show individual models. Tap a model to show/hide its line, or tap the graph for values.${varId === 'temp' ? ' Daily highs require every forecast hour in the displayed day. Incomplete model days are unavailable. The daily-high range includes all published model highs, including hidden lines, and excludes the blended forecast. Comparison-only models are labeled separately from contributing models. Confidence also checks same-hour disagreements, including overnight; that is a separate comparison from the daily-high range.'+(stamp?' Forecast updated '+stamp+'.':'') : varId === 'rain' ? ' Rain totals use the same local calendar dates as the daily tiles, ending at midnight.' : varId === 'wind' ? ' Wind shows the average over that forecast period.' : varId === 'cloud' ? ' Cloud cover is the average percentage across the same remaining daylight hours used for Sky/rain agreement, or remaining nighttime when daylight has ended. 0% means clear; 100% means overcast. Tap the graph to compare models. Incomplete model coverage stays unavailable.' : varId === 'dewpoint' ? ' Dew point shows the highest reading over that forecast period.' : varId === 'pop' ? ' NWS is a probability. NBM uses its published probability when that field is present; otherwise, and for every other model, Dry, Light, and Wet are rain signals rather than percentages. Values under 5% stay listed as under 5%. A starred day is only partly covered, and every line on it uses the hours that were published. A model chip ending in a day count, such as HRRR, does not cover the full period.' : varId === 'snow' ? ' Snow totals are inches for the same local calendar date. HRRR and NAM stop at their published forecast range; missing coverage is Unavailable. Overlapping zero lines mean the models forecast no snow. WPC uses different accumulation periods, and WeatherNext does not publish snowfall depth, so neither is substituted into these daily model lines.' : ''}</p>` : '';
   container.innerHTML = `<div style="display:flex;flex-wrap:wrap;gap:4px;padding:2px 0 8px">${legend}</div>`
     + `<div class="wn-chart-wrap" style="position:relative;touch-action:pan-y">`
     + `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" style="width:100%;height:auto;display:block;cursor:crosshair" role="img" aria-label="${varId==='temp'?'Daily high temperature':varDef.label} comparison chart">${ylabels}${labels}${lines}${dots}`
     + `<line class="wn-cross" x1="0" x2="0" y1="${PT - 10}" y2="${H - PB}" stroke="#fff" stroke-width="1.5" stroke-dasharray="3,3" opacity="0"/><g class="wn-cross-dots"></g></svg>`
-    + `<div class="wn-tip" role="status" aria-live="polite" style="position:absolute;top:4px;display:none;min-width:130px;padding:8px 10px;border-radius:12px;background:rgba(10,20,40,.88);border:1px solid rgba(255,255,255,.22);color:#fff;font-size:12px;line-height:1.45;pointer-events:none;box-shadow:0 6px 18px rgba(0,0,0,.35)"><button type="button" class="wn-tip-close" aria-label="Close model values" style="position:absolute;top:3px;right:3px;width:32px;height:32px;border:0;border-radius:6px;background:transparent;color:#fff;font-size:24px;line-height:1;cursor:pointer;pointer-events:auto">×</button><div class="wn-tip-content"></div></div></div>${note}${sourceNote}${coverageNote}`;
+    + `<div class="wn-tip" role="status" aria-live="polite" style="position:absolute;top:4px;display:none;min-width:130px;max-width:calc(100% - 8px);padding:8px 10px;border-radius:12px;background:rgba(10,20,40,.88);border:1px solid rgba(255,255,255,.22);color:#fff;font-size:12px;line-height:1.45;white-space:nowrap;pointer-events:none;box-shadow:0 6px 18px rgba(0,0,0,.35)"><button type="button" class="wn-tip-close" aria-label="Close model values" style="position:absolute;top:3px;right:3px;width:32px;height:32px;border:0;border-radius:6px;background:transparent;color:#fff;font-size:24px;line-height:1;cursor:pointer;pointer-events:auto">×</button><div class="wn-tip-content"></div></div></div>${note}${sourceNote}${coverageNote}`;
   container.querySelectorAll('button.wn-chip').forEach((b) => b.addEventListener('click', () => {
     const id = b.dataset.model; if (hiddenModels.has(id)) hiddenModels.delete(id); else hiddenModels.add(id);
     renderChart(container, built, varDef, varId);
@@ -400,14 +472,16 @@ function renderChart(container, built, varDef, varId) {
     const x = X(i);
     svg.querySelectorAll('[data-point-label]').forEach(label => { label.style.visibility = Number(label.dataset.pointLabel) === i ? 'hidden' : ''; });
     cross.setAttribute('x1', x); cross.setAttribute('x2', x); cross.setAttribute('opacity', '0.8');
-    const rows = visible.map((id) => [id, series[id][i]]).filter(([id, value]) => (varId === 'temp' || varId === 'snow' || id === primaryId || finite(value))&&!(varId==='pop'&&hideLowRainChance(value)));
+    const rows = visible.map((id) => [id, series[id][i]]).filter(([id, value]) => varId === 'temp' || varId === 'snow' || id === primaryId || finite(value));
     cdots.innerHTML = rows.filter(([, value]) => finite(value)).map(([id, v]) => `<circle cx="${x}" cy="${Y(v).toFixed(1)}" r="5" fill="${COLORS[id]}" stroke="#0a1428" stroke-width="1.5"/>`).join('');
     const comparison=varId==='temp'?dailyHighComparison(built,i):null;
     const precision=comparison?Math.max(...[comparison.published,comparison.contributing].map(range=>finite(range?.spread)?temperatureRangePrecision(range):1)):1;
     const range=(summary,label)=>finite(summary?.spread)?`<span style="display:block;margin-top:5px">${label}: <b>${summary.low.value.toFixed(precision)}–${summary.high.value.toFixed(precision)}°F</b> · ${summary.spread.toFixed(1)}°F spread</span>`:'';
     const hasComparisonOnly=comparison?.published.sources.some(source=>!Object.hasOwn(built.contributingHighs?.[i]||{},source.id));
-    tipContent.innerHTML = `<b style="display:block;margin-bottom:3px;padding-right:30px">${dayName(days[i], i, true)}</b>${varId==='temp'?'<b style="display:block;margin-bottom:3px">Daily highs (°F)</b>':''}`
-      + (rows.length ? rows.map(([id, v]) => `<span data-tip-series="${id}" style="display:flex;justify-content:space-between;gap:10px"><span><i style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${COLORS[id]};margin-right:5px"></i>${displayName(id) || varDef.label}${varId==='temp'&&id!=='nourie'&&finite(v)&&!Object.hasOwn(built.contributingHighs?.[i]||{},id)?' (comparison only)':''}</span><b>${finite(v) ? varId==='temp'?v.toFixed(precision)+'°':varDef.fmt(v) : 'Unavailable'}</b></span>`).join('') : varId==='pop'?'<span>No rain chances of 5% or higher</span>':'<span>No model data</span>')
+    const partial=built.partialDays?.[i];
+    const partialNote=partial?`<span style="display:block;margin-bottom:3px">Partial day · ${Number(partial.availableHours)%1?Number(partial.availableHours).toFixed(1):Number(partial.availableHours)} of ${Number(partial.expectedHours)%1?Number(partial.expectedHours).toFixed(1):Number(partial.expectedHours)} hours</span>`:'';
+    tipContent.innerHTML = `<b style="display:block;margin-bottom:3px;padding-right:30px">${dayName(days[i], i, true)}${partial?' · partial':''}</b>${partialNote}${varId==='temp'?'<b style="display:block;margin-bottom:3px">Daily highs (°F)</b>':''}`
+      + (rows.length ? rows.map(([id, v]) => `<span data-tip-series="${id}" style="display:flex;justify-content:space-between;gap:10px;white-space:nowrap"><span style="white-space:nowrap"><i style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${COLORS[id]};margin-right:5px"></i>${displayName(id) || varDef.label}${varId==='temp'&&id!=='nourie'&&finite(v)&&!Object.hasOwn(built.contributingHighs?.[i]||{},id)?' (comparison only)':''}</span><b>${escapeHTML(comparisonReading(varId,id,v,built.modelKinds?.[i]?.[id],varId==='temp'&&finite(v)?value=>value.toFixed(precision)+'°':varDef.fmt))}</b></span>`).join('') : '<span>No model data</span>')
       +(comparison?range(comparison.published,'All published model highs')+(hasComparisonOnly?range(comparison.contributing,'Contributing model highs'):'')+'<small style="display:block">Ranges exclude the blended forecast and include hidden models.</small>':'');
     tip.style.display = 'block';
     const px = (x / W) * r.width, tw = tip.offsetWidth;

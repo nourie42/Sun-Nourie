@@ -8,32 +8,46 @@ import {snapshot,testInputs} from './weatherFusion.fixtures.js';
 
 const extended=(pop,amounts)=>precipitationLikelihood(pop,{sourceValues:amounts},EXTENDED_RAIN_WEIGHTS);
 
-test('every positive WeatherNext amount through .010 receives one-third of its share',()=>{
+test('WeatherNext amounts under 0.005 add no points and amounts through .010 stay a one-third trace',()=>{
  const policy=precipitationPolicy(1,true);
- for(const amount of [.00000214,.00001069,.00000316,.00099999]){
+ for(const amount of [.00000214,.00001069,.00000316,.00099999,.004]){
+  const score=publishedPrecipitationLikelihood(2,{sourceValues:{hrrr:0,ecmwf:0,nbm:0,wn:amount}},policy);
+  assert.equal(score.sourcePoints.wn,0);
+  assert.equal(score.value,1);
+  assert.equal(score.officialProbability,2);
+  assert.equal(score.sourceAmounts.wn,amount,'retain the actual published model amount');
+  assert.equal(score.reductionReasons.wn,'negligible');
+  assert.ok(!score.wetSources.includes('wn'));
+  assert.ok(!score.drySources.includes('wn'),'do not mislabel a tiny positive amount as a published zero');
+ }
+ for(const amount of [.005,.006,.010]){
   const score=publishedPrecipitationLikelihood(2,{sourceValues:{hrrr:0,ecmwf:0,nbm:0,wn:amount}},policy);
   assert.equal(score.sourcePoints.wn,3.33333333);
   assert.equal(score.value,4);
-  assert.equal(score.officialProbability,2);
-  assert.equal(score.sourceAmounts.wn,amount,'retain the actual published model amount');
   assert.equal(score.sources.find(s=>s.id==='wn').weight,.1);
   assert.equal(score.reductionReasons.wn,'trace');
   assert.ok(score.wetSources.includes('wn'));
-  assert.ok(!score.drySources.includes('wn'),'do not mislabel a tiny positive amount as a published zero');
  }
 });
 
-test('the hourly signal boundaries follow zero, one-third and full-credit tiers exactly',()=>{
- assert.equal(MIN_RAIN_SIGNAL_INCHES,0);
+test('the hourly signal boundaries follow dry, one-third and full-credit tiers exactly',()=>{
+ assert.equal(MIN_RAIN_SIGNAL_INCHES,0.005);
  assert.equal(deterministicRainSignal(null),null);
  assert.equal(deterministicRainSignal(0),0);
- for(const amount of [Number.MIN_VALUE,.00000214,.00099999,.001,.00306636,.010])assert.ok(Math.abs(deterministicRainSignal(amount)-100/3)<1e-8);
+ for(const amount of [Number.MIN_VALUE,.00000214,.00099999,.001,.00306636,.004999])assert.equal(deterministicRainSignal(amount),0);
+ for(const amount of [.005,.006,.010])assert.ok(Math.abs(deterministicRainSignal(amount)-100/3)<1e-8);
  assert.equal(deterministicRainSignal(.010001),100);
  for(const id of ['hrrr','ecmwf','nbm']){
   const score=precipitationLikelihood(0,{sourceValues:{hrrr:0,ecmwf:0,nbm:0,[id]:.00000214}});
-  assert.ok(score.sourcePoints[id]>0);
-  assert.equal(score.reductionReasons[id],'trace');
+  assert.equal(score.sourcePoints[id],0);
+  assert.equal(score.reductionReasons[id],'negligible');
  }
+ const lone=precipitationLikelihood(8,{sourceValues:{hrrr:0,ecmwf:.012,nbm:0}});
+ assert.equal(lone.reductionReasons.ecmwf,'uncorroborated');
+ assert.ok(Math.abs(lone.sourcePoints.ecmwf-10/3)<1e-6);
+ const backed=precipitationLikelihood(8,{sourceValues:{hrrr:0,ecmwf:.012,nbm:.006}});
+ assert.equal(backed.reductionReasons.ecmwf,undefined);
+ assert.equal(backed.sourcePoints.ecmwf,10);
  const missing=publishedPrecipitationLikelihood(40,{sourceValues:{hrrr:0,ecmwf:0,nbm:null}});
  assert.equal(missing.value,40);assert.equal(missing.mode,'nws-fallback');
 });
@@ -114,7 +128,7 @@ for(const [name,latitude,longitude] of [['Greenville, NC',35.6127,-77.3664],['Ra
     assert.equal(day.rainLikelihood.value,46);
     assert.equal(day.rainLikelihood.peak.sourcePoints.ecmwf,42.352941);
     const html=modelExplanationHTML(forecast,{index,phase:'overall',now});
-    assert.match(html,/above 0\.010 in\/hour gets all of its points/i);
+    assert.match(html,/at least 0\.050 in\/hour gets all of its points/i);
     assert.match(html,/<td>42\.352941<small>of 42\.3529 max<\/small><\/td>/);
     assert.match(html,/3\.2 \+ 42\.3529 \+ 0 = 45\.552941/);
     assert.match(html,/Shown: <b>46%/);

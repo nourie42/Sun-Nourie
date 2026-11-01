@@ -52,7 +52,8 @@ test('hourly rain likelihood scales the NWS share and tiers wet-model points',()
  const lowOfficialAndDryEcmwf=precipitationLikelihood(5,{sourceValues:{nws:null,hrrr:null,ecmwf:0,nbm:null}});
  assert.equal(lowOfficialAndDryEcmwf.rawValue,2);assert.equal(lowOfficialAndDryEcmwf.value,2);
  assert.equal(deterministicRainSignal(0),0);
- assert.ok(Math.abs(deterministicRainSignal(.004)-100/3)<1e-8);
+ assert.equal(deterministicRainSignal(.004),0);
+ assert.ok(Math.abs(deterministicRainSignal(.005)-100/3)<1e-8);
  assert.ok(Math.abs(deterministicRainSignal(.009999)-100/3)<1e-8);
  assert.ok(Math.abs(deterministicRainSignal(.01)-100/3)<1e-8);
  assert.equal(deterministicRainSignal(.010001),100);
@@ -69,13 +70,15 @@ test('hourly rain likelihood scales the NWS share and tiers wet-model points',()
  assert.equal(requested.value,15);
  assert.deepEqual(requested.sourcePoints,{nws:5.2,hrrr:0,ecmwf:10,nbm:0});
  const screenshot=precipitationLikelihood(7,{sourceValues:{hrrr:0,ecmwf:.004,nbm:.012}});
- assert.equal(screenshot.value,26);
- const boundary=precipitationLikelihood(7,{sourceValues:{hrrr:0,ecmwf:.004,nbm:.010}});
+ assert.equal(screenshot.value,9);
+ const boundary=precipitationLikelihood(7,{sourceValues:{hrrr:0,ecmwf:.006,nbm:.010}});
  assert.equal(boundary.value,13);
  assert.deepEqual(boundary.sourcePoints,{nws:2.8,hrrr:0,ecmwf:3.33333333,nbm:6.66666667});
- assert.equal(screenshot.weightedValue,26.13333333);
- assert.deepEqual(screenshot.sourcePoints,{nws:2.8,hrrr:0,ecmwf:3.33333333,nbm:20});
- assert.deepEqual(screenshot.reducedSources,['ecmwf']);
+ assert.equal(screenshot.weightedValue,9.46666667);
+ assert.deepEqual(screenshot.sourcePoints,{nws:2.8,hrrr:0,ecmwf:0,nbm:6.66666667});
+ assert.deepEqual(screenshot.reducedSources,['ecmwf','nbm']);
+ assert.equal(screenshot.reductionReasons.ecmwf,'negligible');
+ assert.equal(screenshot.reductionReasons.nbm,'uncorroborated');
  assert.deepEqual(boundary.reducedSources,['ecmwf','nbm']);
 });
 test('API feels-like helper uses the same Steadman equation family in hot mild and cold weather',()=>{

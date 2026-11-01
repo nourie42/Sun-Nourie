@@ -11,23 +11,30 @@ import {precipitationActivity,comfortSceneState} from '../public/weather-fusion/
 const close=(a,b)=>Math.abs(a-b)<1e-8;
 const directSource=readFileSync(fileURLToPath(new URL('../src/weatherFusionDirect.js',import.meta.url)),'utf8');
 const forecastSource=readFileSync(fileURLToPath(new URL('../src/weatherFusion.js',import.meta.url)),'utf8');
-assert.match(directSource,/const rainLikelihood=publishedPrecipitationLikelihood\(officialPop,precipitationBlend,policy\)/,'active hourly path must use the required tiered rain score');
+assert.match(directSource,/const rainLikelihood=publishedPrecipitationLikelihood\(officialPop,precipitationBlend,policy/,'active hourly path must use the required tiered rain score');
 assert.doesNotMatch(directSource,/out\.blendV2\?\.enabled\s*\?\s*officialRainV2/,'Blend V2 must not bypass the required tiered rain score');
 assert.match(forecastSource,/NWS probability fills its fixed 40-point share proportionally/,'published Blend V2 policy must describe the active 40-point NWS share');
 
 assert.equal(deterministicRainSignal(0),0);
-assert.ok(close(deterministicRainSignal(0.004),100/3));
+assert.equal(deterministicRainSignal(0.004),0);
+assert.ok(close(deterministicRainSignal(0.006),100/3));
 assert.ok(close(deterministicRainSignal(0.010),100/3));
 assert.equal(deterministicRainSignal(0.0100001),100);
 assert.equal(deterministicRainSignal(0.099),100);
 assert.equal(deterministicRainSignal(0.10),100);
 
-const boundary=precipitationLikelihood(7,{sourceValues:{hrrr:0,ecmwf:0.004,nbm:0.010}});
+const boundary=precipitationLikelihood(7,{sourceValues:{hrrr:0,ecmwf:0.006,nbm:0.010}});
 assert.equal(boundary.value,13);
 assert.ok(close(boundary.sourcePoints.nws,2.8));
 assert.equal(boundary.sourcePoints.hrrr,0);
 assert.ok(close(boundary.sourcePoints.ecmwf,10/3));
 assert.ok(close(boundary.sourcePoints.nbm,20/3));
+const speck=precipitationLikelihood(7,{sourceValues:{hrrr:0,ecmwf:0.004,nbm:0}});
+assert.equal(speck.sourcePoints.ecmwf,0);
+assert.equal(speck.reductionReasons.ecmwf,'negligible');
+const lone=precipitationLikelihood(7,{sourceValues:{hrrr:0,ecmwf:0.012,nbm:0}});
+assert.equal(lone.reductionReasons.ecmwf,'uncorroborated');
+assert.ok(close(lone.sourcePoints.ecmwf,10/3));
 
 assert.equal(conditionForRainChance('Rain',100),'Rain');
 assert.equal(conditionForRainChance('Sunny',100),'Rain');

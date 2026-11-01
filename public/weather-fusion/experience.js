@@ -3,10 +3,10 @@ import {FORECAST_CONFIDENCE_VERSION,confidenceMeterPosition,displayForecastConfi
 import {dailyUvHTML} from './daily-uv.js?v=weather-art-labels-v10';
 import {pavementEstimate,pavementHTML,pavementDetailsHTML} from './pavement.js?v=current-rain-20261017-v3';
 import {weatherState} from './weather-state.js?v=current-rain-20261017-v3';
-import {currentSample,forecastSample,peakComparisonHTML,sampleCaption} from './weather-display.js?v=low-rain-display-v1';
+import {currentSample,forecastSample,peakComparisonHTML,sampleCaption} from './weather-display.js?v=comparison-chart-v3';
 import {degrees,displayedFeelsAt,dailyFeels,forecastValue,peakFeelsHTML,GUSTY_FEELS_DISPLAY_MPH} from './hourly-feels.js?v=current-rain-20261017-v3';
 import {pressureMb,stationPressureMb,pressureTrendText,sunShadeHTML} from './personal-details.js?v=current-rain-20261017-v3';
-import {comfortMode,comfortWindow,comfortNarrative,warmestTodayWindow,comfortArtworkContext} from './comfort-outlook.js?v=current-rain-20261017-v3';
+import {comfortMode,comfortWindow,comfortNarrative,warmestTodayWindow,comfortArtworkContext} from './comfort-outlook.js?v=comparison-chart-v3';
 import {dailyDisplay,temperatureBar,thermalComfort,finite,solarElevation} from './weather-math.js?v=current-rain-20261017-v3';
 import {hideLowRainChance,displayedRainChance,rainAwareCondition,dailySkyCover} from './rain-display.js?v=low-rain-display-v1';
 import {resetDewpointMeter} from './dewpoint-meter.js?v=air-moisture-v1';

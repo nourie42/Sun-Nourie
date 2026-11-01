@@ -35,6 +35,12 @@ export function validatePointModel(data,meta,id,location,now){
   hourly.weather_code=raw.weather_code.map((value,i)=>times[i]*1000>run+(id==='hrrr'?48:240)*H?null:Number.isInteger(value)&&value>=0&&value<=99?value:null);
   hourly_units.weather_code='wmo code';
  }
+ // NBM publishes an hourly probability. Other named models may echo a fill-in
+ // value; only NBM's field is read as a probability.
+ if(id==='nbm'&&Array.isArray(raw.precipitation_probability)&&raw.precipitation_probability.length===times.length&&(units.precipitation_probability==='%'||units.precipitation_probability==='percent')){
+  hourly.precipitation_probability=raw.precipitation_probability.map((value,i)=>times[i]*1000>run+240*H?null:finite(value)&&value>=0&&value<=100?value:null);
+  hourly_units.precipitation_probability='%';
+ }
  const future=times.filter((t,i)=>t*1000>now&&finite(hourly.temperature_2m[i]));
  if(!future.length)throw new Error('No future named-model temperatures.');
  hourly.pressure_msl=hourly.pressure_msl.map(v=>finite(v)?v/33.86389:null);hourly_units.pressure_msl='inHg';
@@ -79,7 +85,7 @@ export function createPointModels({fetchImpl=globalThis.fetch,now=Date.now}={}){
   }
   if(pending.size>=50)throw new Error('Named model sources are busy. Please retry.');
   const task=(async()=>{
-   const query=new URLSearchParams({latitude:String(location.latitude),longitude:String(location.longitude),models:model.name,hourly:[...Object.keys(FIELDS),'weather_code'].join(','),temperature_unit:'fahrenheit',wind_speed_unit:'mph',precipitation_unit:'inch',timeformat:'unixtime',timezone:'GMT',forecast_days:'10'});
+   const query=new URLSearchParams({latitude:String(location.latitude),longitude:String(location.longitude),models:model.name,hourly:[...Object.keys(FIELDS),'weather_code','precipitation_probability'].join(','),temperature_unit:'fahrenheit',wind_speed_unit:'mph',precipitation_unit:'inch',timeformat:'unixtime',timezone:'GMT',forecast_days:'10'});
    try{
     const forecast=async()=>{
      try{return await json(`https://api.open-meteo.com/v1/forecast?${query}`);}

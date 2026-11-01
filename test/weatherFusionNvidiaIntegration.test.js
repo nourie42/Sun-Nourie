@@ -162,7 +162,7 @@ test('a published zero NVIDIA rainfall amount stays a genuine zero contributor',
   assert.equal(rain.precipitationBlend.sources.find(source=>source.id==='wn').weight,.1);
 });
 
-test('tiny positive NVIDIA rain receives one-third of its forecast share',()=>{
+test('tiny positive NVIDIA rain adds no rain points while the amount is still recorded',()=>{
  const input=sourceInputs({patchNvidia:wn=>{
   wn.precipitationIntervals.forEach(row=>{row.value=.00000214;});wn.hourly.precipitation.fill(.00000214);
  }});
@@ -173,11 +173,11 @@ test('tiny positive NVIDIA rain receives one-third of its forecast share',()=>{
  for(const epoch of [now+H,now+30*H]){
   const row=at(forecast.rainTimeline,epoch);
   assert.equal(row.rainLikelihood.sourceAmounts.wn,.00000214);
-  assert.equal(row.rainLikelihood.sourcePoints.wn,3.33333333);
-  assert.equal(row.rainLikelihood.reductionReasons.wn,'trace');
+  assert.equal(row.rainLikelihood.sourcePoints.wn,0);
+  assert.equal(row.rainLikelihood.reductionReasons.wn,'negligible');
   assert.equal(row.precipitationBlend.sources.find(s=>s.id==='wn').weight,.1);
   assert.ok(row.precipitation>0,'raw rainfall amount still contributes separately');
-  assert.equal(row.rainLikelihood.value,4);
+  assert.equal(row.rainLikelihood.value,1);
  }
  for(const [index,card] of cards.entries())assert.equal(card.pop,chances.forecastValues[index]);
  const day=forecast.days[1],rows=forecast.rainTimeline.filter(r=>Date.parse(r.time)>=Date.parse(day.rainLikelihood.window.start)&&Date.parse(r.time)<Date.parse(day.rainLikelihood.window.end));

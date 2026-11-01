@@ -63,9 +63,9 @@ test('rain inputs scale the NWS share and explain full and reduced model points'
   assert.doesNotMatch(html,/QPF support|NWS-anchored input/);
   assert.match(html,/NWS hourly probability always fills its 40-point share proportionally/);
   assert.match(html,/40% NWS chance contributes 16 points/);
-  assert.match(html,/Zero deterministic QPF gets zero points/);
-  assert.match(html,/positive amount through 0\.010 in\/hour gets one-third/);
-  assert.match(html,/above 0\.010 in\/hour gets all of its points/);
+  assert.match(html,/Amounts under 0\.005 in\/hour get no points/);
+  assert.match(html,/from 0\.005 through 0\.010 in\/hour get one-third/);
+  assert.match(html,/at least 0\.050 in\/hour gets all of its points/);
   assert.match(html,/result is capped at 100%/);
   assert.match(html,/uncalibrated estimate, not a proven model-accuracy ranking/);
   assert.match(html,/not a separate probability of rain at any time/);
@@ -83,12 +83,13 @@ test('rain inputs scale the NWS share and explain full and reduced model points'
   assert.match(unanimous,/21\.2 \+ 30 \+ 10 \+ 20 = 81\.2/);
 
   const trace=likelihood(13,{officialProbability:7,rawTotal:12.8,weightedValue:12.8,rawValue:13,
-    sourceValues:{nws:7,hrrr:0,ecmwf:100/3,nbm:100/3},sourcePoints:{nws:2.8,hrrr:0,ecmwf:3.33333333,nbm:6.66666667},sourceAmounts:{nws:0,hrrr:0,ecmwf:.004,nbm:.010},
+    sourceValues:{nws:7,hrrr:0,ecmwf:100/3,nbm:100/3},sourcePoints:{nws:2.8,hrrr:0,ecmwf:3.33333333,nbm:6.66666667},sourceAmounts:{nws:0,hrrr:0,ecmwf:.006,nbm:.010},
+    reductionReasons:{ecmwf:'trace',nbm:'trace'},
     sources:[{id:'nws',value:7,weight:.4,points:2.8},{id:'hrrr',value:0,weight:.3,points:0},{id:'ecmwf',value:100/3,weight:.1,points:3.33333333},{id:'nbm',value:100/3,weight:.2,points:6.66666667}],drySources:['hrrr'],wetSources:['ecmwf','nbm'],reducedSources:['ecmwf','nbm']});
   forecast.rainTimeline[0].rainLikelihood=trace;
   Object.assign(forecast.days[0].rainLikelihood,{value:13,peak:trace,peakTime:at(0)});
   const traceHtml=modelExplanationHTML(forecast,{now});
-  assert.match(traceHtml,/0\.004 in<small>Light rain forecast: one-third of model points<\/small><\/td><td>3\.333333<small>of 10 max<\/small><\/td>/);
+  assert.match(traceHtml,/0\.006 in<small>Light rain forecast: one-third of model points<\/small><\/td><td>3\.333333<small>of 10 max<\/small><\/td>/);
   assert.match(traceHtml,/0\.01 in<small>Light rain forecast: one-third of model points<\/small><\/td><td>6\.666667<small>of 20 max<\/small><\/td>/);
   assert.match(traceHtml,/2\.8 \+ 0 \+ 3\.3333 \+ 6\.6667 = 12\.8/);
   assert.match(traceHtml,/Shown: <b>13%/);
@@ -105,8 +106,8 @@ test('missing models do not renormalize the NWS base or remaining model points',
   assert.match(html,/<th scope="row">HRRR<\/th><td>Unavailable<\/td><td>Not used<\/td>/);
 });
 
-test('a wet vote above .010 keeps its full points without hiding the score',()=>{
-  const forecast=fixture(),single=precipitationLikelihood(0,{sourceValues:{hrrr:0,ecmwf:0,nbm:.02}});
+test('a wet vote at .05 keeps its full points without hiding the score',()=>{
+  const forecast=fixture(),single=precipitationLikelihood(0,{sourceValues:{hrrr:0,ecmwf:0,nbm:.05}});
   for(const row of forecast.rainTimeline)row.rainLikelihood=single;
   Object.assign(forecast.days[0].rainLikelihood,{value:20,peak:single});
   const html=modelExplanationHTML(forecast,{now});
@@ -115,12 +116,12 @@ test('a wet vote above .010 keeps its full points without hiding the score',()=>
   assert.doesNotMatch(html,/Data mismatch/);
 });
 
-test('a tiny positive WeatherNext amount is disclosed as a one-third light-rain vote',()=>{
+test('a tiny positive WeatherNext amount is disclosed as below the dry threshold',()=>{
  const forecast=fixture(),score=precipitationLikelihood(2,{sourceValues:{hrrr:0,ecmwf:0,nbm:0,wn:.00000214}},{nws:.4,hrrr:.25,ecmwf:.08333333,nbm:.16666667,wn:.1});
  for(const row of forecast.rainTimeline)row.rainLikelihood=score;
  Object.assign(forecast.days[0].rainLikelihood,{value:score.value,peak:score});
  const html=modelExplanationHTML(forecast,{now});
- assert.match(html,/<th scope="row">Google WeatherNext<\/th><td>0\.00000214 in<small>Light rain forecast: one-third of model points<\/small><\/td><td>3\.333333<small>of 10 max<\/small>/);
+ assert.match(html,/<th scope="row">Google WeatherNext<\/th><td>0\.00000214 in<small>Under 0\.005 in\/hour: no model points<\/small><\/td><td>0<small>of 10 max<\/small>/);
 });
 
 test('missing hourly data remains unavailable instead of becoming a zero or a reassuring match',()=>{
