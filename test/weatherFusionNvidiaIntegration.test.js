@@ -12,8 +12,12 @@ const iso=time=>new Date(time).toISOString();
 const close=(actual,expected,tolerance=1e-8)=>assert.ok(Math.abs(actual-expected)<tolerance,`${actual} should equal ${expected}`);
 const weights=sources=>Object.fromEntries(sources.map(source=>[source.id,source.weight]));
 const sameDay={nws:.36,hrrr:.27,ecmwf:.09,nbm:.18,wn:.10};
-const sameDayRain={nws:.4,hrrr:.25,ecmwf:.08333333,nbm:.16666667,wn:.10};
-const extendedRain={nws:.4,ecmwf:.35294117,nbm:.14705883,wn:.10};
+const sameDayRain={nws:.4,hrrr:.25,ecmwf:.08333333,nbm:.16666667,wn:.05,weathernext3:.05};
+const extendedRain={nws:.4,ecmwf:.25294118,nbm:.14705883,gefs:.10,wn:.05,weathernext3:.05};
+// Likelihood sources list only feeds that reported; this fixture has no
+// WeatherNext 3 or GEFS model, so neither can appear as a source.
+const sameDayRainSources={nws:.4,hrrr:.25,ecmwf:.08333333,nbm:.16666667,wn:.05};
+const extendedRainSources={nws:.4,ecmwf:.25294118,nbm:.14705883,wn:.05};
 const extendedAmount={nws:.135,ecmwf:.54,nbm:.225,wn:.10};
 
 function sourceInputs({withNvidia=true,patchNvidia}={}) {
@@ -75,12 +79,12 @@ test('NVIDIA changes published daily and hourly temperatures with attributed 10 
 test('NVIDIA contributes to hourly rain amounts and scores while later rain excludes HRRR',()=>{
   const forecast=buildForecast(sourceInputs()),first=at(forecast.rainTimeline,now+H),later=at(forecast.rainTimeline,now+30*H);
   assert.deepEqual(weights(first.precipitationBlend.sources),sameDay);
-  assert.deepEqual(weights(first.rainLikelihood.sources),sameDayRain);
+  assert.deepEqual(weights(first.rainLikelihood.sources),sameDayRainSources);
   close(first.precipitationBlend.sourceValues.wn,.04);
   assert.equal(first.rainLikelihood.sourceAmounts.wn,.04);
-  assert.equal(first.rainLikelihood.sourcePoints.wn,10);
+  assert.equal(first.rainLikelihood.sourcePoints.wn,5);
   assert.deepEqual(weights(later.precipitationBlend.sources),extendedAmount);
-  assert.deepEqual(weights(later.rainLikelihood.sources),extendedRain);
+  assert.deepEqual(weights(later.rainLikelihood.sources),extendedRainSources);
   assert.equal(later.rainLikelihood.sourcePoints.hrrr,null);
   assert.equal(later.precipitationBlend.sources.some(source=>source.id==='hrrr'),false);
   const expected=later.precipitationBlend.sources.reduce((sum,source)=>sum+source.value*source.weight,0);

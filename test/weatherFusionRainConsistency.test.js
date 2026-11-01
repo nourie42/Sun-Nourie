@@ -34,9 +34,9 @@ function matchingRows(data,summary) {
 test('later-day trace amounts use the extended blend without HRRR',()=>{
   const data=buildForecast(inputs({amount:.007}));
   const day=data.days[1],rows=matchingRows(data,day.rainLikelihood);
-  assert.equal(day.rainLikelihood.value,36); // 39*.40 + the remaining 60-point model share / 3
+  assert.equal(day.rainLikelihood.value,32); // 39*.40 + the available model share / 3 (GEFS has no fixture input)
   assert.equal(day.rainLikelihood.value,Math.max(...rows.map(row=>row.rainLikelihood.value)));
-  assert.deepEqual(new Set(rows.map(row=>row.rainLikelihood.value)),new Set([36]));
+  assert.deepEqual(new Set(rows.map(row=>row.rainLikelihood.value)),new Set([32]));
   assert.ok(rows.every(row=>row.rainLikelihood.sourcePoints.hrrr===null));
   assert.ok(rows.every(row=>!row.rainLikelihood.sources.some(source=>source.id==='hrrr')));
   assert.equal(day.rainLikelihood.coverage.complete,true);
@@ -48,8 +48,8 @@ test('an isolated later-day model rain hour uses the extended blend',()=>{
   const target=now+36*H;
   for(const id of ['ecmwf','nbm'])for(const interval of data.models[id].precipitationIntervals)if(interval.start*1000===target)interval.value=.012;
   const forecast=buildForecast(data),row=forecast.rainTimeline.find(item=>Date.parse(item.time)===target);
-  assert.equal(row.rainLikelihood.value,80); // 49*.40 + the full 60-point model share
-  assert.deepEqual(row.rainLikelihood.sourcePoints,{nws:19.6,hrrr:null,ecmwf:42.352941,nbm:17.647059});
+  assert.equal(row.rainLikelihood.value,68); // 49*.40 + ECMWF and NBM full shares (GEFS has no fixture input)
+  assert.deepEqual(row.rainLikelihood.sourcePoints,{nws:19.6,hrrr:null,ecmwf:30.352941,nbm:17.647059,gefs:null});
   assert.deepEqual(row.rainLikelihood.sources.map(source=>source.id),['nws','ecmwf','nbm']);
   assert.equal(row.rainLikelihood.officialProbability,49);
   assert.equal(row.rainLikelihood.fallbackReason,undefined);
@@ -61,8 +61,8 @@ test('adjacent later-day 0.01-inch model hours each receive one-third model poin
   for(const id of ['ecmwf','nbm'])for(const interval of data.models[id].precipitationIntervals)if([target,target+H].includes(interval.start*1000))interval.value=.010;
   const forecast=buildForecast(data),rows=forecast.rainTimeline.filter(item=>[target,target+H].includes(Date.parse(item.time)));
   assert.equal(rows.length,2);
-  assert.ok(rows.every(row=>row.rainLikelihood.value===40)); // 49*.40 + the remaining 60-point model share / 3
-  assert.ok(rows.every(row=>Math.abs(row.rainLikelihood.sourcePoints.ecmwf-42.352941/3)<1e-8));
+  assert.ok(rows.every(row=>row.rainLikelihood.value===36)); // 49*.40 + the available model share / 3
+  assert.ok(rows.every(row=>Math.abs(row.rainLikelihood.sourcePoints.ecmwf-30.352941/3)<1e-8));
   assert.ok(rows.every(row=>Math.abs(row.rainLikelihood.sourcePoints.nbm-17.647059/3)<1e-8));
 });
 
@@ -72,8 +72,8 @@ test('adjacent later-day meaningful model rain uses the same extended points as 
   for(const id of ['ecmwf','nbm'])for(const interval of data.models[id].precipitationIntervals)if([target,target+H].includes(interval.start*1000))interval.value=.03;
   const forecast=buildForecast(data),rows=forecast.rainTimeline.filter(item=>[target,target+H].includes(Date.parse(item.time)));
   assert.equal(rows.length,2);
-  assert.ok(rows.every(row=>row.rainLikelihood.value===80));
-  assert.ok(rows.every(row=>row.rainLikelihood.sourcePoints.ecmwf===42.352941&&row.rainLikelihood.sourcePoints.nbm===17.647059));
+  assert.ok(rows.every(row=>row.rainLikelihood.value===68));
+  assert.ok(rows.every(row=>row.rainLikelihood.sourcePoints.ecmwf===30.352941&&row.rainLikelihood.sourcePoints.nbm===17.647059));
 });
 
 test('missing models use a labeled official NWS fallback instead of lowering its probability',()=>{

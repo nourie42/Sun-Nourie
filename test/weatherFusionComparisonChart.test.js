@@ -73,9 +73,10 @@ test('rain chance keeps the owner weights and still records an NBM probability',
   assert.deepEqual(precipitationPolicy(4),EXTENDED_RAIN_WEIGHTS);
   const withWeatherNext=precipitationPolicy(1,true);
   assert.equal(withWeatherNext.nws,.4);
-  assert.equal(withWeatherNext.wn,.1);
-  assert.equal(withWeatherNext.gefs,undefined);
-  assert.equal(withWeatherNext.weathernext3,undefined);
+  assert.equal(withWeatherNext.wn,.05);
+  assert.equal(withWeatherNext.weathernext3,.05);
+  assert.equal(withWeatherNext.gefs,.1);
+  assert.equal(withWeatherNext.ecmwf,.25294118);
   const scored=precipitationLikelihood(12,{sourceValues:{hrrr:0,ecmwf:.012,nbm:0}},SAME_DAY_WEIGHTS,{nbmProbability:47});
   assert.equal(scored.sourceValues.nbm,47);
   assert.equal(scored.sourceKinds.nbm,'probability');
