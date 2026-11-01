@@ -144,7 +144,7 @@ export function renderHourlyWeather(forecast, now = Date.now()) {
   root.scrollLeft = scroll;
 }
 export function peakComparison(summary, currentSun) {
-  const label='Warmest sun feels like from now';
+  const label='Warmest in-sun feel for the rest of today';
   if (!summary) return {kind:'missing', label:'No direct sun in the remaining forecast today', value:null, time:null, now:false};
   const peak = summary.chosen.value;
   if (summary.mode === 'day' && finite(currentSun) && currentSun > peak) {
@@ -156,7 +156,7 @@ export function peakComparisonHTML(summary, currentSun, zone = 'America/New_York
   const comparison = peakComparison(summary,currentSun);
   if(!summary&&finite(currentSun)){
     const clock=new Intl.DateTimeFormat('en-US',{timeZone:zone,hour:'numeric',minute:'2-digit'}).format(new Date(now));
-    return `<div class="comfort-later" data-comparison="current-only"><span>Warmest sun feels like from now</span><span class="peak-reading"><strong>${degrees(currentSun)}</strong></span><small>Now · ${esc(clock)} · sunny forecast unavailable</small></div>`;
+    return `<div class="comfort-later" data-comparison="current-only"><span>Warmest in-sun feel for the rest of today</span><span class="peak-reading"><strong>${degrees(currentSun)}</strong></span><small>Now · ${esc(clock)} · sunny forecast unavailable</small></div>`;
   }
   if (!summary) return '<p class="comfort-later" data-comparison="no-direct-sun"><span>No direct sun in the remaining forecast today</span><small>Clouds, rain, night, or missing sky inputs can remove the sunny-hour estimate.</small></p>';
   const clock=new Intl.DateTimeFormat('en-US',{timeZone:zone,hour:'numeric',minute:'2-digit'}).format(new Date(comparison.time));

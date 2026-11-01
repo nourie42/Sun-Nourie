@@ -32,7 +32,7 @@ function matchingRows(data,summary) {
 }
 
 test('later-day trace amounts use the extended blend without HRRR',()=>{
-  const data=buildForecast(inputs());
+  const data=buildForecast(inputs({amount:.007}));
   const day=data.days[1],rows=matchingRows(data,day.rainLikelihood);
   assert.equal(day.rainLikelihood.value,36); // 39*.40 + the remaining 60-point model share / 3
   assert.equal(day.rainLikelihood.value,Math.max(...rows.map(row=>row.rainLikelihood.value)));
@@ -238,7 +238,8 @@ test('source evidence preserves exact amounts and trace-QPF point tiers',()=>{
   assert.equal(score.weightedValue,25.6);
   assert.equal(score.value,26);
   assert.deepEqual(score.sources.map(row=>[row.id,row.weight]),[['nws',.4],['ecmwf',.1]]);
-  assert.ok(Math.abs(precipitationLikelihood(39,{sourceValues:{ecmwf:.0049}}).sourceValues.ecmwf-100/3)<1e-8);
+  assert.equal(precipitationLikelihood(39,{sourceValues:{ecmwf:.0049}}).sourceValues.ecmwf,0);
+  assert.ok(Math.abs(precipitationLikelihood(39,{sourceValues:{ecmwf:.006}}).sourceValues.ecmwf-100/3)<1e-8);
   const data=buildForecast(inputs({amount:.001})),row=data.rainTimeline[0];
   assert.equal(row.precipitationBlend.sourceValues.hrrr,.001);
   assert.equal(row.precipitationBlend.sourceValues.ecmwf,.001);
@@ -247,9 +248,12 @@ test('source evidence preserves exact amounts and trace-QPF point tiers',()=>{
   assert.ok(row.precipitationBlend.sources.every(source=>source.runAt!==undefined));
   const below=buildForecast(inputs({chance:0,amount:.00499})).rainTimeline[0];
   assert.equal(below.rainLikelihood.sourceAmounts.hrrr,.00499);
-  assert.ok(Math.abs(below.rainLikelihood.sourceValues.hrrr-100/3)<1e-8,'trace forecast amounts receive one-third of model points');
-  assert.equal(below.rainLikelihood.sourcePoints.hrrr,10);
-  assert.equal(below.rainLikelihood.value,20);
+  assert.equal(below.rainLikelihood.sourceValues.hrrr,0,'amounts under 0.005 inch/hour add no rain points');
+  assert.equal(below.rainLikelihood.sourcePoints.hrrr,0);
+  assert.equal(below.rainLikelihood.value,0);
+  const trace=buildForecast(inputs({chance:0,amount:.007})).rainTimeline[0];
+  assert.ok(Math.abs(trace.rainLikelihood.sourceValues.hrrr-100/3)<1e-8);
+  assert.equal(trace.rainLikelihood.sourcePoints.hrrr,10);
 });
 
 test('expired peak hours leave the remaining forecast when the current hour advances',()=>{

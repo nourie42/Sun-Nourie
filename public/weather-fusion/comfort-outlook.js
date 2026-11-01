@@ -24,7 +24,7 @@ export function warmestTodayWindow(forecast,now=Date.now()){
  }
  if(!points.length)return null;
  const high=points.reduce((a,b)=>a.value>=b.value?a:b);
- return {mode:'day',chosen:high,high,points,available,expected,partial:available<expected,label:'Warmest sun feels like from now'};
+ return {mode:'day',chosen:high,high,points,available,expected,partial:available<expected,label:'Warmest in-sun feel for the rest of today'};
 }
 export function comfortWindow(forecast,now=Date.now()){
  if(forecastSnapshotFreshness(forecast,now).expired)return null;

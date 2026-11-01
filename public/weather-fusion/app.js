@@ -9,7 +9,7 @@ import {weatherIcon,renderHourlyWeather,currentSample} from './weather-display.j
 import {dayGraphHTML,dayGraphPoints,installDayGraph} from './day-graph.js?v=low-rain-display-v1';
 import {degrees,feelsAt,GUSTY_FEELS_DISPLAY_MPH} from './hourly-feels.js?v=current-rain-20261017-v3';
 import {createFramePlayer} from './frame-player.js';
-import {dailyConfidenceNoticeHTML,renderComfort,selectComfortHour,renderDailyRows,renderMetricTiles,resetExperience,installExperience} from './experience.js?v=low-rain-display-v1';
+import {dailyConfidenceNoticeHTML,renderComfort,selectComfortHour,renderDailyRows,renderMetricTiles,resetExperience,installExperience} from './experience.js?v=comparison-chart-v3';
 import {dailyDisplay} from './weather-math.js?v=current-rain-20261017-v3';
 import {conditionForRainChance} from './weather-state.js?v=current-rain-20261017-v3';
 import {currentHero} from './current-temperature.js?v=current-rain-20261017-v3';
@@ -21,7 +21,7 @@ import {renderWeatherPanel} from './render-safety.js';
 import {forecastPeriodSummary} from './forecast-story.js?v=low-rain-display-v1';
 import {forecastOutlookDetails} from './outlook-details.js?v=current-rain-20261017-v3';
 import {isExperimentalWeatherPage,renderCarWashForecast,resetCarWashForecast} from './car-wash.js?v=low-rain-display-v1';
-import {renderModelExplanation,resetModelExplanation} from './model-explanation.js?v=rain-signal-floor-v1';
+import {renderModelExplanation,resetModelExplanation} from './model-explanation.js?v=comparison-chart-v3';
 import {updateRainTrend} from './rain-trend.js?v=current-rain-20261017-v3';
 import {renderRiskOutlooks,resetRiskOutlooks} from './risk-outlooks.js?v=risk-outlooks-v5';
 import {renderAirQuality} from './air-quality.js?v=mobile-repair-v1';

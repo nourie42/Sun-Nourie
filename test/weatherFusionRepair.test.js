@@ -169,7 +169,8 @@ test('public methodology states the fixed 40-point NWS share and exact QPF tiers
  const out=buildForecast({...testInputs,models:models()});
  assert.match(out.methodology,/NWS hourly probability always fills its 40-point share proportionally/i);
  assert.match(out.blendPolicy.probability,/NWS hourly probability always fills its 40-point share proportionally/i);
- assert.match(out.blendPolicy.probability,/positive amount through 0\.010 inch\/hour adds one-third/i);
- assert.match(out.blendPolicy.probability,/above 0\.010 inch\/hour adds all/i);
+ assert.match(out.blendPolicy.probability,/from 0\.005 through 0\.010 inch\/hour add one-third/i);
+ assert.match(out.blendPolicy.probability,/at least 0\.050 inch\/hour adds all/i);
+ assert.match(out.blendPolicy.probability,/above 0\.010 and under 0\.050 inch\/hour adds all of that model's points only when another source is also wet/i);
  assert.doesNotMatch(out.methodology,/displayed rain chance uses the official NWS hourly probability directly/i);
 });
