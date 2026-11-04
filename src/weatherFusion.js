@@ -802,6 +802,7 @@ export function registerWeatherFusionRoutes(app, options = {}) {
     'comfort-integrated-rain-night.webp','comfort-integrated-snow-play-dawn.webp','comfort-integrated-snow-play.webp',
     'model-explanation.js','model-explanation.css','weathernext-site.html','weathernext-site.css','weathernext-site.js','weathernext-data.js','weathernext-catalog.json',
     'glance.html','glance.css','glance.js',
+    'aurora.html','aurora.css','aurora.js',
     'halo.html','halo.css','halo.js',
     'blend.html','blend.css','blend.js',
     'today.html','today.css','today.js',
