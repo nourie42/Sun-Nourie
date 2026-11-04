@@ -43,7 +43,7 @@
     const d={...blank(),...raw,fields:{...blank().fields,...raw.fields}};
     d.id=typeof d.id==='string'&&d.id?d.id:id();
     for(const key of Object.keys(d.fields))d.fields[key]=['string','number'].includes(typeof d.fields[key])?String(d.fields[key]):'';
-    for(const key of ['gates','tasks','evidence','facts','fieldOrigin','modelInputs','originalInputs','modelConfirmed','originalConfirmed','pastedEstimates','fieldSources'])if(!record(d[key]))d[key]={};
+    for(const key of ['gates','tasks','evidence','facts','fieldOrigin','modelInputs','originalInputs','modelConfirmed','originalConfirmed','pastedEstimates','fieldSources','factCorrections'])if(!record(d[key]))d[key]={};
     for(const key of ['gates','evidence'])for(const [name,value] of Object.entries(d[key]))if(!record(value))d[key][name]={};
     for(const key of ['sites','siteClues','tableReviews','financialSources','signals','history','materials','reportedFacts'])d[key]=Array.isArray(d[key])?d[key].filter(record):[];
     d.reportedFacts=d.reportedFacts.filter(f=>Number.isFinite(f.value));
@@ -119,7 +119,7 @@
     const d=deal(),rows=DealIntake.facts(d),groups=[...new Set(rows.map(f=>[f.source,f.siteName||'Portfolio'].join(' · ')))];
     if(!groups.includes(d.intakeGroup))d.intakeGroup=groups[0]||'';
     $('#currentDealLabel').textContent=d.fields.name||'Untitled deal';
-    $('#intakeNumberCount').textContent=rows.length+' numbers';$('#dealNumbersCard').hidden=!rows.length;
+    $('#intakeNumberCount').textContent=rows.length+' numbers';$('#dealNumbersCard').hidden=false;
     $('#intakeNumberSource').innerHTML=groups.length?'<label class="number-source-label">Numbers from<select id="numberSource">'+groups.map(g=>'<option '+(g===d.intakeGroup?'selected ':'')+'value="'+esc(g)+'">'+esc(g)+'</option>').join('')+'</select></label>':'';
     const chosen=rows.filter(f=>[f.source,f.siteName||'Portfolio'].join(' · ')===d.intakeGroup);
     const samePeriod=new Set(chosen.map(f=>f.period||'Period not stated')).size===1;
@@ -127,13 +127,31 @@
     const labels={...FACT_LABELS,...SELLER_LABELS,...SITE_LABELS,assetCount:'Asset count',fuelMarginCpg:'Fuel margin',insideMarginPct:'Inside gross margin'};
     $('#intakeNumberGrid').innerHTML=chosen.length?chosen.map(f=>{
       const value=DealPaste.formatFact(f),status=f.confidence==='low'?'Estimate · review':'Source figure · review';
-      return '<div class="intake-number"><span>'+esc(labels[f.key]||f.key)+'</span><strong>'+esc(value)+'</strong>'+(!samePeriod?'<small>'+esc(f.period||'Period not stated')+'</small>':'')+'<small>'+status+'</small></div>';
+      const token=encodeURIComponent(DealIntake.token(f));
+      return '<label class="intake-number"><span>'+esc(labels[f.key]||f.key)+'</span><input class="corrected-number" type="text" inputmode="decimal" data-correct-fact="'+esc(token)+'" value="'+esc(String(f.value))+'" aria-label="Correct '+esc(labels[f.key]||f.key)+'"><small>'+esc(value)+'</small>'+(!samePeriod?'<small>'+esc(f.period||'Period not stated')+'</small>':'')+'<small>'+(f.manuallyCorrected?'Your saved correction · used in model':status)+'</small></label>';
     }).join(''):'<div class="prelim-empty">Your extracted numbers will appear here. You can also enter the deal assumptions below.</div>';
     if(!rows.length)$('#intakeAssumptions').open=true;
     renderUploadDestination();
   }
   function renderUploadDestination(){const isNew=document.querySelector('[name="uploadIntent"]:checked')?.value==='new';$('#uploadDestination').textContent=isNew&&DealIntake.hasData(deal())?'The next upload starts a separate deal. This deal stays saved.':'Uploads will be added to '+(deal().fields.name||'this deal')+'.';}
-  document.addEventListener('change',e=>{if(e.target.id==='numberSource'){deal().intakeGroup=e.target.value;save();renderDealNumbers();}if(e.target.name==='uploadIntent'){renderUploadDestination();refreshPastePrompt();}});
+  document.addEventListener('change',e=>{
+    if(e.target.id==='numberSource'){deal().intakeGroup=e.target.value;save();renderDealNumbers();}
+    if(e.target.name==='uploadIntent'){renderUploadDestination();refreshPastePrompt();}
+    if(e.target.dataset.correctFact){
+      const token=decodeURIComponent(e.target.dataset.correctFact),d=deal();
+      const row=DealIntake.facts(d).find(f=>DealIntake.token(f)===token);
+      if(!row)return;
+      const value=DealModel.parse(e.target.value);
+      if(value==null){toast('Enter a number. Use 0 only when the source confirms zero.');renderDealNumbers();return;}
+      (d.factCorrections||={})[token]={value,source:row.source,priorValue:row.value,at:new Date().toISOString()};
+      if(row.scope==='portfolio'&&Object.hasOwn(FACT_LABELS,row.key)){
+        d.fields[row.key]=String(value);d.fieldOrigin[row.key]='manual';
+        if(row.key==='ask')d.modelInputs={...(d.modelInputs||{}),price:value*1e6};
+      }
+      (d.history||=[]).unshift({time:new Date().toISOString(),label:'Manual numeric correction',detail:row.key+': '+row.value+' corrected to '+value+' · '+row.source,kinds:['manual correction']});
+      save();renderIntake();renderNumbers();renderBrief();toast('Correction saved and applied to the original model.');
+    }
+  });
   function factFormat(key,v){if(key==='siteMonthlyGallons')return v.toLocaleString('en-US')+' gallons/month';return key==='sites'?`${v} sites`:key==='gallons'?`${v.toFixed(2)}MM gallons`:mm(v);}
   function conflict(candidates){if(candidates.length<2)return false;const vals=[...new Set(candidates.map(x=>x.value))];return vals.length>1&&Math.max(...vals)-Math.min(...vals)>Math.max(.01,Math.abs(vals[0])*.02);}
   function factValue(d,key){const manual=num(d.fields[key]);if(present(manual))return manual;const f=d.facts?.[key];return conflict(f?.candidates||[])?NaN:f?.candidates?.find(c=>!c.ai||c.confidence==='high')?.value??NaN;}
@@ -260,7 +278,7 @@
       autoNarrative(d);d.draftNote='';resetFileSelection();save();hydrate();$('#rawDealText').value='';$('#intakeStatus').textContent=materials.some(m=>m.kind==='structured_financial')?'Financial rows extracted · review seller figures below':materials.some(m=>m.kind==='wide_table_photo'&&m.ocrConfidence<55)&&!extracted.candidates.length?'Photo recognized · zoomed review below':`Preliminary read updated · ${d.siteClues.length} site sheets · ${Object.keys(d.facts).length} portfolio fact types`;toast('Preliminary read ready');
     }catch(err){$('#intakeStatus').textContent='Could not process materials';toast('Processing error: '+err.message);}finally{try{await DealParser.closeOcr();}catch{}controls.forEach(el=>el.disabled=false);button.disabled=false;button.textContent='Read locally';}
   }
-  function switchTab(tab){document.querySelectorAll('.panel').forEach(el=>el.classList.toggle('active',el.id===tab));document.querySelectorAll('.nav-btn').forEach(el=>el.classList.toggle('active',el.dataset.tab===tab));$('#crumb').textContent=({tracker:'DEAL TRACKER',intake:'DEAL INTAKE',fit:'STRATEGIC FIT',plan:'DEAL PLAN',numbers:'ECONOMICS',brief:'BRIEF FOR CHIP'})[tab];window.scrollTo({top:0,behavior:'smooth'});}
+  function switchTab(tab){document.querySelectorAll('.panel').forEach(el=>el.classList.toggle('active',el.id===tab));document.querySelectorAll('.nav-btn').forEach(el=>el.classList.toggle('active',el.dataset.tab===tab));$('#crumb').textContent=({tracker:'DEAL TRACKER',intake:'DEAL INTAKE',fit:'STRATEGIC FIT',plan:'DEAL PLAN',numbers:'ECONOMICS',brief:'LEADERSHIP SUMMARY',fuel:'DODO FUEL SUPPLY'})[tab];window.scrollTo({top:0,behavior:'smooth'});}
   document.addEventListener('input',e=>{const t=e.target;if(t.id==='readingMethod')return;if(t.id==='pastedAiResponse'){deal().pasteDraft=t.value;save();return;}if(t.id==='rawDealText'){deal().draftNote=t.value;save();refreshPastePrompt();return;}if(t.dataset.field){clearModelOverride(deal(),t.dataset.field);deal().fields[t.dataset.field]=storedField(t);(deal().fieldOrigin ||= {})[t.dataset.field]='manual';if(t.dataset.field==='ttmEbitda'&&deal().fieldOrigin.normEbitda==='ttm proxy')deal().fields.normEbitda=storedField(t);save();if(t.dataset.field==='name')renderPicker();renderTracker();renderAction();renderNumbers(false);renderBrief();if(!t.closest('#tableReviewCard'))renderIntake();}else if(t.dataset.gateNote){(deal().gates[t.dataset.gateNote] ||= {}).note=t.value;save();renderBrief();}else if(t.dataset.evidenceSource){(deal().evidence[t.dataset.evidenceSource] ||= {}).source=t.value;save();renderBrief();}else if(t.dataset.factEdit){const v=num(t.value);if(present(v)){const d=deal(),key=t.dataset.factEdit;clearModelOverride(d,key);d.fields[key]=String(v);(d.fieldOrigin ||= {})[key]='manual';if(key==='ttmEbitda'&&d.fieldOrigin.normEbitda==='ttm proxy')d.fields.normEbitda=String(v);autoNarrative(d);save();renderNumbers();renderBrief();t.closest('.fact').querySelector('.fact-value').textContent=factFormat(key,v);t.closest('.fact').querySelector('.saved').textContent='Your correction';}}else if(t.dataset.site!=null){deal().sites[Number(t.dataset.site)][t.dataset.prop]=t.value;save();renderSiteTotal();renderBrief();}});
   document.addEventListener('change',e=>{const t=e.target;if(t.dataset.gate){(deal().gates[t.dataset.gate] ||= {}).status=t.value;save();renderGates();renderBrief();}else if(t.dataset.task){deal().tasks[t.dataset.task]=t.checked;save();renderPhases();}else if(t.dataset.evidence){(deal().evidence[t.dataset.evidence] ||= {}).status=t.value;save();renderEvidence();renderNeeds(deal());renderBrief();}else if(t.dataset.site!=null){deal().sites[Number(t.dataset.site)][t.dataset.prop]=t.value;save();renderBrief();}});
   document.addEventListener('focusout',e=>{if(e.target.dataset.factEdit||e.target.closest('#tableReviewCard')){autoNarrative(deal());renderIntake();renderBrief();}});
@@ -357,7 +375,7 @@
       const target=current||pendingUploadDealId===deal().id||!DealIntake.hasData(deal())?deal():blank(parsed.dealName||'New deal');
       const preview=JSON.parse(JSON.stringify(target));DealPaste.apply(preview,parsed,{files});const check=OriginalModel.calculate(preview);if(check.available!==false&&check.errors.length)throw Error(check.errors.join('; '));
       if(target!==deal()){db.deals.push(target);db.active=target.id;}
-      const d=deal();DealPaste.apply(d,parsed,{files});d.intakeGroup='';if(parsed.summary&&!d.fields.thesis)d.fields.thesis=parsed.summary;
+      const d=deal();DealPaste.apply(d,parsed,{files});d.intakeGroup='';if(parsed.summary&&!d.fields.thesis)d.fields.thesis=parsed.summary.split(/(?<=[.!?])\\s+/)[0].slice(0,180);
       resetFileSelection();$('#pastedAiResponse').value='';
       document.querySelector('[name="uploadIntent"][value="new"]').checked=true;save();hydrate();
       const model=OriginalModel.calculate(d);
