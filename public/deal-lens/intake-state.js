@@ -18,6 +18,7 @@
     if(Object.entries(d.fields||{}).some(([key,value])=>filled(value)&&!defaults[key]?.includes(String(value))))return true;
     if(['originalInputs','modelInputs'].some(key=>Object.values(d[key]||{}).some(filled)))return true;
     if((d.sites||[]).some(site=>Object.entries(site||{}).some(([key,value])=>key!=='route'&&filled(value))))return true;
+    if((d.fuelContracts||[]).some(c=>Object.values(c||{}).some(filled)))return true;
     return Object.values(d.tasks||{}).some(Boolean)||Object.values(d.gates||{}).some(g=>filled(g.note)||['yes','no'].includes(g.status))||Object.values(d.evidence||{}).some(e=>filled(e.source)||['verified','estimated'].includes(e.status));
   }
   function remember(deal,newFacts){const byKey=new Map(facts(deal).map(f=>[token(f),f]));for(const f of newFacts||[])byKey.set(token(f),f);deal.reportedFacts=[...byKey.values()].slice(-500);}
