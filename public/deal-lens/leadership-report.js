@@ -32,9 +32,9 @@
     const sites=Number.isFinite(model?.inputs?.sites)?model.inputs.sites:siteRows.length;
     const ask=model?.items?.price?.status==='estimated'?null:model?.inputs?.price;
     const price=result?.returnCases?.B38?.maxPrice;
-    let buyerIrr=null;
+    let buyerIrr=null,buyerEngine=null;
     if(Number.isFinite(price)){
-      try{const engine=OriginalModel.compute({...model.changes,'COOP!B29':-price});const irr=engine.get('COOP','B38');if(Number.isFinite(irr)&&Math.abs(irr-.13)<1e-7)buyerIrr=irr;}catch{}
+      try{const engine=OriginalModel.compute({...model.changes,'COOP!B29':-price});const irr=engine.get('COOP','B38');if(Number.isFinite(irr)&&Math.abs(irr-.13)<1e-7){buyerIrr=irr;buyerEngine=engine;}}catch{}
     }
     const valid=buyerIrr!==null;
     const offer=valid?price:null;
@@ -47,6 +47,8 @@
         row('Retail sites',sites),
         row('Seller asking price',Number.isFinite(ask)?money(ask):'Not confirmed'),
         row('Annual earnings base',money(model?.inputs?.base)),
+        row('Year 1 buyer EBITDA',money(buyerEngine?.get('COOP','C22'))),
+        row('Closing cash outlay | B37',money(Number.isFinite(buyerEngine?.get('COOP','B37'))?-buyerEngine.get('COOP','B37'):null)),
         row('Estimated inputs to review',model?.estimated??'Not available')
       ],
       sections:[]
