@@ -133,3 +133,15 @@ test('uncertain rent and observed volumes are retained when estimating the missi
   const {OriginalModel:m}=load(syntheticWorkbook()),d={fields:{},reportedFacts:[{key:'sellerEbitdaUsd',value:2000000},{key:'gallons',value:1},{key:'rentUsd',value:100000,confidence:'low'}]};
   const r=m.calculate(d);assert.ok(r.result);assert.equal(r.inputs.gallons,1000000);assert.equal(r.inputs.rent,100000);assert.equal(r.items.rent.status,'estimated');close(r.inputs.base,2000000);
 });
+
+
+test('confirmed no rent removes AI or template rent from original COOP model',()=>{
+  const {OriginalModel:m}=load(syntheticWorkbook());
+  const d=workbookDeal({rent:100000});
+  d.fields.rentTreatment='none';
+  const calc=m.calculate(d);
+  assert.ok(calc.result);
+  assert.equal(calc.items.rent.value,0);
+  assert.equal(calc.items.rent.status,'manual');
+  assert.equal(calc.result.engine.get('COOP','C21'),0);
+});
