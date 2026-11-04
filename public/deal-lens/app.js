@@ -97,7 +97,65 @@
   function calculate(){const d=deal(),m=OriginalModel.calculate(d),p=m.inputs||{},r=m.result,y=r?.years[0],usd=n=>n==null?NaN:n/1e6,sourceBase=[num(d.fields.normEbitda),num(d.fields.ttmEbitda),usd(num(d.fields.sellerEbitdaUsd))].find(present);return {base:m.available===false?sourceBase:usd(p.base),fuel:usd(y?.fuel),inside:usd(y?.insideBenefit),opex:usd(y?.savings),other:usd(p.otherBenefit),rent:usd(p.addedRent),field:usd(p.fieldCost),dealer:usd(p.operatorCost),buyer:usd(y?.ebitda),ask:m.available===false?num(d.fields.ask):usd(p.price),allIn:usd(r?.initial),prior:num(d.fields.priorEbitda),ttm:num(d.fields.ttmEbitda),askMult:r?.multiple??NaN,allMult:y?.ebitda>0?r.initial/y.ebitda:NaN,model:m};}
   function renderNumbers(rebuild=true){DealModelUI.render(deal(),rebuild);}
   const val=(v)=>v&&String(v).trim()?String(v).trim():'Not established';
-  function renderBrief(){const d=deal(),f=d.fields,c=calculate();const open=GATES.filter(g=>d.gates[g.id]?.status!=='yes').map(g=>g.title);const evidence=DealEvidence.assess(d,c.model),unresolved=evidence.filter(e=>e.state!=='verified'),received=evidence.filter(e=>['received','verified'].includes(e.state)),outstanding=evidence.filter(e=>['missing','partial'].includes(e.state));const m=c.model,r=m.result;const returnLine=r?`${Object.values(r.returnCases).map(b=>`${b.cell} (${b.label}): ${b.irr==null?'no calculable IRR':(b.irr*100).toFixed(4)+'%'} IRR; NPV at ${m.inputs.target}%: ${DealModel.money(b.npv)}; purchase price at ${m.inputs.target}%: ${DealModel.money(b.maxPrice)}.`).join(' ')} Year 1 operator add-back: ${DealModel.money(r.years[0].contribution)}. ${Object.values(m.meta).filter(v=>v.status==='estimated').length} estimated inputs require review. Earnings basis: ${m.meta.base.basis}.`:'Model is incomplete: '+m.errors.join('; ')+'.';const siteRows=d.sites.filter(s=>s.name||s.reason);const routeLine=siteRows.length?siteRows.slice(0,8).map(s=>`${s.name||'Unnamed site'} → ${s.route||'Unassigned'}${s.reason?' ('+s.reason+')':''}`).join('; '):'Site-level operating routes have not been assigned.';let changed=present(c.prior)&&present(c.ttm)?`TTM ${mm(c.ttm)} versus prior year ${mm(c.prior)} (${mm(c.ttm-c.prior)} change).`:`TTM/prior-year trend not fully entered.`;const sellerLine=present(num(f.sellerEbitdaUsd))?`Seller table for ${f.sellerTablePeriod||'unconfirmed period'}: revenue ${mm(num(f.sellerRevenueUsd)/1e6)}, gross profit ${mm(num(f.sellerGrossProfitUsd)/1e6)}, expenses ${mm(num(f.sellerExpensesUsd)/1e6)}, EBITDA ${mm(num(f.sellerEbitdaUsd)/1e6)} (seller supplied or reviewed transcription, unverified period and not reconciled to TTM).`:'';const keyRisks=open.length?open.slice(0,4):[];keyRisks.push(...DealEvidence.questions(d,c.model));const baseLabel=d.fieldOrigin?.normEbitda==='ttm proxy'?'TTM proxy (normalization open)':'defensible base';const paper=$('#briefPaper');paper.innerHTML=`<div class="paper-top"><span class="paper-kicker">DEAL LENS / DECISION BRIEF</span><span class="paper-date">${esc(new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'}))}</span></div><h2>${esc(f.name||'Untitled deal')}</h2>${d.aiReview?`<p class="footnote">AI narrative drafted ${esc(new Date(d.aiReview.time).toLocaleString())}. Review against current figures and any newer materials.</p>`:''}<p class="subhead">${esc(f.market||'Market open')} · ${esc(f.scope||'Scope open')} · ${esc(f.sites||'—')} sites · ${esc(f.stage||'Screening')}</p><div class="decision-bar"><strong>${esc((f.recommendation||'Clarify before pricing').toUpperCase())}</strong><p>${text(val(f.thesis))}</p></div><div class="brief-kpis"><div><span>SELLER ASK</span><strong>${mm(c.ask)}</strong></div><div><span>ASK / BASE EBITDA</span><strong>${mult(c.askMult)}</strong></div><div><span>ALL-IN / RUN-RATE</span><strong>${mult(c.allMult)}</strong></div></div><h3>Why this fits Sunoco</h3><p>${text(val(f.whyUs))}</p><h3>What the business is doing</h3><p>${esc(changed)} ${esc(sellerLine)} ${text(val(f.earningsStory))}</p><h3>Operating choice</h3><p>${esc(routeLine)}</p><h3>Economics and price</h3><p>${m.available===false?`Seller ask ${mm(c.ask)}; entered earnings ${mm(c.base)}. The workbook is temporarily unavailable. Source figures are saved; reload to calculate returns.`:`${baseLabel} ${mm(c.base)}; entered incremental fuel ${mm(c.fuel)}, inside ${mm(c.inside)}, expense ${mm(c.opex)}, dealer/operator allocation ${mm(c.dealer)}; illustrative buyer run-rate ${mm(c.buyer)}. Entered one-time cash needs plus price ${mm(c.allIn)}. ${esc(returnLine)}`}</p><div class="rule"></div><h3>Downside / deal breaker</h3><p>${text(val(f.downside))}</p><div class="open-items"><h3>Questions before commitment</h3><ul>${(keyRisks.length?keyRisks.slice(0,5):['All seven fit gates marked yes; confirm evidence and model diligence.']).map(x=>`<li>${esc(x)}</li>`).join('')}</ul><h3>Evidence received</h3><ul>${(received.length?received.map(e=>e.title+': '+e.label+' — '+e.detail):['No complete source evidence recorded yet.']).map(x=>`<li>${esc(x)}</li>`).join('')}</ul><h3>Evidence still needed / incomplete</h3><ul>${(outstanding.length?outstanding.map(e=>e.title+': '+e.detail):['No source categories marked missing; verification may remain open.']).map(x=>`<li>${esc(x)}</li>`).join('')}</ul></div><h3>Decision requested from Chip</h3><p>${text(val(f.chipAsk))}</p><h3>Next action</h3><p>${text(val(f.nextAction))} · Owner: ${esc(f.actionOwner||'unassigned')} · Due: ${esc(f.actionDue||'not set')}</p><h3>Next three answers</h3><p>${text(val(f.nextAnswers))}</p><p class="footnote">Source/version: ${esc(f.sourceVersion||'Not recorded')} · Evidence items not verified: ${unresolved.length}/${EVIDENCE.length}. Returns use the current forecast and estimates shown in the Model tab. Entries are stored only in this browser.</p>`;}
+  // The leadership brief reads the *approved original* COOP model engine.
+  // The seller ask is separate from the price the buyer can pay at 13% B38.
+  function renderBrief(){
+    const d=deal(),f=d.fields||{},m=OriginalModel.calculate(d),r=m.result;
+    const n=v=>Number.isFinite(v)?v:null,usd=v=>n(v)==null?'Not confirmed':DealModel.money(v);
+    const brief=v=>String(v||'').replace(/\s+/g,' ').trim().slice(0,190);
+    const overview=brief(f.thesis)||brief([f.sites?f.sites+' sites':'Fuel and convenience assets',f.market||'',f.scope||''].filter(Boolean).join(' · '));
+    const offer=r?.returnCases?.B38?.maxPrice;
+    let solved=null,buyerIrr=null;
+    if(Number.isFinite(offer)){
+      try{solved=OriginalModel.compute({...m.changes,'COOP!B29':-offer});buyerIrr=solved.get('COOP','B38');}catch{}
+    }
+    const ask=m.items?.price?.status!=='estimated'?m.inputs?.price:null;
+    const nonblank=(v)=>String(v??'').trim()?String(v).trim():'To confirm';
+    const term=f.fuelContractEnd||f.fuelTimeRemaining||'To confirm';
+    const supplyItems=[
+      ['Current distributor',f.fuelDistributor],['Fuel brand / supplier',f.fuelBrand],
+      ['How they buy fuel',f.purchaseMethod],['Terminal',f.fuelTerminal],
+      ['Terminal operator / company',f.terminalOperator],['Price / rack terms',f.fuelPriceTerms],
+      ['Contract expiration / time left',term],['Contract gallons',f.contractGallons],
+      ['UNAM amount',f.fuelUnams],['UNAM terms',f.unamTerms],
+      ['Assignment / termination / ROFR',f.fuelTransfer]
+    ];
+    const rows=supplyItems.map(([name,value])=>'<tr><th>'+esc(name)+'</th><td>'+esc(nonblank(value))+'</td></tr>').join('');
+    const synergies=r?[
+      ['Fuel supply improvement',r.years[0].fuel],
+      ['Inside gross-margin improvement',r.years[0].insideBenefit],
+      ['Operating-expense savings',r.years[0].savings]
+    ]:[];
+    const synergyRows=synergies.map(([name,value])=>'<li>'+esc(name)+': <strong>'+esc(usd(value))+'</strong> per year (modeled, not guaranteed)</li>').join('');
+    const rent=m.items?.rent;
+    const rentLine=f.rentTreatment==='none'?'No rent expense (confirmed for this deal)':
+      f.rentTreatment==='paid'?'Rent expense modeled: '+usd(rent?.value):
+      'Rent expense not confirmed — do not assume a rent payment';
+    const risks=[f.downside||'Main downside not entered.',m.estimated?m.estimated+' original model inputs are estimates and must be checked.':'',
+      r?.returnCases?.B38?.maxPrice==null?'No verified 13% COOP offer is available from the current inputs.':'']
+      .filter(Boolean).map(x=>'<li>'+esc(x)+'</li>').join('');
+    const seller=usd(ask),buyer=usd(offer),irr=Number.isFinite(buyerIrr)?(buyerIrr*100).toFixed(4)+'%':'Not verified';
+    const income=m.inputs?.base;
+    const paper=$('#briefPaper');
+    paper.innerHTML='<div class="paper-top"><span class="paper-kicker">LEADERSHIP SUMMARY</span><span class="paper-date">'+
+      esc(new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'}))+'</span></div>'+
+      '<h2>'+esc(f.name||'Untitled deal')+'</h2><p class="subhead">'+esc([f.market,f.scope,f.sites?f.sites+' sites':''].filter(Boolean).join(' · ')||'Deal scope to confirm')+'</p>'+
+      '<div class="decision-bar"><strong>'+esc(f.recommendation||'Clarify before pricing')+'</strong><p>'+esc(overview)+'</p></div>'+
+      '<div class="brief-kpis"><div><span>SELLER ASK (NOT OUR OFFER)</span><strong>'+esc(seller)+'</strong></div>'+
+      '<div><span>OUR COOP OFFER · 13% BUYER IRR</span><strong>'+esc(buyer)+'</strong></div>'+
+      '<div><span>COOP!B38 AT OUR OFFER</span><strong>'+esc(irr)+'</strong></div></div>'+
+      '<h3>Deal in plain words</h3><p>Estimated annual earnings before synergies: '+esc(usd(income))+'. '+esc(rentLine)+'. '+(f.whyUs?esc(brief(f.whyUs)):'Check why owning these assets is better than only supplying fuel.')+'</p>'+
+      '<h3>Synergies · annual modeled improvements</h3>'+(r?'<ul>'+synergyRows+'</ul>':'<p>Model inputs still need checking; no reliable synergy calculation yet.</p>')+
+      '<p>These savings are separate from the seller asking price. Operator earnings, capital spending, taxes and contract commitments also affect the offer.</p>'+
+      '<h3>How they buy fuel today · DODO supply agreement</h3><table class="brief-fuel">'+rows+'</table>'+
+      '<h3>Offer and price</h3><p>The seller is asking '+esc(seller)+'. The COOP workbook says we can pay '+esc(buyer)+
+      ' to earn a '+esc(irr)+' buyer IRR on COOP!B38. The offer goes in COOP!B29; the asking price does not set our return. DODO must be valued separately at 20.0% in its approved workbook.</p>'+
+      '<h3>Biggest risks / answers still needed</h3><ul>'+risks+'</ul>'+
+      '<h3>Decision needed from leadership</h3><p>'+text(f.chipAsk||'Confirm next diligence steps, fuel-supply rights and our offer range.')+'</p>'+
+      '<h3>Next step</h3><p>'+text(f.nextAction||'Confirm supplier, terminal, contract expiration and UNAMs before relying on the offer.')+'</p>'+
+      '<p class="footnote">Source: '+esc(f.sourceVersion||'Uploaded documents and Deal Lens edits')+
+      '. Numbers may still be estimates. Verify signed contracts, site roster and the downloaded workbook before approving an offer.</p>';
+  }
   const FACT_LABELS={sites:'Site count',ask:'Seller ask / transaction value',priorEbitda:'Prior-year EBITDA',ttmEbitda:'Latest TTM EBITDA',normEbitda:'Normalized EBITDA',gallons:'Annual gallons',insideSales:'Inside sales',opex:'Operating expense'};
   const FACT_KEYS=Object.keys(FACT_LABELS);
   const SITE_LABELS={siteNoiUsd:'Seller site NOI',siteMonthlyGallons:'Monthly site gallons',siteInsideSalesUsd:'Site inside sales',projectedEbitdaUsd:'Projected EBITDA',landlordNoiUsd:'Landlord NOI',fuelDistributionIncomeUsd:'Fuel distribution income',suggestedRentUsd:'Suggested rental income',mortgagePaymentUsd:'Mortgage payment',netIncomeUsd:'Net income',sellerEbitdarUsd:'Seller EBITDAR'};
