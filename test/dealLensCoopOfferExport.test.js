@@ -7,7 +7,8 @@ function harness({offer=9089579,irr=.13}={}) {
   const files=new Map([
     ['xl/worksheets/sheet1.xml','<worksheet><c r="B29" s="1"><v>-9500000</v></c><c r="B38" s="2"><f>IRR(B37:Q37)</f><v>0.12</v></c></worksheet>'],
     ['xl/worksheets/sheet2.xml','<worksheet><c r="A1"><v>123</v></c></worksheet>'],
-    ['xl/workbook.xml','<workbook><calcPr calcId="42"/></workbook>']
+    ['xl/workbook.xml','<workbook><sheets><sheet name="COOP" r:id="rId1"/></sheets><calcPr calcId="42"/></workbook>'],
+    ['xl/_rels/workbook.xml.rels','<Relationships><Relationship Id="rId1" Target="worksheets/sheet1.xml"/></Relationships>']
   ]);
   const zip={
     file(name,value) {
@@ -57,6 +58,8 @@ test('download refuses unsolved or unverified 13% COOP workbook instead of a mis
 test('export replaces an old master asset roster with current deal site details',async()=>{
   const h=harness();
   h.ctx.OriginalModel.data.sheetPaths['Master Asset Roster']='xl/worksheets/sheet2.xml';
+  h.files.set('xl/workbook.xml',h.files.get('xl/workbook.xml').replace('</sheets>','<sheet name="Master Asset Roster" r:id="rId2"/></sheets>'));
+  h.files.set('xl/_rels/workbook.xml.rels',h.files.get('xl/_rels/workbook.xml.rels').replace('</Relationships>','<Relationship Id="rId2" Target="worksheets/sheet2.xml"/></Relationships>'));
   h.files.set('xl/worksheets/sheet2.xml','<worksheet><sheetData>'+
     '<row r="1"><c r="A1" t="inlineStr"><is><t>Asset Name</t></is></c>'+
     '<c r="B1" t="inlineStr"><is><t>Address</t></is></c></row>'+
