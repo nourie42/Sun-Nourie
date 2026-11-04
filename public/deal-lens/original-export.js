@@ -97,6 +97,24 @@
       template=await response.arrayBuffer();
     }
     let zip;try{zip=await JSZip.loadAsync(template);}catch{throw Error('The workbook download was incomplete or invalid. Please try again.');}
+    // An optional user-uploaded template must have the same approved COOP sheet
+    // structure. A random XLSX could otherwise have unrelated cells at B29/B38.
+    if(bytes){
+      const file=zip.file('xl/workbook.xml'),rels=zip.file('xl/_rels/workbook.xml.rels');
+      if(!file||!rels)throw Error('The uploaded template is missing an Excel workbook or worksheet relationships.');
+      const xml=await file.async('string'),relationships=await rels.async('string');
+      if(!/<sheets\b/.test(xml))throw Error('The uploaded approved model is missing its worksheet list.');
+      const tags=[...xml.matchAll(/<sheet\b[^>]*\/?>/g)].map(x=>x[0]),expected=Object.keys(OriginalModel.data.sheetPaths||{});
+      const names=tags.map(tag=>unxml(tag.match(/\bname="([^"]+)"/)?.[1]||''));
+      if(tags.length!==expected.length||expected.some(name=>!names.includes(name)))
+        throw Error('Uploaded template is not the same approved COOP workbook: its worksheet names or count differ.');
+      const coop=tags.find((tag,i)=>names[i]==='COOP'),id=coop?.match(/\br:id="([^"]+)"/)?.[1];
+      const rel=[...relationships.matchAll(/<Relationship\b[^>]*\/?>/g)].map(x=>x[0]).find(tag=>tag.includes('Id="'+id+'"'));
+      const target=rel?.match(/\bTarget="([^"]+)"/)?.[1];
+      const path=target?(target.startsWith('/')?target.slice(1):'xl/'+target.replace(/^\.?\//,'')):'';
+      if(!path||path!==OriginalModel.data.sheetPaths.COOP)
+        throw Error('Uploaded template has a different COOP sheet position. Use the approved workbook version instead.');
+    }
     // The downloaded acquisition model must reflect the solved buyer offer,
     // not the seller's asking-price scenario shown in the intake preview.
     const price=model.result.returnCases?.B38?.maxPrice;
