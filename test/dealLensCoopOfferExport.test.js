@@ -52,3 +52,26 @@ test('download refuses unsolved or unverified 13% COOP workbook instead of a mis
     assert.equal(h.files.get('xl/worksheets/sheet1.xml').includes('-9500000'),true);
   }
 });
+
+
+test('export replaces an old master asset roster with current deal site details',async()=>{
+  const h=harness();
+  h.ctx.OriginalModel.data.sheetPaths['Master Asset Roster']='xl/worksheets/sheet2.xml';
+  h.files.set('xl/worksheets/sheet2.xml','<worksheet><sheetData>'+
+    '<row r="1"><c r="A1" t="inlineStr"><is><t>Asset Name</t></is></c>'+
+    '<c r="B1" t="inlineStr"><is><t>Address</t></is></c></row>'+
+    '<row r="2"><c r="A2" t="inlineStr"><is><t>Romeo old site</t></is></c>'+
+    '<c r="B2" t="inlineStr"><is><t>Tallahassee old address</t></is></c></row>'+
+    '</sheetData></worksheet>');
+  await h.ctx.OriginalModelExport.make({fields:{name:'New deal'},sites:[{name:'New Site',address:'100 Market St, Orlando, FL, 32801'}]},new Uint8Array([1]));
+  const xml=h.files.get('xl/worksheets/sheet2.xml');
+  assert.match(xml,/New Site/);
+  assert.match(xml,/100 Market St/);
+  assert.doesNotMatch(xml,/Romeo|Tallahassee/);
+});
+
+test('an export with old Romeo project cells elsewhere is blocked rather than misrepresented',async()=>{
+  const h=harness();
+  h.files.set('xl/worksheets/sheet1.xml',h.files.get('xl/worksheets/sheet1.xml').replace('</worksheet>','<sheetData><row r="99"><c r="A99" t="inlineStr"><is><t>Romeo legacy project</t></is></c></row></sheetData></worksheet>'));
+  await assert.rejects(h.ctx.OriginalModelExport.make({fields:{name:'Other Deal'},sites:[]},new Uint8Array([1])),/prior-deal text/i);
+});
