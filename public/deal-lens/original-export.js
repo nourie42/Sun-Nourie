@@ -35,7 +35,13 @@
   function rosterCell(label,site){
     if(/(?:asset|site|store)\s*(?:id|#|no\b|number)|^id$/.test(label))return site.id||'';
     if(/(?:asset|site|store|location)\s*name|^name$|^site$|^store$/.test(label))return site.name||'';
-    if(/address|street|city|state|zip/.test(label))return /city|state|zip/.test(label)?'':site.address||'';
+    if(/address|street|city|state|zip/.test(label)){
+      const parts=String(site.address||'').split(',').map(x=>x.trim());
+      if(/city/.test(label))return parts[1]||'';
+      if(/state/.test(label))return (parts[2]||'').split(' ')[0];
+      if(/zip/.test(label))return parts[3]||(parts[2]||'').match(/\b\d{5}(?:-\d{4})?\b/)?.[0]||'';
+      return parts[0]||'';
+    }
     if(/division|type/.test(label))return site.division||'';
     if(/brand|channel/.test(label))return site.channel||'';
     if(/control|tenure|owned|leased/.test(label))return site.tenure||'';
