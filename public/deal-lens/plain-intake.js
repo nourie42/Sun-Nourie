@@ -102,7 +102,16 @@ Check row/column alignment, portfolio vs site totals, units, signs, reporting pe
           for(const row of rows){
             const key=supplyMap.find(([pattern])=>pattern.test(row[fuelField]||''))?.[1];
             const value=(row[fuelValue]||'').trim();
-            if(key&&value&&!/^(?:not provided|unknown|n\/a|missing)$/i.test(value))result.fuelSupply[key]=value;
+            if(key&&value&&!/^(?:not provided|unknown|n\/a|missing)$/i.test(value)){
+              if(key==='rentTreatment'){
+                if(/^(?:none|no rent|zero rent)|no rent expense/i.test(value))result.fuelSupply[key]='none';
+                else if(/rent (?:paid|expense|payment)|^yes$/i.test(value))result.fuelSupply[key]='paid';
+              }else if(key==='purchaseMethod'){
+                result.fuelSupply[key]=/direct|refiner/i.test(value)?'Direct from supplier / refiner':
+                  /rack/i.test(value)?'Rack purchase / jobber':
+                  /distribut|jobber|delivered/i.test(value)?'Delivered through distributor':'Other / mixed';
+              }else result.fuelSupply[key]=value;
+            }
           }
           continue;
         }
