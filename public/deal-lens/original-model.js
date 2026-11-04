@@ -210,7 +210,7 @@
   // A single edit renders several panels. Reuse its calculation until a model input changes.
   const calculationCache=new WeakMap();
   function calculate(d){
-    const key=JSON.stringify([d.fields,d.fieldOrigin,d.fieldSources,d.facts,d.aiReview?.facts,d.reportedFacts,d.financialSources,d.modelInputs,d.originalInputs,d.originalConfirmed,d.pastedEstimates]);
+    const key=JSON.stringify([d.fields,d.fieldOrigin,d.fieldSources,d.facts,d.aiReview?.facts,d.reportedFacts,d.financialSources,d.modelInputs,d.originalInputs,d.originalConfirmed,d.pastedEstimates,d.factCorrections]);
     const cached=calculationCache.get(d);if(cached?.key===key)return cached.value;
     const value=calculateFresh(d);calculationCache.set(d,{key,value});return value;
   }
