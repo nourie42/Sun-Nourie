@@ -15,7 +15,7 @@
     document.querySelector('#dealNumbersCard').before(main);
 
     const evidenceSections={dealNumbersCard:'Figures read from your documents',materialsRegister:'Files in this deal',dealHistory:'Reading history and limits',prelimOutput:'Preliminary read and source tables',needsCard:'Evidence received and still needed',siteCluesCard:'Individual site facts',extractedCard:'Review and correct extracted facts',tableReviewCard:'Review seller financial tables'};
-    for(const [id,title] of Object.entries(evidenceSections)){const node=document.getElementById(id);const card=node.matches('.card')?node:node.closest('article,section,.card');if(!card)continue;const detail=document.createElement('details');detail.className=card.className+' intake-evidence';detail.hidden=card.hidden;const summary=document.createElement('summary');summary.textContent=title;detail.append(summary);while(card.firstChild)detail.append(card.firstChild);if(card.id){detail.id=card.id;card.id='';}card.replaceWith(detail);}
+    for(const [id,title] of Object.entries(evidenceSections)){const node=document.getElementById(id);const card=node.matches('.card')?node:node.closest('article,section,.card');if(!card)continue;const detail=document.createElement('details');detail.className=card.className+' intake-evidence';detail.hidden=card.hidden;if(id==='dealNumbersCard')detail.open=true;const summary=document.createElement('summary');summary.textContent=title;detail.append(summary);while(card.firstChild)detail.append(card.firstChild);if(card.id){detail.id=card.id;card.id='';}card.replaceWith(detail);}
 
     document.getElementById('tableReviewCard').hidden=true;
 
