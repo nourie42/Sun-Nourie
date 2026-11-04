@@ -37,7 +37,7 @@ test('workbook failure leaves a visible recovery state and disables model downlo
   assert.doesNotMatch(h.nodes.get('modelCoverage').textContent,/null sites/);
   assert.ok(['intakeModelInputs','originalInputsCard','originalCashflowsCard'].every(id=>h.nodes.get(id).hidden));
   assert.ok(h.buttons.every(b=>b.disabled));
-  assert.equal(h.nodes.get('originalCashflows').innerHTML,'');
+  assert.match(h.nodes.get('originalCashflows').innerHTML,/Cannot verify a 13.0% COOP offer/);
 });
 
 test('download keeps the selected deal and filename when the user switches deals while it is preparing',async()=>{
@@ -48,6 +48,6 @@ test('download keeps the selected deal and filename when the user switches deals
   assert.ok(h.buttons.every(b=>b.disabled));
   assert.equal(h.exported().fields.name,'Deal One');
   h.finish();await pending;
-  assert.deepEqual(h.downloads,['Deal-One-original-model.xlsx']);
+  assert.deepEqual(h.downloads,['Deal-One-COOP_13pct_B38.xlsx']);
   assert.ok(h.buttons.every(b=>!b.disabled));
 });

@@ -6,23 +6,23 @@
   <meta name="theme-color" content="#0b1422">
   <meta name="description" content="A browser-based workspace to screen, analyze, and brief Sunoco fuel and convenience deals. Deal entries are saved on your device.">
   <title>Deal Lens | Strategic M&A workspace</title>
-  <link rel="stylesheet" href="./style.css">
+  <link rel="stylesheet" href="./style.css?v=19">
   <script src="./vendor/jszip.min.js" defer></script>
   <script src="./vendor/pdf-lib.min.js" defer></script>
   <script src="./roster.js?v=18" defer></script>
   <script src="./ingest.js?v=18" defer></script>
   
-  <script src="./intake-state.js?v=13" defer></script>
+  <script src="./intake-state.js?v=19" defer></script>
   <script src="./model.js?v=14" defer></script>
   <script src="./original-model-data.js?v=16" defer></script>
   <script src="./original-engine.js?v=16" defer></script>
-  <script src="./original-model.js?v=18" defer></script>
-  <script src="./original-export.js?v=16" defer></script>
-  <script src="./intake-model-ui.js?v=17" defer></script>
-  <script src="./plain-intake.js?v=18" defer></script>
+  <script src="./original-model.js?v=19" defer></script>
+  <script src="./original-export.js?v=19" defer></script>
+  <script src="./intake-model-ui.js?v=19" defer></script>
+  <script src="./plain-intake.js?v=19" defer></script>
   <script src="./evidence-state.js?v=18" defer></script>
-  <script src="./paste-intake.js?v=18" defer></script>
-  <script src="./app.js?v=18" defer></script>
+  <script src="./paste-intake.js?v=19" defer></script>
+  <script src="./app.js?v=19" defer></script>
 </head>
 <body>
   <a class="weather-return" href="/weather-fusion/experimental-weather.html">← Experimental weather</a>
@@ -36,9 +36,10 @@
         <button class="nav-btn" data-tab="fit"><span>02</span> Strategic fit</button>
         <button class="nav-btn" data-tab="plan"><span>03</span> Deal plan</button>
         <button class="nav-btn" data-tab="numbers"><span>04</span> Model &amp; returns</button>
-        <button class="nav-btn" data-tab="brief"><span>05</span> Brief for Chip</button>
+        <button class="nav-btn" data-tab="fuel"><span>05</span> DODO fuel supply</button>
+        <button class="nav-btn" data-tab="brief"><span>06</span> Leadership Summary</button>
       </nav>
-      <a class="tool-link" href="./model-tool.html"><span>06</span> Deal Model Tool</a>
+
       <div class="rail-bottom">
         <div class="privacy"><span class="dot"></span> Saved in this browser</div>
         <p>Your entries stay in this browser. Export a backup to move them to another device.</p>
@@ -115,18 +116,41 @@
           <div class="eyebrow">03 / EXECUTION MAP</div><div class="page-title"><div><h1>Move the deal forward.</h1><p>At each phase, produce one decision-ready output.</p></div><span class="badge" id="planProgress">0 / 0 complete</span></div>
           <div class="flowbar"><span>SCREEN</span><i></i><span>PROVE</span><i></i><span>DESIGN</span><i></i><span>PRICE</span><i></i><span>DECIDE</span></div>
           <div id="phaseList" class="phase-list"></div>
-          <div class="card"><div class="section-head"><div><h2>Site-by-site operating plan</h2><p>A portfolio average hides the stores that create or destroy the case. Choose the route for each site.</p></div><button class="button subtle" id="addSite">+ Add site</button></div><div class="site-scroll"><table class="site-table"><thead><tr><th>Site / group</th><th>TTM EBITDA, $MM</th><th>Gallons, MM</th><th>Route</th><th>Critical reason / right</th><th></th></tr></thead><tbody id="siteRows"></tbody></table></div><div class="site-total" id="siteTotal"></div></div>
+          <div class="card"><div class="section-head"><div><h2>Site-by-site operating plan</h2><p>A portfolio average hides the stores that create or destroy the case. Choose the route for each site.</p></div><button class="button subtle" id="addSite">+ Add site</button></div><div class="site-scroll"><table class="site-table"><thead><tr><th>Site / group</th><th>Address</th><th>TTM EBITDA, $MM</th><th>Gallons, MM</th><th>Route</th><th>Critical reason / right</th><th></th></tr></thead><tbody id="siteRows"></tbody></table></div><div class="site-total" id="siteTotal"></div></div>
           <div class="card thought-card"><div class="section-head"><div><h2>Working thought pad</h2><p>Capture the point you want to make before it disappears into a workbook.</p></div></div><div class="fields two"><label>What changed your view?<textarea data-field="viewChange" rows="4" placeholder="One or two sentences"></textarea></label><label>Who owes which answer?<textarea data-field="owners" rows="4" placeholder="Name → question → due date"></textarea></label></div></div>
         </section>
         <section id="numbers" class="panel" aria-label="Model and returns"><p>Loading model…</p></section>
-        <section id="brief" class="panel" aria-label="Brief for Chip">
-          <div class="eyebrow">05 / DECISION NOTE</div><div class="page-title"><div><h1>Walk in with a point of view.</h1><p>A one-page discussion brief that leads with your recommendation and the proof.</p></div><div class="title-actions"><button id="copyBrief" class="button primary">Copy brief</button><button id="printBrief" class="button subtle">Print / PDF</button></div></div>
-          <div class="brief-layout"><div class="card brief-editor"><h2>Shape the message</h2><p>Write in plain language. These prompts are the questions Chip is likely to ask.</p>
+        <section id="fuel" class="panel" aria-label="DODO fuel supply agreement">
+          <div class="eyebrow">05 / FUEL SUPPLY DILIGENCE</div>
+          <div class="page-title"><div><h1>How are they buying fuel today?</h1><p>Record the current supplier, contract rights and costs before valuing a DODO supply agreement. DODO offer target: 20.0% buyer IRR in the approved DODO workbook; COOP returns are not a DODO valuation.</p></div></div>
+          <div class="card"><div class="section-head"><div><h2>Current fuel purchasing</h2><p>Enter confirmed details or leave blank. Each deal keeps its own terms.</p></div></div>
+            <div class="fields three">
+              <label>Current distributor<input data-field="fuelDistributor" placeholder="Who delivers the fuel now?"></label>
+              <label>Fuel brand / supplier<input data-field="fuelBrand" placeholder="Brand and supplying company"></label>
+              <label>Terminal / loading point<input data-field="fuelTerminal" placeholder="Terminal name and location"></label>
+              <label>Terminal operator / supplying company<input data-field="terminalOperator" placeholder="Who operates the terminal?"></label>
+              <label>How the fuel is purchased<select data-field="purchaseMethod"><option value="">Not confirmed</option><option>Delivered through distributor</option><option>Direct from supplier / refiner</option><option>Rack purchase / jobber</option><option>Other / mixed</option></select></label>
+              <label>Pricing / rack terms<input data-field="fuelPriceTerms" placeholder="Rack plus/minus, fees, rebates"></label>
+              <label>Contract expiration date<input data-field="fuelContractEnd" type="date"></label>
+              <label>Contract time remaining (if date unknown)<input data-field="fuelTimeRemaining" placeholder="e.g. 30 months"></label>
+              <label>Annual contracted gallons<input data-field="contractGallons" inputmode="decimal" placeholder="Actual gallons per year"></label>
+              <label>UNAM payoff / exposure ($)<input data-field="fuelUnams" inputmode="decimal" placeholder="Dollar amount; leave blank if unknown"></label>
+              <label>UNAM rate / clause<input data-field="unamTerms" placeholder="¢/gallon, dates and trigger"></label>
+              <label>Assignment / termination / ROFR<input data-field="fuelTransfer" placeholder="Assignment, termination and rights"></label>
+              <label>Rent expense treatment<select data-field="rentTreatment"><option value="">Not confirmed; do not assume rent</option><option value="none">No rent expense</option><option value="paid">Rent expense paid — amount in source/model</option></select></label>
+            </div>
+            <label class="full-label">Other fuel-contract or terminal details<textarea data-field="fuelNotes" rows="3" placeholder="Volumes by product, contract counterparty, remaining investment, dealer commitments, supply restrictions, open questions"></textarea></label>
+            <p class="review-note">This section records fuel supply facts for the Leadership Summary. It does not modify DODO, COAG, CODO or other standalone model calculations.</p>
+          </div>
+        </section>
+        <section id="brief" class="panel" aria-label="Leadership Summary">
+          <div class="eyebrow">06 / LEADERSHIP SUMMARY</div><div class="page-title"><div><h1>Walk in with a point of view.</h1><p>A one-page discussion brief that leads with your recommendation and the proof.</p></div><div class="title-actions"><button id="copyBrief" class="button primary">Copy brief</button><button id="printBrief" class="button subtle">Print / PDF</button></div></div>
+          <div class="brief-layout"><div class="card brief-editor"><h2>Shape the summary</h2><p>Keep it short, plain and easy to read in the exported PDF.</p>
             <label>Recommended move<select data-field="recommendation"><option value="Clarify before pricing">Clarify before pricing</option><option value="Pursue">Pursue</option><option value="Pause">Pause</option><option value="Pass">Pass</option></select></label>
-            <label>One sentence thesis<textarea data-field="thesis" rows="3" placeholder="We should [action] because Sunoco can [specific value] if [conditions]."></textarea></label>
+            <label>Quick deal overview<textarea data-field="thesis" rows="2" placeholder="1–2 short sentences: what is being bought and why"></textarea></label>
             <label>Why Sunoco specifically?<textarea data-field="whyUs" rows="3" placeholder="Fuel channel, supply costs, site operating model, geography, or commercial relationship."></textarea></label>
             <label>What is the biggest downside?<textarea data-field="downside" rows="3" placeholder="What breaks the value case even if the spreadsheet works?"></textarea></label>
-            <label>What decision do you need from Chip?<textarea data-field="chipAsk" rows="3" placeholder="Approve diligence, set a price guardrail, pick an operating route, or stop."></textarea></label>
+            <label>What decision do you need from leadership?<textarea data-field="chipAsk" rows="3" placeholder="Approve diligence, set a price guardrail, pick an operating route, or stop."></textarea></label>
             <label>Three next answers / owners<textarea data-field="nextAnswers" rows="4" placeholder="1. Question — owner — date\n2. Question — owner — date\n3. Question — owner — date"></textarea></label>
             <label>Source / model version<input data-field="sourceVersion" placeholder="CIM date, actuals through, model filename or version"></label>
           </div><article class="paper" id="briefPaper"></article></div>

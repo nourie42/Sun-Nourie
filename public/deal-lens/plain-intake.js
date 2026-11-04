@@ -58,6 +58,9 @@ Use full USD dollars and actual gallons, not millions, with $ / gallons / count 
 COMPLETE ASSET ROSTER
 Return EVERY roster row in a table: Asset ID | Asset name | Address | City | State | Zip | Division | RE control | RE owner | Source. Include retail stores, bulk plants and other included assets, even if they have no P&L. Distinguish total assets from retail store count. Do not mistake trucks/rolling stock for properties. Preserve ownership descriptions as printed; a roster is received evidence, not independent legal-title verification. State whether the roster is complete or partial and reconcile its row count to the workbook's asset count.
 
+FUEL SUPPLY AGREEMENT
+Return a table with exactly Field | Value | Source. Include Current distributor; Fuel brand / supplier; Terminal / loading point; Terminal operator / company; How the fuel is purchased; Pricing / rack terms; Contract expiration date; Contract time remaining; Annual contracted gallons; UNAM payoff / exposure; UNAM rate / clause; Assignment / termination / ROFR; Rent expense treatment. State Not provided rather than guessing. Distinguish current supplier from delivery distributor. A DODO fuel supply deal is separately valued at 20% buyer IRR; do not confuse it with the COOP 13% buyer offer.
+
 MODEL ESTIMATES
 For missing inputs that can reasonably be estimated, use a separate table: Assumption | Value | Basis. ${estimateInstructions} These estimates will be shown RED for review. Do not replace source figures with estimates. Do not invent a deal's asking price from summed site asks or invent an IRR. Deal Lens calculates returns using my original workbook, changing only its yellow/orange inputs.
 
@@ -65,7 +68,17 @@ CHECKS AND LIMITATIONS
 Check row/column alignment, portfolio vs site totals, units, signs, reporting periods, and arithmetic. Explain conflicts without silently changing printed values. List which sheets/pages were read and anything inaccessible. Separate evidence received from evidence still missing (signed leases, fuel rights, legal entities, environmental reports, etc.). Do not say the site list is missing if a roster was supplied. Return the readable results only; no code or JSON wrapper.`;
   }
   function parse(raw){
-    const result={facts:[],sites:[],assumptions:[],limitations:[],dealName:'',market:'',summary:''};
+    const result={facts:[],sites:[],assumptions:[],limitations:[],fuelSupply:{},dealName:'',market:'',summary:''};
+    const supplyMap=[
+      [/^current distributor$/i,'fuelDistributor'],[/^fuel brand/i,'fuelBrand'],
+      [/^terminal\s*\/\s*loading point$/i,'fuelTerminal'],
+      [/^terminal operator/i,'terminalOperator'],[/^how the fuel is purchased$/i,'purchaseMethod'],
+      [/^pricing\s*\/\s*rack terms$/i,'fuelPriceTerms'],
+      [/^contract expiration/i,'fuelContractEnd'],[/^contract time remaining/i,'fuelTimeRemaining'],
+      [/^annual contracted gallons/i,'contractGallons'],[/^unam payoff/i,'fuelUnams'],
+      [/^unam rate/i,'unamTerms'],[/^assignment\s*\/\s*termination/i,'fuelTransfer'],
+      [/^rent expense treatment/i,'rentTreatment']
+    ];
     let section='',source='Pasted AI summary',period='',scope='portfolio',siteName='';
     const lines=raw.replace(/\r/g,'').split('\n'),tables=[];
     function add(label,value,extra={}){
@@ -84,6 +97,24 @@ Check row/column alignment, portfolio vs site totals, units, signs, reporting pe
         for(;i<lines.length&&lines[i].includes('|');i++){const values=split(lines[i]);if(values.length!==headers.length){result.limitations.push('A table row with mismatched columns was skipped.');continue;}rows.push(Object.fromEntries(headers.map((h,j)=>[h,values[j]])));}i--;
         const roster=DealRoster.read(rows.length?[Object.fromEntries(headers.map(h=>[h,h])),...rows]:[],source);if(roster.length){result.sites.push(...roster);continue;}
         const find=re=>headers.find(h=>re.test(h));
+        const fuelField=find(/^(?:field|fuel supply field|contract field)$/i),fuelValue=find(/^value$/i);
+        if(fuelField&&fuelValue){
+          for(const row of rows){
+            const key=supplyMap.find(([pattern])=>pattern.test(row[fuelField]||''))?.[1];
+            const value=(row[fuelValue]||'').trim();
+            if(key&&value&&!/^(?:not provided|unknown|n\/a|missing)$/i.test(value)){
+              if(key==='rentTreatment'){
+                if(/^(?:none|no rent|zero rent)|no rent expense/i.test(value))result.fuelSupply[key]='none';
+                else if(/rent (?:paid|expense|payment)|^yes$/i.test(value))result.fuelSupply[key]='paid';
+              }else if(key==='purchaseMethod'){
+                result.fuelSupply[key]=/direct|refiner/i.test(value)?'Direct from supplier / refiner':
+                  /rack/i.test(value)?'Rack purchase / jobber':
+                  /distribut|jobber|delivered/i.test(value)?'Delivered through distributor':'Other / mixed';
+              }else result.fuelSupply[key]=value;
+            }
+          }
+          continue;
+        }
         const metric=find(/^(?:metric|item|financial figure|measure)$/i),assumption=find(/^(?:assumption|model input)$/i),val=find(/^(?:value|amount)(?:\s|$)/i),per=find(/^period$/i),src=find(/^source/i),sc=find(/^scope$/i),sn=find(/^site name$/i),status=find(/^status|confidence$/i);
         for(const r of rows){
           if(assumption&&val){addEstimate(r[assumption],r[val],r[find(/^basis|reason|rationale$/i)]||'Estimate from pasted AI summary');continue;}
