@@ -38,7 +38,7 @@
     }catch{return null;}
   }
   function output(m){
-    if(m.available===false)return '<div class="model-incomplete" role="status"><strong>Original workbook unavailable.</strong><p>'+esc(m.errors.join(' · '))+'</p></div>';
+    if(m.available===false)return '<div class="model-incomplete" role="status"><strong>Workbook temporarily unavailable.</strong><p>'+esc(m.errors.join(' · '))+'</p></div>';
     if(!m.result)return '<div class="model-incomplete"><strong>More data needed.</strong><p>'+esc(m.errors.join(' · ')||'Import deal figures or enter model inputs first.')+'</p></div>';
     const v=offerCase(m),r=m.result,seller=m.items.price.status==='estimated'?null:m.inputs.price;
     const year= v?.engine.get('COOP','C22'),closing=v?.engine.get('COOP','B37');
