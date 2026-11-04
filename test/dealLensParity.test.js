@@ -143,5 +143,5 @@ test('confirmed no rent removes AI or template rent from original COOP model',()
   assert.ok(calc.result);
   assert.equal(calc.items.rent.value,0);
   assert.equal(calc.items.rent.status,'manual');
-  assert.equal(calc.result.engine.get('COOP','C21'),0);
+  assert.ok(calc.result.engine.get('COOP','C21')===0,'A signed negative zero is still a zero-dollar rent expense');
 });
