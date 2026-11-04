@@ -41,6 +41,8 @@
     if(!obj||typeof obj!=='object'||Array.isArray(obj))throw Error('Paste one deal summary at a time.');
     if(obj.analysis&&typeof obj.analysis==='object')obj=obj.analysis;
     const facts=[],assumptions={},warnings=[],sites=[];
+    const permittedSupply=new Set(['fuelDistributor','fuelBrand','fuelTerminal','terminalOperator','purchaseMethod','fuelPriceTerms','fuelContractEnd','fuelTimeRemaining','contractGallons','fuelUnams','unamTerms','fuelTransfer','rentTreatment','fuelNotes']);
+    const fuelSupply=Object.fromEntries(Object.entries(obj.fuelSupply&&typeof obj.fuelSupply==='object'&&!Array.isArray(obj.fuelSupply)?obj.fuelSupply:{}).filter(([key,value])=>permittedSupply.has(key)&&typeof value==='string'&&value.trim()).map(([key,value])=>[key,clean(value,600)]));
     if(!Array.isArray(obj.facts))obj.facts=[];
     if(obj.facts.length>1000)throw Error('Limit this response to 1,000 facts.');
     for(const row of obj.facts){
@@ -66,13 +68,15 @@
     if(sites.length){const counts=DealRoster.counts(sites);for(const [key,value] of [['sites',counts.sites],['assetCount',counts.assets]])if(value>0&&!facts.some(f=>f.key===key&&f.scope==='portfolio'))facts.push({key,value,source:sites[0].source||'Pasted roster',scope:'portfolio',confidence:'medium',excerpt:'Counted '+counts.assets+' assets and '+counts.sites+' retail sites'});}
     if(!facts.length)throw Error('No usable labelled figures or site table were found. Paste the readable financial summary and full asset roster from Copy AI prompt. Your deal has not changed.');
     const seen=new Set(),unique=facts.filter(f=>{const id=[f.key,f.source,f.scope,f.siteName,f.period,f.value].join('|');if(seen.has(id))return false;seen.add(id);return true;});
-    return {dealName:clean(obj.dealName,200),market:clean(obj.market,200),summary:clean(obj.summary),facts:unique,assumptions,sites,limitations:[...(Array.isArray(obj.limitations)?obj.limitations.filter(x=>typeof x==='string').map(x=>clean(x)):[]),...warnings].slice(0,50)};
+    return {dealName:clean(obj.dealName,200),market:clean(obj.market,200),summary:clean(obj.summary),fuelSupply,facts:unique,assumptions,sites,limitations:[...(Array.isArray(obj.limitations)?obj.limitations.filter(x=>typeof x==='string').map(x=>clean(x)):[]),...warnings].slice(0,50)};
   }
   function apply(deal,parsed,{files=[],time=new Date().toISOString()}={}){
     DealIntake.remember(deal,parsed.facts);
     deal.pastedEstimates={...(deal.pastedEstimates||{}),...parsed.assumptions};
     deal.aiReview={...parsed,assumptions:undefined,time,model:'Pasted AI response · no API request',estimatedUsd:0,partial:false,usage:{inputTokens:0,outputTokens:0},coverage:[{files:files.length,figures:parsed.facts.length,sites:parsed.sites.length}]};
-    deal.fields||={};deal.fieldOrigin||={};const seenFields=new Set();for(const f of parsed.facts){if(['site','segment'].includes(f.scope)||seenFields.has(f.key)||deal.fieldOrigin[f.key]==='manual')continue;seenFields.add(f.key);deal.fields[f.key]=String(f.value);deal.fieldOrigin[f.key]=f.confidence==='low'?'pasted AI estimate':'pasted AI source';if(f.key.startsWith('seller')&&f.period)deal.fields.sellerTablePeriod=f.period;}if(parsed.dealName&&(!deal.fields.name||/^(?:Untitled deal|New deal)$/.test(deal.fields.name)))deal.fields.name=parsed.dealName;if(parsed.market&&!deal.fields.market)deal.fields.market=parsed.market;
+    deal.fields||={};deal.fieldOrigin||={};
+    for(const [key,value] of Object.entries(parsed.fuelSupply||{}))if(deal.fieldOrigin[key]!=='manual'){deal.fields[key]=value;deal.fieldOrigin[key]='pasted AI source';}
+    const seenFields=new Set();for(const f of parsed.facts){if(['site','segment'].includes(f.scope)||seenFields.has(f.key)||deal.fieldOrigin[f.key]==='manual')continue;seenFields.add(f.key);deal.fields[f.key]=String(f.value);deal.fieldOrigin[f.key]=f.confidence==='low'?'pasted AI estimate':'pasted AI source';if(f.key.startsWith('seller')&&f.period)deal.fields.sellerTablePeriod=f.period;}if(parsed.dealName&&(!deal.fields.name||/^(?:Untitled deal|New deal)$/.test(deal.fields.name)))deal.fields.name=parsed.dealName;if(parsed.market&&!deal.fields.market)deal.fields.market=parsed.market;
     const sources=[...new Set(parsed.facts.map(f=>f.source))],materials=files.length?files.map(f=>typeof f==='string'?f:f.name):sources;
     deal.materials||=[];for(const name of materials)deal.materials.unshift({name,time,state:'Imported from pasted response',detail:'Read in your AI chat; no Deal Lens API charge.'});deal.materials=DealIntake.materials(deal).slice(0,80);
     deal.history||=[];deal.history.unshift({time,label:'Pasted AI results',detail:parsed.facts.length+' figures · '+Object.keys(parsed.assumptions).length+' imported estimates · no API charge',warnings:parsed.limitations,kinds:['pasted AI response'],clues:parsed.facts.map(f=>f.source+': '+f.excerpt).join('\n').slice(0,22000)});deal.history=deal.history.slice(0,30);
