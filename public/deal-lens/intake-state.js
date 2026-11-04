@@ -4,7 +4,7 @@
     const rows=[...(deal.aiReview?.facts||[]),...(deal.reportedFacts||[])];
     for(const [key,record] of Object.entries(deal.facts||{}))for(const f of record.candidates||[])rows.push({...f,key});
     for(const source of deal.financialSources||[])for(const [key,value] of Object.entries(source.fields||{}))rows.push({key,value,source:source.source,period:source.period,scope:'portfolio',confidence:source.confidence||'medium'});
-    const seen=new Set();return rows.filter(f=>{const key=token(f);if(!Number.isFinite(f.value)||seen.has(key))return false;seen.add(key);return true;});
+    const seen=new Set();return rows.filter(f=>{const key=token(f);if(!Number.isFinite(f.value)||seen.has(key))return false;seen.add(key);return true;}).map(f=>{const corrected=deal.factCorrections?.[token(f)];return corrected&&Number.isFinite(corrected.value)?{...f,value:corrected.value,confidence:'high',verification:'Manually corrected; original source value retained in edit history',manuallyCorrected:true}:f;});
   }
   function materials(deal){
     const seen=new Set();return (deal.materials||[]).map(r=>({...r,name:r.name.replace(/ · (?:page \d+(?:\.pdf)?|section \d+)(?:.*)?$/i,'')})).filter(r=>{const key=r.name.trim().toLowerCase();if(seen.has(key))return false;seen.add(key);return true;});
