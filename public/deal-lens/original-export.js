@@ -16,7 +16,14 @@
       template=await response.arrayBuffer();
     }
     let zip;try{zip=await JSZip.loadAsync(template);}catch{throw Error('The workbook download was incomplete or invalid. Please try again.');}
-    const values=model.result.engine.snapshot(),sheets=new Map();
+    // The downloaded acquisition model must reflect the solved buyer offer,
+    // not the seller's asking-price scenario shown in the intake preview.
+    const price=model.result.returnCases?.B38?.maxPrice;
+    if(!Number.isFinite(price))throw Error('Cannot solve an offer at 13.0% COOP!B38 using these inputs. Correct the assumptions before downloading; no unsolved workbook was created.');
+    const engine=OriginalModel.compute({...model.changes,'COOP!B29':-price});
+    const buyerIrr=engine.get('COOP','B38');
+    if(!Number.isFinite(buyerIrr)||Math.abs(buyerIrr-.13)>1e-7)throw Error('Workbook verification failed: COOP!B38 is not 13.0%. No workbook was downloaded.');
+    const values=engine.snapshot(),sheets=new Map();
     for(const [key,value] of Object.entries(values)){const p=key.lastIndexOf('!'),sheet=key.slice(0,p),cell=key.slice(p+1),input=Object.hasOwn(model.changes,key);if(input&&!OriginalModel.data.allowed[sheet]?.includes(cell))throw Error('Blocked non-yellow/orange edit: '+key);if(!sheets.has(sheet))sheets.set(sheet,await zip.file(OriginalModel.data.sheetPaths[sheet]).async('string'));sheets.set(sheet,patchCell(sheets.get(sheet),cell,value,input));}
     for(const [sheet,xml] of sheets)zip.file(OriginalModel.data.sheetPaths[sheet],xml);
     // Input formulas may have been replaced by values. Excel must rebuild its calculation chain.
