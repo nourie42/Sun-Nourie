@@ -27,11 +27,29 @@
 
   }
 
+  function offerCase(m){
+    const price=m.result?.returnCases?.B38?.maxPrice;
+    if(!Number.isFinite(price))return null;
+    try{
+      const engine=OriginalModel.compute({...m.changes,'COOP!B29':-price});
+      const irr=engine.get('COOP','B38');
+      if(!Number.isFinite(irr)||Math.abs(irr-.13)>1e-7)return null;
+      return {price,irr,engine};
+    }catch{return null;}
+  }
   function output(m){
-    if(m.available===false)return `<div class="model-incomplete" role="status"><strong>Workbook temporarily unavailable.</strong><p>${esc(m.errors.join(' · ')||'Reload the page to try again. Your saved deals and intake tools are still available.')}</p></div>`;
-    if(!m.result)return `<div class="model-incomplete"><strong>${m.errors.length?'Finish the number you’re editing.':'Upload deal materials to fill your original model.'}</strong><p>${esc(m.errors.join(' · ')||'The model will appear here after the documents are read.')}</p></div>`;
-    const r=m.result,returns=Object.values(r.returnCases).map(b=>`<div class="primary-return"><span>IRR · ${esc(b.cell)}</span><strong>${b.irr==null?'—':(b.irr*100).toFixed(4)+'%'}</strong><small>${esc(b.label)}</small><small>Price at ${m.inputs.target}%: ${dollars(b.maxPrice)}</small><small>NPV at ${m.inputs.target}%: ${dollars(b.npv)}</small></div>`).join('');
-    return `<p class="case-note"><strong>COOP offer at 13.0% buyer IRR (COOP!B38): ${dollars(r.returnCases.B38?.maxPrice)}</strong>. IRRs below are at the seller asking price; the downloaded original COOP workbook uses the solved offer in COOP!B29. Estimated case · ${m.estimated} inputs to review. Source digits and missing operating terms remain assumptions.</p><div class="result-metrics parity-results">${returns}<div><span>Seller earnings base</span><strong>${dollars(m.inputs.base)}</strong><small>From documents / estimated composition</small></div><div><span>Buyer year 1 EBITDA</span><strong>${dollars(r.years[0].ebitda)}</strong><small>Original COOP model</small></div><div><span>Cash at closing · B34</span><strong>${dollars(r.initial)}</strong><small>Price, working capital, UNAM and fees</small></div><div><span>Year 1 operator add-back</span><strong>${dollars(r.years[0].contribution)}</strong><small>COOP!C29; controlled by operator retained earnings per site</small></div></div>`;
+    if(m.available===false)return '<div class="model-incomplete" role="status"><strong>Original workbook unavailable.</strong><p>'+esc(m.errors.join(' · '))+'</p></div>';
+    if(!m.result)return '<div class="model-incomplete"><strong>More data needed.</strong><p>'+esc(m.errors.join(' · ')||'Import deal figures or enter model inputs first.')+'</p></div>';
+    const v=offerCase(m),r=m.result,seller=m.items.price.status==='estimated'?null:m.inputs.price;
+    const year= v?.engine.get('COOP','C22'),closing=v?.engine.get('COOP','B37');
+    return '<p class="case-note"><strong>One authoritative COOP return: original workbook cell COOP!B38.</strong> This is the buyer IRR, not the operator return. The offer is calculated independently of the seller ask. All output below is from the same approved model engine.</p>'+
+      '<div class="result-metrics parity-results">'+
+      '<div class="primary-return"><span>OUR MAX COOP OFFER · COOP!B29</span><strong>'+dollars(v?.price)+'</strong><small>Offer solved at 13.0% buyer IRR</small></div>'+
+      '<div class="primary-return"><span>BUYER IRR AT OUR OFFER · COOP!B38</span><strong>'+(v?(v.irr*100).toFixed(4)+'%':'Cannot verify')+'</strong><small>With capitalized lease</small></div>'+
+      '<div><span>SELLER ASK (NOT OUR OFFER)</span><strong>'+dollars(seller)+'</strong><small>Ask scenario COOP!B38: '+(Number.isFinite(r.returnCases?.B38?.irr)?(r.returnCases.B38.irr*100).toFixed(4)+'%':'—')+'</small></div>'+
+      '<div><span>YEAR 1 BUYER EBITDA · AT OFFER</span><strong>'+dollars(year)+'</strong><small>Original COOP!C22, same offer scenario</small></div>'+
+      '<div><span>CLOSING CASH OUTFLOW · B38 BASIS</span><strong>'+dollars(Number.isFinite(closing)?-closing:null)+'</strong><small>Original COOP!B37</small></div>'+
+      '<div><span>ESTIMATES TO VERIFY</span><strong>'+m.estimated+'</strong><small>Red estimates are not confirmed facts</small></div></div>';
   }
 
   function render(d,rebuild=true){active=d;const m=OriginalModel.calculate(d),newDeal=lastId!==d.id;if(newDeal)rebuild=true;lastId=d.id;
@@ -49,7 +67,17 @@
 
     else for(const row of document.querySelectorAll('[data-original-wrap]')){const key=row.dataset.originalWrap,item=m.items[key],s=OriginalModel.byKey[key],el=row.querySelector('input');if(el!==document.activeElement)el.value=d.originalInputs?.[key]??display(item.value,s);row.classList.toggle('estimated',item.status==='estimated');row.querySelector('.assumption-status').textContent=item.status==='estimated'?'ESTIMATE':item.status==='manual'?'YOUR ENTRY':item.status==='confirmed'?'CONFIRMED':'FROM DOCUMENT';row.querySelector('.input-hint').textContent=s.unit.startsWith('$')?dollars(item.value):display(item.value,s)+' '+s.unit;row.querySelector('.input-source p').textContent=item.basis;}
 
-    const r=m.result;document.getElementById('originalCashflows').innerHTML=r?'<p>COOP!B34 · Without capitalized lease. The year 1 add-back follows the editable operator retained earnings per site in COOP!S18.</p><table class="model-flow"><thead><tr><th>Year</th><th>EBITDA</th><th>Operator add-back</th><th>Exit value</th><th>Funds flow · B34</th></tr></thead><tbody><tr><td>Closing</td><td>—</td><td>—</td><td>—</td><td>'+dollars(-r.initial)+'</td></tr>'+r.years.map(y=>'<tr><td>'+y.year+'</td><td>'+dollars(y.ebitda)+'</td><td>'+dollars(y.contribution)+'</td><td>'+dollars(y.exit)+'</td><td>'+dollars(y.cash)+'</td></tr>').join('')+'</tbody></table>':'';
+    const v=offerCase(m);
+    let cashRows='';
+    if(v)for(let year=0;year<=15;year++){
+      const col=String.fromCharCode(66+year),sum=v.engine.get('COOP',col+'37');
+      cashRows+='<tr><td>'+(year||'Closing')+'</td><td>'+dollars(v.engine.get('COOP',col+'22'))+
+        '</td><td>'+dollars(v.engine.get('COOP',col+'29'))+'</td><td>'+dollars(sum)+'</td></tr>';
+    }
+    document.getElementById('originalCashflows').innerHTML=v?
+      '<p>Original COOP!B37:Q37 funds flow at the solved acquisition offer; this supports COOP!B38 = 13%. Cash out at closing is a negative number. No separate web calculator is used.</p>'+
+      '<table class="model-flow"><thead><tr><th>Year</th><th>EBITDA</th><th>Contribution / exit</th><th>Cash flow (B38 basis)</th></tr></thead><tbody>'+cashRows+'</tbody></table>':
+      '<p>Cannot verify a 13.0% COOP offer from the current inputs. The original workbook will not be exported as a solved deal.</p>';
 
     return m;
 
