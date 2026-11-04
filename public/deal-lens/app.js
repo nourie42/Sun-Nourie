@@ -202,7 +202,7 @@
       const value=DealModel.parse(e.target.value);
       if(value==null){toast('Enter a number. Use 0 only when the source confirms zero.');renderDealNumbers();return;}
       (d.factCorrections||={})[token]={value,source:row.source,priorValue:row.value,at:new Date().toISOString()};
-      if(row.scope==='portfolio'&&Object.hasOwn(FACT_LABELS,row.key)){
+      if(row.scope==='portfolio'){
         d.fields[row.key]=String(value);d.fieldOrigin[row.key]='manual';
         if(row.key==='ask')d.modelInputs={...(d.modelInputs||{}),price:value*1e6};
       }
