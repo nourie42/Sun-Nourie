@@ -95,7 +95,8 @@
 
     const otherFact=use('otherIncome',['otherIncomeUsd']);if(!otherFact)items.otherIncome.value=defaults('COOP','C14')/defaults('COOP','C2')*sites;
 
-    if(!use('rent',['rentUsd']))put('rent',0,'estimated','Rent not separately supplied; assume included in total operating expenses');
+    if(f.rentTreatment==='none')put('rent',0,'manual','User confirmed no rent expense for this deal');
+    else if(!use('rent',['rentUsd']))put('rent',0,'estimated','Rent expense not confirmed; modeled as zero pending verification, not stated as a known expense');
 
     const fuelMarginFact=use('fuelMargin',['fuelMarginCpg']),insideMarginFact=use('insideMargin',['insideMarginPct']);
     if(fuelGp&&items.gallons.value>0&&!fuelMarginFact?.corrected)put('fuelMargin',fuelGp.value/items.gallons.value*100,fuelGp.status==='document'&&items.gallons.status==='document'?'derived':'estimated','Fuel gross profit ÷ annual gallons · '+fuelGp.basis);
@@ -155,7 +156,7 @@
     put('unams',parse(d.modelInputs?.unams)??0,'estimated','UNAM payoff not supplied; zero estimated');put('tankCapital',0,'estimated','Year 1 tank capital not supplied; zero estimated. Original later-year capital schedule is preserved');put('rebrandSites',0,'estimated','No rebrand project supplied; zero sites estimated');
 
     for(const [key,estimate] of Object.entries(d.pastedEstimates||{})){if(Object.hasOwn(byKey,key)&&items[key].status==='estimated')put(key,estimate.value,'estimated','Pasted AI estimate: '+estimate.basis);}
-    for(const [key,raw] of Object.entries(d.originalInputs||{})){if(!byKey[key])continue;const n=parse(raw);if(n==null){errors.push(byKey[key].label+': enter a valid number');continue;}put(key,n,d.originalConfirmed?.[key]?'confirmed':'manual','Your model input · COOP!'+byKey[key].cell);}
+    for(const [key,raw] of Object.entries(d.originalInputs||{})){if(!byKey[key]||(key==='rent'&&f.rentTreatment==='none'))continue;const n=parse(raw);if(n==null){errors.push(byKey[key].label+': enter a valid number');continue;}put(key,n,d.originalConfirmed?.[key]?'confirmed':'manual','Your model input · COOP!'+byKey[key].cell);}
 
     for(const s of definitions){const n=items[s.key].value;if(!Number.isFinite(n)||n<0)errors.push(s.label+' must be zero or greater');}
 
