@@ -433,7 +433,7 @@
       const target=current||pendingUploadDealId===deal().id||!DealIntake.hasData(deal())?deal():blank(parsed.dealName||'New deal');
       const preview=JSON.parse(JSON.stringify(target));DealPaste.apply(preview,parsed,{files});const check=OriginalModel.calculate(preview);if(check.available!==false&&check.errors.length)throw Error(check.errors.join('; '));
       if(target!==deal()){db.deals.push(target);db.active=target.id;}
-      const d=deal();DealPaste.apply(d,parsed,{files});d.intakeGroup='';if(parsed.summary&&!d.fields.thesis)d.fields.thesis=parsed.summary.split(/(?<=[.!?])\\s+/)[0].slice(0,180);
+      const d=deal();DealPaste.apply(d,parsed,{files});d.intakeGroup='';if(parsed.summary&&!d.fields.thesis)d.fields.thesis=parsed.summary.split(/(?<=[.!?])\s+/)[0].slice(0,180);
       resetFileSelection();$('#pastedAiResponse').value='';
       document.querySelector('[name="uploadIntent"][value="new"]').checked=true;save();hydrate();
       const model=OriginalModel.calculate(d);
