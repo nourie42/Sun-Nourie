@@ -6,23 +6,24 @@
   <meta name="theme-color" content="#0b1422">
   <meta name="description" content="A browser-based workspace to screen, analyze, and brief Sunoco fuel and convenience deals. Deal entries are saved on your device.">
   <title>Deal Lens | Strategic M&A workspace</title>
-  <link rel="stylesheet" href="./style.css?v=19">
+  <link rel="stylesheet" href="./style.css?v=20">
   <script src="./vendor/jszip.min.js" defer></script>
   <script src="./vendor/pdf-lib.min.js" defer></script>
   <script src="./roster.js?v=18" defer></script>
   <script src="./ingest.js?v=18" defer></script>
   
-  <script src="./intake-state.js?v=19" defer></script>
+  <script src="./intake-state.js?v=20" defer></script>
   <script src="./model.js?v=14" defer></script>
   <script src="./original-model-data.js?v=16" defer></script>
   <script src="./original-engine.js?v=16" defer></script>
   <script src="./original-model.js?v=19" defer></script>
   <script src="./original-export.js?v=19" defer></script>
-  <script src="./intake-model-ui.js?v=19" defer></script>
-  <script src="./plain-intake.js?v=19" defer></script>
+  <script src="./intake-model-ui.js?v=20" defer></script>
+  <script src="./plain-intake.js?v=20" defer></script>
   <script src="./evidence-state.js?v=18" defer></script>
-  <script src="./paste-intake.js?v=19" defer></script>
-  <script src="./app.js?v=19" defer></script>
+  <script src="./paste-intake.js?v=20" defer></script>
+  <script src="./leadership-report.js?v=20" defer></script>
+  <script src="./app.js?v=20" defer></script>
 </head>
 <body>
   <a class="weather-return" href="/weather-fusion/experimental-weather.html">← Experimental weather</a>
@@ -139,12 +140,13 @@
               <label>Assignment / termination / ROFR<input data-field="fuelTransfer" placeholder="Assignment, termination and rights"></label>
               <label>Rent expense treatment<select data-field="rentTreatment"><option value="">Not confirmed; do not assume rent</option><option value="none">No rent expense</option><option value="paid">Rent expense paid — amount in source/model</option></select></label>
             </div>
+            <div class="card" id="fuelContractCard"><div class="section-head"><div><h2>Fuel contracts by site and distributor</h2><p>Enter one row for each agreement. A site may have multiple distributors and different end dates, gallons and UNAMs.</p></div><button class="button primary" id="addFuelContract" type="button">+ Add supply contract</button></div><div id="fuelContractRows"></div></div>
             <label class="full-label">Other fuel-contract or terminal details<textarea data-field="fuelNotes" rows="3" placeholder="Volumes by product, contract counterparty, remaining investment, dealer commitments, supply restrictions, open questions"></textarea></label>
             <p class="review-note">This section records fuel supply facts for the Leadership Summary. It does not modify DODO, COAG, CODO or other standalone model calculations.</p>
           </div>
         </section>
         <section id="brief" class="panel" aria-label="Leadership Summary">
-          <div class="eyebrow">06 / LEADERSHIP SUMMARY</div><div class="page-title"><div><h1>Walk in with a point of view.</h1><p>A one-page discussion brief that leads with your recommendation and the proof.</p></div><div class="title-actions"><button id="copyBrief" class="button primary">Copy brief</button><button id="printBrief" class="button subtle">Print / PDF</button></div></div>
+          <div class="eyebrow">06 / LEADERSHIP SUMMARY</div><div class="page-title"><div><h1>Leadership Summary</h1><p>Download a complete leadership PDF with key answers first, then all site contracts, numbers, risks and diligence gaps.</p></div><div class="title-actions"><button class="button primary" data-report-pdf type="button">Download PDF</button><button id="copyBrief" class="button subtle" type="button">Copy summary</button><button id="printBrief" class="button subtle" type="button">Print</button></div></div>
           <div class="brief-layout"><div class="card brief-editor"><h2>Shape the summary</h2><p>Keep it short, plain and easy to read in the exported PDF.</p>
             <label>Recommended move<select data-field="recommendation"><option value="Clarify before pricing">Clarify before pricing</option><option value="Pursue">Pursue</option><option value="Pause">Pause</option><option value="Pass">Pass</option></select></label>
             <label>Quick deal overview<textarea data-field="thesis" rows="2" placeholder="1–2 short sentences: what is being bought and why"></textarea></label>
@@ -154,7 +156,7 @@
             <label>Three next answers / owners<textarea data-field="nextAnswers" rows="4" placeholder="1. Question — owner — date\n2. Question — owner — date\n3. Question — owner — date"></textarea></label>
             <label>Source / model version<input data-field="sourceVersion" placeholder="CIM date, actuals through, model filename or version"></label>
           </div><article class="paper" id="briefPaper"></article></div>
-          <div class="last-note"><strong>Use the brief as a conversation opener.</strong> If a core fact is unknown, the brief calls it out. A multiple or illustrative run-rate is not an approved offer.</div>
+          <div class="last-note"><strong>Full report:</strong> The PDF includes all entered figures, fuel agreements, site-level information, estimates, risk flags and missing diligence items. The Excel model is a separate download.</div>
         </section>
       </div>
       <footer class="footer"><span>DEAL LENS · STRATEGY → DECISION</span><span>Autosaved on this device · Copy & paste · no API extraction charges</span></footer>

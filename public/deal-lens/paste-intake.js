@@ -41,6 +41,10 @@
     if(!obj||typeof obj!=='object'||Array.isArray(obj))throw Error('Paste one deal summary at a time.');
     if(obj.analysis&&typeof obj.analysis==='object')obj=obj.analysis;
     const facts=[],assumptions={},warnings=[],sites=[];
+    const objectRows=(value,keys,limit)=>Array.isArray(value)?value.slice(0,limit).filter(row=>row&&typeof row==='object'&&!Array.isArray(row)).map(row=>Object.fromEntries(keys.map(k=>[k,clean(row[k],700)]))):[];
+    const contractRows=objectRows(obj.contractRows||obj.fuelContracts,['site','distributor','supplier','brand','terminal','expiration','remaining','gallons','unams','pricing','rights','source','notes'],1000);
+    const industryFlags=objectRows(obj.industryFlags||obj.benchmarks,['metric','dealValue','benchmark','comparable','year','source','flag','basis','status'],200);
+    const diligence=objectRows(obj.diligence||obj.dueDiligence,['category','issue','needed','owner','status','priority','source'],300);
     const permittedSupply=new Set(['fuelDistributor','fuelBrand','fuelTerminal','terminalOperator','purchaseMethod','fuelPriceTerms','fuelContractEnd','fuelTimeRemaining','contractGallons','fuelUnams','unamTerms','fuelTransfer','rentTreatment','fuelNotes']);
     const fuelSupply=Object.fromEntries(Object.entries(obj.fuelSupply&&typeof obj.fuelSupply==='object'&&!Array.isArray(obj.fuelSupply)?obj.fuelSupply:{}).filter(([key,value])=>permittedSupply.has(key)&&typeof value==='string'&&value.trim()).map(([key,value])=>[key,clean(value,600)]));
     if(!Array.isArray(obj.facts))obj.facts=[];
@@ -66,15 +70,25 @@
     for(const row of obj.assumptions||[]){const spec=row&&Object.hasOwn(OriginalModel.byKey,row.key)&&OriginalModel.byKey[row.key];if(!spec){warnings.push('An unrecognized model assumption was skipped.');continue;}let value=number(row.value);if(value==null){warnings.push(row.key+': missing estimate was left to the original-model default.');continue;}if(value<0)throw Error('Model assumption '+row.key+' must be zero or greater.');if(spec.unit==='sites'&&(!Number.isInteger(value)||(row.key==='sites'&&value<1)))throw Error('Site assumptions must use whole site counts.');if(['insideMargin','savings'].includes(row.key)&&value>100)throw Error(row.key+' cannot exceed 100%.');if(spec.unit.startsWith('$')&&/million|\$mm/i.test(row.unit||''))value*=1e6;assumptions[row.key]={value,basis:clean(row.basis,1000)||'Estimate in pasted AI response'};}
     for(const row of Array.isArray(obj.sites)?obj.sites:[]){if(row&&clean(row.name,180))sites.push(Object.fromEntries(['id','name','address','division','channel','owner','tenure','source','notes'].map(k=>[k,clean(row[k],k==='address'?400:300)])));}
     if(sites.length){const counts=DealRoster.counts(sites);for(const [key,value] of [['sites',counts.sites],['assetCount',counts.assets]])if(value>0&&!facts.some(f=>f.key===key&&f.scope==='portfolio'))facts.push({key,value,source:sites[0].source||'Pasted roster',scope:'portfolio',confidence:'medium',excerpt:'Counted '+counts.assets+' assets and '+counts.sites+' retail sites'});}
-    if(!facts.length&&!Object.keys(fuelSupply).length)throw Error('No usable figures, site roster, or fuel contract terms were found. Paste the readable source summary. Your deal has not changed.');
+    if(!facts.length&&!sites.length&&!contractRows.length&&!Object.keys(fuelSupply).length)throw Error('No usable figures, site roster, or fuel contract terms were found. Paste the readable source summary. Your deal has not changed.');
     const seen=new Set(),unique=facts.filter(f=>{const id=[f.key,f.source,f.scope,f.siteName,f.period,f.value].join('|');if(seen.has(id))return false;seen.add(id);return true;});
-    return {dealName:clean(obj.dealName,200),market:clean(obj.market,200),summary:clean(obj.summary),fuelSupply,facts:unique,assumptions,sites,limitations:[...(Array.isArray(obj.limitations)?obj.limitations.filter(x=>typeof x==='string').map(x=>clean(x)):[]),...warnings].slice(0,50)};
+    return {dealName:clean(obj.dealName,200),market:clean(obj.market,200),summary:clean(obj.summary),fuelSupply,contractRows,industryFlags,diligence,facts:unique,assumptions,sites,limitations:[...(Array.isArray(obj.limitations)?obj.limitations.filter(x=>typeof x==='string').map(x=>clean(x)):[]),...warnings].slice(0,50)};
   }
   function apply(deal,parsed,{files=[],time=new Date().toISOString()}={}){
     DealIntake.remember(deal,parsed.facts);
     deal.pastedEstimates={...(deal.pastedEstimates||{}),...parsed.assumptions};
     deal.aiReview={...parsed,assumptions:undefined,time,model:'Pasted AI response · no API request',estimatedUsd:0,partial:false,usage:{inputTokens:0,outputTokens:0},coverage:[{files:files.length,figures:parsed.facts.length,sites:parsed.sites.length}]};
     deal.fields||={};deal.fieldOrigin||={};
+    deal.fuelContracts||=[];
+    // Import each separate site/distributor/expiration agreement. Preserve
+    // existing manual edits instead of silently replacing a contract.
+    for(const row of parsed.contractRows||[]){
+      const sig=x=>[x.site,x.distributor,x.expiration].map(v=>String(v||'').trim().toLowerCase()).join('|');
+      const match=deal.fuelContracts.find(x=>sig(x)===sig(row));
+      if(!match)deal.fuelContracts.push({...row});
+      else for(const [k,v] of Object.entries(row))if(v&&!match[k])match[k]=v;
+    }
+
     for(const [key,value] of Object.entries(parsed.fuelSupply||{}))if(deal.fieldOrigin[key]!=='manual'){deal.fields[key]=value;deal.fieldOrigin[key]='pasted AI source';}
     const seenFields=new Set();for(const f of parsed.facts){if(['site','segment'].includes(f.scope)||seenFields.has(f.key)||deal.fieldOrigin[f.key]==='manual')continue;seenFields.add(f.key);deal.fields[f.key]=String(f.value);deal.fieldOrigin[f.key]=f.confidence==='low'?'pasted AI estimate':'pasted AI source';if(f.key.startsWith('seller')&&f.period)deal.fields.sellerTablePeriod=f.period;}if(parsed.dealName&&(!deal.fields.name||/^(?:Untitled deal|New deal)$/.test(deal.fields.name)))deal.fields.name=parsed.dealName;if(parsed.market&&!deal.fields.market)deal.fields.market=parsed.market;
     const sources=[...new Set(parsed.facts.map(f=>f.source))],materials=files.length?files.map(f=>typeof f==='string'?f:f.name):sources;

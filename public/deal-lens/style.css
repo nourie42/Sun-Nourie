@@ -69,3 +69,27 @@
   .paper .brief-kpis{margin:10px 0}
   .paper .footnote{font-size:8px}
 }
+
+
+/* Deal Lens complete leadership report */
+.fuel-contract-entry{padding:18px;margin:13px 0;background:#f8fbfb;border:1px solid #dce9e7;border-left:3px solid #008d7d;border-radius:6px}
+.fuel-contract-entry h3{font:800 14px Manrope,sans-serif;margin:4px 0}
+.fuel-contract-entry .section-head{margin-bottom:9px}
+.report-kpis{grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:8px!important}
+.report-kpis strong{font-size:14px!important}
+.report-section{margin:19px 0;border-top:1px solid #dbe6e6;padding-top:8px}
+.report-section h3{margin:8px 0 9px!important;font-size:12px}
+.report-section .brief-fuel td{overflow-wrap:anywhere;white-space:pre-wrap}
+.report-section .brief-fuel th{width:31%}
+.tracker-actions{display:flex;gap:7px;align-items:center}
+.delete-action{color:#a33730;background:#fff8f7;border-color:#e6c4c1}
+.delete-action:hover{background:#fff1ee;border-color:#cc8d88}
+.title-actions{flex-wrap:wrap}
+@media(max-width:700px){.report-kpis{grid-template-columns:repeat(2,minmax(0,1fr))!important}.fuel-contract-entry .fields.three{grid-template-columns:1fr}}
+@media print{
+  .paper .report-section{break-before:auto;page-break-inside:auto}
+  .report-section h3{break-after:avoid}
+  .report-section .brief-fuel tr{break-inside:avoid;page-break-inside:avoid}
+  .paper .brief-kpis{grid-template-columns:repeat(3,1fr)}
+  .paper .report-kpis strong{font-size:12px!important}
+}

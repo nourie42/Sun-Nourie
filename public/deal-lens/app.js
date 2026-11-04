@@ -36,7 +36,7 @@
   const mm = (v) => present(v) ? (v < 0 ? '-$' : '$') + Math.abs(v*1e6).toLocaleString('en-US',{maximumFractionDigits:0}) : '—';
   const mult = (v) => present(v) && v > 0 ? v.toFixed(1)+'×' : '—';
   const id = () => (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random());
-  function blank(name='Untitled deal') { return {id:id(), fields:{name,stage:'Screening',targetIrr:'13',recommendation:'Clarify before pricing'},gates:{},tasks:{},evidence:{},sites:[],siteClues:[],tableReviews:[],financialSources:[],facts:{},signals:[],history:[],fieldOrigin:{},updated:new Date().toISOString()}; }
+  function blank(name='Untitled deal') { return {id:id(), fields:{name,stage:'Screening',targetIrr:'13',recommendation:'Clarify before pricing'},gates:{},tasks:{},evidence:{},sites:[],fuelContracts:[],siteClues:[],tableReviews:[],financialSources:[],facts:{},signals:[],history:[],fieldOrigin:{},updated:new Date().toISOString()}; }
   const record=v=>!!v&&typeof v==='object'&&!Array.isArray(v);
   function normalizeDeal(raw){
     if(!record(raw)||!record(raw.fields)||!Array.isArray(raw.sites))throw Error('Invalid deal backup');
@@ -45,12 +45,13 @@
     for(const key of Object.keys(d.fields))d.fields[key]=['string','number'].includes(typeof d.fields[key])?String(d.fields[key]):'';
     for(const key of ['gates','tasks','evidence','facts','fieldOrigin','modelInputs','originalInputs','modelConfirmed','originalConfirmed','pastedEstimates','fieldSources','factCorrections'])if(!record(d[key]))d[key]={};
     for(const key of ['gates','evidence'])for(const [name,value] of Object.entries(d[key]))if(!record(value))d[key][name]={};
-    for(const key of ['sites','siteClues','tableReviews','financialSources','signals','history','materials','reportedFacts'])d[key]=Array.isArray(d[key])?d[key].filter(record):[];
+    for(const key of ['sites','siteClues','tableReviews','financialSources','signals','history','materials','reportedFacts','fuelContracts'])d[key]=Array.isArray(d[key])?d[key].filter(record):[];
     d.reportedFacts=d.reportedFacts.filter(f=>Number.isFinite(f.value));
     for(const review of d.tableReviews)for(const key of ['labelImage','totalImage'])if(typeof review[key]!=='string')review[key]='';
     for(const financial of d.financialSources)financial.fields=Object.fromEntries(Object.entries(record(financial.fields)?financial.fields:{}).filter(([,value])=>Number.isFinite(value)));
     d.pastedEstimates=Object.fromEntries(Object.entries(d.pastedEstimates).filter(([,value])=>record(value)&&Number.isFinite(value.value)));
     for(const site of d.sites)for(const key of ['name','address','route','reason'])site[key]=String(site[key]??'');
+    for(const c of d.fuelContracts)for(const [k,v] of Object.entries(c))c[k]=String(v??'');
     for(const clue of d.siteClues){clue.name=String(clue.name??'');clue.address=String(clue.address??'');clue.snippets=Array.isArray(clue.snippets)?clue.snippets.map(String):[];}
     for(const item of d.materials)item.name=String(item.name??'Unnamed material');
     for(const item of d.history){item.warnings=Array.isArray(item.warnings)?item.warnings.map(String):[];item.kinds=Array.isArray(item.kinds)?item.kinds.map(String):[];}
@@ -88,10 +89,30 @@
   function save(){try{deal() && (deal().updated=new Date().toISOString());localStorage.setItem(KEY,JSON.stringify(db));$('#saveStatus').textContent='Saved on this device';}catch{$('#saveStatus').textContent='Storage full — export a backup';toast('Could not save. Export a backup.');}}
   function toast(message){const el=$('#toast');el.textContent=message;el.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.remove('show'),3000);}
   function renderPicker(){const p=$('#dealPicker');p.innerHTML=db.deals.map(d=>`<option value="${esc(d.id)}" ${d.id===db.active?'selected':''}>${esc(d.fields.name||'Untitled deal')}</option>`).join('');}
-  function hydrate(){ $('#rawDealText').value=deal().draftNote||''; $('#pastedAiResponse').value=deal().pasteDraft||''; refreshPastePrompt(); renderTracker(); renderMaterials();document.querySelectorAll('[data-field]').forEach(el=>{el.value=displayField(el,deal().fields[el.dataset.field]);});renderPicker();renderIntake();renderGates();renderPhases();renderSites();renderEvidence();renderNumbers();renderBrief();}
+  function hydrate(){ $('#rawDealText').value=deal().draftNote||''; $('#pastedAiResponse').value=deal().pasteDraft||''; refreshPastePrompt(); renderTracker(); renderMaterials();document.querySelectorAll('[data-field]').forEach(el=>{el.value=displayField(el,deal().fields[el.dataset.field]);});renderPicker();renderIntake();renderGates();renderPhases();renderSites();renderFuelContracts();renderEvidence();renderNumbers();renderBrief();}
   function renderGates(){const d=deal();$('#gateList').innerHTML=GATES.map((g,i)=>{const v=d.gates[g.id]||{};return `<div class="gate-card status-${esc(v.status||'open')}"><div class="gate-head"><div class="gate-num">${String(i+1).padStart(2,'0')}</div><div><h3>${esc(g.title)}</h3><p>${esc(g.hint)}</p></div></div><div class="gate-foot"><select data-gate="${g.id}" aria-label="${esc(g.title)}"><option value="open" ${!v.status||v.status==='open'?'selected':''}>Open</option><option value="yes" ${v.status==='yes'?'selected':''}>Yes / proven</option><option value="no" ${v.status==='no'?'selected':''}>No / concern</option></select><input data-gate-note="${g.id}" value="${esc(v.note||'')}" placeholder="Evidence or next question" aria-label="Evidence for ${esc(g.title)}"></div></div>`}).join('');const yes=GATES.filter(g=>d.gates[g.id]?.status==='yes').length;const no=GATES.filter(g=>d.gates[g.id]?.status==='no').length;const answered=yes+no;const banner=$('#fitBanner');banner.className='score-banner '+(no?'red':answered===GATES.length?'green':'amber');$('#fitCount').textContent=`${answered} / ${GATES.length}`;$('#fitHeadline').textContent=no?'Resolve a strategic concern':answered===GATES.length?'Strategic gates supported':'Key answers still open';$('#fitSubline').textContent=no?`${no} concern${no>1?'s':''} need a mitigation, price change or pass decision.`:answered===GATES.length?'Move to diligence and test price in the approved model.':`${GATES.length-answered} question${GATES.length-answered>1?'s':''} need evidence before a confident recommendation.`;banner.querySelector('.score-icon').textContent=no?'!':answered===GATES.length?'✓':'?';}
   function renderPhases(){const d=deal();let done=0,total=0;$('#phaseList').innerHTML=PHASES.map((p,i)=>{const rows=p.tasks.map((task,j)=>{total++;const key=p.id+'-'+j;const checked=!!d.tasks[key];if(checked)done++;return `<div class="task-row"><input type="checkbox" data-task="${key}" id="task-${key}" ${checked?'checked':''}><label for="task-${key}">${esc(task)}</label></div>`}).join('');return `<div class="phase"><div class="phase-side"><span>0${i+1} / PHASE</span><h2>${esc(p.name)}</h2><p>${esc(p.why)}</p></div><div class="phase-main"><div class="phase-output">${esc(p.out)}</div>${rows}</div></div>`}).join('');$('#planProgress').textContent=`${done} / ${total} complete`;}
   function renderSites(){const d=deal();$('#siteRows').innerHTML=d.sites.map((s,i)=>`<tr><td><input data-site="${i}" data-prop="name" aria-label="Site ${i+1} name" value="${esc(s.name||'')}" placeholder="Site / group"></td><td><input data-site="${i}" data-prop="address" aria-label="Site ${i+1} address" value="${esc(s.address||'')}" placeholder="Street, city, state, ZIP"></td><td><input data-site="${i}" data-prop="ebitda" aria-label="Site ${i+1} EBITDA in millions of dollars" type="number" step="any" value="${esc(s.ebitda??'')}" placeholder="—"></td><td><input data-site="${i}" data-prop="gallons" aria-label="Site ${i+1} gallons in millions" type="number" step="any" value="${esc(s.gallons??'')}" placeholder="—"></td><td><select data-site="${i}" data-prop="route" aria-label="Site ${i+1} operating route">${['Unassigned','Keep / operate','Dealer / COOP','COAG','CALS','Exit / dispose','Separate valuation'].map(o=>`<option ${s.route===o?'selected':''}>${o}</option>`).join('')}</select></td><td><input data-site="${i}" data-prop="reason" aria-label="Site ${i+1} route reason" value="${esc(s.reason||'')}" placeholder="Why this route? Rights / rent / cost"></td><td><button data-remove-site="${i}" aria-label="Remove site">×</button></td></tr>`).join('');renderSiteTotal();}
+
+  function renderFuelContracts(){
+    const rows=deal().fuelContracts||[],fields=[
+      ['site','Site / group','text'],['distributor','Distributor','text'],
+      ['supplier','Supplier / company','text'],['brand','Brand','text'],
+      ['terminal','Terminal / loading point','text'],['expiration','Contract expiration','date'],
+      ['remaining','Time remaining','text'],['gallons','Annual gallons','text'],
+      ['unams','UNAM exposure ($)','text'],['pricing','Pricing / rebates','text'],
+      ['rights','Transfer / termination / ROFR','text'],['source','Source contract / page','text'],
+      ['notes','Notes','text']
+    ];
+    const host=$('#fuelContractRows');if(!host)return;
+    const datalist='<datalist id="fuelSiteNames">'+(deal().sites||[]).map(s=>'<option value="'+esc(s.name||'')+'"></option>').join('')+'</datalist>';
+    host.innerHTML=datalist+(rows.length?rows.map((contract,i)=>
+      '<div class="fuel-contract-entry"><div class="section-head"><h3>Supply agreement '+(i+1)+'</h3><button class="button subtle" type="button" data-remove-contract="'+i+'">Delete agreement</button></div>'+
+      '<div class="fields three">'+fields.map(([key,title,type])=>
+        '<label>'+esc(title)+'<input data-contract-index="'+i+'" data-contract-key="'+key+'" '+(key==='site'?'list="fuelSiteNames" ':'')+'type="'+type+'" value="'+esc(contract[key]||'')+'" placeholder="'+(key==='distributor'?'Name each distributor':key==='expiration'?'yyyy-mm-dd':'Not confirmed')+'"></label>').join('')+'</div></div>').join(''):
+      '<p class="prelim-empty">No supply contracts entered. Add one for every site and distributor, including different expiration dates.</p>');
+  }
+
   function renderSiteTotal(){const rows=deal().sites,eb=rows.reduce((s,r)=>s+(present(num(r.ebitda))?num(r.ebitda):0),0),g=rows.reduce((s,r)=>s+(present(num(r.gallons))?num(r.gallons):0),0);$('#siteTotal').textContent=rows.length?`${rows.length} site/group rows · entered EBITDA ${mm(eb)} · entered gallons ${g.toFixed(2)}MM`:'Add a site or a group of similar sites to map the operating routes.';}
   function renderEvidence(){const d=deal(),assessments=DealEvidence.assess(d);$('#evidenceList').innerHTML=EVIDENCE.map(e=>{const v=d.evidence[e.id]||{},assessment=assessments.find(r=>r.id===e.id);return `<div class="evidence-row"><div><strong>${esc(e.title)}</strong><small>${esc(assessment.label)} · ${esc(assessment.detail)}</small></div><select data-evidence="${e.id}" aria-label="Evidence status for ${esc(e.title)}"><option value="open" ${!v.status||v.status==='open'?'selected':''}>Not yet verified</option><option value="estimated" ${v.status==='estimated'?'selected':''}>Estimated</option><option value="verified" ${v.status==='verified'?'selected':''}>Verified</option></select><input data-evidence-source="${e.id}" value="${esc(v.source||'')}" placeholder="Source, owner or date" aria-label="Source for ${esc(e.title)}"></div>`}).join('');}
   function calculate(){const d=deal(),m=OriginalModel.calculate(d),p=m.inputs||{},r=m.result,y=r?.years[0],usd=n=>n==null?NaN:n/1e6,sourceBase=[num(d.fields.normEbitda),num(d.fields.ttmEbitda),usd(num(d.fields.sellerEbitdaUsd))].find(present);return {base:m.available===false?sourceBase:usd(p.base),fuel:usd(y?.fuel),inside:usd(y?.insideBenefit),opex:usd(y?.savings),other:usd(p.otherBenefit),rent:usd(p.addedRent),field:usd(p.fieldCost),dealer:usd(p.operatorCost),buyer:usd(y?.ebitda),ask:m.available===false?num(d.fields.ask):usd(p.price),allIn:usd(r?.initial),prior:num(d.fields.priorEbitda),ttm:num(d.fields.ttmEbitda),askMult:r?.multiple??NaN,allMult:y?.ebitda>0?r.initial/y.ebitda:NaN,model:m};}
@@ -99,63 +120,8 @@
   const val=(v)=>v&&String(v).trim()?String(v).trim():'Not established';
   // The leadership brief reads the *approved original* COOP model engine.
   // The seller ask is separate from the price the buyer can pay at 13% B38.
-  function renderBrief(){
-    const d=deal(),f=d.fields||{},m=OriginalModel.calculate(d),r=m.result;
-    const n=v=>Number.isFinite(v)?v:null,usd=v=>n(v)==null?'Not confirmed':DealModel.money(v);
-    const brief=v=>String(v||'').replace(/\s+/g,' ').trim().slice(0,190);
-    const overview=brief(f.thesis)||brief([f.sites?f.sites+' sites':'Fuel and convenience assets',f.market||'',f.scope||''].filter(Boolean).join(' · '));
-    const offer=r?.returnCases?.B38?.maxPrice;
-    let solved=null,buyerIrr=null;
-    if(Number.isFinite(offer)){
-      try{solved=OriginalModel.compute({...m.changes,'COOP!B29':-offer});buyerIrr=solved.get('COOP','B38');}catch{}
-    }
-    const ask=m.items?.price?.status!=='estimated'?m.inputs?.price:null;
-    const nonblank=(v)=>String(v??'').trim()?String(v).trim():'To confirm';
-    const term=f.fuelContractEnd||f.fuelTimeRemaining||'To confirm';
-    const supplyItems=[
-      ['Current distributor',f.fuelDistributor],['Fuel brand / supplier',f.fuelBrand],
-      ['How they buy fuel',f.purchaseMethod],['Terminal',f.fuelTerminal],
-      ['Terminal operator / company',f.terminalOperator],['Price / rack terms',f.fuelPriceTerms],
-      ['Contract expiration / time left',term],['Contract gallons',f.contractGallons],
-      ['UNAM amount',f.fuelUnams],['UNAM terms',f.unamTerms],
-      ['Assignment / termination / ROFR',f.fuelTransfer]
-    ];
-    const rows=supplyItems.map(([name,value])=>'<tr><th>'+esc(name)+'</th><td>'+esc(nonblank(value))+'</td></tr>').join('');
-    const synergies=r?[
-      ['Fuel supply improvement',r.years[0].fuel],
-      ['Inside gross-margin improvement',r.years[0].insideBenefit],
-      ['Operating-expense savings',r.years[0].savings]
-    ]:[];
-    const synergyRows=synergies.map(([name,value])=>'<li>'+esc(name)+': <strong>'+esc(usd(value))+'</strong> per year (modeled, not guaranteed)</li>').join('');
-    const rent=m.items?.rent;
-    const rentLine=f.rentTreatment==='none'?'No rent expense (confirmed for this deal)':
-      f.rentTreatment==='paid'?'Rent expense modeled: '+usd(rent?.value):
-      'Rent expense not confirmed — do not assume a rent payment';
-    const risks=[f.downside||'Main downside not entered.',m.estimated?m.estimated+' original model inputs are estimates and must be checked.':'',
-      r?.returnCases?.B38?.maxPrice==null?'No verified 13% COOP offer is available from the current inputs.':'']
-      .filter(Boolean).map(x=>'<li>'+esc(x)+'</li>').join('');
-    const seller=usd(ask),buyer=usd(offer),irr=Number.isFinite(buyerIrr)?(buyerIrr*100).toFixed(4)+'%':'Not verified';
-    const income=m.inputs?.base;
-    const paper=$('#briefPaper');
-    paper.innerHTML='<div class="paper-top"><span class="paper-kicker">LEADERSHIP SUMMARY</span><span class="paper-date">'+
-      esc(new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'}))+'</span></div>'+
-      '<h2>'+esc(f.name||'Untitled deal')+'</h2><p class="subhead">'+esc([f.market,f.scope,f.sites?f.sites+' sites':''].filter(Boolean).join(' · ')||'Deal scope to confirm')+'</p>'+
-      '<div class="decision-bar"><strong>'+esc(f.recommendation||'Clarify before pricing')+'</strong><p>'+esc(overview)+'</p></div>'+
-      '<div class="brief-kpis"><div><span>SELLER ASK (NOT OUR OFFER)</span><strong>'+esc(seller)+'</strong></div>'+
-      '<div><span>OUR COOP OFFER · 13% BUYER IRR</span><strong>'+esc(buyer)+'</strong></div>'+
-      '<div><span>COOP!B38 AT OUR OFFER</span><strong>'+esc(irr)+'</strong></div></div>'+
-      '<h3>Deal in plain words</h3><p>Estimated annual earnings before synergies: '+esc(usd(income))+'. '+esc(rentLine)+'. '+(f.whyUs?esc(brief(f.whyUs)):'Check why owning these assets is better than only supplying fuel.')+'</p>'+
-      '<h3>Synergies · annual modeled improvements</h3>'+(r?'<ul>'+synergyRows+'</ul>':'<p>Model inputs still need checking; no reliable synergy calculation yet.</p>')+
-      '<p>These savings are separate from the seller asking price. Operator earnings, capital spending, taxes and contract commitments also affect the offer.</p>'+
-      '<h3>How they buy fuel today · DODO supply agreement</h3><table class="brief-fuel">'+rows+'</table>'+
-      '<h3>Offer and price</h3><p>The seller is asking '+esc(seller)+'. The COOP workbook says we can pay '+esc(buyer)+
-      ' to earn a '+esc(irr)+' buyer IRR on COOP!B38. The offer goes in COOP!B29; the asking price does not set our return. DODO must be valued separately at 20.0% in its approved workbook.</p>'+
-      '<h3>Biggest risks / answers still needed</h3><ul>'+risks+'</ul>'+
-      '<h3>Decision needed from leadership</h3><p>'+text(f.chipAsk||'Confirm next diligence steps, fuel-supply rights and our offer range.')+'</p>'+
-      '<h3>Next step</h3><p>'+text(f.nextAction||'Confirm supplier, terminal, contract expiration and UNAMs before relying on the offer.')+'</p>'+
-      '<p class="footnote">Source: '+esc(f.sourceVersion||'Uploaded documents and Deal Lens edits')+
-      '. Numbers may still be estimates. Verify signed contracts, site roster and the downloaded workbook before approving an offer.</p>';
-  }
+  function reportFor(d=deal()){return DealLeadershipReport.collect(d,OriginalModel.calculate(d),{evidence:EVIDENCE,gates:GATES,phases:PHASES});}
+  function renderBrief(){$('#briefPaper').innerHTML=DealLeadershipReport.html(reportFor());}
   const FACT_LABELS={sites:'Site count',ask:'Seller ask / transaction value',priorEbitda:'Prior-year EBITDA',ttmEbitda:'Latest TTM EBITDA',normEbitda:'Normalized EBITDA',gallons:'Annual gallons',insideSales:'Inside sales',opex:'Operating expense'};
   const FACT_KEYS=Object.keys(FACT_LABELS);
   const SITE_LABELS={siteNoiUsd:'Seller site NOI',siteMonthlyGallons:'Monthly site gallons',siteInsideSalesUsd:'Site inside sales',projectedEbitdaUsd:'Projected EBITDA',landlordNoiUsd:'Landlord NOI',fuelDistributionIncomeUsd:'Fuel distribution income',suggestedRentUsd:'Suggested rental income',mortgagePaymentUsd:'Mortgage payment',netIncomeUsd:'Net income',sellerEbitdarUsd:'Seller EBITDAR'};
@@ -368,6 +334,21 @@
   $('#newDeal').addEventListener('click',()=>startNewDeal());
   $('#newIntakeDeal').addEventListener('click',()=>startNewDeal());
   document.addEventListener('input',e=>{const field=e.target.dataset.field;if(!field)return;document.querySelectorAll('[data-field="'+field+'"]').forEach(el=>{if(el!==e.target)el.value=e.target.value;});});
+  $('#addFuelContract').addEventListener('click',()=>{
+    (deal().fuelContracts||=[]).push({site:'',distributor:'',supplier:'',brand:'',terminal:'',expiration:'',remaining:'',gallons:'',unams:'',pricing:'',rights:'',source:'',notes:''});
+    save();renderFuelContracts();renderBrief();$('#fuelContractRows .fuel-contract-entry:last-child input')?.focus();
+  });
+  document.addEventListener('input',e=>{
+    const t=e.target;if(t.dataset.contractIndex===undefined)return;
+    const c=deal().fuelContracts?.[Number(t.dataset.contractIndex)];if(!c)return;
+    c[t.dataset.contractKey]=t.value;save();renderBrief();
+  });
+  document.addEventListener('click',e=>{
+    const b=e.target.closest('[data-remove-contract]');if(!b)return;
+    const i=Number(b.dataset.removeContract),c=deal().fuelContracts?.[i];if(!c)return;
+    if(!confirm('Delete the supply agreement for '+(c.site||c.distributor||'this site')+'?'))return;
+    deal().fuelContracts.splice(i,1);save();renderFuelContracts();renderBrief();
+  });
   $('#addSite').addEventListener('click',()=>{deal().sites.push({name:'',ebitda:'',gallons:'',route:'Unassigned',reason:''});save();renderSites();$('#siteRows tr:last-child input').focus();});
   document.addEventListener('click',e=>{const b=e.target.closest('[data-remove-site]');if(b){deal().sites.splice(Number(b.dataset.removeSite),1);save();renderSites();renderBrief();}});
   $('#moreButton').addEventListener('click',()=>{const menu=$('#moreMenu');menu.hidden=!menu.hidden;$('#moreButton').setAttribute('aria-expanded',String(!menu.hidden));});
@@ -388,6 +369,13 @@
     toast('Brief selected. Press Ctrl+C (or Command+C) to copy.');
   });
   $('#printBrief').addEventListener('click',()=>window.print());
+  document.addEventListener('click',async e=>{
+    const b=e.target.closest('[data-report-pdf]');if(!b||b.disabled)return;
+    const original=b.textContent;b.disabled=true;b.textContent='Building PDF…';
+    try{await DealLeadershipReport.downloadPdf(reportFor());toast('Leadership Summary PDF downloaded');}
+    catch(error){console.error(error);toast('PDF download failed: '+String(error.message||error).slice(0,90));}
+    finally{b.disabled=false;b.textContent=original;}
+  });
   
   function localDate(){const n=new Date();return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0');}
   function actionLabel(d){const f=d.fields;if(!f.nextAction)return 'No next action';if(!f.actionDue)return 'Date needed';return f.actionDue<localDate()?'Overdue':f.actionDue===localDate()?'Due today':'Scheduled';}
@@ -399,7 +387,7 @@
     const query=$('#pipelineSearch').value.toLowerCase().trim(),stage=$('#pipelineStage').value;
     const rows=db.deals.filter(d=>(!query||(d.fields.name+' '+(d.fields.market||'')).toLowerCase().includes(query))&&(!stage||d.fields.stage===stage)).sort((x,y)=>String(y.updated).localeCompare(String(x.updated)));
     $('#pipelineDeals').innerHTML=rows.map(d=>{const f=d.fields,verified=EVIDENCE.filter(e=>d.evidence?.[e.id]?.status==='verified').length;
-      return '<article class="card pipeline-deal"><div class="section-head"><div><h2>'+esc(f.name||'Untitled deal')+'</h2><p>'+esc(f.market||'Market open')+' · '+esc(f.stage||'Screening')+'</p></div><button class="button subtle" data-open-deal="'+esc(d.id)+'">Open deal →</button></div><div class="pipeline-meta"><span>'+esc(f.recommendation||'Clarify before pricing')+'</span><span>'+verified+'/'+EVIDENCE.length+' evidence items verified</span><span>Ask '+mm(num(f.ask))+'</span></div><div class="pipeline-action"><strong>'+esc(f.nextAction||'Set the next action in Deal intake')+'</strong><small>'+esc(f.actionOwner||'Owner unassigned')+' · '+esc(f.actionDue||'No due date')+' · '+esc(actionLabel(d))+'</small></div></article>';
+      return '<article class="card pipeline-deal"><div class="section-head"><div><h2>'+esc(f.name||'Untitled deal')+'</h2><p>'+esc(f.market||'Market open')+' · '+esc(f.stage||'Screening')+'</p></div><div class="tracker-actions"><button class="button subtle" data-open-deal="'+esc(d.id)+'">Open deal</button><button class="button delete-action" data-delete-tracked-deal="'+esc(d.id)+'" type="button">Delete</button></div></div><div class="pipeline-meta"><span>'+esc(f.recommendation||'Clarify before pricing')+'</span><span>'+verified+'/'+EVIDENCE.length+' evidence items verified</span><span>Ask '+mm(num(f.ask))+'</span></div><div class="pipeline-action"><strong>'+esc(f.nextAction||'Set the next action in Deal intake')+'</strong><small>'+esc(f.actionOwner||'Owner unassigned')+' · '+esc(f.actionDue||'No due date')+' · '+esc(actionLabel(d))+'</small></div></article>';
     }).join('')||'<div class="prelim-empty">No deals match these filters.</div>';
   }
   function sellerConflicts(d){return Object.keys(SELLER_LABELS).filter(k=>present(num(d.fields[k]))&&(d.financialSources||[]).some(s=>present(s.fields?.[k])&&Math.abs(s.fields[k]-num(d.fields[k]))>.01));}
@@ -407,7 +395,18 @@
   function recordMaterials(d,materials,results){d.materials||=[];for(const r of results){const m=materials.find(m=>m.name===r.name),safe=m?.kind!=='wide_table_photo',count=m?DealParser.extract(safe?m.blocks||[]:[]).candidates.length+Object.keys(m.financialTables?.[0]?.fields||{}).length:0;d.materials.unshift({name:r.name,time:new Date().toISOString(),state:!m?'Needs attention':count?count+' numeric candidates · review':'No numeric facts extracted',detail:r.detail||'',lines:m?.blocks?.length||0});}if(!results.length&&materials.length)d.materials.unshift({name:'Pasted details',time:new Date().toISOString(),state:DealParser.extract(materials[0].blocks).candidates.length+' numeric candidates · review',detail:'Saved with the deal timeline'});d.materials=d.materials.slice(0,80);}
   function renderMaterials(){const rows=DealIntake.materials(deal());$('#materialsRegister').innerHTML=rows.length?rows.map(r=>'<div class="file-result"><strong>'+esc(r.name)+'</strong><span>'+esc(r.state)+'</span><small>'+esc(new Date(r.time).toLocaleString())+' · '+esc(r.detail)+'</small></div>').join(''):'<div class="prelim-empty">No files in this deal. Upload a document to get started.</div>';}
   $('#pipelineSearch').addEventListener('input',renderTracker);$('#pipelineStage').addEventListener('change',renderTracker);
-  document.addEventListener('click',e=>{const b=e.target.closest('[data-open-deal]');if(b){if($('#analyzeDeal').disabled){toast('Let the current upload finish first');return;}db.active=b.dataset.openDeal;resetFileSelection();save();hydrate();switchTab('intake');}const s=e.target.closest('[data-seller-key]');if(s){const d=deal();d.fields[s.dataset.sellerKey]=s.dataset.sellerValue;const picked=d.financialSources.find(x=>x.fields?.[s.dataset.sellerKey]===Number(s.dataset.sellerValue));(d.fieldSources||={})[s.dataset.sellerKey]={source:picked?.source||'',period:picked?.period||''};d.fieldOrigin[s.dataset.sellerKey]='manual';autoNarrative(d);save();hydrate();toast('Source figure selected; confirm its period');}});
+  document.addEventListener('click',e=>{
+    const remove=e.target.closest('[data-delete-tracked-deal]');
+    if(remove){
+      const victim=db.deals.find(x=>x.id===remove.dataset.deleteTrackedDeal);
+      if(!victim)return;
+      if(!confirm('Permanently delete "'+(victim.fields.name||'Untitled deal')+'" from this browser? This cannot be undone. Download a backup first if needed.'))return;
+      db.deals=db.deals.filter(x=>x.id!==victim.id);
+      if(!db.deals.length)db.deals=[blank()];
+      if(db.active===victim.id)db.active=db.deals[0].id;
+      resetFileSelection();save();hydrate();renderTracker();toast('Deal deleted from this browser.');return;
+    }
+    const b=e.target.closest('[data-open-deal]');if(b){if($('#analyzeDeal').disabled){toast('Let the current upload finish first');return;}db.active=b.dataset.openDeal;resetFileSelection();save();hydrate();switchTab('intake');}const s=e.target.closest('[data-seller-key]');if(s){const d=deal();d.fields[s.dataset.sellerKey]=s.dataset.sellerValue;const picked=d.financialSources.find(x=>x.fields?.[s.dataset.sellerKey]===Number(s.dataset.sellerValue));(d.fieldSources||={})[s.dataset.sellerKey]={source:picked?.source||'',period:picked?.period||''};d.fieldOrigin[s.dataset.sellerKey]='manual';autoNarrative(d);save();hydrate();toast('Source figure selected; confirm its period');}});
   document.querySelectorAll('[data-field="stage"]').forEach(el=>{for(const name of ['Closed','Passed']){const o=document.createElement('option');o.textContent=name;el.append(o);}});
   
   function aiReadout(d){const r=d.aiReview;if(!r)return '';const list=rows=>'<ul>'+rows.map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul>';return '<div class="ai-readout"><div class="section-head"><div><h3>AI material review</h3><small>'+esc(new Date(r.time).toLocaleString())+' · '+esc(r.model)+'</small></div><span class="badge">'+(r.partial?'Partial · completed sections kept':'Source claims · unverified')+'</span></div><p>'+esc(r.summary)+'</p>'+[['Potential fit',r.attractions],['Concerns & contradictions',r.concerns],['Evidence to request',r.missing],['Reading limits',r.limitations]].filter(([,rows])=>rows?.length).map(([title,rows])=>'<h4>'+title+'</h4>'+list(rows)).join('')+''+(r.sectionNotes?.length?'<details class="section-notes"><summary>Read each source section ('+r.sectionNotes.length+')</summary>'+r.sectionNotes.map(s=>'<p><strong>'+esc(s.source)+'</strong><br>'+esc(s.summary)+'</p>').join('')+'</details>':'')+'<small>This is the interpretation of the latest batch. Current figure corrections and screening calculations appear below.</small></div>';}
