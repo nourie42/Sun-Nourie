@@ -62,7 +62,18 @@
     if(!valid)red.push('No verified COOP!B38 offer is available; check model inputs and workbook.');
     if(model?.estimated)red.push(model.estimated+' modeled inputs are estimates, not confirmed source facts.');
     if(!contracts.length)red.push('No site-by-site fuel supply contract schedule has been entered.');
-    for(const c of contracts)if(!filled(c.expiration)&&!filled(c.remaining))red.push('Supply contract expiry is missing for '+(c.site||c.distributor||'an unidentified site')+'.');
+    for(const c of contracts){
+      const which=[c.site,c.distributor].filter(Boolean).join(' / ')||'Unknown contract';
+      if(!filled(c.expiration)&&!filled(c.remaining))red.push('Supply contract expiry is missing for '+which+'.');
+      if(filled(c.expiration)){
+        const exp=Date.parse(c.expiration);
+        if(Number.isFinite(exp)){
+          const days=(exp-Date.now())/86400000;
+          if(days<0)red.push(which+' fuel supply agreement appears expired ('+c.expiration+'). Verify renewal.');
+          else if(days<365)red.push(which+' fuel supply agreement expires within 12 months ('+c.expiration+'). Confirm options, ROFR and renewal.');
+        }
+      }
+    }
     if(!filled(f.fuelDistributor)&&!contracts.some(c=>filled(c.distributor)))red.push('Current fuel distributor is not confirmed.');
     if(!filled(f.fuelUnams)&&!contracts.some(c=>filled(c.unams)))red.push('UNAM exposure has not been documented.');
     if(!filled(f.fuelTransfer)&&!contracts.some(c=>filled(c.rights)))red.push('Fuel supply assignment, termination and ROFR rights are unconfirmed.');
