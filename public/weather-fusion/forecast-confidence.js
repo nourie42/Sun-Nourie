@@ -134,7 +134,7 @@ export function confidenceWeatherEvidenceHTML(confidence,{timeZone='America/New_
   return `<div class="confidence-weather-source-table"><table><caption>${label} comparison · ${escapeEvidence(time)}</caption><thead><tr><th scope="col">Source</th><th scope="col">${kind==='sky'?'Cloud cover':'Rain (in/hr)'}</th><th scope="col">Category</th></tr></thead><tbody>${rows}</tbody></table>${kind==='rain'&&hour.probabilityConflict?'<p>The official rain chance conflicts with the model wet/dry signals at this hour.</p>':''}</div>`;
  };
  const sourceTables=table('sky','Sky')+table('rain','Rain');
- return `<section class="confidence-weather-evidence"><h3>What the models agree on</h3><ul>${coverage('sky','Sky')}${coverage('rain','Rain')}</ul><p>These comparisons describe sky and precipitation. Temperature disagreement is rated separately below.</p>${sourceTables?`<details class="confidence-weather-readings"><summary>Compare sky and rain readings</summary>${sourceTables}</details>`:''}</section>`;
+ return `<section class="confidence-weather-evidence"><h3>What we can compare</h3><ul>${coverage('sky','Sky')}${coverage('rain','Rain')}</ul><p>These comparisons describe sky and precipitation. Temperature disagreement is rated separately below.</p>${sourceTables?`<details class="confidence-weather-readings"><summary>Compare sky and rain readings</summary>${sourceTables}</details>`:''}</section>`;
 }
 
 export function confidenceDetailsHTML(confidence,options={}){
