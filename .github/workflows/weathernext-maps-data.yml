@@ -4,14 +4,15 @@ name: WeatherNext forecast map frames
 #
 # Runs twice a day for the 00Z and 12Z initializations (about 14.6 GB of BigQuery
 # processing, roughly $0.09, and about 2 MB of new frames per run). Add hours 2 and 14 to the
-# hours below to follow the 06Z and 18Z runs too. A run that bills more than 30 GB writes
-# models/weathernext-maps-cost-stop.json, which pauses later runs until it is deleted.
-# Manual runs: dry_run=true only asks BigQuery for a byte estimate.
+# hours below to follow the 06Z and 18Z runs too. Field batches share a 250 GB hard run budget.
+# A run that bills more than 30 GB immediately writes
+# models/weathernext-maps-cost-stop.json, which blocks later batches and runs until reviewed and deleted.
+# Manual runs: dry_run=true estimates map queries; initialization discovery may bill bytes.
 on:
   workflow_dispatch:
     inputs:
       dry_run:
-        description: 'Only estimate BigQuery bytes; bill nothing and publish nothing'
+        description: 'Estimate map queries; discovery may bill bytes; publish nothing'
         type: boolean
         default: true
       force:
@@ -96,3 +97,4 @@ jobs:
             sleep 3
           done
           exit 1
+
