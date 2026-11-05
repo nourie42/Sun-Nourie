@@ -12,6 +12,11 @@ function anchoredText(text,anchor,zone,now){
  });
 }
 const brief=text=>{const sentences=norm(text).match(/[^.!?]+[.!?]+|[^.!?]+$/g)||[];let result='',count=0;for(const s of sentences){if(result.length+s.length>440)continue;result+=s+' ';if(++count===2)break;}return result.trim();};
+// Extracted discussion sentences are shown nearly verbatim, so they must meet
+// the same plain-language bar as AI prose: no numeric weather quantities
+// (clock times are fine) and no forecast jargon, in EVERY section — a
+// technical SYNOPSIS sentence is still jargon on the public card.
+const hasNumericQuantity=text=>/\d/.test(String(text||'').replace(/\b\d{1,2}(?::\d{2})?\s*(?:am|pm)\b/gi,''));
 // An extracted sentence has lost the preceding argument. Remove its opening
 // connective, while preserving transitions inside a complete source paragraph.
 const standalone=text=>norm(text).replace(/^(?:(?:however|consequently|therefore|nevertheless|thus|as a result|in addition|meanwhile)[,:]?\s+)+/i,'').replace(/^[a-z]/,letter=>letter.toUpperCase());
@@ -58,7 +63,7 @@ export function danOverview(briefing,forecast,now=Date.now()){
     const messages=[];
     for(const sentence of sentences){
      const current=anchoredText(sentence,anchor,zone,now),period=discussionPeriod(sentence,anchor,zone);
-     if((period&&period.end<=now)||hasDanJargon(sentence)||forecastProseConflict(current,forecast,now)||!/(?:rain|shower|storm|snow|wind|cloud|temperature|warm|cold|cool|heat|fog|dry|sun)/i.test(sentence))continue;
+     if((period&&period.end<=now)||hasDanJargon(sentence)||hasNumericQuantity(sentence)||forecastProseConflict(current,forecast,now)||!/(?:rain|shower|storm|snow|wind|cloud|temperature|warm|cold|cool|heat|fog|dry|sun)/i.test(sentence))continue;
      const message=plainKeyMessage(current);
      if(message.length>180||messages.join(' ').length+message.length>360)continue;
      messages.push(message);
@@ -69,7 +74,8 @@ export function danOverview(briefing,forecast,now=Date.now()){
     continue;
    }
    const currentSentences=sentences.filter(s=>{
-    if(section!=='SYNOPSIS'&&(!/\b(?:will|may|could|is|are|remains?|continues?|expected|possible|likely|can|should|becomes?|develops?)\b/i.test(s)||hasDanJargon(s)))return false;
+    if(hasDanJargon(s)||hasNumericQuantity(s))return false;
+    if(section!=='SYNOPSIS'&&!/\b(?:will|may|could|is|are|remains?|continues?|expected|possible|likely|can|should|becomes?|develops?)\b/i.test(s))return false;
     const period=discussionPeriod(s,anchor,zone);return (!period||period.end>now)&&!forecastProseConflict(anchoredText(s,anchor,zone,now),forecast,now);
    }).join(' ');
    if(brief(currentSentences))return {text:plain(anchoredText(brief(currentSentences),anchor,zone,now)),source:'Local NWS discussion summary'};
@@ -82,7 +88,7 @@ export function danTakeDisplay(briefing,forecast,now=Date.now()){
  if(forecast?.comparison?.source==='google')return 'Nourie Weather Take summarizes the NWS discussion on the regular weather page. This page shows the experimental model forecast.';
  const card=danCard(briefing,forecast,now);
  const summary=briefing?.signature===forecast?.signature&&typeof briefing?.danSummary==='string'?weatherOnlyProse(briefing.danSummary):'';
- if(summary&&!forecastProseConflict(summary,forecast,now))return directTakeWording(summary)+(card.text?'\n\n'+card.text:'');
+ if(summary&&!hasDanJargon(summary)&&!hasNumericQuantity(summary)&&!forecastProseConflict(summary,forecast,now))return directTakeWording(summary)+(card.text?'\n\n'+card.text:'');
  const overview=danOverview(null,forecast,now);
  return directTakeWording(overview.text)+(card.text?'\n\n'+card.text:'');
 }

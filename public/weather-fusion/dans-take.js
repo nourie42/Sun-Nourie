@@ -8,7 +8,7 @@ export const plainDanWording=text=>String(text||'').replace(/than (?:some |the )
 // Dan's Take is an outcome-first explanation for a ten-year-old, not a lightly
 // edited forecast discussion. Keep this list broad so scientific mechanisms can
 // never leak into the public card when the AI merely copies the source.
-export const hasDanJargon=text=>/\b(?:convergence|divergence|troughs?|troughing|ridges?|ridging|subsidence|mid[ -]levels?|upper[ -]levels?|aloft|instability|shear|vorticity|shortwaves?|isentropic|baroclinic|cyclogenesis|anticyclones?|dewpoint|PWAT|HRRR|ECMWF|NBM|CAPE|QPF|synoptic|advection|deterministic|convection|guidance|ensembles?|runs|forcing(?: for ascent)?|airmass|decoupl(?:e|ed|es|ing)|radiational)\b|\bpressure gradient\b|\bsinking air\b|\b(?:inland|coastal)\s+(?:feature|plain)\b|\bweather (?:feature|setup|pattern)\b/i.test(text);
+export const hasDanJargon=text=>/\b(?:convergence|divergence|troughs?|troughing|ridges?|ridging|subsidence|mid[ -]levels?|upper[ -]levels?|aloft|instability|shear|vorticity|shortwaves?|isentropic|baroclinic|cyclogenesis|anticyclones?|dew ?points?|PWAT|HRRR|ECMWF|NBM|QPF|synoptic|advection|deterministic|convection|guidance|ensembles?|runs|forcing(?: for ascent)?|airmass|decoupl(?:e|ed|es|ing)|radiational|diurnal)\b|\w*CAPE\b|J\/kg|\bpressure gradient\b|\bsinking air\b|\bboundary layer\b|\blow[ -]topped\b|\b(?:inland|coastal)\s+(?:feature|plain)\b|\bweather (?:feature|setup|pattern)\b/i.test(text);
 const H = 3600000, DAY = 24 * H, MAX_SOURCE_AGE = 12 * H;
 const norm = v => String(v || '').replace(/\s+/g, ' ').trim();
 const finite = Number.isFinite;

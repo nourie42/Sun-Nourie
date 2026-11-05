@@ -10,7 +10,7 @@ import {createDiscussionSource,DISCUSSION_SOURCE_VERSION} from './weatherFusionD
 import {createExposureWeatherService,addExposureWeather} from './weatherFusionExposure.js';
 import {airQualityUrl,normalizeAirQuality,addAirQuality} from './weatherFusionAirQuality.js';
 import {FORECAST_CONFIDENCE_VERSION,forecastConfidence} from '../public/weather-fusion/forecast-confidence.js';
-import {DAN_TAKE_VERSION,collectDanTakeEvidence,approveDanTake,visibleDanTakeItems,danTakeText,rebindDanTake} from '../public/weather-fusion/dans-take.js';
+import {DAN_TAKE_VERSION,collectDanTakeEvidence,approveDanTake,visibleDanTakeItems,danTakeText,rebindDanTake,hasDanJargon} from '../public/weather-fusion/dans-take.js';
 import {stationWeather,resolveCurrentWeather} from '../public/weather-fusion/weather-state.js';
 import {createSpecialDiscussionService} from './weatherFusionSpecialDiscussions.js';
 import {createPrecipitationDiscussionService} from './weatherFusionPrecipitationDiscussions.js';
@@ -641,6 +641,7 @@ export function createWeatherService({ fetchImpl = globalThis.fetch, env = proce
         if (fields.some((k) => typeof content[k] !== 'string' || !content[k].trim() || content[k].length > 1600)) throw Object.assign(new Error('AI prose structure failed validation.'), { aiDiagnostic: 'AI_PROSE_STRUCTURE' });
         if (fields.some((k) => hasUngroundedNumbers(content[k], facts))) throw Object.assign(new Error('AI numerical prose failed validation.'), { aiDiagnostic: 'AI_PROSE_CONTAINS_NONCLOCK_DIGITS' });
         if (fields.some(k=>/\b(deterministic|HRRR|ECMWF|NBM|CAPE|QPF|synoptic|advection|guidance|Weather Fusion)\b/i.test(content[k]))) throw Object.assign(new Error('Outlook needs plain language.'),{aiDiagnostic:'AI_PROSE_JARGON'});
+        if (fields.some(k=>hasDanJargon(content[k]))) throw Object.assign(new Error('Outlook needs plain language.'),{aiDiagnostic:'AI_PROSE_JARGON'});
         if(fields.some(k=>forecastProseConflict(content[k],data,now())))throw Object.assign(new Error('Outlook contradicts the point rain forecast.'),{aiDiagnostic:'AI_PROSE_FORECAST_CONFLICT'});
         if(/\b(aviation|TAFs?|VFR|MVFR|IFR|LIFR|pilots?|runways?|flight conditions)\b/i.test(content.danSummary))throw Object.assign(new Error('Dan summary must exclude aviation.'),{aiDiagnostic:'AI_PROSE_AVIATION'});
         if (!Array.isArray(content.sources) || !['nws', 'afd', ...data.modelContributions.map(m=>m.id)].every((id) => content.sources.includes(id)) || content.sources.some((id) => !data.feeds.some((f) => f.id === id && f.status === 'ready'))) throw Object.assign(new Error('AI source attribution failed validation.'), { aiDiagnostic: 'AI_SOURCE_ATTRIBUTION' });

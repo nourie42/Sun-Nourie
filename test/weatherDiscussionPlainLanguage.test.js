@@ -55,6 +55,14 @@ test('briefing fallback summarizes fragment-style key messages when AI is rate l
  assert.match(display,/The timing of the showers is uncertain/);
  assert.doesNotMatch(display,/Sunny, with a high near|spread in the models|kicking the can|KEY MESSAGES/);
 });
+test('technical synopsis sentences never reach the Take, even from the SYNOPSIS section',()=>{
+ const f={signature:'technical-synopsis',location:{office:'RAH',latitude:35.787,longitude:-78.4806,timeZone:'America/New_York'},feeds:[{id:'afd',status:'ready'}],discussion:{id:'technical-synopsis',office:'RAH',issuanceTime:new Date(now-H).toISOString(),text:'.SYNOPSIS...\nSurface dew points in the mid-60s are fueling around 1000 J/kg of MLCAPE, supporting isolated, infrequent, low-topped showers producing mostly sprinkles. These showers will likely continue for the next several hours before collapsing with the loss of diurnal heating as the cooling boundary layer takes over. A few clouds will linger into the evening, with skies clearing overnight.\n&&\n.LONG TERM /SATURDAY THROUGH MONDAY/...\nRain is expected Monday.\n&&'}};
+ const display=danTakeDisplay(null,f,now);
+ assert.match(display,/^A few clouds will linger into the evening, with skies clearing overnight\./);
+ assert.doesNotMatch(display,/MLCAPE|J\/kg|diurnal|boundary layer|low-topped|dew points/i);
+ for(const text of ['MLCAPE will increase.','Around 1000 J/kg of energy.','Loss of diurnal heating.','Dew points in the mid-60s.','The cooling boundary layer takes over.','Low-topped showers.'])assert.equal(hasDanJargon(text),true,text);
+ assert.equal(hasDanJargon('A few clouds will linger into the evening.'),false);
+});
 test('a missing or expired discussion is disclosed instead of showing point-forecast prose',()=>{
  const f=forecast('Showers may arrive Monday.');
  f.days=[{detail:'Sunny, with a high near 74.'}];
