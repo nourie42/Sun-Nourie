@@ -103,9 +103,18 @@ test('sub-thousandth-inch expected-value noise does not turn dry agreement into 
 });
 
 test('a genuine trace from one source still lowers rain agreement',()=>{
- const out=fixture();out.rainTimeline[12].precipitationBlend.sources[0].value=.004;
- const weather=calculate(out);assert.equal(weather.evidence.rain.worstHour.agreement,2/3);
- assert.equal(weather.evidence.rain.agreementScore,87);assert.ok(weather.evidence.rain.agreementScore<100);
+ const out=fixture();out.rainTimeline[12].precipitationBlend.sources[0].value=.05;
+ const weather=calculate(out);assert.equal(weather.evidence.rain.worstHour.agreement,1/3);
+ // Daily-total rule (owner, 2026-11-05): that source's window total (0.05 in)
+ // is a trace day while the others are dry, so agreement is (0.5+0.5+1)/3 = 67.
+ assert.equal(weather.evidence.rain.agreementScore,67);assert.ok(weather.evidence.rain.agreementScore<100);
+});
+
+test('when every source is wet for the day, rain agreement is 100 even if one source is dry for a single hour',()=>{
+ const out=fixture();for(const row of out.rainTimeline)row.precipitationBlend.sources=sources(.05);
+ out.rainTimeline[0].precipitationBlend.sources[0].value=0;
+ const weather=calculate(out);assert.equal(weather.evidence.rain.worstHour.agreement,1/3);
+ assert.equal(weather.evidence.rain.agreementScore,100);assert.equal(weather.evidence.rain.score,100);
 });
 
 test('an official meaningful rain chance cannot be described as agreed dry weather',()=>{

@@ -4,7 +4,7 @@ import {solarElevation} from '../public/weather-fusion/weather-math.js';
 import {TRACE_QPF_THRESHOLD_INCHES} from './weatherFusionDirect.js';
 import {ensembleLeadTrim,scoreDeterministicTemperature,scoreEnsembleTemperature} from './weatherFusionEnsembleSpread.js';
 
-export const CONDITION_CONFIDENCE_VERSION='weather-nourie-sky-rain-agreement-v6';
+export const CONDITION_CONFIDENCE_VERSION='weather-nourie-sky-rain-agreement-v7';
 const H=3600000,finite=value=>typeof value==='number'&&Number.isFinite(value),round=value=>Math.round(value*1000)/1000;
 const sourceIds=['nws','hrrr','ecmwf','nbm','wn','weathernext3','gefs'];
 const iso=time=>finite(time)?new Date(time).toISOString():null;
@@ -17,6 +17,11 @@ const skyCategory=value=>value<=30?'clear':value>=70?'cloudy':'mixed';
 // (0.001-0.010 in) still count as trace.
 const RAIN_NOISE_FLOOR_INCHES=.001;
 const rainCategory=value=>value<RAIN_NOISE_FLOOR_INCHES?'dry':value<=TRACE_QPF_THRESHOLD_INCHES?'trace':'wet';
+// Window-total bands for the rain agreement score (owner rule, 2026-11-05):
+// under 0.01 in is not measurable rain (dry); 0.01-0.10 in is a trace-to-light
+// day; above 0.10 in is a wet day. A steady trace-rate signal therefore still
+// disagrees less with a dry consensus than a soaking signal does.
+const dailyRainCategory=total=>total<.01?'dry':total<=.1?'trace':'wet';
 // Trace precipitation is an intermediate amount, not the same disagreement
 // as measurable rain versus dry. The trace remains visible in the evidence.
 const categories={clear:0,mixed:1,cloudy:2,dry:0,trace:.5,wet:1};
@@ -53,7 +58,7 @@ function agreement(sources,kind){
  }
  return total/count;
 }
-function component(hours,window,scope){
+function component(hours,window,scope,kind){
  const coverage={},expectedHours=hours.reduce((sum,hour)=>sum+hour.durationHours,0);
  let coveredHours=0,comparedHours=0,total=0,worstHour=null;
  for(const hour of hours){
@@ -67,10 +72,25 @@ function component(hours,window,scope){
  const completeSources=sourceIds.filter(id=>expectedHours>0&&(coverage[id]||0)>=expectedHours-1e-8);
  const complete=expectedHours>0&&comparedHours>=expectedHours-1e-8;
  // Daily sky agreement represents the assessed daylight hours, not the worst
- // single hour. Keep that hour in evidence. Rain retains its timing safeguard:
- // a short wet/dry disagreement can materially affect someone's plans.
+ // single hour. Keep that hour in evidence.
  const averageAgreementScore=comparedHours?total/comparedHours*100:null;
- const agreementScore=comparedHours&&worstHour?Math.round(scope==='calendar-day'?Math.min(averageAgreementScore,worstHour.agreement*100+20):averageAgreementScore):null;
+ let agreementScore=comparedHours&&worstHour?Math.round(averageAgreementScore):null;
+ if(kind==='rain'&&comparedHours){
+  // Owner rule (Daniel, 2026-11-05): rain agreement answers whether the
+  // models agree it rains over the assessed window, judged from each
+  // complete source's total precipitation for the window — dry / trace /
+  // wet — not from hour-by-hour amounts. If every complete source's total
+  // is wet, agreement is 100 even when one source is dry for a single
+  // hour; the hourly readings, including the worst hour, stay in evidence.
+  const totals=new Map();
+  for(const hour of hours)for(const source of hour.sources)totals.set(source.id,(totals.get(source.id)||0)+source.value*hour.durationHours);
+  const dailyCategories=completeSources.filter(id=>totals.has(id)).map(id=>dailyRainCategory(totals.get(id)));
+  if(dailyCategories.length>=2){
+   let pairTotal=0,pairCount=0;
+   for(let i=0;i<dailyCategories.length;i++)for(let j=i+1;j<dailyCategories.length;j++){pairTotal+=1-Math.abs(categories[dailyCategories[i]]-categories[dailyCategories[j]]);pairCount++;}
+   agreementScore=Math.round(pairTotal/pairCount*100);
+  }
+ }
  let score=agreementScore;
  if(score!==null)score=Math.min(score,completeSources.length>=3?100:completeSources.length===2?80:60,complete?100:60);
  return {scope,window,expectedHours:round(expectedHours),coveredHours:round(coveredHours),comparedHours:round(comparedHours),completeSources,agreementScore,averageAgreementScore:averageAgreementScore===null?null:round(averageAgreementScore),
@@ -176,7 +196,7 @@ export function addConditionConfidence(out,{now=Date.now()}={}){
   const daylight=assessedSky.filter(hour=>hour.daylight),skyHours=daylight.length?daylight:assessedSky;
   const skyWindow=skyHours.length?{start:skyHours[0].time,end:skyHours.at(-1).end}:window;
   const rainWindow=assessedRain.length?{start:assessedRain[0].time,end:assessedRain.at(-1).end}:window;
-  const sky=component(skyHours,skyWindow,daylight.length?'daylight':'remaining-night'),rainEvidence=component(assessedRain,rainWindow,'calendar-day');
+  const sky=component(skyHours,skyWindow,daylight.length?'daylight':'remaining-night','sky'),rainEvidence=component(assessedRain,rainWindow,'calendar-day','rain');
   rainEvidence.officialProbabilityCoveredHours=round(assessedRain.filter(hour=>hour.officialPop!==null).reduce((sum,hour)=>sum+hour.durationHours,0));
   rainEvidence.officialProbabilityComplete=rainEvidence.expectedHours>0&&rainEvidence.officialProbabilityCoveredHours>=rainEvidence.expectedHours-1e-8;
   rainEvidence.fallbackHours=round(assessedRain.filter(hour=>hour.officialFallback).reduce((sum,hour)=>sum+hour.durationHours,0));
@@ -199,7 +219,7 @@ export function addConditionConfidence(out,{now=Date.now()}={}){
   if(rainEvidence.fallbackHours>0)factors.push(`Official NWS rain fallback is used for ${rainEvidence.fallbackHours} assessed hours because required rain-model inputs are missing.`);
   if(assessedRain.some(hour=>hour.probabilityConflict))factors.push('The official rain chance conflicts with the model rain amounts in some hours.');
   if(sameDayCoverageFloorApplied)factors.push(`A missing interval cannot lower otherwise agreeing same-day evidence below Moderate; the coverage-limited score is ${evidenceScore}.`);
-  let summary=score===null?`${!sky.comparedHours&&!rainEvidence.comparedHours?'Cloud-cover and rain-amount forecasts':!sky.comparedHours?'Cloud-cover forecasts':'Rain-amount forecasts'} are unavailable or lack a second comparable source for these hours.`:key==='high'?'Available forecasts agree closely on sky cover and precipitation timing.':'Sky/rain agreement is limited by the available source coverage.';
+  let summary=score===null?`${!sky.comparedHours&&!rainEvidence.comparedHours?'Cloud-cover and rain-amount forecasts':!sky.comparedHours?'Cloud-cover forecasts':'Rain-amount forecasts'} are unavailable or lack a second comparable source for these hours.`:key==='high'?'Available forecasts agree closely on sky cover and precipitation.':'Sky/rain agreement is limited by the available source coverage.';
   if(score!==null&&key!=='high'){
    if(rainEvidence.probabilityConflictCap<=score&&rainEvidence.probabilityConflictCap<100){
     const conflict=assessedRain.filter(hour=>hour.probabilityConflict).sort((a,b)=>a.probabilityAgreement-b.probabilityAgreement)[0];
@@ -211,7 +231,7 @@ export function addConditionConfidence(out,{now=Date.now()}={}){
    else summary=`Only ${Math.min(sky.completeSources.length,rainEvidence.completeSources.length)} named sources cover both the assessed sky and rain windows.`;
   }
   day.confidence.weather={version:CONDITION_CONFIDENCE_VERSION,scope:'sky-and-rain',label,key,score,evidenceScore,sameDayCoverageFloorApplied,summary,factors,sourceIds:ids,sourceCount:ids.length,leadDays:index,
-   note:'Agreement among named forecast sources about sky cover and precipitation timing, not a calibrated accuracy percentage or a claim that the sources are statistically independent. Temperature, wind and winter precipitation type are assessed separately. Hourly QPF under 0.001 inch is dry (expected-value noise); amounts from 0.001 through 0.010 inch are trace precipitation, and larger amounts are wet. Trace-versus-dry differences count less than measurable-rain-versus-dry differences. Missing values are never dry weather.',
+   note:'Agreement among named forecast sources about sky cover and whether precipitation occurs, not a calibrated accuracy percentage or a claim that the sources are statistically independent. Temperature, wind and winter precipitation type are assessed separately. Rain agreement compares each source\u2019s total precipitation for the assessed window: under 0.01 inch is dry (not measurable rain); 0.01 through 0.10 inch is a trace-to-light day, and larger totals are wet. Hourly readings in the details use a finer scale (under 0.001 inch is expected-value noise). Trace-versus-dry differences count less than wet-versus-dry differences. Missing values are never dry weather.',
    evidence:{window,sky,rain:rainEvidence,currentPartialExcluded:{sky:!!skyCurrentPartialExcluded,rain:!!rainCurrentPartialExcluded}}};
   day.confidence.temperature=temperatureComponent(day,index,ensembleDay(out,day.date));
   day.confidence.overall=overallForecastConfidence(day.confidence.temperature,day.confidence.weather);
