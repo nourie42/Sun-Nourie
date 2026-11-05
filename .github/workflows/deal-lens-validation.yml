@@ -36,4 +36,4 @@ jobs:
           node --check public/deal-lens/original-export.js
           node --check public/deal-lens/intake-model-ui.js
       - name: Run Deal Lens regression tests
-        run: node --test test/dealLensParity.test.js test/dealLensUiState.test.js test/dealLensCoopOfferExport.test.js test/dealLensManualCorrections.test.js test/dealLensHosting.test.js test/dealLensLeadershipReport.test.js
+        run: node --test test/dealLensParity.test.js test/dealLensUiState.test.js test/dealLensCoopOfferExport.test.js test/dealLensManualCorrections.test.js test/dealLensHosting.test.js test/dealLensLeadershipReport.test.js test/dealLensCleanUrl.test.js

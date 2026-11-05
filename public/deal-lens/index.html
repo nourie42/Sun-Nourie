@@ -6,6 +6,25 @@
   <meta name="theme-color" content="#0b1422">
   <meta name="description" content="A browser-based workspace to screen, analyze, and brief Sunoco fuel and convenience deals. Deal entries are saved on your device.">
   <title>Deal Lens | Strategic M&A workspace</title>
+  <link rel="canonical" href="https://sun-nourie-live.onrender.com/deal-lens/">
+  <script>
+    // Keep the address bar focused on Deal Lens, not inbound referral tracking.
+    (() => {
+      try {
+        const url = new URL(window.location.href);
+        let changed = false;
+        for (const key of [...url.searchParams.keys()]) {
+          if (/^utm_/i.test(key)) {
+            url.searchParams.delete(key);
+            changed = true;
+          }
+        }
+        if (changed) window.history.replaceState(window.history.state, '', url.pathname + url.search + url.hash);
+      } catch (_) {
+        // Do not block the workspace if URL cleanup is unavailable.
+      }
+    })();
+  </script>
   <link rel="stylesheet" href="./style.css?v=20">
   <script src="./vendor/jszip.min.js" defer></script>
   <script src="./vendor/pdf-lib.min.js" defer></script>
