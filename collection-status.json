@@ -1,19 +1,19 @@
 {
-  "checkedAt": "2026-11-06T20:51:03Z",
+  "checkedAt": "2026-11-06T20:51:38Z",
   "results": [
     {
       "model": "ecmwf",
-      "runAt": "2026-11-06T00:00:00Z",
+      "runAt": "2026-11-06T12:00:00Z",
       "messages": 455,
       "complete": true,
-      "checkedAt": "2026-11-06T14:59:17Z"
+      "checkedAt": "2026-11-06T20:51:38Z"
     },
     {
       "model": "nbm",
-      "runAt": "2026-11-06T12:00:00Z",
+      "runAt": "2026-11-06T18:00:00Z",
       "messages": 140,
       "complete": true,
-      "checkedAt": "2026-11-06T14:59:17Z"
+      "checkedAt": "2026-11-06T20:51:38Z"
     },
     {
       "model": "hrrr",
