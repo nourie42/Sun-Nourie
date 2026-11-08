@@ -17,6 +17,15 @@ export function weatherState(condition = '', skyCover = null) {
   return {kind, label, condition: text || label, known: kind !== 'unknown',
     chance: /chance|possible|isolated|scattered (?:showers|storms)/.test(lower)};
 }
+/** Convert sun-specific forecast language to the appropriate night description.
+ * Keep precipitation and cloud conditions intact; this is presentation only. */
+export function conditionForDaylight(condition = '', daylight = true) {
+  if (daylight !== false) return condition;
+  const state = weatherState(condition);
+  if (state.kind === 'clear') return /mostly|few clouds/i.test(condition) ? 'Mostly clear' : 'Clear';
+  if (state.kind === 'partly-cloudy' && /sunny/i.test(condition)) return 'Partly cloudy';
+  return condition;
+}
 /** Keep thunder tied to forecast wording while letting dominant rain replace dry-only artwork. */
 export const THUNDER_DISPLAY_CHANCE = null;
 export const RAIN_DOMINANT_CHANCE = 70;
