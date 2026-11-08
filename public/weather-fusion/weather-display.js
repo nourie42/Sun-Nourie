@@ -3,7 +3,7 @@ import {currentWeatherDisplay} from './current-weather.js?v=current-rain-2026101
 import {hourlyUvValue,hourlyUvHTML} from './daily-uv.js?v=clear-weather-daygraph-v3';
 import {outdoorExposure} from './outdoor-feels.js?v=current-rain-20261017-v3';
 import {currentComfortInputs} from './current-inputs.js?v=current-rain-20261017-v3';
-import {weatherState,conditionForRainChance} from './weather-state.js?v=current-rain-20261017-v3';
+import {weatherState,conditionForRainChance,conditionForDaylight} from './weather-state.js?v=current-rain-20261017-v3';
 import {thermalComfort, finite, solarElevation,rainChanceValue} from './weather-math.js?v=current-rain-20261017-v3';
 import {displayedFeelsAt,forecastValue,degrees} from './hourly-feels.js?v=current-rain-20261017-v3';
 import {winterSceneExpected,selectedHourSnowPhase} from './exposure-scene.js?v=current-rain-20261017-v3';
@@ -76,23 +76,28 @@ export function currentSample(forecast, now = Date.now()) {
   const canonicalGuidance=current.type==='guidance'&&current.localEstimate?.basis==='canonical-hourly-blend'
     &&finite(thermalTime)&&thermalTime===Date.parse(current.time);
   const thermalInputs=canonicalGuidance?{...current,condition:current.thermalCondition||current.condition}:current;
+  // Current sunlight must use the actual viewing time, not a stale observation or assembled forecast timestamp.
   const comfort = thermalComfort(thermalInputs, forecast.location, canonicalGuidance?thermalTime:finite(assembled)?assembled:now);
+  const solarDaylight=solarElevation(now,forecast.location?.latitude,forecast.location?.longitude);
+  const isDay=finite(solarDaylight)?solarDaylight>0:comfort.daylight;
+  comfort.daylight=isDay;
   if(canonicalGuidance){
     for(const [key,field]of [['outdoors','feelsLike'],['shade','feelsLikeShade'],['sun','feelsLikeSun']]){
       if(Object.hasOwn(current,field))comfort[key]=finite(current[field])?current[field]:null;
     }
   }
+  if(isDay===false){comfort.sun=null;comfort.radiationStatus='night';}
   comfort.inputEvidence.estimatedFields=current.comfortEstimatedFields;
   comfort.inputEvidence.fallbackSources=current.comfortInputSources;
   const state=currentWeatherDisplay(forecast,now);
   const {currentHour,currentLikelihood,currentPrecipitation,rainExpected,radarThreat,rainAround}=state;
-  const displayCondition=state.condition;
+  const displayCondition=conditionForDaylight(state.condition,isDay);
   const displayComfort={...comfort,weatherKind:weatherState(displayCondition).kind,radiantCondition:displayCondition,condition:displayCondition};
   const currentGust=current.type==='unavailable'?null:finite(current.gust)?current.gust:(currentHour?forecastValue(forecast,'gust',currentHour.time):null);
   const exposure=outdoorExposure(displayComfort),shownInputs={...current,gust:currentGust};
   return {windDirection:current.windDirection,pop:rainChanceValue(currentLikelihood),officialPop:currentHour?.officialPop??currentHour?.pop,rainLikelihood:currentLikelihood,currentPrecipitation,rainExpected,rainAround,radarThreat,precipitation:state.precipitation,precipitationBlend:currentHour?.precipitationBlend,uvIndex:hourlyUvValue(forecast,now),id:'now', now:true, time:current.time, temperature:finite(current.temperature) ? current.temperature : null,
     feels:exposure.value, exposure, comfort:displayComfort, condition:displayCondition || 'Sky conditions unavailable',
-    isDay:comfort.daylight ?? (solarElevation(now,forecast.location.latitude,forecast.location.longitude) > 0),
+    isDay,
     source:current.type === 'observation' ? 'Station observation' : current.type==='unavailable'?'Unavailable':'Current estimate', inputs:shownInputs};
 }
 export function forecastSample(forecast, time) {
@@ -103,17 +108,19 @@ export function forecastSample(forecast, time) {
   const rawCondition=hour.condition || point.condition || 'Sky conditions unavailable';
   const described=conditionForRainChance(rawCondition,pop,hour.skyCover);
   const snowEvidence=finite(hour.snowfall)&&hour.snowfall>0&&winterSceneExpected(described,{snowScope:'hour',forecast:true,airTemperature:hour.temperature,snowfall:hour.snowfall,hourSnowPhaseAllowed:selectedHourSnowPhase(forecast,epoch)});
-  const condition=snowEvidence&&weatherState(described).kind!=='snow'?'Snow possible':described;
+  const hourDaylight=solarElevation(epoch,forecast.location?.latitude,forecast.location?.longitude);
+  const isDay=finite(hourDaylight)?hourDaylight>0:null;
+  const condition=conditionForDaylight(snowEvidence&&weatherState(described).kind!=='snow'?'Snow possible':described,isDay);
   const rawInputs = {...point.inputs, condition:rawCondition, type:'guidance'};
   const estimated = thermalComfort(rawInputs, forecast.location, epoch);
   const gust=forecastValue(forecast,'gust',hour.time),inputs={...rawInputs,condition,gust};
   const rounded=v=>finite(v)?Number(v.toFixed(1)):null;
   const value=rounded(estimated.rawOutdoors);
   if(finite(value)!==finite(point.value)||(finite(value)&&Math.abs(value-point.value)>.11))return null;
-  const comfort={...estimated,weatherKind:weatherState(condition).kind,outdoors:value,shade:point.shadeValue??rounded(estimated.rawShade),sun:estimated.sun===null?null:value};
+  const comfort={...estimated,daylight:isDay,weatherKind:weatherState(condition).kind,outdoors:value,shade:point.shadeValue??rounded(estimated.rawShade),sun:isDay===true&&estimated.sun!==null?value:null};
   return {windDirection:hour.windDirectionDegrees??hour.windDirection,uvIndex:hourlyUvValue(forecast,epoch),id:new Date(epoch).toISOString(), now:false, time:hour.time,
     temperature:forecastValue(forecast,'temperature',hour.time), feels:displayedFeelsAt(forecast,hour.time),
-    condition:inputs.condition, isDay:comfort.daylight, exposure:outdoorExposure(comfort), comfort, inputs, source:hour.forecastSource==='model-guidance'?'Model forecast':'Hourly forecast', pop,officialPop:hour.officialPop??hour.pop,rainLikelihood:hour.rainLikelihood,precipitationBlend:hour.precipitationBlend};
+    condition:inputs.condition, isDay, exposure:outdoorExposure(comfort), comfort, inputs, source:hour.forecastSource==='model-guidance'?'Model forecast':'Hourly forecast', pop,officialPop:hour.officialPop??hour.pop,rainLikelihood:hour.rainLikelihood,precipitationBlend:hour.precipitationBlend};
 }
 export function hourlyDisplaySamples(forecast, now = Date.now()) {
   return [currentSample(forecast, now), ...(forecast?.hours || []).filter(hour => Date.parse(hour.time) > now)
