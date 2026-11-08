@@ -68,7 +68,7 @@ function sampleRainChance(sample){
  return sample?.rainLikelihood&&Object.hasOwn(sample.rainLikelihood,'value')?rainChanceValue(sample.rainLikelihood):rainChanceValue(null,sample?.pop);
 }
 export function currentSample(forecast, now = Date.now()) {
-  const current = currentComfortInputs(forecast,now), assembled = Date.parse(forecast?.assembledAt);
+  const current = currentComfortInputs(forecast,now);
   // Modeled Now uses the same inputs, exposure clock and displayed values as
   // its canonical forecast hour. Accepted station readings keep their existing
   // current-snapshot calculation instead of borrowing that forecast clock.
@@ -81,8 +81,7 @@ export function currentSample(forecast, now = Date.now()) {
   const solarDaylight=solarElevation(now,forecast.location?.latitude,forecast.location?.longitude);
   const isDay=finite(solarDaylight)?solarDaylight>0:comfort.daylight;
   comfort.daylight=isDay;
-  if(isDay===false){comfort.sun=null;comfort.radiationStatus='night';}
-  if(canonicalGuidance){
+  if(canonicalGuidance && isDay!==false){
     for(const [key,field]of [['outdoors','feelsLike'],['shade','feelsLikeShade'],['sun','feelsLikeSun']]){
       if(Object.hasOwn(current,field))comfort[key]=finite(current[field])?current[field]:null;
     }
