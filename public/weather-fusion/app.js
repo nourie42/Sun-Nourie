@@ -10,8 +10,8 @@ import {dayGraphHTML,dayGraphPoints,installDayGraph} from './day-graph.js?v=low-
 import {degrees,feelsAt,GUSTY_FEELS_DISPLAY_MPH} from './hourly-feels.js?v=current-rain-20261017-v3';
 import {createFramePlayer} from './frame-player.js';
 import {dailyConfidenceNoticeHTML,renderComfort,selectComfortHour,renderDailyRows,renderMetricTiles,resetExperience,installExperience} from './experience.js?v=comparison-chart-v3';
-import {dailyDisplay} from './weather-math.js?v=current-rain-20261017-v3';
-import {conditionForRainChance} from './weather-state.js?v=current-rain-20261017-v3';
+import {dailyDisplay,solarElevation} from './weather-math.js?v=current-rain-20261017-v3';
+import {conditionForRainChance,conditionForDaylight} from './weather-state.js?v=current-rain-20261017-v3';
 import {currentHero} from './current-temperature.js?v=current-rain-20261017-v3';
 import {renderBulletins} from './bulletins.js?v=county-warnings-v1';
 import {withLiveAlerts,retainUnverifiedAlerts,alertLocationKey,ALERT_REFRESH_MS} from './live-alerts.js?v=county-warnings-v3';
@@ -124,14 +124,10 @@ let lastHeroCondition = '';
 function syncSkyState() { if (!forecast) return; const day = isDaylight(), next = !day ? 'night' : /rain|storm|shower/i.test(lastHeroCondition) ? 'rain' : 'day'; if (document.body.dataset.sky !== next) document.body.dataset.sky = next; }
 setInterval(syncSkyState, 60000);
 function isDaylight() {
-  // Prefer the forecast's calculated sunrise/sunset for the selected location.
-  const rise = Date.parse(forecast?.solar?.sunrise), set = Date.parse(forecast?.solar?.sunset), now = Date.now();
-  if (Number.isFinite(rise) && Number.isFinite(set) && set > rise && set - rise < 86400000 && Math.abs(now - (rise + set) / 2) < 86400000) {
-    const day = 86400000, shift = Math.round(((rise + set) / 2 - now) / day) * day; // tolerate a stale solar date
-    return now >= rise - shift && now < set - shift;
-  }
-  const h = Number(new Intl.DateTimeFormat('en-US', { timeZone: forecast?.location.timeZone || 'America/New_York', hour: 'numeric', hourCycle: 'h23' }).format(new Date()));
-  return h >= 7 && h < 19;
+  // Solar elevation tracks the selected point and the actual time, including
+  // changing sunset times and DST. Never assume that 7 AM–7 PM means daylight.
+  const elevation=solarElevation(Date.now(),forecast?.location?.latitude,forecast?.location?.longitude);
+  return finite(elevation) ? elevation>0 : false;
 }
 function radarObservationLabel(current) {
   const radar=current?.radarPrecipitation;
@@ -167,8 +163,9 @@ function render(data) {
   });
   const c = data.current, d = data.days[0], day = isDaylight();
   const hero = currentHero(data, day);
+  const heroCondition=conditionForDaylight(hero.condition,day);
   document.body.dataset.sky = !day ? 'night' : /rain|storm|shower/i.test(hero.condition) ? 'rain' : 'day';
-  lastHeroCondition = hero.condition;
+  lastHeroCondition = heroCondition;
   $('city-name').textContent = data.location.name || place?.name || 'Your location';
   if(place?.source?.startsWith('device'))setDeviceLocationLabel(`Device location · ${data.location.name||'current position'}`);
   $('hero-date').textContent = new Intl.DateTimeFormat('en-US', { timeZone: data.location.timeZone, weekday: 'long', month: 'long', day: 'numeric' }).format(new Date()).toUpperCase();
@@ -177,13 +174,13 @@ function render(data) {
   const currentSource=currentSourceDisplay(data);
   document.querySelector('.current-temp-label').textContent=currentSource.temperatureLabel;
   if($('hero-uv'))$('hero-uv').innerHTML=dailyUvHTML(data.days[0]?.uvMax,'Peak UV today');
-  $('condition').textContent = hero.tonight ? `Tonight · ${hero.condition}` : hero.condition;
+  $('condition').textContent = hero.tonight ? `Tonight · ${heroCondition}` : heroCondition;
   $('high-low').textContent = hero.tonight ? 'Overnight low' : hero.range;
   const radarLabel=radarObservationLabel(c);
   $('observation-label').textContent = [currentSource.sourceLabel,radarLabel].filter(Boolean).join(' · ');
   $('observation-label').title = currentSource.sourceLabel;
   $('observation-label').hidden = false;
-  $('hero-scene').innerHTML = icon(hero.condition, hero.isDay, 120);
+  $('hero-scene').innerHTML = icon(heroCondition, day, 120);
   renderWeatherChanges(data);
   draw('forecast-window-banners','Upcoming weather windows',()=>renderForecastWindowBanners(data));
   draw('snow-outlook-banner','Snow outlook',()=>renderSnowOutlook(data));
