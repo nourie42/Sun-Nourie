@@ -9,12 +9,12 @@ layer or frame that cannot be built from published WeatherNext values is left
 out and named in the catalog.
 
 Cost safety, in the same spirit as weather_weathernext_site_collect.py:
-  * --dry-run only asks BigQuery for a (free) byte estimate and exits.
+  * --dry-run estimates map queries; initialization discovery can still bill bytes.
   * Every real query sends maximumBytesBilled and is checked against an
     estimate ceiling first.
   * Actual billed bytes are printed. If a run bills more than --review-billed-bytes
-    it still publishes (the bytes are already spent) and then writes a cost-stop
-    file that blocks further runs until a person has looked and deleted it.
+    it writes a cost-stop immediately, blocking later batches and runs.
+    A completed final batch can still publish; incomplete batches never publish.
   * This job has its own stop file and never touches the point-feed collector.
 
 Docs: https://developers.google.com/weathernext/guides/bigquery
@@ -176,6 +176,8 @@ class Queries:
         return int(job.total_bytes_processed or 0)
 
     def run(self, sql, params=(), discovery=False):
+        if self.stop_path.exists():
+            raise CostStop('Map collection is paused by the saved cost-stop record.')
         estimate = self.estimate(sql, params)
         ceiling = 3_000_000_000 if discovery else self.max_estimate
         if estimate > ceiling:
@@ -186,20 +188,28 @@ class Queries:
         # the ceiling above, plus 10% because the estimate BigQuery checks at execution runs a hair above the
         # dry-run figure (190,151,020,800 vs 190,151,917,568 bytes). Actual billing is checked after the run (pause_if_expensive).
         cap = 3_000_000_000 if discovery else max(self.max_billed, int(estimate * 1.1))
+        # One shared hard budget, including discovery, prevents batching from
+        # multiplying the previous single-query spending exposure.
+        cap = min(cap, self.max_estimate - self.billed)
+        if cap <= 0 or estimate > cap:
+            raise EstimateCeiling('Query exceeds the remaining run billing budget; it was not executed.')
         job = self.client.query(sql, job_config=self.make_config(params, max_bytes=cap), location='US')
-        rows = list(job.result(timeout=600))
+        try:
+            rows = list(job.result(timeout=600))
+        finally:
+            self.billed += int(job.total_bytes_billed or 0)
+            self.pause_if_expensive()
         billed = int(job.total_bytes_billed or 0)
-        self.billed += billed
         print(json.dumps({'job': job.job_id, 'estimatedBytes': estimate, 'billedBytes': billed, 'runBilledBytes': self.billed, 'rows': len(rows)}), flush=True)
         return rows
 
     def pause_if_expensive(self):
-        """Called after publishing: an unexpectedly large bill blocks the next run until reviewed."""
+        """Persist immediately, including on failures; block the next query or run."""
         if self.billed <= self.review_bytes:
             return False
         self.stop_path.parent.mkdir(parents=True, exist_ok=True)
         self.stop_path.write_text(json.dumps({'pausedAt': iso(datetime.now(timezone.utc)), 'runBilledBytes': self.billed,
-                                              'reviewBytes': self.review_bytes, 'hardCapBytes': self.max_billed,
+                                              'reviewBytes': self.review_bytes, 'hardCapBytes': self.max_estimate,
                                               'reason': 'This run billed more than the review threshold. Check Google Cloud billing, then delete this file to resume.'}, indent=1) + '\n')
         print('WARNING: billing exceeded the review threshold; further map collection is paused.', flush=True)
         return True
@@ -397,18 +407,36 @@ def collect(q, table, out, now, layers=None, max_hours=DEFAULT_MAX_HOURS, force=
     missing = [n for n in wanted if n not in present]
     if not present:
         raise RuntimeError('None of the map fields exist in the linked table')
-    sql = build_query(table, [LAYERS[n]['column'] for n in present], hours)
     params = query_params(run, hours)
-    if dry_run:
+    # Preflight the entire plan before executing any map query. Split fields,
+    # not hours: lead times live inside a repeated record, not partitions.
+    pending, plan = [present], []
+    while pending:
+        batch = pending.pop(0)
+        sql = build_query(table, [LAYERS[n]['column'] for n in batch], hours)
         estimate = q.estimate(sql, params)
-        print(json.dumps({'dryRun': True, 'runAt': iso(run), 'layers': present, 'missingLayers': missing, 'frames': len(hours) * len(present),
-                          'estimatedBytes': estimate, 'estimatedGB': round(estimate / 1e9, 2),
-                          'note': 'For clustered tables this estimate is an upper bound; actual billing is capped by --max-billed-bytes.'}))
+        print(json.dumps({'runAt': iso(run), 'layers': batch, 'estimatedBytes': estimate}), flush=True)
+        if estimate > q.max_estimate:
+            if len(batch) == 1:
+                raise EstimateCeiling(f'Single-layer estimate {estimate} exceeds ceiling; no map queries executed.')
+            mid = len(batch) // 2
+            pending[0:0] = [batch[:mid], batch[mid:]]
+        else:
+            plan.append((batch, sql))
+    if dry_run:
+        print(json.dumps({'dryRun': True, 'runAt': iso(run), 'batches': len(plan),
+                          'note': 'Map queries were only estimated; initialization discovery may bill bytes.'}))
         return None
-    rows = q.run(sql, params)
-    if not rows:
-        raise RuntimeError('WeatherNext returned no grid cells for the contiguous United States')
-    cubes = rows_to_cubes(rows, present, hours)
+    cubes, coverage = {}, None
+    for batch, sql in plan:
+        rows = q.run(sql, params)
+        if not rows:
+            raise RuntimeError('WeatherNext returned no grid cells for the contiguous United States')
+        keys = {(float(r.lat), float(r.lon), int(r.lead_hours)) for r in rows}
+        if len(keys) != len(rows) or (coverage is not None and keys != coverage):
+            raise RuntimeError('Map field batches have duplicate or inconsistent grid/hour coverage')
+        coverage = keys
+        cubes.update(rows_to_cubes(rows, batch, hours))
     catalog = write_maps(out, run, cubes, hours, present, now, missing, table)
     if not catalog['layers']:
         raise RuntimeError('No layer had enough published grid cells to draw')
@@ -419,7 +447,6 @@ def collect(q, table, out, now, layers=None, max_hours=DEFAULT_MAX_HOURS, force=
     removed = prune(out, catalog, previous if previous and previous.get('runAt') != catalog['runAt'] else None)
     print(json.dumps({'published': CATALOG, 'runAt': catalog['runAt'], 'layers': {k: len(v['frames']) for k, v in catalog['layers'].items()},
                       'missingLayers': catalog['missingLayers'], 'removedOldFrames': removed, 'bytesBilled': q.billed}))
-    q.pause_if_expensive()
     return catalog
 
 
@@ -430,10 +457,10 @@ def main():
     ap.add_argument('--output', required=True, help='Checked-out weather-fusion-data worktree')
     ap.add_argument('--layers', nargs='*', choices=list(LAYERS), help='Default: every layer')
     ap.add_argument('--max-hours', type=int, default=DEFAULT_MAX_HOURS)
-    ap.add_argument('--dry-run', action='store_true', help='Print the BigQuery byte estimate and exit without billing a query')
+    ap.add_argument('--dry-run', action='store_true', help='Estimate map batches only; initialization discovery can still bill bytes')
     ap.add_argument('--force', action='store_true', help='Rebuild even when this initialization is already published')
     ap.add_argument('--max-estimate-bytes', type=int, default=250_000_000_000,
-                    help='Pre-execution ceiling and so the most one run can ever bill. Clustered-table estimates are pessimistic upper bounds.')
+                    help='Per-query estimate ceiling and shared hard billing budget for the entire run.')
     ap.add_argument('--max-billed-bytes', type=int, default=12_000_000_000,
                     help='Billing cap sent to BigQuery; raised to the passed estimate because BigQuery checks the cap against the estimate')
     ap.add_argument('--review-billed-bytes', type=int, default=30_000_000_000,
@@ -446,3 +473,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+
