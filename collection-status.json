@@ -1,18 +1,17 @@
 {
-  "checkedAt": "2026-11-12T01:05:26Z",
+  "checkedAt": "2026-11-12T01:07:50Z",
   "results": [
     {
       "model": "ecmwf",
-      "runAt": "2026-11-11T00:00:00Z",
-      "reused": true,
-      "checkedAt": "2026-11-11T18:47:31Z"
+      "runAt": "2026-11-11T12:00:00Z",
+      "messages": 455,
+      "complete": true,
+      "checkedAt": "2026-11-12T01:07:50Z"
     },
     {
       "model": "nbm",
-      "runAt": "2026-11-11T12:00:00Z",
-      "messages": 140,
-      "complete": true,
-      "checkedAt": "2026-11-11T18:47:31Z"
+      "error": "nbm collection incomplete: FH001: HTTPError: 404 Client Error: Not Found for url: https://noaa-nbm-grib2-pds.s3.amazonaws.com/blend.20261112/00/core/blend.t00z.core.f001.co.grib2.idx; FH002: HTTPError: 404 Client Error: Not Found for url: https://noaa-nbm-grib2-pds.s3.amazonaws.com/blend.20261112/00/core/blend.t00z.core.f002.co.grib2.idx; FH004: HTTPError: 404 Client Error: Not Found for url: https://noaa-nbm-grib2-pds.s3.amazonaws.com/blend.20261112/00/core/blend.t00z.core.f004.co.grib2.idx; FH005: HTTPError: 404 Client Error: Not Found for url: https://noaa-nbm-grib2-pds.s3.amazonaws.com/ble",
+      "checkedAt": "2026-11-12T01:07:50Z"
     },
     {
       "model": "hrrr",
