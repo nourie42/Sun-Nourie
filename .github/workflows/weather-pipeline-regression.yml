@@ -1,0 +1,42 @@
+name: Weather pipeline regression gates
+on:
+  pull_request:
+    paths:
+      - 'scripts/weather_fusion_collect.py'
+      - 'scripts/test_weather_hrrr_completeness.py'
+      - 'scripts/weather_weathernext_maps.py'
+      - 'scripts/test_weathernext_maps.py'
+      - '.github/workflows/weathernext-maps-data.yml'
+      - 'public/weather-fusion/weather-display.js'
+      - 'test/weatherFusionSkyConsistency.test.js'
+      - '.github/workflows/weather-pipeline-regression.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  focused-regressions:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+      - name: Install only offline test dependencies
+        run: |
+          pip install 'numpy<3' 'scipy<2' 'Pillow<13'
+          npm ci
+      - name: Verify collector Python syntax
+        run: python -m py_compile scripts/weather_fusion_collect.py scripts/weather_fusion_refresh.py scripts/weather_weathernext_maps.py
+      - name: Verify HRRR cycle fallback offline
+        run: python scripts/test_weather_hrrr_completeness.py
+      - name: Verify WeatherNext map billing guards and geometry offline
+        run: python scripts/test_weathernext_maps.py
+      - name: Verify weather icons and sky behavior
+        run: node --test test/weatherFusionSkyConsistency.test.js
+      - name: Check existing website code
+        run: npm run check

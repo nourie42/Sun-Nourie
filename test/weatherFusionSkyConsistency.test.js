@@ -87,6 +87,25 @@ test('same, lower and higher later readings are labeled honestly and never chang
   }
  }
 });
+test('hourly icons keep clear and frost day and night art, and use cloud cover or precipitation instead of the unknown mark',()=>{
+  for(const [condition,isDay,mark] of [
+    ['Clear',false,'sky-moon'],['Mostly Clear',false,'sky-moon'],['Clear',true,'sky-sun'],['Mostly Clear',true,'sky-sun'],
+    ['Patchy Frost',false,'sky-moon'],['Areas Of Frost',false,'sky-moon'],['Widespread Frost',true,'sky-sun'],['Frost',true,'sky-sun']
+  ]){
+    const art=weatherIcon(condition,isDay,32);
+    assert.match(art,new RegExp(mark),condition);
+    assert.match(art,/data-weather-kind="clear"/);
+    assert.doesNotMatch(art,/sky-unknown/);
+  }
+  assert.match(weatherIcon('Not a reported sky',true,32,5),/sky-sun/);
+  assert.doesNotMatch(weatherIcon('Not a reported sky',true,32,5),/sky-unknown/);
+  assert.match(weatherIcon('Not a reported sky',false,32,90),/sky-cloud/);
+  assert.doesNotMatch(weatherIcon('Not a reported sky',false,32,90),/sky-sun|sky-unknown/);
+  assert.match(weatherIcon('Not a reported sky',false,32,null,.02),/sky-rain/);
+  assert.doesNotMatch(weatherIcon('Not a reported sky',false,32,null,.02),/sky-unknown/);
+  assert.match(weatherIcon('',true,32),/sky-unknown/);
+  assert.equal(weatherState('Patchy Frost').kind,'unknown');
+});
 test('thunder icons follow thunder wording, not rain percentage',()=>{
  assert.equal(conditionForRainChance('Scattered Showers And Thunderstorms then Partly Sunny',26),'Scattered Showers And Thunderstorms then Partly Sunny');
  assert.equal(conditionForRainChance('Rain',100),'Rain');
