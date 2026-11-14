@@ -1,5 +1,5 @@
 {
-  "checkedAt": "2026-11-14T17:00:49Z",
+  "checkedAt": "2026-11-14T21:24:48Z",
   "results": [
     {
       "model": "ecmwf",
@@ -16,10 +16,8 @@
     },
     {
       "model": "hrrr",
-      "runAt": "2026-11-14T15:00:00Z",
-      "messages": 152,
-      "complete": true,
-      "checkedAt": "2026-11-14T17:00:26Z"
+      "error": "hrrr collection incomplete: FH014: HTTPError: 404 Client Error: Not Found for url: https://noaa-hrrr-bdp-pds.s3.amazonaws.com/hrrr.20261114/conus/hrrr.t20z.wrfsfcf14.grib2.idx",
+      "checkedAt": "2026-11-14T21:24:48Z"
     }
   ]
 }
