@@ -29,11 +29,13 @@ test('Today rain trend compares every distinct forecast update and reports up, d
   });
 });
 
-test('trend history is isolated by location and Today/Tonight phase',()=>{
+test('trend history is isolated by location and calendar day',()=>{
   const state=storage();
   const first=forecast(40,'2026-09-12T09:00:00Z');
-  assert.match(rainTrendSample(first,Date.parse('2026-09-12T10:00:00Z')).key,/\|day$/);
+  assert.match(rainTrendSample(first,Date.parse('2026-09-12T10:00:00Z')).key,/35\.787,-78\.481\|2026-09-12\|calendar-v2$/);
   updateRainTrend(first,Date.parse('2026-09-12T10:00:00Z'),state);
   assert.equal(updateRainTrend(forecast(20,'2026-09-12T10:00:00Z',35.612),Date.parse('2026-09-12T10:00:00Z'),state).direction,'first');
-  assert.equal(updateRainTrend(forecast(20,'2026-09-12T10:00:00Z'),Date.parse('2026-09-12T20:00:00Z'),state).direction,'first');
+  assert.deepEqual(updateRainTrend(forecast(20,'2026-09-12T10:00:00Z'),Date.parse('2026-09-12T20:00:00Z'),state),{
+    direction:'down',change:20,delta:-20,from:40,to:20,previousRunAt:'2026-09-12T09:00:00Z',currentRunAt:'2026-09-12T10:00:00Z'
+  });
 });

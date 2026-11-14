@@ -70,8 +70,8 @@ test('main weather navigation is one compact row with weather, Google WeatherNex
   const html=read('public/weather-fusion/index.html');
   const css=read('public/weather-fusion/weather-polish.css');
   const nav=html.match(/<nav class="weather-jump-nav"[\s\S]*?<\/nav>/)[0];
-  assert.equal((nav.match(/weather-jump-card/g)||[]).length,7);
-  assert.match(nav,/href="\/weathernext\/" aria-label="Open Google WeatherNext forecast"/);
+  assert.equal((nav.match(/weather-jump-card/g)||[]).length,9);
+  assert.match(html,/id="weathernext-site-link" href="\/weathernext\/" aria-label="Open Google WeatherNext forecast"/);
   assert.match(nav,/id="open-car-wash" type="button"/);
   assert.doesNotMatch(nav,/<svg|<img|jump-visual|jump-arrow/);
   assert.match(css,/grid-template-columns:repeat\(7,minmax\(0,1fr\)\)/);
