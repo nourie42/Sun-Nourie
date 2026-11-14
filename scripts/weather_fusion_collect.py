@@ -128,6 +128,54 @@ def make_hourly(native: list[dict[str, Any]], intervals: list[dict[str, Any]]) -
         hourly["precipitation"].append(round(interval["value"] * 3600/(interval["end"]-interval["start"]), 6) if interval else None)
     return {"hourly": hourly, "hourly_units": {"time": "unixtime", "temperature_2m": "°F", "dew_point_2m": "°F", "precipitation": "inch", "wind_speed_10m": "mp/h", "wind_gusts_10m": "mp/h", "relative_humidity_2m": "%", "cloud_cover": "%", "reflectivity": "dBZ", "nearby_reflectivity": "dBZ", "visibility": "mi", "pressure_msl": "inHg"}}
 
+def complete_hrrr_indices(run: dt.datetime, hours: int, fetch_index, verified: set[int] | None = None) -> bool:
+    """Require every forecast hour index before accepting an HRRR cycle.
+
+    A published FH018 or FH048 index does not prove intervening files exist.
+    This is only an availability check; full GRIB decoding still validates data.
+    """
+    verified = set() if verified is None else verified
+    for hour in range(hours + 1):
+        if hour in verified:
+            continue
+        _, index = urls("hrrr", run, hour)
+        try:
+            entries = parse_index("hrrr", fetch_index(index, retries=0).decode())
+            if not any(item["field"] == "temperature" for item in entries):
+                raise ValueError("temperature missing from index")
+            verified.add(hour)
+        except Exception as error:
+            print(f"HRRR cycle {iso(run)} incomplete at FH{hour:03d}: {error}", flush=True)
+            return False
+    return True
+
+
+def select_model_cycle(model: str, now: dt.datetime, fetch_index) -> tuple[dt.datetime, int]:
+    """Select a verified source cycle, falling back without inventing freshness."""
+    for back in range(1, 31):
+        candidate = (now - dt.timedelta(hours=back)).replace(minute=0, second=0, microsecond=0)
+        if model == "ecmwf" and candidate.hour not in (0, 12):
+            continue
+        # Intervening HRRR cycles have 18 h; 00/06/12/18Z may extend to 48 h.
+        probe = 18 if model == "hrrr" else SOURCES[model]["hours"]
+        _, index = urls(model, candidate, probe)
+        try:
+            entries = parse_index(model, fetch_index(index, retries=0).decode())
+            if not any(item["field"] == "temperature" for item in entries):
+                continue
+            verified = {probe} if model == "hrrr" else set()
+            if model == "hrrr" and not complete_hrrr_indices(candidate, probe, fetch_index, verified):
+                continue
+            run_hours = probe
+            if model == "hrrr" and candidate.hour % 6 == 0:
+                if complete_hrrr_indices(candidate, 48, fetch_index, verified):
+                    run_hours = 48
+            return candidate, run_hours
+        except Exception:
+            continue
+    raise RuntimeError(f"No complete recent {model} run found")
+
+
 def collect_model(model: str, output: str) -> dict[str, Any]:
     import requests
     import numpy as np
@@ -167,35 +215,7 @@ def collect_model(model: str, output: str) -> dict[str, Any]:
                 time.sleep(1 + attempt)
         raise AssertionError("unreachable")
     now = dt.datetime.now(UTC)
-    run = None
-    run_hours = None
-    for back in range(1, 31):
-        candidate = (now-dt.timedelta(hours=back)).replace(minute=0, second=0, microsecond=0)
-        if model == "ecmwf" and candidate.hour not in [0, 12]:
-            continue
-        # HRRR produces a new CONUS run every hour. The 00/06/12/18Z cycles
-        # extend to 48 h; the intervening cycles provide the shorter operational
-        # horizon. Probe 18 h first so a fresh hourly run is never ignored.
-        probe = 18 if model == "hrrr" else SOURCES[model]["hours"]
-        _, index = urls(model, candidate, probe)
-        try:
-            entries = parse_index(model, get(index, retries=0).decode())
-            if any(r["field"] == "temperature" for r in entries):
-                run = candidate
-                run_hours = probe
-                if model == "hrrr" and candidate.hour % 6 == 0:
-                    try:
-                        _, extended_index = urls(model, candidate, 48)
-                        extended = parse_index(model, get(extended_index, retries=0).decode())
-                        if any(r["field"] == "temperature" for r in extended):
-                            run_hours = 48
-                    except Exception:
-                        pass
-                break
-        except Exception:
-            pass
-    if run is None or run_hours is None:
-        raise RuntimeError(f"No complete recent {model} run found")
+    run, run_hours = select_model_cycle(model, now, get)
     target = out / "models" / f"{model}.json"
     if target.exists():
         old = json.loads(target.read_text())
