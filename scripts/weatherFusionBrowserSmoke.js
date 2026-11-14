@@ -68,7 +68,7 @@ async function checkForecastDetails(page){
  assert.equal(await page.locator('#condition').isVisible(),false);
  assert.equal(await page.locator('.sun-shade-comparison figure').count(),3);
  assert.ok(!(await page.locator('#skin-exposure').innerText()).includes('~'));
- assert.match(await page.locator('.brand small').innerText(),/Because Apple, Google and Samsung weather suck/);
+ assert.equal((await page.locator('.brand .brand-name').innerText()).trim(),'Nourie');
  assert.equal(await page.locator('.today-uncertainty-label').textContent(),"Dan's take");
  assert.match(await page.locator('#hero-feels').innerText(),/Feels like/);
  assert.equal(await page.locator('#hourly .hour-feels').count(),await page.locator('#hourly .hour').count());

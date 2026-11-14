@@ -8,8 +8,18 @@ import {thermalComfort, finite, solarElevation,rainChanceValue} from './weather-
 import {displayedFeelsAt,forecastValue,degrees} from './hourly-feels.js?v=current-rain-20261017-v3';
 import {winterSceneExpected,selectedHourSnowPhase} from './exposure-scene.js?v=current-rain-20261017-v3';
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-export function weatherShapes(condition, isDay = true) {
-  const weather = weatherState(condition);
+function iconWeather(condition = '', skyCover = null, precipitation = null) {
+  const text = weatherState(condition);
+  // Frost is a clear-sky ground condition. Keep that on the icon only so a
+  // missing sky word does not draw the unknown mark.
+  if (!text.known && /\bfrost\b/i.test(String(condition || ''))) return {...text, kind:'clear', label:'Clear', known:true};
+  const covered = weatherState(condition, skyCover);
+  if (covered.known) return covered;
+  if (finite(precipitation) && precipitation > 0) return {...covered, kind:'rain', label:'Rain', known:true};
+  return covered;
+}
+export function weatherShapes(condition, isDay = true, skyCover = null, precipitation = null) {
+  const weather = iconWeather(condition, skyCover, precipitation);
   const sun = '<g class="sky-sun"><circle cx="18" cy="16" r="8" fill="#ffdb83"/><path d="M18 3V0M18 29v3M5 16H2M31 16h3M8 6L6 4M28 26l2 2M8 26l-2 2M28 6l2-2" stroke="#ffdb83" stroke-width="2.3" stroke-linecap="round"/></g>';
   const moon = '<path class="sky-moon" d="M27 5A13 13 0 1 0 36 27 14 14 0 0 1 27 5" fill="#e6eaf5"/>';
   const cloud = '<g class="sky-cloud"><path d="M10 32a8 8 0 0 1-1-16 12 12 0 0 1 22-4 9 9 0 1 1 5 20Z" fill="#e4edf8"/><path d="M10 32h26a9 9 0 0 0 7-3H7a8 8 0 0 0 3 3" fill="#bcd3e7"/></g>';
@@ -22,8 +32,9 @@ export function weatherShapes(condition, isDay = true) {
   if (weather.kind === 'fog') return cloud + '<path class="sky-fog" d="M9 38h29M13 44h21" stroke="#c9dfed" stroke-width="2.5" stroke-linecap="round"/>';
   return '<g class="sky-unknown"><circle cx="25" cy="25" r="17" fill="none" stroke="#b5cce1" stroke-width="2"/><path d="M20 19a6 6 0 1 1 9 5q-4 2-4 5" fill="none" stroke="#d7e6f6" stroke-width="2.5" stroke-linecap="round"/><circle cx="25" cy="35" r="1.7" fill="#d7e6f6"/></g>';
 }
-export function weatherIcon(condition = '', isDay = true, size = 32) {
-  return `<svg width="${size}" height="${size}" viewBox="0 0 50 50" aria-hidden="true" data-weather-kind="${weatherState(condition).kind}">${weatherShapes(condition, isDay)}</svg>`;
+export function weatherIcon(condition = '', isDay = true, size = 32, skyCover = null, precipitation = null) {
+  const weather = iconWeather(condition, skyCover, precipitation);
+  return `<svg width="${size}" height="${size}" viewBox="0 0 50 50" aria-hidden="true" data-weather-kind="${weather.kind}">${weatherShapes(condition, isDay, skyCover, precipitation)}</svg>`;
 }
 export function weatherMetricIcon(kind){
  const paths={eye:'M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12ZM9 12a3 3 0 1 0 6 0 3 3 0 1 0-6 0',wind:'M3 8h12c5 0 5-6 1-6M3 12h16c5 0 5 6 1 6M3 16h7c4 0 4 6 0 6',drop:'M12 2C9 7 5 12 5 16a7 7 0 0 0 14 0c0-4-4-9-7-14Z',sun:'M12 3V1M12 23v-2M3 12H1M23 12h-2M4 4l2 2M18 18l2 2M4 20l2-2M18 6l2-2M17 12a5 5 0 1 1-10 0 5 5 0 0 1 10 0',humidity:'M12 2C9 7 5 12 5 16a7 7 0 0 0 14 0c0-4-4-9-7-14ZM9 18l6-7M9 12h.01M15 18h.01'};
@@ -76,9 +87,10 @@ export function currentSample(forecast, now = Date.now()) {
   const canonicalGuidance=current.type==='guidance'&&current.localEstimate?.basis==='canonical-hourly-blend'
     &&finite(thermalTime)&&thermalTime===Date.parse(current.time);
   const thermalInputs=canonicalGuidance?{...current,condition:current.thermalCondition||current.condition}:current;
-  // Current sunlight must use the actual viewing time, not a stale observation or assembled forecast timestamp.
+  // A modeled hour uses that hour's sun. The live view uses the actual time, not a stale observation or assembled forecast timestamp.
   const comfort = thermalComfort(thermalInputs, forecast.location, canonicalGuidance?thermalTime:finite(assembled)?assembled:now);
-  const solarDaylight=solarElevation(now,forecast.location?.latitude,forecast.location?.longitude);
+  const solarClock=canonicalGuidance&&finite(thermalTime)?thermalTime:now;
+  const solarDaylight=solarElevation(solarClock,forecast.location?.latitude,forecast.location?.longitude);
   const isDay=finite(solarDaylight)?solarDaylight>0:comfort.daylight;
   comfort.daylight=isDay;
   if(canonicalGuidance){
@@ -147,7 +159,7 @@ export function renderHourlyWeather(forecast, now = Date.now()) {
   const scroll = root.scrollLeft, zone = forecast.location.timeZone || 'America/New_York';
   const date=time=>new Intl.DateTimeFormat('en-US',{timeZone:zone,weekday:'short'}).format(new Date(time));
   const hour = time => new Intl.DateTimeFormat('en-US',{timeZone:zone,hour:'numeric'}).format(new Date(time)).replace(' ','');
-  root.innerHTML = hourlyDisplaySamples(forecast,now).map(raw => { const mix=snowHourCondition(forecast,raw), sample=mix?{...raw,condition:mix}:raw, iconCondition=mix?'Snow':sample.condition; return `<button type="button" class="hour ${sample.now ? 'now hour-current' : 'forecast-hour'}" data-comfort-time="${esc(sample.id)}" data-time="${esc(sample.time)}" title="${esc(sample.condition)} · ${esc(sample.source)}" aria-label="${sample.now ? 'Now' : esc(hour(sample.time))}, ${esc(sample.condition)}, air ${degrees(sample.temperature)}, feels like ${degrees(sample.feels)} ${esc(sample.exposure.label.toLowerCase())}. Preview this weather."><span>${sample.now ? 'Now' : esc(hour(sample.time))}</span><small class="hour-date">${esc(date(sample.now?now:sample.time))}</small>${weatherIcon(iconCondition,sample.isDay)}<strong>${degrees(sample.temperature)}</strong><span class="hour-feels">Feels <b>${degrees(sample.feels)}</b><em class="hour-exposure sr-only">${esc(sample.exposure.shortLabel)}</em></span>${hourlyRainHTML(sample)}${hourlySnowHTML(forecast,sample)}${hourlyUvHTML(sample.uvIndex)}${hourlyWindHTML(sample)}</button>`; }).join('');
+  root.innerHTML = hourlyDisplaySamples(forecast,now).map(raw => { const mix=snowHourCondition(forecast,raw), sample=mix?{...raw,condition:mix}:raw, iconCondition=mix?'Snow':sample.condition, row=(forecast?.hours||[]).find(item=>Date.parse(item.time)===Date.parse(sample.time)), sky=sample.inputs?.skyCover??sample.comfort?.inputEvidence?.skyCover??row?.skyCover, precip=row?.precipitation; return `<button type="button" class="hour ${sample.now ? 'now hour-current' : 'forecast-hour'}" data-comfort-time="${esc(sample.id)}" data-time="${esc(sample.time)}" title="${esc(sample.condition)} · ${esc(sample.source)}" aria-label="${sample.now ? 'Now' : esc(hour(sample.time))}, ${esc(sample.condition)}, air ${degrees(sample.temperature)}, feels like ${degrees(sample.feels)} ${esc(sample.exposure.label.toLowerCase())}. Preview this weather."><span>${sample.now ? 'Now' : esc(hour(sample.time))}</span><small class="hour-date">${esc(date(sample.now?now:sample.time))}</small>${weatherIcon(iconCondition,sample.isDay,32,sky,precip)}<strong>${degrees(sample.temperature)}</strong><span class="hour-feels">Feels <b>${degrees(sample.feels)}</b><em class="hour-exposure sr-only">${esc(sample.exposure.shortLabel)}</em></span>${hourlyRainHTML(sample)}${hourlySnowHTML(forecast,sample)}${hourlyUvHTML(sample.uvIndex)}${hourlyWindHTML(sample)}</button>`; }).join('');
   root.scrollLeft = scroll;
 }
 export function peakComparison(summary, currentSun) {
