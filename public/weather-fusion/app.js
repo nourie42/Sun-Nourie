@@ -71,6 +71,7 @@ function configurePageMode() {
   const modelExplanation=$('model-explanation');if(modelExplanation)modelExplanation.hidden=!experimentalPage;
   const back=$('experimental-back');if(back)back.hidden=!experimentalPage;
   const experimentBanner=document.querySelector('.experimental-page-banner');if(experimentBanner)experimentBanner.hidden=!experimentalPage;
+  const aiRankings=$('ai-rankings-link');if(aiRankings)aiRankings.hidden=!experimentalPage;
 }
 configurePageMode();
 const sevenDayCarousel=createSevenDayCarousel({onOpenDay:showDay});
