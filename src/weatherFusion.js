@@ -773,8 +773,13 @@ export function registerWeatherFusionRoutes(app, options = {}) {
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-    const page = _req.path === '/weather-fusion/experimental-weather.html' ? 'experimental-weather.html' : 'index.html';
-    res.sendFile(path.join(PUBLIC_DIR, page));
+    res.sendFile(path.join(PUBLIC_DIR, 'index.html'));
+  });
+  app.get('/weather-fusion/ai-rankings.html', (_req, res) => {
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+    res.sendFile(path.join(PUBLIC_DIR, 'ai-rankings.html'));
   });
   app.get(['/weather-fusion/halo', '/weather-fusion/halo/'], (_req, res) => res.redirect(302, '/weather-fusion/halo.html'));
   app.get('/weather-fusion/weathernext-site.html', (req,res) => {
