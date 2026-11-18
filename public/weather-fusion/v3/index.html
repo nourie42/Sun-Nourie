@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="en" data-weather-page="experimental" class="sky-active">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#0e1e3a" />
+  <title>Experimental Weather · Weather Nourie Fusion</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body data-sky="day">
+  <!-- Living Sky Atmosphere & GPU Particle Canvas -->
+  <div class="atmosphere" aria-hidden="true"></div>
+  <canvas id="sky-canvas" aria-hidden="true"></canvas>
+
+  <!-- Top Ecosystem & View Mode Strip -->
+  <div class="ecosystem-strip">
+    <div class="shell ecosystem-inner">
+      <div class="mode-switcher" role="tablist" aria-label="Weather Nourie Workspace Modes">
+        <button class="mode-pill active" data-view-mode="experimental" type="button">🧪 Experimental Fusion</button>
+        <button class="mode-pill" data-view-mode="glance" type="button">◔ Glance</button>
+        <button class="mode-pill" data-view-mode="blend" type="button">◑ Blend Lab</button>
+        <button class="mode-pill" data-view-mode="today" type="button">☀ Today Editorial</button>
+        <button class="mode-pill" data-view-mode="halo" type="button">◯ Halo Living Sky</button>
+      </div>
+      <nav class="eco-links" aria-label="Sun-Nourie Ecosystem">
+        <button class="eco-pill" id="open-car-wash-modal" type="button">🚗 Car Wash Advisor</button>
+        <button class="eco-pill" id="open-snow-modal" type="button">❄️ Snow &amp; Winter</button>
+        <button class="eco-pill" id="open-afd-modal" type="button">📡 Local NWS Discussion</button>
+        <a class="eco-pill" href="https://sun-nourie-live.onrender.com/weather-fusion/" target="_blank" rel="noopener">↗ Live Production</a>
+      </nav>
+    </div>
+  </div>
+
+  <!-- Sticky Brand & Search Header -->
+  <header class="topbar">
+    <div class="shell">
+      <div class="topbar-grid">
+        <a class="brand" href="#top">
+          <div class="brand-mark" id="brand-icon-slot"></div>
+          <div>
+            <span class="brand-kicker">Weather</span>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span class="brand-name">Nourie</span>
+              <span class="exp-badge">Experimental V3</span>
+            </div>
+          </div>
+        </a>
+
+        <!-- City / ZIP Search + GPS Locate -->
+        <div class="search-cluster">
+          <div class="search-box-wrap">
+            <div class="search-input-shell">
+              <span class="search-icon" aria-hidden="true">⌕</span>
+              <input id="city-search" type="search" placeholder="Search any city or US ZIP code (press / to focus)…" autocomplete="off" />
+            </div>
+            <div id="search-results" class="search-dropdown" hidden></div>
+          </div>
+          <button id="locate-btn" class="icon-btn" type="button" title="Use my current GPS location">
+            <span>⌖</span>
+            <span>GPS</span>
+          </button>
+        </div>
+
+        <!-- Sky Mood Preview, Units (°F/°C) & Refresh -->
+        <div class="header-controls">
+          <select id="sky-mood-select" class="sky-select" aria-label="Atmosphere Sky Mode">
+            <option value="auto">Sky: Auto Live</option>
+            <option value="day">Sky: Clear Day</option>
+            <option value="rain">Sky: Rain &amp; Storm</option>
+            <option value="sunset">Sky: Golden Sunset</option>
+            <option value="night">Sky: Starry Night</option>
+          </select>
+          <button id="unit-toggle" class="icon-btn" type="button" title="Toggle Fahrenheit / Celsius">°F</button>
+          <button id="refresh-btn" class="icon-btn" type="button" title="Refresh multi-model fusion">↻ Refresh</button>
+        </div>
+      </div>
+
+      <!-- Saved City Chips & Section Jump Navigation -->
+      <div class="subnav-bar">
+        <div id="preset-city-chips" class="city-chips" aria-label="Saved Cities"></div>
+        <nav class="weather-jump-nav" aria-label="Jump to section">
+          <a class="jump-pill" href="#daily-panel">7-Day</a>
+          <a class="jump-pill" href="#main-hourly-trend">48h Graph</a>
+          <a class="jump-pill" href="#skin-exposure">Shade &amp; Pets</a>
+          <a class="jump-pill" href="#model-explanation">Why This Forecast</a>
+          <a class="jump-pill" href="#wn-compare-section">Compare Models</a>
+          <a class="jump-pill" href="#best-times">Best Times</a>
+          <a class="jump-pill" href="#dewpoint-gross-meter">Feel Meter</a>
+          <a class="jump-pill" href="#air-quality">AQI &amp; Your Day</a>
+          <a class="jump-pill" href="#map-panel">Weather Maps</a>
+        </nav>
+      </div>
+    </div>
+  </header>
+
+  <main id="top" class="shell">
+    <!-- Live Telemetry Status Line -->
+    <div id="status-bar" class="status-line">
+      <div><span class="live-dot"></span><span id="status-text">Initializing Multi-Model Fusion Engine (NWS · HRRR · NBM · ECMWF IFS · GEFS · WeatherNext AI)…</span></div>
+      <div id="coords-text">37.7749°N, 122.4194°W · Blend V2 Active</div>
+    </div>
+
+    <!-- Urgent Official NWS Warnings Banner (Hidden when none active) -->
+    <div id="urgent-alerts-container"></div>
+
+    <!-- Forecast Window Banners (Rain windows, Sunny windows, Golden Outdoor windows) -->
+    <div id="forecast-window-banners" class="window-banners-grid"></div>
+
+    <!-- Above-the-Fold Hero + Remainder of Today + Nourie Weather Take -->
+    <section class="hero-bento" aria-label="Current Conditions and Executive Briefing">
+      <!-- Left Hero Card -->
+      <article class="glass hero-card">
+        <div>
+          <div class="hero-top-meta">
+            <span id="hero-date" class="hero-date-badge">Wednesday, Nov 18</span>
+            <span id="hero-wfo" class="wfo-pill">NWS WFO MTR · Multi-Model Blend V2</span>
+          </div>
+          <h1 id="city-name" class="hero-city">San Francisco, CA</h1>
+
+          <div class="hero-main-row">
+            <div id="hero-scene"></div>
+            <div id="temperature" class="hero-temp" title="Click to jump to 48-hour temperature curve">57°</div>
+            <div class="hero-cond-stack">
+              <div id="hero-condition" class="hero-condition">Rain Showers</div>
+              <div id="hero-hilo" class="hero-hi-lo">High 57° · Low 52° · Confidence High</div>
+              <div id="hero-uv" style="font-size:12.5px;color:var(--gold);font-weight:600;">Peak UV today 1.8 · Low</div>
+            </div>
+          </div>
+
+          <div id="hero-telemetry-chips" class="hero-feels-strip"></div>
+        </div>
+
+        <div class="hero-obs-footer">
+          <span id="observation-label">Blended from NOAA NWS, HRRR 3km, NBM v4.2, ECMWF IFS 0.25° &amp; WeatherNext AI</span>
+          <span id="radar-proximity-pill" style="color:var(--mint);font-weight:700;">● Radar 5/12/36 mi Scanned</span>
+        </div>
+      </article>
+
+      <!-- Right Stack: Remainder of Today + Nourie Weather Take -->
+      <div class="hero-right-stack">
+        <article class="glass today-remainder-card">
+          <div class="card-kicker-row">
+            <span class="section-kicker">Remainder of Today &amp; Tonight</span>
+            <button id="open-today-scrubber" class="mode-pill" type="button">Inspect Hourly ▸</button>
+          </div>
+          <div id="remainder-stats-grid" class="remainder-grid"></div>
+        </article>
+
+        <article class="glass nourie-take-card">
+          <div class="card-kicker-row">
+            <span class="section-kicker">Nourie Weather Take · Forecaster &amp; AI Synthesis</span>
+            <span id="risk-outlook-pill" class="wfo-pill">SPC / WPC Outlook</span>
+          </div>
+          <h2 id="take-headline" class="nourie-take-headline">Loading forecast synthesis…</h2>
+          <p id="take-summary" class="nourie-take-body"></p>
+          <ul id="take-bullets" class="take-bullets"></ul>
+        </article>
+      </div>
+    </section>
+
+    <!-- 7-Day / 10-Day Forecast with Confidence Meters -->
+    <section id="daily-panel" class="glass section-panel" data-section="daily">
+      <div class="section-header">
+        <div>
+          <span class="section-kicker">Multi-Model Consensus</span>
+          <h2 class="section-title">10-Day Forecast &amp; Confidence Meters</h2>
+          <p class="section-subtitle">Click any day card to inspect its 100-point rain math, model weights, and 24-hour curve.</p>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <span class="wfo-pill">Confidence = Cross-Model Spread</span>
+        </div>
+      </div>
+      <div id="experimental-week" class="seven-day-track"></div>
+    </section>
+
+    <!-- 48-Hour Interactive Multi-Metric Explorer + 48-Hour Scrubber Strip -->
+    <section id="main-hourly-trend" class="glass section-panel" data-section="hourly">
+      <div class="section-header">
+        <div>
+          <span class="section-kicker">High-Resolution Timeline</span>
+          <h2 class="section-title">Explore the Next 48 Hours</h2>
+          <p id="hourly-metric-desc" class="section-subtitle">Drag or move across the graph to inspect every hour's multi-model blend and 100-point rain ledger.</p>
+        </div>
+      </div>
+
+      <!-- 12 Variable Tabs -->
+      <div id="hourly-metric-tabs" class="metric-tabs-bar" role="tablist"></div>
+
+      <!-- Live Scrubbed Hour Readout -->
+      <div id="hourly-readout" class="hourly-readout-bar"></div>
+
+      <!-- Interactive SVG Graph Stage -->
+      <div id="hourly-chart-stage"></div>
+
+      <!-- Synchronized 48-Hour Horizontal Strip -->
+      <div style="margin-top:16px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+          <span class="section-kicker">Hour-by-Hour Scrubber Strip (48 Hours)</span>
+          <span style="font-size:12px;color:var(--faint);">Click any hour card to lock inspection</span>
+        </div>
+        <div id="hourly-strip" class="hourly-strip-scroll"></div>
+      </div>
+    </section>
+
+    <!-- 3 Tall Illustrated Outdoor Exposure & Pet Sidewalk Heat Cards -->
+    <section id="skin-exposure" data-section="exposure">
+      <div id="exposure-cards-grid" class="exposure-grid"></div>
+    </section>
+
+    <!-- "Why This Forecast" — Transparent Multi-Model Fusion Math & 100-Point Rain Ledger -->
+    <section id="model-explanation" class="glass section-panel" data-section="explanation">
+      <div class="section-header">
+        <div>
+          <span class="section-kicker">Transparent Forecast Math</span>
+          <h2 class="section-title">Why This Forecast (Blend V2 &amp; 100-Point Rain Ledger)</h2>
+          <p class="section-subtitle">Exact lead-time horizon weights, outlier-dampening audit (`weather-nourie-temperature-outliers-v1`), and deterministic QPF rain scoring.</p>
+        </div>
+      </div>
+
+      <div class="explanation-controls">
+        <div id="explanation-day-pills" class="day-pills-row"></div>
+        <div id="explanation-period-pills" style="display:flex;gap:6px;">
+          <button class="mode-pill active" data-period="all" type="button">Calendar Day (24h)</button>
+          <button class="mode-pill" data-period="daytime" type="button">NWS Daytime (6a–6p)</button>
+          <button class="mode-pill" data-period="overnight" type="button">NWS Overnight (6p–6a)</button>
+        </div>
+      </div>
+
+      <div class="explanation-two-col">
+        <div id="rain-ledger-card" class="math-subcard"></div>
+        <div id="temp-weights-card" class="math-subcard"></div>
+      </div>
+
+      <details style="margin-top:16px;padding-top:12px;border-top:1px solid rgba(255,255,255,0.12);">
+        <summary style="cursor:pointer;font-weight:700;font-size:13.5px;color:var(--blue);">▸ View all hourly raw model inputs for this day</summary>
+        <div id="all-hours-matrix" style="overflow-x:auto;margin-top:12px;"></div>
+      </details>
+    </section>
+
+    <!-- 10-Day Multi-Model Comparison Visualizer ("Compare") -->
+    <section id="wn-compare-section" class="glass section-panel" data-section="compare">
+      <div class="section-header">
+        <div>
+          <span class="section-kicker">Ensemble &amp; Deterministic Divergence</span>
+          <h2 class="section-title">10-Day Multi-Model Comparison Lab</h2>
+          <p class="section-subtitle">Compare the Weather Nourie Blend against individual contributing models across 10 variables. Click any model pill to toggle its curve.</p>
+        </div>
+      </div>
+
+      <!-- Variable Selector Tabs -->
+      <div id="compare-var-tabs" class="metric-tabs-bar"></div>
+
+      <!-- Toggleable Model Legend Pills -->
+      <div id="compare-model-toggles" class="metric-tabs-bar" style="margin-bottom:12px;"></div>
+
+      <!-- SVG Multi-Model Chart -->
+      <div id="compare-chart-stage"></div>
+
+      <!-- Selected Day Model Comparison Readout -->
+      <div id="compare-day-breakdown" style="margin-top:14px;"></div>
+    </section>
+
+    <!-- "Best Times to Be Outside" 7-Day × 24-Hour Comfort Heatmap -->
+    <section id="best-times" class="glass section-panel" data-section="best-times">
+      <div class="section-header">
+        <div>
+          <span class="section-kicker">Biometeorological Comfort Matrix</span>
+          <h2 class="section-title">Best Times to Be Outside (7-Day × 24-Hour Heatmap)</h2>
+          <p class="section-subtitle">Every square is one hour of the coming week, colored by outdoor UTCI/Steadman feel. Gold squares are near-perfect outdoor hours; white dots indicate rain likely.</p>
+        </div>
+        <div id="perfect-hours-badge" class="wfo-pill"></div>
+      </div>
+
+      <div class="heatmap-scroll">
+        <div id="best-times-grid" class="heatmap-grid"></div>
+      </div>
+
+      <div id="heatmap-hover-readout" style="margin-top:12px;font-size:13px;color:var(--blue);font-weight:600;">
+        Hover or tap any hour square above to inspect its exact outdoor feel, dew point, wind, and rain score.
+      </div>
+
+      <div class="heatmap-legend">
+        <span><i class="legend-swatch" style="background:#ffd66b;"></i>Perfect (66–77° &amp; Crisp)</span>
+        <span><i class="legend-swatch" style="background:#3b68c9;"></i>Freezing (&lt;32°)</span>
+        <span><i class="legend-swatch" style="background:#548de0;"></i>Cold (32–48°)</span>
+        <span><i class="legend-swatch" style="background:#8cc4f7;"></i>Cool (48–65°)</span>
+        <span><i class="legend-swatch" style="background:#63c98c;"></i>Comfortable (65–79°)</span>
+        <span><i class="legend-swatch" style="background:#f2ad73;"></i>Warm (79–90°)</span>
+        <span><i class="legend-swatch" style="background:#eb7a44;"></i>Hot (90–100°)</span>
+        <span><i class="legend-swatch" style="background:#d9483b;"></i>Very Hot (100°+)</span>
+        <span>● White Dot = Rain Likely (≥40%)</span>
+      </div>
+    </section>
+
+    <!-- Dew Point "Feel Meter" -->
+    <section id="dewpoint-gross-meter" class="glass section-panel" data-section="feel-meter">
+      <div class="section-header">
+        <div>
+          <span class="section-kicker">Absolute Moisture Comfort</span>
+          <h2 class="section-title">Dew Point "Feel Meter" &amp; Indoor Humidity</h2>
+          <p class="section-subtitle">Unlike relative humidity, dew point measures directly how muggy or dry the air feels on your skin.</p>
+        </div>
+        <div id="dewpoint-range-tabs" style="display:flex;gap:6px;">
+          <button class="mode-pill" data-dp-range="24" type="button">24h</button>
+          <button class="mode-pill active" data-dp-range="48" type="button">48h</button>
+          <button class="mode-pill" data-dp-range="168" type="button">7 days</button>
+          <button class="mode-pill" data-dp-range="240" type="button">10 days</button>
+        </div>
+      </div>
+
+      <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--muted);font-weight:600;">
+        <span>20° Very Dry</span>
+        <span>40° Crisp</span>
+        <span>55° Comfortable</span>
+        <span>65° Sticky</span>
+        <span>75°+ Very Muggy</span>
+      </div>
+      <div class="feel-spectrum-bar">
+        <div id="feel-spectrum-pip" class="feel-spectrum-pip" style="left:45%;"></div>
+      </div>
+
+      <div id="dewpoint-readout-row" style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:12px;margin-bottom:10px;"></div>
+      <div id="dewpoint-chart-stage"></div>
+    </section>
+
+    <!-- Air Quality (AQI) + "Your Day, at a Glance" 8-Tile Grid -->
+    <section class="aqi-and-glance-grid" data-section="your-day">
+      <!-- Dynamic Air Quality Card -->
+      <article id="air-quality" class="glass section-panel" style="margin-bottom:0;">
+        <div class="card-kicker-row">
+          <span class="section-kicker">Local Air Quality &amp; CAMS Pollutants</span>
+          <span id="aqi-peak-badge" class="wfo-pill">24h Peak</span>
+        </div>
+        <div style="display:flex;align-items:baseline;gap:14px;margin:8px 0;">
+          <span id="aqi-big-number" style="font-size:54px;font-weight:800;line-height:1;font-variant-numeric:tabular-nums;">36</span>
+          <div>
+            <div id="aqi-category-label" style="font-size:20px;font-weight:800;color:var(--mint);">Good</div>
+            <div id="aqi-advice-text" style="font-size:13px;color:var(--muted);">Air quality is clean and ideal for outdoor activity.</div>
+          </div>
+        </div>
+        <div id="pollutant-bars" class="pollutant-list"></div>
+      </article>
+
+      <!-- "Your Day, at a Glance" 8 Interactive Metric Tiles -->
+      <div id="your-day">
+        <div style="margin-bottom:10px;">
+          <span class="section-kicker">Interactive Telemetry Grid</span>
+          <h2 class="section-title" style="font-size:18px;">Your Day, at a Glance (Click any tile to view curve)</h2>
+        </div>
+        <div id="metrics-grid" class="glance-tiles-grid"></div>
+      </div>
+    </section>
+
+    <!-- Multi-Layer Weather Maps (Leaflet 1.9.4) -->
+    <section id="map-panel" class="glass section-panel" data-section="map">
+      <div class="section-header">
+        <div>
+          <span class="section-kicker">Spatial Radar &amp; Model Guidance</span>
+          <h2 class="section-title">Interactive Weather Maps (7 Layers · 5/12/36 mi Rings)</h2>
+          <p id="map-layer-caption" class="section-subtitle">NEXRAD / RainViewer High-Resolution Composite Reflectivity with 5 / 12 / 36 mi proximity rings.</p>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+          <div id="basemap-tabs" style="display:flex;gap:5px;">
+            <button class="mode-pill active" data-basemap="dark" type="button">Dark</button>
+            <button class="mode-pill" data-basemap="topo" type="button">Topographic</button>
+            <button class="mode-pill" data-basemap="aerial" type="button">Aerial Imagery</button>
+          </div>
+          <button id="map-fullscreen-btn" class="icon-btn" type="button">⛶ Expand</button>
+        </div>
+      </div>
+
+      <!-- 7 Map Layer Tabs -->
+      <div id="map-layer-tabs" class="metric-tabs-bar"></div>
+
+      <!-- Map Container -->
+      <div id="map-stage-wrap" class="map-stage-container">
+        <div id="radar-map"></div>
+      </div>
+
+      <!-- Playback Scrubber & Legend -->
+      <div class="map-controls-bar">
+        <div class="radar-scrubber-wrap">
+          <button id="radar-play" class="icon-btn" type="button">▶ Play</button>
+          <input id="radar-time" type="range" min="0" max="10" value="0" aria-label="Map timeline frame scrubber" />
+          <span id="radar-stamp" class="wfo-pill">Live Frame</span>
+        </div>
+        <div id="map-legend" style="display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--muted);"></div>
+      </div>
+    </section>
+
+    <!-- Scientific Stuff & Active Feed Health -->
+    <section id="scientific-stuff" class="glass section-panel" data-section="scientific">
+      <div class="section-header">
+        <div>
+          <span class="section-kicker">Model Run Telemetry &amp; Physics Documentation</span>
+          <h2 class="section-title">Scientific Stuff &amp; Active Source Feeds</h2>
+          <p class="section-subtitle">Real-time initialization status of all contributing meteorological models and local NWS discussions.</p>
+        </div>
+      </div>
+
+      <div id="feeds-cloud" class="feeds-pill-cloud"></div>
+
+      <div class="sci-accordion">
+        <details open>
+          <summary>Latest Local NWS Area Forecast Discussion (<span id="afd-wfo-label">NWS</span>)</summary>
+          <pre id="afd-text-block" class="afd-pre">Loading Area Forecast Discussion…</pre>
+        </details>
+        <details>
+          <summary>How Blend V2 &amp; Outlier Dampening (`weather-nourie-temperature-outliers-v1`) Work</summary>
+          <p style="font-size:13.5px;color:var(--muted);line-height:1.6;">
+            Weather Nourie dynamically shifts temperature weights across five lead-time horizons: <strong>0–24h</strong> (NWS 20%, HRRR 25%, NBM 25%, ECMWF 15%, WeatherNext 15%), <strong>24–48h</strong> (NWS 15%, HRRR 20%, NBM 25%, ECMWF 20%, WeatherNext 20%), <strong>48–72h</strong> (NWS 15%, NBM 25%, ECMWF 25%, GEFS 10%, WeatherNext 25%), <strong>Days 4–7</strong> (NWS 10%, NBM 25%, ECMWF 25%, GEFS 10%, WeatherNext 30%), and <strong>Days 8–10</strong> (NBM 10%, ECMWF 30%, GEFS 20%, WeatherNext 40%). On Days 1–2, if ECMWF diverges ≥4°F from the peer median, its weight is dampened to 10% and remaining feeds renormalize.
+          </p>
+        </details>
+        <details>
+          <summary>How UTCI / Steadman Thermal Comfort &amp; 2-Layer Pavement Heat Work</summary>
+          <p style="font-size:13.5px;color:var(--muted);line-height:1.6;">
+            Apparent temperature uses the Universal Thermal Climate Index (UTCI) as its physical baseline, transitioning smoothly into Steadman Apparent Temperature in mild temperatures (55–85°F) and fading toward NWS Wind Chill below 60°F. Direct sun adds ASHRAE standing-person Effective Radiant Field (ERF) from shortwave solar irradiance. Concrete and dark asphalt temperatures are integrated via a 2-layer energy-balance model over 48 hours and evaluated against the 135°F AAHA pet paw-burn threshold.
+          </p>
+        </details>
+      </div>
+    </section>
+  </main>
+
+  <!-- Modal Dialog for Snow / Car Wash / Remainder of Today / AFD -->
+  <dialog id="nourie-dialog" class="nourie-modal">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+      <h3 id="modal-title" style="margin:0;font-size:20px;font-weight:800;">Details</h3>
+      <button id="modal-close" class="icon-btn" type="button">✕ Close</button>
+    </div>
+    <div id="modal-body"></div>
+  </dialog>
+
+  <footer class="site-footer">
+    <div class="shell">
+      <div style="font-weight:700;color:var(--text);margin-bottom:4px;">Weather Nourie · Your weather. A little clearer.</div>
+      <div>Data sources: NOAA / NWS · NOAA/NCEP HRRR &amp; NBM · ECMWF Open Data (CC BY 4.0) · GEFS · Open-Meteo / CAMS Air Quality · RainViewer &amp; Iowa State Mesonet · USGS The National Map</div>
+    </div>
+  </footer>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
