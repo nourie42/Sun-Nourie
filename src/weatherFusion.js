@@ -781,6 +781,26 @@ export function registerWeatherFusionRoutes(app, options = {}) {
     res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
     res.sendFile(path.join(PUBLIC_DIR, 'ai-rankings.html'));
   });
+  app.get('/weather-fusion/v3', (_req, res) => res.redirect(302, '/weather-fusion/v3/'));
+  app.get(['/weather-fusion/v3/', '/weather-fusion/v3/index.html', '/weather-fusion/v3/experimental-weather.html'], (_req, res) => {
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+    res.sendFile(path.join(PUBLIC_DIR, 'v3', 'index.html'));
+  });
+  for (const v3Asset of [
+    'v3/css/styles.css',
+    'v3/js/app.js',
+    'v3/js/charts.js',
+    'v3/js/fusion-engine.js',
+    'v3/js/icons.js',
+    'v3/js/map.js',
+    'v3/js/physics.js',
+  ]) app.get(`/weather-fusion/${v3Asset}`, (_req, res) => {
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.sendFile(path.join(PUBLIC_DIR, v3Asset));
+  });
   app.get(['/weather-fusion/halo', '/weather-fusion/halo/'], (_req, res) => res.redirect(302, '/weather-fusion/halo.html'));
   app.get('/weather-fusion/weathernext-site.html', (req,res) => {
     // The standalone data explorer lives at its explicit file route. The public
