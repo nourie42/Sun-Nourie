@@ -781,8 +781,7 @@ export function registerWeatherFusionRoutes(app, options = {}) {
     res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
     res.sendFile(path.join(PUBLIC_DIR, 'ai-rankings.html'));
   });
-  app.get('/weather-fusion/v3', (_req, res) => res.redirect(302, '/weather-fusion/v3/'));
-  app.get(['/weather-fusion/v3/', '/weather-fusion/v3/index.html', '/weather-fusion/v3/experimental-weather.html'], (_req, res) => {
+  app.get(['/weather-fusion/v3', '/weather-fusion/v3/', '/weather-fusion/v3/index.html', '/weather-fusion/v3/experimental-weather.html'], (_req, res) => {
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
