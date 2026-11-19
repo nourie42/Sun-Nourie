@@ -815,7 +815,21 @@ export function registerWeatherFusionRoutes(app, options = {}) {
     res.setHeader('X-Weather-Nourie-Page','weathernext-data-explorer-20260925');
     res.sendFile(path.join(PUBLIC_DIR,'weathernext-site.html'),{lastModified:false,cacheControl:false});
   });
+  app.get('/weather-fusion/manifest.webmanifest', (_req, res) => {
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.type('application/manifest+json');
+    res.sendFile(path.join(PUBLIC_DIR, 'manifest.webmanifest'));
+  });
+  app.get('/weather-fusion/sw.js', (_req, res) => {
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Service-Worker-Allowed', '/weather-fusion/');
+    res.type('application/javascript');
+    res.sendFile(path.join(PUBLIC_DIR, 'sw.js'));
+  });
   for (const name of [
+    'pwa-bridge.css','pwa-bridge.js','pwa-192x192.png','pwa-512x512.png','pwa-maskable-512x512.png','apple-touch-icon.png',
     ...COMFORT_SCENE_ASSETS,
     ...PET_WALKER_FILES,
     'pet-walker-art.js',
