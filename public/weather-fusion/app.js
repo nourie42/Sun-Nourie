@@ -706,28 +706,15 @@ window.addEventListener('pageshow', (event) => { if(event.persisted&&!document.h
 setInterval(()=>{if(validPlace(place)&&!document.hidden){if(forecast)renderAlerts(forecast);else if(alertSnapshot)renderBulletins(alertSnapshot);void refreshAlerts();}},ALERT_REFRESH_MS);
 // Missing model inputs retry sooner; healthy snapshots keep their normal cadence.
 setInterval(() => { if (validPlace(place)&&!document.hidden&&!busy&&forecastRefreshDue(forecast)) void load(); }, 60000);
-const more=$('more-tools'), nav=more?.closest('nav');
-more?.addEventListener('click',()=>more.setAttribute('aria-expanded',String(nav.classList.toggle('expanded'))));
-const pin=$('pin-tool');
-if(pin) {
-  const applyPin=()=>{
-    nav.querySelector('.pinned')?.classList.remove('pinned');
-    const target=$(pin.value) || (pin.value==='jump-air'?nav.querySelector('.jump-air'):null);
-    target?.classList.add('pinned');
-  };
-  pin.value=readPreference('weather-favorite') || '';
-  applyPin();
-  pin.addEventListener('change',()=>{savePreference('weather-favorite',pin.value);applyPin();});
-}
 for(const link of document.querySelectorAll('link[data-for]')){
   $(link.dataset.for)?.addEventListener('click',()=>{link.rel='stylesheet';link.href=link.dataset.href;},{once:true,capture:true});
 }
 const compare=$('open-compare');
-if(compare && $('more-tools')) {
+if(compare && !document.querySelector('script[src*="/wn-blend.js"]')) {
   const openCompare=async()=>{
     compare.disabled=true;
     try {
-      await import('./wn-blend.js?v=1.1');
+      await import('./wn-blend.js?v=1.1-controls');
       compare.removeEventListener('click',openCompare);
       compare.disabled=false; compare.click();
     } catch {

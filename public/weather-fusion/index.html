@@ -22,7 +22,7 @@
   <link rel="stylesheet" href="/weather-fusion/risk-outlooks.css?v=risk-outlooks-v4">
   <link rel="stylesheet" href="/weather-fusion/weather-polish.css?v=aqi-bg-v2">
   <link rel="stylesheet" href="/weather-fusion/forecast-window-banners.css?v=sun-window-main-v2">
-  <script type="module" src="/weather-fusion/app.js?v=1.1"></script>
+  <script type="module" src="/weather-fusion/app.js?v=1.1-controls"></script>
   <script type="module" src="/weather-fusion/experimental-sky.js?v=audit-20261017-v1"></script>
 
 
@@ -106,7 +106,7 @@
   </style>
 
   <link rel="stylesheet" href="/weather-fusion/header-sky.css?v=photo-rain-header-v1">
-  <link rel="stylesheet" href="/weather-fusion/page-unify.css?v=1.1">
+  <link rel="stylesheet" href="/weather-fusion/page-unify.css?v=1.1-controls">
   <script type="module" src="/weather-fusion/gross-toggle.js?v=feel-v1"></script>
   <script type="module" src="/weather-fusion/week-toggle.js?v=1"></script>
   <script type="module" src="/weather-fusion/collapse.js?v=3"></script>
@@ -152,10 +152,8 @@
     </div>
     <section id="urgent-alerts" class="urgent-alerts" role="alert" aria-live="assertive" aria-label="Urgent official weather warnings" hidden></section>
     <nav class="weather-jump-nav" aria-label="Jump to weather section">
-      <a class="weather-jump-card jump-now" href="#city-name">Now</a>
-      <a class="weather-jump-card jump-hourly" href="#hourly-panel">Hourly</a>
-      <a class="weather-jump-card jump-map" href="#map-panel" aria-label="Weather radar map">
-        <span class="jump-label">Radar</span>
+      <a class="weather-jump-card jump-map" href="#map-panel" aria-label="Weather Map">
+        <span class="jump-label">Map</span>
       </a>
       <a class="weather-jump-card jump-day" href="#your-day">
         <span class="jump-label">Your Day</span>
@@ -173,10 +171,6 @@
       <button class="weather-jump-card jump-snow" id="open-snow" type="button" aria-haspopup="dialog" aria-controls="forecast-window-dialog"><span class="jump-label">Snow</span></button>
       <button class="weather-jump-card jump-compare" id="open-compare" type="button" aria-expanded="false" aria-controls="wn-compare-section"><span class="jump-label">Compare</span></button>
       <button class="weather-jump-card jump-best-times" id="open-best-times" type="button" aria-expanded="false" aria-controls="best-times"><span class="jump-label">Best Times</span></button>
-      <button type="button" class="weather-jump-card" id="more-tools" aria-expanded="false">More</button>
-      <label class="pin-tool">Favorite shortcut <select id="pin-tool">
-        <option value="">None</option><option value="open-compare">Compare</option><option value="open-gross">Feel Meter</option><option value="open-best-times">Best Times</option><option value="open-snow">Snow</option><option value="jump-air">Air quality</option>
-      </select></label>
     </nav>
     <div class="experimental-page-banner" role="status" hidden>EXPERIMENTAL</div>
     <main id="forecast" data-awaiting-place>

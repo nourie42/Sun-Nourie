@@ -362,8 +362,8 @@ function rememberComparison(key,value) {
   try { localStorage.setItem(key,JSON.stringify(value)); } catch { /* Optional preference. */ }
 }
 let comparisonDays=comparisonPreference('weather-comparison-days',7)===10?10:7;
-const savedModels=comparisonPreference('weather-hidden-models',null);
-const hiddenModels=new Set(Array.isArray(savedModels)?savedModels:['hrrr','nam','nbm','wn','gfs','weathernext3','gefs']);
+const savedModels=comparisonPreference('weather-comparison-hidden-v2',null);
+const hiddenModels=new Set(Array.isArray(savedModels)?savedModels:[]);
 const NAMES = { nourie: 'Weather Nourie blend', nws: 'NWS', hrrr: 'HRRR', nam: 'NAM', nbm: 'NBM', ecmwf: 'ECMWF', wn: 'Google WeatherNext', gfs: 'GFS', weathernext3:'WeatherNext 3',gefs:'GEFS', single: '' };
 export function dailyHighComparison(built,index){
   const published={...built.modelMaps[index]};
@@ -462,7 +462,7 @@ export function renderChart(container, built, varDef, varId) {
     + `<div class="wn-tip" role="status" aria-live="polite" style="position:absolute;top:4px;display:none;min-width:130px;max-width:calc(100% - 8px);padding:8px 10px;border-radius:12px;background:rgba(10,20,40,.88);border:1px solid rgba(255,255,255,.22);color:#fff;font-size:12px;line-height:1.45;white-space:nowrap;pointer-events:none;box-shadow:0 6px 18px rgba(0,0,0,.35)"><button type="button" class="wn-tip-close" aria-label="Close model values" style="position:absolute;top:3px;right:3px;width:32px;height:32px;border:0;border-radius:6px;background:transparent;color:#fff;font-size:24px;line-height:1;cursor:pointer;pointer-events:auto">×</button><div class="wn-tip-content"></div></div></div>${note}${sourceNote}${coverageNote}`;
   container.querySelectorAll('button.wn-chip').forEach((b) => b.addEventListener('click', () => {
     const id = b.dataset.model; if (hiddenModels.has(id)) hiddenModels.delete(id); else hiddenModels.add(id);
-    rememberComparison('weather-hidden-models',[...hiddenModels]);
+    rememberComparison('weather-comparison-hidden-v2',[...hiddenModels]);
     renderChart(container, built, varDef, varId);
   },{signal}));
   const svg = container.querySelector('svg'), tip = container.querySelector('.wn-tip'), tipContent=container.querySelector('.wn-tip-content'), cross = container.querySelector('.wn-cross'), cdots = container.querySelector('.wn-cross-dots'), wrap = container.querySelector('.wn-chart-wrap');
