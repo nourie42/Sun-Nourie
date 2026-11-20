@@ -62,8 +62,9 @@
           </button>
         </div>
 
-        <!-- Sky Mood Preview, Units (°F/°C) & Refresh -->
+        <!-- Sky Mood Preview, Live Audio, Units (°F/°C) & Refresh -->
         <div class="header-controls">
+          <button id="sky-audio-btn" class="icon-btn" type="button" title="Toggle procedural ambient weather soundscape">🔊 Sky Audio</button>
           <select id="sky-mood-select" class="sky-select" aria-label="Atmosphere Sky Mode">
             <option value="auto">Sky: Auto Live</option>
             <option value="day">Sky: Clear Day</option>
@@ -80,6 +81,7 @@
       <div class="subnav-bar">
         <div id="preset-city-chips" class="city-chips" aria-label="Saved Cities"></div>
         <nav class="weather-jump-nav" aria-label="Jump to section">
+          <a class="jump-pill" href="#globe-panel">🌍 3D Cloud Globe</a>
           <a class="jump-pill" href="#daily-panel">7-Day</a>
           <a class="jump-pill" href="#main-hourly-trend">48h Graph</a>
           <a class="jump-pill" href="#skin-exposure">Shade &amp; Pets</a>
@@ -107,38 +109,40 @@
     <!-- Forecast Window Banners (Rain windows, Sunny windows, Golden Outdoor windows) -->
     <div id="forecast-window-banners" class="window-banners-grid"></div>
 
-    <!-- Above-the-Fold Hero + Remainder of Today + Nourie Weather Take -->
-    <section class="hero-bento" aria-label="Current Conditions and Executive Briefing">
-      <!-- Left Hero Card -->
-      <article class="glass hero-card">
-        <div>
-          <div class="hero-top-meta">
-            <span id="hero-date" class="hero-date-badge">Wednesday, Nov 18</span>
-            <span id="hero-wfo" class="wfo-pill">NWS WFO MTR · Multi-Model Blend V2</span>
-          </div>
-          <h1 id="city-name" class="hero-city">San Francisco, CA</h1>
-
-          <div class="hero-main-row">
-            <div id="hero-scene"></div>
-            <div id="temperature" class="hero-temp" title="Click to jump to 48-hour temperature curve">57°</div>
-            <div class="hero-cond-stack">
-              <div id="hero-condition" class="hero-condition">Rain Showers</div>
-              <div id="hero-hilo" class="hero-hi-lo">High 57° · Low 52° · Confidence High</div>
-              <div id="hero-uv" style="font-size:12.5px;color:var(--gold);font-weight:600;">Peak UV today 1.8 · Low</div>
+    <!-- Above-the-Fold Hero + Live 3D Moving Cloud Globe Command Deck -->
+    <section class="hero-bento" aria-label="Current Conditions and Live 3D Cloud Globe">
+      <!-- Left Column: Hero Telemetry + Remainder of Today + Nourie Weather Take -->
+      <div class="hero-left-column">
+        <article class="glass hero-card">
+          <div>
+            <div class="hero-top-meta">
+              <span id="hero-date" class="hero-date-badge">Wednesday, Nov 18</span>
+              <span id="hero-wfo" class="wfo-pill">NWS WFO MTR · Multi-Model Blend V2</span>
             </div>
+            <h1 id="city-name" class="hero-city">San Francisco, CA</h1>
+
+            <div class="hero-main-row">
+              <div id="hero-scene"></div>
+              <div id="temperature" class="hero-temp" title="Click to jump to 48-hour temperature curve">57°</div>
+              <div class="hero-cond-stack">
+                <div id="hero-condition" class="hero-condition">Rain Showers</div>
+                <div id="hero-hilo" class="hero-hi-lo">High 57° · Low 52° · Confidence High</div>
+                <div id="hero-uv" style="font-size:12.5px;color:var(--gold);font-weight:600;">Peak UV today 1.8 · Low</div>
+              </div>
+            </div>
+
+            <div id="hero-telemetry-chips" class="hero-feels-strip"></div>
+
+            <!-- Celestial Sun Arc & Daylight Progress -->
+            <div id="hero-celestial-strip" class="celestial-strip"></div>
           </div>
 
-          <div id="hero-telemetry-chips" class="hero-feels-strip"></div>
-        </div>
+          <div class="hero-obs-footer">
+            <span id="observation-label">Blended from NOAA NWS, HRRR 3km, NBM v4.2, ECMWF IFS 0.25° &amp; WeatherNext AI</span>
+            <span id="radar-proximity-pill" style="color:var(--mint);font-weight:700;">● Radar 5/12/36 mi Scanned</span>
+          </div>
+        </article>
 
-        <div class="hero-obs-footer">
-          <span id="observation-label">Blended from NOAA NWS, HRRR 3km, NBM v4.2, ECMWF IFS 0.25° &amp; WeatherNext AI</span>
-          <span id="radar-proximity-pill" style="color:var(--mint);font-weight:700;">● Radar 5/12/36 mi Scanned</span>
-        </div>
-      </article>
-
-      <!-- Right Stack: Remainder of Today + Nourie Weather Take -->
-      <div class="hero-right-stack">
         <article class="glass today-remainder-card">
           <div class="card-kicker-row">
             <span class="section-kicker">Remainder of Today &amp; Tonight</span>
@@ -157,6 +161,53 @@
           <ul id="take-bullets" class="take-bullets"></ul>
         </article>
       </div>
+
+      <!-- Right Column: Live 3D Moving Cloud Cover & Atmospheric Earth Globe -->
+      <article id="globe-panel" class="glass globe-command-card">
+        <div class="globe-header-row">
+          <div>
+            <span class="section-kicker">Planetary Atmospheric Telemetry · Live 3D</span>
+            <h2 class="section-title" style="font-size:21px;">Live 3D Cloud Cover &amp; Jet Stream Globe</h2>
+            <p class="section-subtitle">Drag to rotate · Scroll to zoom · Click anywhere on Earth to teleport &amp; forecast.</p>
+          </div>
+          <div style="display:flex;gap:6px;">
+            <button id="globe-spin-btn" class="mode-pill active" type="button" title="Toggle 3D Earth auto-rotation">⟳ Auto-Orbit</button>
+            <button id="globe-center-btn" class="mode-pill" type="button" title="Center globe on active city">⌖ Center</button>
+          </div>
+        </div>
+
+        <!-- 3D Globe Canvas Stage -->
+        <div class="globe-stage-wrap">
+          <canvas id="cloud-globe-canvas" aria-label="Interactive 3D Earth globe showing live cloud cover, jet stream winds, and day/night solar terminator"></canvas>
+          <div class="globe-hud-overlay-top">
+            <span id="globe-cloud-hud" class="globe-hud-pill">☁️ Local Cloud Deck: 65%</span>
+            <span id="globe-wind-hud" class="globe-hud-pill">💨 Jet / Surface Flow: WSW 10 mph</span>
+          </div>
+          <div class="globe-hint-tag">Click any point on Earth to forecast</div>
+          <div class="globe-zoom-dock">
+            <button id="globe-zoom-in" class="globe-mini-btn" type="button" title="Zoom in">＋</button>
+            <button id="globe-zoom-out" class="globe-mini-btn" type="button" title="Zoom out">－</button>
+          </div>
+        </div>
+
+        <!-- 5 Interactive 3D Globe Layer Toggles -->
+        <div>
+          <div class="globe-layer-pills">
+            <button class="mode-pill active" data-globe-layer="clouds" type="button">☁️ Live Clouds</button>
+            <button class="mode-pill active" data-globe-layer="wind" type="button">💨 Wind Streams</button>
+            <button class="mode-pill active" data-globe-layer="precip" type="button">🌧️ Precip &amp; Storms</button>
+            <button class="mode-pill active" data-globe-layer="terminator" type="button">🌗 Day / Night</button>
+            <button class="mode-pill" data-globe-layer="thermal" type="button">🌡️ Thermal Field</button>
+          </div>
+
+          <!-- 48-Hour 3D Globe Time-Machine Scrubber -->
+          <div class="globe-scrubber-row">
+            <span class="section-kicker" style="white-space:nowrap;">48h Time Machine</span>
+            <input id="globe-time-slider" type="range" min="0" max="47" value="0" aria-label="Scrub 3D globe cloud cover forward 48 hours" />
+            <span id="globe-time-label" class="wfo-pill" style="white-space:nowrap;">Now (Live)</span>
+          </div>
+        </div>
+      </article>
     </section>
 
     <!-- 7-Day / 10-Day Forecast with Confidence Meters -->

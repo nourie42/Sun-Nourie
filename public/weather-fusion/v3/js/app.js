@@ -26,6 +26,7 @@ import {
   MAP_LAYERS,
   WeatherMapController
 } from './map.js';
+import { LiveCloudGlobe } from './globe.js';
 
 const state = {
   location: PRESET_CITIES[0],
@@ -42,6 +43,10 @@ const state = {
   dewPointRangeHours: 48,
   selectedDewPointIdx: 0,
   mapController: null,
+  globeController: null,
+  skyAudioActive: false,
+  audioCtx: null,
+  audioGainNode: null,
   skyMood: 'day'
 };
 
@@ -57,6 +62,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initHeaderControls();
   initPresetCityChips();
   initModalSystem();
+  initGlobeSection();
   initMapSection();
 
   // 1. Instant zero-latency initial render with synthetic seed
@@ -113,7 +119,11 @@ function renderAll() {
   renderDewPointFeelMeter(f);
   renderAqiAndGlanceTiles(f);
   renderScientificFeedsAndAfd(f);
+  updateGlobeHUD(f, state.selectedHourIdx);
 
+  if (state.globeController) {
+    state.globeController.init(f);
+  }
   if (state.mapController) {
     state.mapController.init(f);
   }
@@ -257,6 +267,21 @@ function renderHeroAndBriefing(f) {
     `;
   }
 
+  const celestialEl = document.getElementById('hero-celestial-strip');
+  if (celestialEl) {
+    const hrNow = cur.dateObj.getHours() + cur.dateObj.getMinutes() / 60;
+    const sunPct = clamp(((hrNow - 6.75) / 10.5) * 100, 0, 100);
+    celestialEl.innerHTML = `
+      <span style="font-size:12px;color:var(--gold);font-weight:700;">🌅 ${today.sunrise}</span>
+      <div class="sun-arc-bar" title="Solar Daylight Arc">
+        <div class="sun-arc-fill" style="width:${sunPct.toFixed(0)}%;"></div>
+        <span class="sun-arc-dot" style="left:${sunPct.toFixed(0)}%;"></span>
+      </div>
+      <span style="font-size:12px;color:var(--blue);font-weight:700;">🌇 ${today.sunset}</span>
+      <span style="font-size:11.5px;color:var(--muted);">Solar Flux: <strong>${cur.shortwaveWm2} W/m²</strong> · Cloud Deck: <strong>${cur.cloudCover}%</strong></span>
+    `;
+  }
+
   if (radarPillEl) {
     if (cur.rainChance >= 55 || cur.precipIn >= 0.01) {
       radarPillEl.style.color = '#7ac6ff';
@@ -322,10 +347,16 @@ function renderSevenDayForecast(f) {
   const container = document.getElementById('experimental-week');
   if (!container) return;
 
-  container.innerHTML = f.days
-    .slice(0, 7)
+  const days7 = f.days.slice(0, 7);
+  const weekMin = Math.min(...days7.map((d) => d.lowF));
+  const weekMax = Math.max(...days7.map((d) => d.highF));
+  const weekSpan = Math.max(4, weekMax - weekMin);
+
+  container.innerHTML = days7
     .map((d, idx) => {
       const isActive = idx === state.selectedDayIdx;
+      const leftPct = clamp(((d.lowF - weekMin) / weekSpan) * 100, 0, 88);
+      const widthPct = clamp(((d.highF - d.lowF) / weekSpan) * 100, 12, 100 - leftPct);
       return `
         <article class="day-card ${isActive ? 'active' : ''}" data-day-idx="${idx}" role="button" tabindex="0">
           <div class="day-card-title">${d.shortWeekday}</div>
@@ -334,6 +365,9 @@ function renderSevenDayForecast(f) {
           <div class="day-card-temps">
             <span class="day-hi">${fmtTemp(d.highF)}</span>
             <span class="day-lo">${fmtTemp(d.lowF)}</span>
+          </div>
+          <div class="day-temp-range-track" title="Daily temperature range vs 7-day span">
+            <div class="day-temp-range-fill" style="left:${leftPct.toFixed(1)}%;width:${widthPct.toFixed(1)}%;"></div>
           </div>
           <div class="day-metrics-list">
             <span style="color:${d.rainChance >= 45 ? '#7ac6ff' : 'var(--muted)'};font-weight:700;">💧 ${d.rainChance}% · ${d.totalQpfIn} in</span>
@@ -422,6 +456,7 @@ function renderHourlyExplorerSection(f) {
         tile.classList.toggle('active', tIdx === state.selectedHourIdx);
       });
     }
+    updateGlobeHUD(f, state.selectedHourIdx);
   }
 
   // Render 48-hour strip cards
@@ -1321,6 +1356,155 @@ function updatePresetChipSelection() {
   document.querySelectorAll('.city-chip').forEach((chip) => {
     chip.classList.toggle('active', chip.dataset.cityId === state.location.id);
   });
+}
+
+function initGlobeSection() {
+  state.globeController = new LiveCloudGlobe({
+    canvasId: 'cloud-globe-canvas',
+    onSelectLocation: (loc) => {
+      loadLocationForecast(loc);
+    }
+  });
+
+  const spinBtn = document.getElementById('globe-spin-btn');
+  const centerBtn = document.getElementById('globe-center-btn');
+  const zoomInBtn = document.getElementById('globe-zoom-in');
+  const zoomOutBtn = document.getElementById('globe-zoom-out');
+  const timeSlider = document.getElementById('globe-time-slider');
+  const audioBtn = document.getElementById('sky-audio-btn');
+
+  spinBtn?.addEventListener('click', () => {
+    const active = state.globeController.setAutoSpin(!state.globeController.autoSpin);
+    spinBtn.classList.toggle('active', active);
+  });
+
+  centerBtn?.addEventListener('click', () => {
+    if (state.forecast?.location) {
+      state.globeController.flyTo(
+        state.forecast.location.latitude,
+        state.forecast.location.longitude
+      );
+    }
+  });
+
+  zoomInBtn?.addEventListener('click', () => {
+    state.globeController.zoom = clamp(state.globeController.zoom + 0.16, 0.78, 2.35);
+  });
+
+  zoomOutBtn?.addEventListener('click', () => {
+    state.globeController.zoom = clamp(state.globeController.zoom - 0.16, 0.78, 2.35);
+  });
+
+  document.querySelectorAll('[data-globe-layer]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const key = btn.dataset.globeLayer;
+      const isOn = state.globeController.toggleLayer(key);
+      btn.classList.toggle('active', isOn);
+    });
+  });
+
+  timeSlider?.addEventListener('input', () => {
+    const idx = Number(timeSlider.value) || 0;
+    state.globeController.setHourOffset(idx);
+    if (state.forecast) {
+      updateGlobeHUD(state.forecast, idx);
+    }
+  });
+
+  audioBtn?.addEventListener('click', () => {
+    toggleProceduralSkyAudio(audioBtn);
+  });
+}
+
+function updateGlobeHUD(f, hourIdx = 0) {
+  const h = f.hours48?.[clamp(hourIdx, 0, f.hours48.length - 1)] || f.current;
+  if (!h) return;
+
+  const cloudHud = document.getElementById('globe-cloud-hud');
+  const windHud = document.getElementById('globe-wind-hud');
+  const timeLbl = document.getElementById('globe-time-label');
+  const timeSlider = document.getElementById('globe-time-slider');
+
+  if (cloudHud) {
+    cloudHud.textContent = `☁️ Cloud Deck: ${h.cloudCover}% · Rain ${h.rainChance}%`;
+  }
+  if (windHud) {
+    windHud.textContent = `💨 Flow: ${h.windCardinal} ${h.windMph} mph (Gusts ${h.windGustMph})`;
+  }
+  if (timeLbl) {
+    timeLbl.textContent =
+      hourIdx === 0
+        ? 'Now (Live)'
+        : `+${hourIdx}h · ${h.dateObj.toLocaleDateString('en-US', { weekday: 'short' })} ${h.hourLabel}`;
+  }
+  if (timeSlider && Number(timeSlider.value) !== hourIdx) {
+    timeSlider.value = hourIdx;
+  }
+  if (state.globeController) {
+    state.globeController.setHourOffset(hourIdx);
+  }
+}
+
+function toggleProceduralSkyAudio(btnEl) {
+  if (state.skyAudioActive) {
+    state.skyAudioActive = false;
+    btnEl?.classList.remove('audio-btn-active');
+    if (btnEl) btnEl.textContent = '🔊 Sky Audio';
+    try {
+      state.audioCtx?.close();
+    } catch {}
+    state.audioCtx = null;
+    return;
+  }
+
+  try {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    const ctx = new AudioCtx();
+    const bufferSize = ctx.sampleRate * 3;
+    const noiseBuffer = ctx.createBuffer(2, bufferSize, ctx.sampleRate);
+
+    for (let ch = 0; ch < 2; ch++) {
+      const out = noiseBuffer.getChannelData(ch);
+      let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0;
+      for (let i = 0; i < bufferSize; i++) {
+        const white = Math.random() * 2 - 1;
+        b0 = 0.99886 * b0 + white * 0.0555179;
+        b1 = 0.99332 * b1 + white * 0.0750759;
+        b2 = 0.96900 * b2 + white * 0.1538520;
+        b3 = 0.86650 * b3 + white * 0.3104856;
+        b4 = 0.55000 * b4 + white * 0.5329522;
+        b5 = -0.7616 * b5 - white * 0.0168980;
+        out[i] = (b0 + b1 + b2 + b3 + b4 + b5 + b6 + white * 0.5362) * 0.032;
+        b6 = white * 0.115926;
+      }
+    }
+
+    const whiteNoise = ctx.createBufferSource();
+    whiteNoise.buffer = noiseBuffer;
+    whiteNoise.loop = true;
+
+    const filter = ctx.createBiquadFilter();
+    const isRain = state.skyMood === 'rain' || state.skyMood === 'storm';
+    filter.type = isRain ? 'bandpass' : 'lowpass';
+    filter.frequency.value = isRain ? 920 : 380;
+    filter.Q.value = isRain ? 0.7 : 0.5;
+
+    const gain = ctx.createGain();
+    gain.gain.value = 0.25;
+
+    whiteNoise.connect(filter);
+    filter.connect(gain);
+    gain.connect(ctx.destination);
+    whiteNoise.start(0);
+
+    state.audioCtx = ctx;
+    state.audioGainNode = gain;
+    state.skyAudioActive = true;
+    btnEl?.classList.add('audio-btn-active');
+    if (btnEl) btnEl.textContent = isRain ? '🌧️ Rain Audio On' : '🌬️ Breeze Audio On';
+  } catch {
+    state.skyAudioActive = false;
+  }
 }
 
 function initMapSection() {
