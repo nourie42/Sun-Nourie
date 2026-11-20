@@ -157,6 +157,7 @@ function render(data) {
   data=withLiveAlerts(data,alertSnapshot);
   data.rainTrend=updateRainTrend(data,Date.now());
   forecast = data;
+  if($('forecast'))delete $('forecast').dataset.awaitingPlace;
   const failedPanels = [];
   const draw = (id, label, renderer) => renderWeatherPanel(id, label, renderer, (error) => {
     failedPanels.push(label);
@@ -314,20 +315,6 @@ async function load({ moveMap = false, refreshModels = false, briefingRetry = 0 
   const slowNotice=setTimeout(()=>{if(id===generation&&busy)$('status').textContent='Weather sources are taking longer than usual. You can tap Refresh to retry.';},10000);
   $('status').textContent = 'Checking the latest source forecasts…';
   try {
-    if (!forecast && $('forecast') && !experimentalPage) {
-      try {
-        const summary=await api('forecast',query({view:'summary'}),requestController.signal);
-        if(id!==generation)return;
-        const freshness=currentReadingFreshness(summary);
-        $('city-name').textContent=summary.location.name || place.name;
-        $('temperature').textContent=freshness.expired?'—°':temperature(summary.current.temperature);
-        document.querySelector('.current-temp-label').textContent=currentSourceDisplay(summary).temperatureLabel;
-        const localTime=time=>new Intl.DateTimeFormat('en-US',{timeZone:summary.location.timeZone,hour:'numeric'}).format(new Date(time));
-        $('observation-label').textContent=summary.current.time ? 'Reading for '+localTime(summary.current.time) : 'Current reading unavailable';
-        $('hourly').textContent=summary.hours.map(h=>localTime(h.time)+' '+temperature(h.temperature)).join('  ·  ');
-        $('status').textContent='Loading forecast details…';
-      } catch { if(id!==generation)return; }
-    }
     const data = await api('forecast', query(), requestController.signal);
     if (id !== generation) return;
     receivedForecast = true;
@@ -378,7 +365,7 @@ function savedCity() {
 }
 function chooseLocation(value,{rememberDevice=false}={}) {
   if(!validPlace(value))return;
-  if($('forecast'))delete $('forecast').dataset.awaitingPlace;
+  if($('forecast'))$('forecast').dataset.awaitingPlace='';
   if($('night-summary'))$('night-summary').hidden=true;
   if (value.source?.startsWith('device')) savePreference(cityKey,'');
   else if(value.id) savePreference(cityKey,JSON.stringify(value));
