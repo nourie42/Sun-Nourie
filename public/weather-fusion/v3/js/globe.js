@@ -332,11 +332,13 @@ export class LiveCloudGlobe {
     });
     this.scene.add(new THREE.Points(starGeo, starMat));
 
-    const loader = new THREE.TextureLoader();
-    loader.setCrossOrigin('anonymous');
-
     const loadTex = (url, fallbackUrl = null, onReady = null) => {
-      const tex = loader.load(
+      const makeLoader = (targetUrl) => {
+        const l = new THREE.TextureLoader();
+        l.setCrossOrigin(/^https?:\/\//i.test(targetUrl) ? 'anonymous' : 'use-credentials');
+        return l;
+      };
+      const tex = makeLoader(url).load(
         url,
         (loaded) => {
           loaded.wrapS = THREE.RepeatWrapping;
@@ -346,7 +348,7 @@ export class LiveCloudGlobe {
         undefined,
         () => {
           if (fallbackUrl) {
-            loader.load(fallbackUrl, (fb) => {
+            makeLoader(fallbackUrl).load(fallbackUrl, (fb) => {
               fb.wrapS = THREE.RepeatWrapping;
               if (onReady) onReady(fb);
             });
