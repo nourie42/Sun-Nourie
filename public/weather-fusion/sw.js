@@ -1,4 +1,4 @@
-const CACHE_NAME = 'weather-nourie-render-v2';
+const CACHE_NAME = 'weather-nourie-render-v3';
 const STATIC_SHELL = [
   '/weather-fusion/',
   '/weather-fusion/manifest.webmanifest',
@@ -37,6 +37,8 @@ self.addEventListener('fetch', (event) => {
 
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
+  // Never intercept or cache live API forecast/alert endpoints.
+  if (url.pathname.startsWith('/api/')) return;
 
   // Network-first so forecasts, scripts, and buttons are always fresh.
   // Falls back to cache only when offline.

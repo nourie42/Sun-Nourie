@@ -1,12 +1,13 @@
-// Global multi-hour atmospheric grid service for the photorealistic 3D Earth Globe.
-// Combines real global Open-Meteo hourly fields (cloud cover, precipitation,
-// 10m wind u/v vectors, surface temperature) over a 14x30 lat/lon grid for 48 hours.
+// Lightweight global multi-hour atmospheric grid service for the 3D Earth Globe.
+// Uses a single compact 8x16 lat/lon Open-Meteo batch cached for 4 hours (with 429 backoff)
+// so it never competes with main-site Open-Meteo exposure/NBM quota.
 
-const GRID_LATS = [74, 64, 54, 45, 37, 29, 19, 8, -4, -16, -28, -40, -52, -66];
-const GRID_LONS = Array.from({ length: 30 }, (_, i) => -180 + i * 12); // -180 .. +168
+const GRID_LATS = [68, 52, 36, 18, 0, -18, -36, -56];
+const GRID_LONS = Array.from({ length: 16 }, (_, i) => -180 + i * 22.5); // -180 .. +157.5
 const FORECAST_HOURS = 48;
-const CACHE_TTL_MS = 30 * 60 * 1000;
-const STALE_FALLBACK_MS = 6 * 3600 * 1000;
+const CACHE_TTL_MS = 4 * 3600 * 1000;
+const STALE_FALLBACK_MS = 12 * 3600 * 1000;
+const RATE_LIMIT_BACKOFF_MS = 2 * 3600 * 1000;
 
 function toGridCoords() {
   const coords = [];
@@ -88,6 +89,7 @@ export function createGlobalGlobeService({ fetchImpl = fetch, now = Date.now } =
   let cached = null;
   let cachedAt = 0;
   let pending = null;
+  let rateLimitedUntil = 0;
 
   async function fetchBatch(coords) {
     const latsParam = coords.map((c) => c.lat).join(',');
@@ -97,6 +99,10 @@ export function createGlobalGlobeService({ fetchImpl = fetch, now = Date.now } =
       headers: { Accept: 'application/json', 'User-Agent': 'WeatherNourie/1.0' },
       signal: AbortSignal.timeout(12000),
     });
+    if (res.status === 429) {
+      rateLimitedUntil = now() + RATE_LIMIT_BACKOFF_MS;
+      throw new Error('Global Open-Meteo grid HTTP 429');
+    }
     if (!res.ok) throw new Error(`Global Open-Meteo grid HTTP ${res.status}`);
     const body = await res.json();
     return Array.isArray(body) ? body : [body];
@@ -104,17 +110,11 @@ export function createGlobalGlobeService({ fetchImpl = fetch, now = Date.now } =
 
   async function refresh() {
     const coords = toGridCoords();
-    const chunkSize = 140;
-    const chunks = [];
-    for (let i = 0; i < coords.length; i += chunkSize) {
-      chunks.push(coords.slice(i, i + chunkSize));
-    }
-    const results = await Promise.all(chunks.map(fetchBatch));
-    const flat = results.flat();
+    const flat = await fetchBatch(coords);
     const tsNow = now();
     const payload = buildGlobalGridPayload(flat, new Date(tsNow).toISOString(), tsNow);
     cached = payload;
-    cachedAt = now();
+    cachedAt = tsNow;
     return payload;
   }
 
@@ -122,6 +122,10 @@ export function createGlobalGlobeService({ fetchImpl = fetch, now = Date.now } =
     const ts = now();
     if (cached && ts - cachedAt < CACHE_TTL_MS) {
       return cached;
+    }
+    if (ts < rateLimitedUntil) {
+      if (cached) return { ...cached, stale: true, staleReason: 'rate-limit backoff' };
+      throw new Error('Global weather feed cooling down after rate limit.');
     }
     if (pending) return pending;
     pending = refresh()

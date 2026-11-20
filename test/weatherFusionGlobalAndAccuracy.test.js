@@ -5,7 +5,7 @@ import { computeNourieHistoricalPoint, scoreModelAgainstTruth } from '../src/wea
 
 test('global grid builds 48 UTC frames and physically exact wind blowing vectors', () => {
   const hrs = Array.from({ length: 48 }, (_, i) => new Date(Date.UTC(2026, 10, 20, i, 0, 0)).toISOString().slice(0, 16));
-  const points = Array.from({ length: 14 * 30 }, (_, idx) => ({
+  const points = Array.from({ length: 8 * 16 }, (_, idx) => ({
     hourly: {
       time: hrs,
       cloud_cover: hrs.map(() => (idx === 0 ? 75 : 20)),
@@ -17,8 +17,8 @@ test('global grid builds 48 UTC frames and physically exact wind blowing vectors
     },
   }));
   const payload = buildGlobalGridPayload(points, '2026-11-20T00:00:00.000Z');
-  assert.equal(payload.nLat, 14);
-  assert.equal(payload.nLon, 30);
+  assert.equal(payload.nLat, 8);
+  assert.equal(payload.nLon, 16);
   assert.equal(payload.frames.length, 48);
   assert.equal(payload.frames[0].cloud[0], 75);
   assert.equal(payload.frames[0].cloud[1], 20);

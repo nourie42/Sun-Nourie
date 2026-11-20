@@ -5,7 +5,7 @@
 
 const H = 3600000;
 const DAY_MS = 86400000;
-const CACHE_TTL_MS = 20 * 60 * 1000;
+const CACHE_TTL_MS = 60 * 60 * 1000;
 
 export const ACCURACY_MODELS = [
   { id: 'nourie', name: 'Weather Nourie', subtitle: 'Consensus Blend (HRRR · NBM · ECMWF · Global)', color: '#ffffff', isNourie: true },
