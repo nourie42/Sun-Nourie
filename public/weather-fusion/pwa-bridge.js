@@ -7,6 +7,28 @@
     (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) ||
     window.navigator.standalone === true;
 
+  // Keep the installed standalone PWA app strictly on the main /weather-fusion/ site.
+  // If an installed app instance lands on experimental-weather.html, redirect automatically.
+  if (isInstalled && /\/weather-fusion\/experimental-weather\.html\/?$/i.test(window.location.pathname || '')) {
+    window.location.replace('/weather-fusion/');
+    return;
+  }
+
+  if (isInstalled) {
+    var keepBrandOnMain = function () {
+      var brand = document.querySelector('a.brand[href="/weather-fusion/experimental-weather.html"]');
+      if (brand) {
+        brand.setAttribute('href', '/weather-fusion/');
+        brand.setAttribute('aria-label', 'Weather Nourie home');
+      }
+    };
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', keepBrandOnMain);
+    } else {
+      keepBrandOnMain();
+    }
+  }
+
   var ua = (window.navigator.userAgent || '').toLowerCase();
   var isIOS = /iphone|ipad|ipod/.test(ua);
   var isSafariMac =

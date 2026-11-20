@@ -1,4 +1,4 @@
-const CACHE_NAME = 'weather-nourie-render-v1';
+const CACHE_NAME = 'weather-nourie-render-v2';
 const STATIC_SHELL = [
   '/weather-fusion/',
   '/weather-fusion/manifest.webmanifest',
@@ -7,7 +7,7 @@ const STATIC_SHELL = [
   '/weather-fusion/pwa-maskable-512x512.png',
   '/weather-fusion/apple-touch-icon.png',
   '/weather-fusion/pwa-bridge.css?v=1',
-  '/weather-fusion/pwa-bridge.js?v=1',
+  '/weather-fusion/pwa-bridge.js?v=2',
 ];
 
 self.addEventListener('install', (event) => {
