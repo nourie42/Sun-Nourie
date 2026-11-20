@@ -26,13 +26,14 @@ test('global grid builds 48 UTC frames and physically exact wind blowing vectors
   assert.ok(Math.abs(payload.frames[0].v[0]) < 0.1);
 });
 
-test('historical Weather Nourie blend and accuracy scorer compute honest MAE, bias, and hit rates', () => {
-  const blend24 = computeNourieHistoricalPoint({ hrrr: 60, nbm: 62, ecmwf: 58, gfs: 65 }, 24);
-  assert.ok(Math.abs(blend24 - (60 * 0.34 + 62 * 0.38 + 58 * 0.18 + 65 * 0.05) / 0.95) < 1e-6);
+test('historical Weather Nourie blend and multi-metric accuracy scorer compute honest MAE, bias, and overall score', () => {
+  const blend24 = computeNourieHistoricalPoint({ hrrr: 60, nbm: 62, ecmwf: 58, icon: 61, ukmo: 60, gem: 62, gfs: 65 }, 24);
+  const expected = 60 * 0.30 + 62 * 0.34 + 58 * 0.16 + 61 * 0.08 + 60 * 0.06 + 62 * 0.03 + 65 * 0.03;
+  assert.ok(Math.abs(blend24 - expected) < 1e-6);
 
   const stats = scoreModelAgainstTruth([
-    { pred: 71, obs: 70, predWind: 8, obsWind: 6, predPrecip: 0, obsPrecip: 0 },
-    { pred: 67, obs: 70, predWind: 10, obsWind: 10, predPrecip: 0.2, obsPrecip: 0.1 },
+    { pred: 71, obs: 70, predWind: 8, obsWind: 6, predPrecip: 0, obsPrecip: 0, predCloud: 40, obsCloud: 50, predHumidity: 60, obsHumidity: 65 },
+    { pred: 67, obs: 70, predWind: 10, obsWind: 10, predPrecip: 0.2, obsPrecip: 0.1, predCloud: 80, obsCloud: 90, predHumidity: 75, obsHumidity: 70 },
   ]);
   assert.equal(stats.maeF, 2);
   assert.equal(stats.biasF, -1);
@@ -40,4 +41,8 @@ test('historical Weather Nourie blend and accuracy scorer compute honest MAE, bi
   assert.equal(stats.within3F, 100);
   assert.equal(stats.windMaeMph, 1);
   assert.equal(stats.precipHitPct, 100);
+  assert.equal(stats.cloudMaePct, 10);
+  assert.equal(stats.humidityMaePct, 5);
+  assert.ok(stats.overallScore > 80 && stats.overallScore <= 100);
+  assert.ok(stats.scores.temp > 0 && stats.scores.rain > 0 && stats.scores.wind > 0 && stats.scores.cloud > 0);
 });

@@ -54,6 +54,20 @@ function smoothstep(edge0, edge1, x) {
   return t * t * (3 - 2 * t);
 }
 
+export function windUvToCompass(uKn, vKn) {
+  const spdKn = Math.hypot(uKn || 0, vKn || 0);
+  const mph = Math.round(spdKn * 1.15078);
+  // u > 0 blows East, v > 0 blows North -> blowing TOWARD angle (clockwise from North)
+  const towardDeg = ((Math.atan2(uKn || 0, vKn || 0) * RAD2DEG) + 360) % 360;
+  // Meteorological wind direction is where wind comes FROM
+  const fromDeg = (towardDeg + 180) % 360;
+  const dirs = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+  const arrows = ['↑', '↗', '→', '↘', '↓', '↙', '←', '↖']; // Arrow points direction wind is blowing TOWARD
+  const compass = dirs[Math.round(fromDeg / 45) % 8];
+  const arrow = arrows[Math.round(towardDeg / 45) % 8];
+  return { mph, fromDeg: Math.round(fromDeg), towardDeg: Math.round(towardDeg), compass, arrow };
+}
+
 function hash2D(ix, iy) {
   const n = Math.sin(ix * 127.1 + iy * 311.7) * 43758.5453123;
   return n - Math.floor(n);
@@ -710,22 +724,24 @@ export class LiveCloudGlobe {
           const cover = clamp(this.sampleGridScalar('cloud', hour, lat, lon) / 100, 0, 1);
 
           let alpha = 0;
-          if (cover > 0.04) {
+          if (cover > 0.05) {
             const fbm = noise[idx];
             const satVal = hasSat ? sat[idx] / 255 : fbm;
-            // Combine satellite structure at hour 0 with real meteorological cover envelope so
-            // clear places like cloudless coasts stay clear while cloudy fronts look swirled & vivid!
-            const micro = useSatBlend ? satVal * 0.58 + fbm * 0.42 : fbm;
-            const threshold = 1.0 - cover * 1.12;
-            const shaped = smoothstep(threshold - 0.18, threshold + 0.36, micro);
-            alpha = Math.min(1, shaped * (0.28 + cover * 0.78) * 255);
+            // Combine satellite IR structure at hour 0 with real meteorological cloud_cover envelope
+            // so overcast regions (e.g. 90%+) show dense realistic cloud shields while clear skies stay clear.
+            const micro = useSatBlend ? satVal * 0.55 + fbm * 0.45 : fbm;
+            const threshold = 1.0 - cover * 1.14;
+            const wispy = smoothstep(threshold - 0.20, threshold + 0.34, micro);
+            const overcastFloor = cover > 0.72 ? (cover - 0.72) * 2.1 : 0;
+            const density = clamp(Math.max(wispy * (0.32 + cover * 0.78), overcastFloor * (0.72 + fbm * 0.28)), 0, 0.96);
+            alpha = Math.round(density * 255);
           }
 
           const p4 = idx * 4;
           out[p4] = 248;
           out[p4 + 1] = 251;
           out[p4 + 2] = 255;
-          out[p4 + 3] = Math.round(alpha);
+          out[p4 + 3] = alpha;
         }
       }
     } else if (hasSat) {
@@ -943,14 +959,55 @@ export class LiveCloudGlobe {
       else if (spd >= 14) rgb = '94, 242, 200';
 
       ctx.strokeStyle = `rgba(${rgb}, ${alpha.toFixed(2)})`;
-      ctx.lineWidth = spd >= 24 ? 1.2 : 0.85;
+      ctx.lineWidth = spd >= 24 ? 1.35 : 0.95;
       ctx.beginPath();
       ctx.moveTo(x0, y0);
       ctx.quadraticCurveTo(xMid, yMid, x1, y1);
       ctx.stroke();
+
+      // Subtle brighter leading head dot shows true flow direction along each stream
+      if (spd >= 9 && p.age % 3 === 0) {
+        ctx.fillStyle = `rgba(255, 255, 255, ${(alpha * 0.72).toFixed(2)})`;
+        ctx.beginPath();
+        ctx.arc(x1, y1, spd >= 24 ? 1.15 : 0.85, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    // Draw subtle directional wind chevrons on a coarse global grid so wind direction is immediately readable
+    if (this.globalGrid?.frames?.length) {
+      ctx.lineWidth = 1.1;
+      for (let lat = -60; lat <= 64; lat += 16) {
+        for (let lon = -168; lon <= 168; lon += 24) {
+          const [uKn, vKn] = this.sampleWindUv(this.hourOffset, lat, lon);
+          const spd = Math.hypot(uKn, vKn);
+          if (spd < 7) continue;
+          const cx = ((lon + 180) / 360) * w;
+          const cy = ((90 - lat) / 180) * h;
+          const ang = Math.atan2(-vKn, uKn); // canvas Y increases downward
+          const sz = spd >= 24 ? 5.2 : 3.8;
+          ctx.strokeStyle = spd >= 26 ? 'rgba(253, 224, 118, 0.55)' : 'rgba(125, 226, 255, 0.42)';
+          ctx.beginPath();
+          ctx.moveTo(cx - Math.cos(ang - 0.55) * sz, cy - Math.sin(ang - 0.55) * sz);
+          ctx.lineTo(cx, cy);
+          ctx.lineTo(cx - Math.cos(ang + 0.55) * sz, cy - Math.sin(ang + 0.55) * sz);
+          ctx.stroke();
+        }
+      }
     }
 
     this.windTex.needsUpdate = true;
+  }
+
+  getLocalGridTelemetry(latDeg, lonDeg, hourIdx = this.hourOffset) {
+    const [uKn, vKn] = this.sampleWindUv(hourIdx, latDeg, lonDeg);
+    const wind = windUvToCompass(uKn, vKn);
+    return {
+      cloudPct: Math.round(this.sampleGridScalar('cloud', hourIdx, latDeg, lonDeg)),
+      tempF: Math.round(this.sampleGridScalar('temp', hourIdx, latDeg, lonDeg)),
+      precipMm: Number(this.sampleGridScalar('precip', hourIdx, latDeg, lonDeg).toFixed(2)),
+      ...wind,
+    };
   }
 
   updateActiveBeacon() {
@@ -1175,14 +1232,18 @@ export class LiveCloudGlobe {
         const x = (proj.x * 0.5 + 0.5) * rect.width;
         const y = (-proj.y * 0.5 + 0.5) * rect.height;
         const h = this.forecast.hours48?.[this.hourOffset] || this.forecast.hours?.[this.hourOffset] || this.forecast.current;
-        const temp = h?.tempF ?? h?.temperature;
-        const cloud = h?.cloudCover ?? h?.skyCover;
+        const gridTel = this.globalGrid?.frames?.length
+          ? this.getLocalGridTelemetry(this.forecast.location.latitude, this.forecast.location.longitude, this.hourOffset)
+          : null;
+        const temp = h?.tempF ?? h?.temperature ?? gridTel?.tempF;
+        const cloud = h?.cloudCover ?? h?.skyCover ?? gridTel?.cloudPct;
         const tempTxt = typeof temp === 'number' && Number.isFinite(temp) ? `${Math.round(temp)}°` : '--°';
         const cloudTxt = typeof cloud === 'number' && Number.isFinite(cloud) ? `${Math.round(cloud)}% Cloud` : 'Live';
+        const windTxt = gridTel ? ` · ${gridTel.mph} mph ${gridTel.compass} ${gridTel.arrow}` : '';
         const cityName = (this.forecast.location.name || 'Selected').split(',')[0];
         this.floatingLabelEl.hidden = false;
         this.floatingLabelEl.style.transform = `translate(${Math.round(x)}px, ${Math.round(y - 26)}px) translate(-50%, -50%)`;
-        this.floatingLabelEl.innerHTML = `<span class="beacon-dot"></span> ${cityName} · <strong>${tempTxt}</strong> · ${cloudTxt}`;
+        this.floatingLabelEl.innerHTML = `<span class="beacon-dot"></span> ${cityName} · <strong>${tempTxt}</strong> · ${cloudTxt}${windTxt}`;
       } else {
         this.floatingLabelEl.hidden = true;
       }

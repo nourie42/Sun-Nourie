@@ -1,10 +1,41 @@
-// Mounts the Historical Model Accuracy dashboard onto /weather-fusion/experimental-weather.html
-// Evaluates Weather Nourie vs NOAA HRRR, NOAA NBM, ECMWF IFS, DWD ICON, and NOAA GFS
-// over past days against real NWS ASOS/METAR observations and ERA5 archive truth.
+// Mounts the Multi-Metric Historical Model Accuracy dashboard onto /weather-fusion/experimental-weather.html
+// Evaluates Weather Nourie vs NOAA HRRR, NOAA NBM, ECMWF IFS, DWD ICON, UK Met Office,
+// Canadian GEM, and NOAA GFS across Temperature, Rain/Precip, Wind, Cloud Cover, and Humidity,
+// plus a transparent comparison & local check-in tracker for Apple Weather and Samsung Weather.
 
 const finite = (v) => typeof v === 'number' && Number.isFinite(v);
 const esc = (s) =>
   String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+const APP_LOG_KEY = 'weather-nourie-consumer-app-log-v1';
+
+const RANK_MODES = [
+  { id: 'overall', label: '🏆 Overall (All Metrics)' },
+  { id: 'temp', label: '🌡 Temperature' },
+  { id: 'rain', label: '🌧 Rain / Precip' },
+  { id: 'wind', label: '💨 Wind' },
+  { id: 'sky', label: '☁ Clouds & Humidity' },
+];
+
+function readAppLogs() {
+  try {
+    const raw = localStorage.getItem(APP_LOG_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveAppLogEntry(entry) {
+  const logs = readAppLogs().filter(
+    (x) => !(x.date === entry.date && x.locKey === entry.locKey)
+  );
+  logs.unshift(entry);
+  try {
+    localStorage.setItem(APP_LOG_KEY, JSON.stringify(logs.slice(0, 60)));
+  } catch {}
+}
 
 function catmullRomPath(pts) {
   const segs = [];
@@ -38,6 +69,48 @@ function catmullRomPath(pts) {
     .join(' ');
 }
 
+function sortRankingsByMode(rankings, mode) {
+  const copy = [...rankings];
+  if (mode === 'temp') {
+    copy.sort((a, b) => (a.maeF ?? 99) - (b.maeF ?? 99));
+  } else if (mode === 'rain') {
+    copy.sort((a, b) => (b.scores?.rain ?? -1) - (a.scores?.rain ?? -1) || (b.precipHitPct ?? -1) - (a.precipHitPct ?? -1));
+  } else if (mode === 'wind') {
+    copy.sort((a, b) => (a.windMaeMph ?? 99) - (b.windMaeMph ?? 99));
+  } else if (mode === 'sky') {
+    const skyScore = (r) => {
+      const vals = [r.scores?.cloud, r.scores?.humidity].filter(finite);
+      return vals.length ? vals.reduce((s, x) => s + x, 0) / vals.length : -1;
+    };
+    copy.sort((a, b) => skyScore(b) - skyScore(a));
+  } else {
+    copy.sort((a, b) => (b.overallScore ?? -1) - (a.overallScore ?? -1) || (a.maeF ?? 99) - (b.maeF ?? 99));
+  }
+  return copy.map((item, idx) => ({ ...item, activeRank: idx + 1 }));
+}
+
+function primaryMetricDisplay(r, mode) {
+  if (mode === 'temp') {
+    return { val: `${r.maeF.toFixed(2)}°F`, unit: 'Temp MAE', barPct: Math.max(8, Math.min(100, r.scores?.temp ?? 60)) };
+  }
+  if (mode === 'rain') {
+    const hit = finite(r.precipHitPct) ? `${r.precipHitPct.toFixed(0)}%` : '—';
+    return { val: hit, unit: 'Rain Hit', barPct: Math.max(8, Math.min(100, r.scores?.rain ?? 50)) };
+  }
+  if (mode === 'wind') {
+    const w = finite(r.windMaeMph) ? `${r.windMaeMph.toFixed(1)} mph` : '—';
+    return { val: w, unit: 'Wind MAE', barPct: Math.max(8, Math.min(100, r.scores?.wind ?? 50)) };
+  }
+  if (mode === 'sky') {
+    const c = finite(r.cloudMaePct) ? `±${Math.round(r.cloudMaePct)}%` : '—';
+    const avg = [r.scores?.cloud, r.scores?.humidity].filter(finite);
+    const pct = avg.length ? avg.reduce((s, x) => s + x, 0) / avg.length : 50;
+    return { val: c, unit: 'Cloud MAE', barPct: Math.max(8, Math.min(100, pct)) };
+  }
+  const sc = finite(r.overallScore) ? r.overallScore.toFixed(1) : String(r.accuracyScore ?? '—');
+  return { val: `${sc}`, unit: '/ 100 Overall', barPct: Math.max(8, Math.min(100, r.overallScore ?? 60)) };
+}
+
 export function mountExperimentalAccuracy() {
   if (typeof document === 'undefined') return;
   if (document.getElementById('experimental-accuracy-section')) return;
@@ -55,9 +128,9 @@ export function mountExperimentalAccuracy() {
   section.innerHTML = `
     <div class="exp-acc-head">
       <div>
-        <span class="exp-eyebrow">VERIFIED AGAINST OBSERVED WEATHER · REAL METAR &amp; ERA5 TRUTH</span>
+        <span class="exp-eyebrow">MULTI-METRIC VERIFICATION · TEMP · RAIN · WIND · CLOUDS · HUMIDITY</span>
         <h2 id="exp-acc-title">Past Model Accuracy · Who Was Most Accurate Here?</h2>
-        <p id="exp-acc-subtitle" class="exp-acc-sub">Evaluating Weather Nourie &amp; global weather models against observed hourly station readings…</p>
+        <p id="exp-acc-subtitle" class="exp-acc-sub">Evaluating Weather Nourie &amp; all global weather models against observed station &amp; ERA5 weather…</p>
       </div>
       <div class="exp-acc-filters">
         <div class="exp-seg-group" role="group" aria-label="Verification window">
@@ -73,7 +146,7 @@ export function mountExperimentalAccuracy() {
     </div>
 
     <div id="exp-acc-body" class="exp-acc-body">
-      <div class="exp-acc-loading">Computing past forecast error metrics vs real observations…</div>
+      <div class="exp-acc-loading">Scoring Weather Nourie against all 7 US &amp; global models across Temperature, Rain, Wind, Clouds, and Humidity…</div>
     </div>
   `;
 
@@ -90,6 +163,7 @@ export function mountExperimentalAccuracy() {
   };
   let curDays = 10;
   let curHorizon = 24;
+  let curRankMode = 'overall';
   let hiddenSeries = new Set();
   let lastData = null;
   let loadToken = 0;
@@ -135,16 +209,16 @@ export function mountExperimentalAccuracy() {
 
     const X = (i) => PL + (i / Math.max(1, pts.length - 1)) * (W - PL - PR);
     const Y = (v) => PT + (1 - (v - lo) / Math.max(1, hi - lo)) * (H - PT - PB);
-
-    // Draw peer models thinner underneath, Observed as dashed emerald reference, Weather Nourie heaviest on top!
     const drawOrder = [...visibleModels].sort((a, b) => (a.isNourie ? 1 : b.isNourie ? -1 : 0));
 
     const yTicks = [0, 0.25, 0.5, 0.75, 1]
       .map((f) => {
         const val = lo + f * (hi - lo);
         const y = Y(val).toFixed(1);
-        return `<line x1="${PL}" x2="${W - PR}" y1="${y}" y2="${y}" stroke="rgba(255,255,255,0.10)" stroke-dasharray="3,4"/>` +
-          `<text x="${PL - 6}" y="${Number(y) + 4}" text-anchor="end" font-size="11" fill="#b7cae4">${Math.round(val)}°</text>`;
+        return (
+          `<line x1="${PL}" x2="${W - PR}" y1="${y}" y2="${y}" stroke="rgba(255,255,255,0.10)" stroke-dasharray="3,4"/>` +
+          `<text x="${PL - 6}" y="${Number(y) + 4}" text-anchor="end" font-size="11" fill="#b7cae4">${Math.round(val)}°</text>`
+        );
       })
       .join('');
 
@@ -159,9 +233,11 @@ export function mountExperimentalAccuracy() {
 
     const obsPts = pts.map((r, i) => (finite(r.observed) ? { x: X(i), y: Y(r.observed) } : null));
     const obsPath = catmullRomPath(obsPts);
-    const obsArea = obsPts.filter(Boolean).length >= 2
-      ? `${obsPath} L${obsPts.filter(Boolean).at(-1).x.toFixed(1)},${(H - PB).toFixed(1)} L${obsPts.find(Boolean).x.toFixed(1)},${(H - PB).toFixed(1)} Z`
-      : '';
+    const obsValid = obsPts.filter(Boolean);
+    const obsArea =
+      obsValid.length >= 2
+        ? `${obsPath} L${obsValid.at(-1).x.toFixed(1)},${(H - PB).toFixed(1)} L${obsValid[0].x.toFixed(1)},${(H - PB).toFixed(1)} Z`
+        : '';
 
     const seriesSvg = drawOrder
       .map((m) => {
@@ -174,7 +250,7 @@ export function mountExperimentalAccuracy() {
             `<path data-acc-line="nourie" d="${d}" fill="none" stroke="#ffffff" stroke-width="4.4" stroke-linecap="round"/>`
           );
         }
-        return `<path data-acc-line="${esc(m.id)}" d="${d}" fill="none" stroke="${esc(m.color)}" stroke-width="1.65" opacity="0.72" stroke-linecap="round"/>`;
+        return `<path data-acc-line="${esc(m.id)}" d="${d}" fill="none" stroke="${esc(m.color)}" stroke-width="1.6" opacity="0.72" stroke-linecap="round"/>`;
       })
       .join('');
 
@@ -182,8 +258,10 @@ export function mountExperimentalAccuracy() {
       `<span class="exp-acc-chip is-fixed"><i style="background:#5ce0a0;height:3px"></i>Actual Observed</span>`,
       ...models.map((m) => {
         const off = hiddenSeries.has(m.id);
-        return `<button type="button" class="exp-acc-chip${m.isNourie ? ' is-nourie' : ''}${off ? ' is-off' : ''}" data-acc-toggle="${esc(m.id)}" aria-pressed="${!off}">` +
-          `<i style="background:${esc(m.color)};height:${m.isNourie ? '4.5px' : '2.5px'}"></i>${esc(m.name)}</button>`;
+        return (
+          `<button type="button" class="exp-acc-chip${m.isNourie ? ' is-nourie' : ''}${off ? ' is-off' : ''}" data-acc-toggle="${esc(m.id)}" aria-pressed="${!off}">` +
+          `<i style="background:${esc(m.color)};height:${m.isNourie ? '4.5px' : '2.5px'}"></i>${esc(m.name)}</button>`
+        );
       }),
     ].join('');
 
@@ -191,7 +269,7 @@ export function mountExperimentalAccuracy() {
       <div class="exp-acc-chart-head">
         <div>
           <h3>Observed Weather vs Past Model Forecasts (${data.horizonHours}h Lead)</h3>
-          <p class="exp-acc-chart-note"><strong>Weather Nourie</strong> renders with the heavier luminous curve against individual model runs. Tap or slide to inspect each hour.</p>
+          <p class="exp-acc-chart-note"><strong>Weather Nourie</strong> renders with the heavier luminous curve against all individual models. Tap or slide to inspect each hour.</p>
         </div>
         <div class="exp-acc-chips">${chipsHtml}</div>
       </div>
@@ -247,7 +325,8 @@ export function mountExperimentalAccuracy() {
           return `<div class="exp-tip-row${m.isNourie ? ' is-nourie' : ''}"><span><i style="background:${esc(m.color)}"></i>${esc(m.name)}</span><b>${row[m.id].toFixed(1)}° (${errTxt})</b></div>`;
         })
         .join('');
-      tip.innerHTML = `<div class="exp-tip-time">${esc(stamp)}</div>` +
+      tip.innerHTML =
+        `<div class="exp-tip-time">${esc(stamp)}</div>` +
         `<div class="exp-tip-row is-obs"><span><i style="background:#5ce0a0"></i>Actual Observed</span><b>${row.observed.toFixed(1)}°F</b></div>` +
         rows;
       tip.hidden = false;
@@ -264,37 +343,146 @@ export function mountExperimentalAccuracy() {
     });
   }
 
+  function renderConsumerAppsSection(data) {
+    const locKey = `${Number(curLoc.latitude).toFixed(2)},${Number(curLoc.longitude).toFixed(2)}`;
+    const todayIso = new Date().toISOString().slice(0, 10);
+    const fxTodayHigh = globalThis.__weatherNourieForecast?.days?.[0]?.high;
+    const logs = readAppLogs().filter((x) => x.locKey === locKey);
+    const todayEntry = logs.find((x) => x.date === todayIso);
+
+    // Match any previously logged Apple/Samsung highs against real observed highs from data.dailySeries
+    const obsByDate = new Map((data.dailySeries || []).map((d) => [d.date, d]));
+    const verifiedLogs = logs
+      .map((entry) => {
+        const day = obsByDate.get(entry.date);
+        if (!day || !finite(day.observedHighF)) return null;
+        return {
+          ...entry,
+          obsHigh: Math.round(day.observedHighF),
+          nourieHigh: day.models?.nourie?.highF != null ? Math.round(day.models.nourie.highF) : entry.nourieHigh,
+          appleErr: finite(entry.appleHigh) ? Math.abs(entry.appleHigh - day.observedHighF) : null,
+          samsungErr: finite(entry.samsungHigh) ? Math.abs(entry.samsungHigh - day.observedHighF) : null,
+          nourieErr:
+            day.models?.nourie?.highF != null
+              ? Math.abs(day.models.nourie.highF - day.observedHighF)
+              : finite(entry.nourieHigh)
+              ? Math.abs(entry.nourieHigh - day.observedHighF)
+              : null,
+        };
+      })
+      .filter(Boolean);
+
+    const avg = (arr) => (arr.length ? (arr.reduce((s, x) => s + x, 0) / arr.length).toFixed(1) : null);
+    const appleAvg = avg(verifiedLogs.map((x) => x.appleErr).filter(finite));
+    const samsungAvg = avg(verifiedLogs.map((x) => x.samsungErr).filter(finite));
+    const nourieAvg = avg(verifiedLogs.map((x) => x.nourieErr).filter(finite));
+
+    const benchmarks = data.consumerBenchmarks || [];
+
+    return `
+      <div class="exp-consumer-box">
+        <div class="exp-consumer-head">
+          <div>
+            <span class="exp-eyebrow">CONSUMER WEATHER APPS · HONEST COMPARISON</span>
+            <h3>Weather Nourie vs Apple Weather &amp; Samsung Weather</h3>
+            <p class="exp-acc-chart-note">Apple Weather (WeatherKit) and Samsung Weather (The Weather Channel / IBM) do not publish open historical forecast archives, so we cannot auto-pull their past runs without fabricating numbers. Here is how they compare structurally — plus a live local check-in so you can verify your own phone's Apple &amp; Samsung predictions against real station observations.</p>
+          </div>
+        </div>
+
+        <div class="exp-consumer-grid">
+          <article class="exp-consumer-card is-nourie">
+            <strong>Weather Nourie</strong>
+            <small>Open Multi-Model Blend V2</small>
+            <ul>
+              <li>Live blend of NWS + HRRR + NBM + ECMWF IFS + GEFS + WeatherNext 3</li>
+              <li>Full per-model chart &amp; verified 5-metric past accuracy score</li>
+              <li>Today's forecast high: <b>${finite(fxTodayHigh) ? `${Math.round(fxTodayHigh)}°F` : 'Live'}</b></li>
+              ${nourieAvg ? `<li>Your logged high error: <b>±${nourieAvg}°F</b> (${verifiedLogs.length}d)</li>` : ''}
+            </ul>
+          </article>
+          ${benchmarks
+            .map(
+              (b) => `
+            <article class="exp-consumer-card">
+              <strong>${esc(b.name)}</strong>
+              <small>${esc(b.provider)}</small>
+              <ul>
+                <li>${esc(b.dataSources)}</li>
+                <li>${esc(b.transparency)}</li>
+                <li>Automated archive: <b>Closed API</b></li>
+                ${
+                  b.id === 'apple_weather' && appleAvg
+                    ? `<li>Your logged high error: <b>±${appleAvg}°F</b> (${verifiedLogs.length}d)</li>`
+                    : b.id === 'samsung_weather' && samsungAvg
+                    ? `<li>Your logged high error: <b>±${samsungAvg}°F</b> (${verifiedLogs.length}d)</li>`
+                    : ''
+                }
+              </ul>
+            </article>`
+            )
+            .join('')}
+        </div>
+
+        <form id="exp-consumer-checkin" class="exp-consumer-form">
+          <div class="exp-consumer-form-title">Log today's high from your phone apps (${esc(todayIso)}) to track them against real observed highs:</div>
+          <div class="exp-consumer-inputs">
+            <label>
+              <span>Apple Weather High (°F)</span>
+              <input type="number" step="1" min="-60" max="140" id="exp-apple-high" placeholder="e.g. 68" value="${todayEntry?.appleHigh ?? ''}">
+            </label>
+            <label>
+              <span>Samsung Weather High (°F)</span>
+              <input type="number" step="1" min="-60" max="140" id="exp-samsung-high" placeholder="e.g. 69" value="${todayEntry?.samsungHigh ?? ''}">
+            </label>
+            <button type="submit" class="exp-pill-btn is-active">Save Today's Check-In</button>
+          </div>
+          <p id="exp-consumer-save-msg" class="exp-acc-chart-note" aria-live="polite"></p>
+        </form>
+      </div>
+    `;
+  }
+
   function renderData(data) {
     lastData = data;
-    const rankings = data.rankings || [];
-    if (!rankings.length) {
+    const rawRankings = data.rankings || [];
+    if (!rawRankings.length) {
       bodyEl.innerHTML = '<p class="muted">Verification history unavailable for these coordinates.</p>';
       return;
     }
 
+    const rankings = sortRankingsByMode(rawRankings, curRankMode);
     const winner = rankings[0];
     const nourie = rankings.find((r) => r.isNourie);
-    const maxMae = Math.max(0.5, ...rankings.map((r) => r.maeF || 0));
+    const winnerDisp = primaryMetricDisplay(winner, curRankMode);
+    const nourieDisp = nourie ? primaryMetricDisplay(nourie, curRankMode) : null;
     const tSum = data.truthSummary || {};
-    const truthText = tSum.nwsStationHours > 0
-      ? `${tSum.nwsStationHours}h NWS Station (${esc(tSum.stationId)}) + ${tSum.era5Hours}h ERA5 Reanalysis${tSum.analysisHours ? ` + ${tSum.analysisHours}h Analysis` : ''}`
-      : `${tSum.era5Hours || tSum.totalHours}h ERA5 Reanalysis`;
+    const truthText =
+      tSum.nwsStationHours > 0
+        ? `${tSum.nwsStationHours}h NWS Station (${esc(tSum.stationId)}) + ${tSum.era5Hours}h ERA5 Reanalysis`
+        : `${tSum.era5Hours || tSum.totalHours}h ERA5 Reanalysis`;
 
-    subEl.textContent = `${data.location.stationName ? `Nearest station ${data.location.stationName} · ` : ''}${data.windowDays}-day ${data.horizonHours}h-ahead verification (${tSum.totalHours} verified hours)`;
+    subEl.textContent = `${data.location.stationName ? `Nearest station ${data.location.stationName} · ` : ''}${data.windowDays}-day ${data.horizonHours}h-ahead verification across ${rankings.length} models (${tSum.totalHours} verified hours)`;
 
     bodyEl.innerHTML = `
+      <div class="exp-rank-tabs" role="tablist" aria-label="Rank models by weather metric">
+        ${RANK_MODES.map(
+          (m) =>
+            `<button type="button" role="tab" class="exp-layer-btn${curRankMode === m.id ? ' is-active' : ''}" data-rank-mode="${m.id}" aria-selected="${curRankMode === m.id}">${m.label}</button>`
+        ).join('')}
+      </div>
+
       <div class="exp-acc-banners">
         <div class="exp-acc-stat is-winner">
-          <small>#1 Most Accurate (${data.horizonHours}h Lead)</small>
+          <small>#1 Most Accurate (${esc(RANK_MODES.find((m) => m.id === curRankMode)?.label.replace(/^[^\s]+\s/, '') || 'Overall')})</small>
           <strong>${esc(winner.name)}</strong>
-          <span>${winner.maeF.toFixed(2)}°F avg error · ${winner.within2F.toFixed(0)}% within ±2°F</span>
+          <span>${winnerDisp.val} ${winnerDisp.unit} · ${winner.maeF.toFixed(2)}°F Temp MAE${finite(winner.precipHitPct) ? ` · ${winner.precipHitPct.toFixed(0)}% Rain Hit` : ''}</span>
         </div>
         ${
           nourie
             ? `<div class="exp-acc-stat is-nourie">
                 <small>Weather Nourie Standing</small>
-                <strong>Rank #${nourie.rank} of ${rankings.length}</strong>
-                <span>${nourie.maeF.toFixed(2)}°F MAE · ${nourie.within3F.toFixed(0)}% within ±3°F · ${nourie.biasF >= 0 ? '+' : ''}${nourie.biasF.toFixed(2)}° bias</span>
+                <strong>Rank #${nourie.activeRank} of ${rankings.length}</strong>
+                <span>${nourieDisp.val} ${nourieDisp.unit} · Temp ${nourie.maeF.toFixed(2)}°F · Wind ${finite(nourie.windMaeMph) ? `${nourie.windMaeMph.toFixed(1)} mph` : '—'}${finite(nourie.cloudMaePct) ? ` · Clouds ±${Math.round(nourie.cloudMaePct)}%` : ''}</span>
               </div>`
             : ''
         }
@@ -307,33 +495,36 @@ export function mountExperimentalAccuracy() {
 
       <div class="exp-acc-grid">
         <div class="exp-acc-table-wrap">
-          <h3>Leaderboard · Lower Average Error (MAE) Wins</h3>
+          <h3>Leaderboard · ${esc(data.scoringFormula || 'Multi-metric verification score')}</h3>
           <div class="exp-acc-rows">
             ${rankings
               .map((r) => {
-                const barPct = Math.max(8, Math.min(100, (r.maeF / maxMae) * 100));
-                const biasSign = r.biasF > 0.05 ? `+${r.biasF.toFixed(2)}° warm` : r.biasF < -0.05 ? `${r.biasF.toFixed(2)}° cool` : '0.0° neutral';
+                const disp = primaryMetricDisplay(r, curRankMode);
+                const biasSign =
+                  r.biasF > 0.05 ? `+${r.biasF.toFixed(2)}° warm` : r.biasF < -0.05 ? `${r.biasF.toFixed(2)}° cool` : '0.0° neutral';
                 return `
-                  <article class="exp-acc-row${r.isNourie ? ' is-nourie' : ''}${r.rank === 1 ? ' is-first' : ''}">
+                  <article class="exp-acc-row${r.isNourie ? ' is-nourie' : ''}${r.activeRank === 1 ? ' is-first' : ''}">
                     <div class="exp-acc-row-top">
-                      <span class="exp-acc-rank">#${r.rank}</span>
+                      <span class="exp-acc-rank">#${r.activeRank}</span>
                       <div class="exp-acc-name">
                         <strong><i style="background:${esc(r.color)}"></i>${esc(r.name)}</strong>
                         <small>${esc(r.subtitle)}</small>
                       </div>
                       <div class="exp-acc-mae">
-                        <b>${r.maeF.toFixed(2)}°F</b>
-                        <small>MAE</small>
+                        <b>${disp.val}</b>
+                        <small>${disp.unit}</small>
                       </div>
                     </div>
                     <div class="exp-acc-bar-track">
-                      <span class="exp-acc-bar-fill" style="width:${barPct.toFixed(1)}%;background:${r.isNourie ? 'linear-gradient(90deg,#ffffff,#7fd4ff)' : esc(r.color)}"></span>
+                      <span class="exp-acc-bar-fill" style="width:${disp.barPct.toFixed(1)}%;background:${r.isNourie ? 'linear-gradient(90deg,#ffffff,#7fd4ff)' : esc(r.color)}"></span>
                     </div>
                     <div class="exp-acc-metrics">
-                      <span>Within ±2°F: <b>${r.within2F.toFixed(0)}%</b></span>
+                      <span>Temp: <b>${r.maeF.toFixed(2)}°F</b> (${r.within2F.toFixed(0)}% ±2°)</span>
+                      ${finite(r.precipHitPct) ? `<span>Rain: <b>${r.precipHitPct.toFixed(0)}% hit</b></span>` : ''}
+                      ${finite(r.windMaeMph) ? `<span>Wind: <b>±${r.windMaeMph.toFixed(1)} mph</b></span>` : ''}
+                      ${finite(r.cloudMaePct) ? `<span>Clouds: <b>±${Math.round(r.cloudMaePct)}%</b></span>` : ''}
+                      ${finite(r.humidityMaePct) ? `<span>RH: <b>±${Math.round(r.humidityMaePct)}%</b></span>` : ''}
                       <span>Bias: <b>${biasSign}</b></span>
-                      ${finite(r.windMaeMph) ? `<span>Wind err: <b>${r.windMaeMph.toFixed(1)} mph</b></span>` : ''}
-                      <span>${r.sampleHours} hrs</span>
                     </div>
                   </article>
                 `;
@@ -345,6 +536,8 @@ export function mountExperimentalAccuracy() {
 
       <div id="exp-acc-timeline-box" class="exp-acc-timeline-box"></div>
 
+      ${renderConsumerAppsSection(data)}
+
       <div class="exp-acc-daily-strip">
         <h3>Recent Daily Verification (Observed High vs Predicted Highs)</h3>
         <div class="exp-acc-daily-scroll">
@@ -353,7 +546,7 @@ export function mountExperimentalAccuracy() {
               <tr>
                 <th>Date</th>
                 <th>Observed High</th>
-                ${rankings.slice(0, 5).map((r) => `<th class="${r.isNourie ? 'is-nourie-col' : ''}">${esc(r.name)}</th>`).join('')}
+                ${rankings.slice(0, 6).map((r) => `<th class="${r.isNourie ? 'is-nourie-col' : ''}">${esc(r.name)}</th>`).join('')}
               </tr>
             </thead>
             <tbody>
@@ -365,7 +558,7 @@ export function mountExperimentalAccuracy() {
                     <td><b>${esc(day.label)}</b></td>
                     <td class="is-obs-col">${finite(day.observedHighF) ? `${Math.round(day.observedHighF)}°` : '—'}</td>
                     ${rankings
-                      .slice(0, 5)
+                      .slice(0, 6)
                       .map((r) => {
                         const cell = day.models?.[r.id];
                         return `<td class="${r.isNourie ? 'is-nourie-col' : ''}">${cell ? `${Math.round(cell.highF)}° <small>(±${cell.maeF.toFixed(1)}°)</small>` : '—'}</td>`;
@@ -380,13 +573,45 @@ export function mountExperimentalAccuracy() {
       </div>
     `;
 
+    bodyEl.querySelectorAll('[data-rank-mode]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        curRankMode = btn.dataset.rankMode;
+        renderData(data);
+      });
+    });
+
+    const form = document.getElementById('exp-consumer-checkin');
+    if (form) {
+      form.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const aVal = document.getElementById('exp-apple-high')?.value;
+        const sVal = document.getElementById('exp-samsung-high')?.value;
+        const appleHigh = aVal !== '' && Number.isFinite(Number(aVal)) ? Number(aVal) : null;
+        const samsungHigh = sVal !== '' && Number.isFinite(Number(sVal)) ? Number(sVal) : null;
+        if (appleHigh == null && samsungHigh == null) return;
+        const locKey = `${Number(curLoc.latitude).toFixed(2)},${Number(curLoc.longitude).toFixed(2)}`;
+        saveAppLogEntry({
+          date: new Date().toISOString().slice(0, 10),
+          locKey,
+          locName: curLoc.name,
+          appleHigh,
+          samsungHigh,
+          nourieHigh: finite(globalThis.__weatherNourieForecast?.days?.[0]?.high)
+            ? Math.round(globalThis.__weatherNourieForecast.days[0].high)
+            : null,
+        });
+        const msg = document.getElementById('exp-consumer-save-msg');
+        if (msg) msg.textContent = 'Saved! Your local Apple & Samsung Weather highs will be scored automatically against real observed highs.';
+      });
+    }
+
     const chartContainer = document.getElementById('exp-acc-timeline-box');
     if (chartContainer) renderTimelineChart(chartContainer, data);
   }
 
   async function refreshAccuracy() {
     const token = ++loadToken;
-    bodyEl.innerHTML = `<div class="exp-acc-loading">Scoring past forecasts for ${esc(curLoc.name)} (${curDays} days, ${curHorizon}h lead)…</div>`;
+    bodyEl.innerHTML = `<div class="exp-acc-loading">Scoring Weather Nourie &amp; all global models for ${esc(curLoc.name)} (${curDays} days, ${curHorizon}h lead)…</div>`;
     try {
       const qs = new URLSearchParams({
         latitude: String(curLoc.latitude),
