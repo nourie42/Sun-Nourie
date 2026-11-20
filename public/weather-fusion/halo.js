@@ -403,7 +403,7 @@ function chartSVG(L, spec, def) {
     const stops = [0, 0.25, 0.5, 0.75, 1].map((f) => `<stop offset="${f}" stop-color="${tempColor(L.hi - f * (L.hi - L.lo))}"/>`).join('');
     defs += `<linearGradient id="${id}-line" gradientUnits="userSpaceOnUse" x1="0" y1="${top}" x2="0" y2="${bottom}">${stops}</linearGradient>`;
   }
-  defs += `<linearGradient id="${id}-area" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="${tempLike ? '#9ee2ff' : solid}" stop-opacity="${isExp ? '.42' : '.3'}"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>`;
+  defs += `<linearGradient id="${id}-area" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="${tempLike ? (isExp ? '#9ee2ff' : '#fff') : solid}" stop-opacity="${isExp ? '.42' : '.3'}"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>`;
   const nights = (spec.nights || []).map(([a, b]) => `<rect class="c-night" x="${L.x(a).toFixed(1)}" y="${top}" width="${(L.x(b) - L.x(a)).toFixed(1)}" height="${L.ih}"/>`).join('');
   const suffix = def.unit === '°' ? '°' : def.unit === '%' ? '%' : '';
   const grid = L.yTicks.map((tk) => `<line class="c-grid" x1="${L.pad.l}" x2="${L.W - L.pad.r}" y1="${tk.y.toFixed(1)}" y2="${tk.y.toFixed(1)}"/><text class="c-ylab" x="${L.W - L.pad.r + 7}" y="${(tk.y + 4).toFixed(1)}">${tk.v}${suffix}</text>`).join('');

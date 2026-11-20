@@ -45,8 +45,18 @@ function injectExperimentalNavShortcuts() {
   }
 }
 
+function ensureExperimentalStylesheet() {
+  if (document.getElementById('experimental-enhance-css')) return;
+  const link = document.createElement('link');
+  link.id = 'experimental-enhance-css';
+  link.rel = 'stylesheet';
+  link.href = '/weather-fusion/experimental-enhance.css?v=exp-globe-acc-v4';
+  document.head.appendChild(link);
+}
+
 async function bootExperimentalEnhancements() {
   if (!isExperimentalWeatherPage()) return;
+  ensureExperimentalStylesheet();
   injectExperimentalNavShortcuts();
   mountExperimentalGlobe();
   try {
