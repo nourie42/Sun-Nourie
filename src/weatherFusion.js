@@ -865,6 +865,11 @@ export function registerWeatherFusionRoutes(app, options = {}) {
     res.setHeader('Cache-Control', 'no-cache');
     res.sendFile(path.join(PUBLIC_DIR, name));
   });
+  app.get('/api/weather-fusion/summary', route(async query => {
+    const {location, current, assembledAt, hours}=await service.getForecast(query);
+    const start=Math.ceil(Date.now()/3600000)*3600000;
+    return {location,current,assembledAt,hours:hours.filter(h=>Date.parse(h.time)>=start).slice(0,6).map(({time,temperature})=>({time,temperature}))};
+  }));
   app.get('/api/weather-fusion/forecast', route(service.getForecast));
   app.get('/api/weather-fusion/alerts', route(service.getAlerts));
   app.get('/api/weather-fusion/briefing', route(service.getBriefing));

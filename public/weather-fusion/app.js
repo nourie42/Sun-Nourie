@@ -174,7 +174,16 @@ function render(data) {
   $('temperature').innerHTML = `${number(hero.temperature)}<span>°</span>`;
   const currentSource=currentSourceDisplay(data);
   document.querySelector('.current-temp-label').textContent=currentSource.temperatureLabel;
-  if($('hero-uv'))$('hero-uv').innerHTML=dailyUvHTML(data.days[0]?.uvMax,'Peak UV today');
+  const nextSunrise = data.metricForecasts?.solar?.map(d=>Date.parse(d.sunrise)).find(t=>t>Date.now());
+  const afterSunset = !day && Date.now()>=Date.parse(data.solar?.sunset);
+  const uvDay=afterSunset ? data.days[1] : d;
+  if($('hero-uv'))$('hero-uv').innerHTML=dailyUvHTML(uvDay?.uvMax,afterSunset?'Peak UV tomorrow':'Peak UV today');
+  const nightHours=data.hours.filter(h=>Date.parse(h.time)>=Math.floor(Date.now()/3600000)*3600000 && Date.parse(h.time)<nextSunrise);
+  const night=$('night-summary');
+  if(night) {
+    night.hidden=day || !nightHours.length || nightHours.some(h=>!finite(h.temperature)) || Date.parse(nightHours.at(-1).time)+3600000<nextSunrise;
+    if(!night.hidden) night.textContent=(afterSunset?'Tonight':'Before sunrise')+' · Low '+temperature(Math.min(...nightHours.map(h=>h.temperature)));
+  }
   $('condition').textContent = hero.tonight ? `Tonight · ${heroCondition}` : heroCondition;
   $('high-low').textContent = hero.tonight ? 'Overnight low' : hero.range;
   const radarLabel=radarObservationLabel(c);
@@ -305,6 +314,20 @@ async function load({ moveMap = false, refreshModels = false, briefingRetry = 0 
   const slowNotice=setTimeout(()=>{if(id===generation&&busy)$('status').textContent='Weather sources are taking longer than usual. You can tap Refresh to retry.';},10000);
   $('status').textContent = 'Checking the latest source forecasts…';
   try {
+    if (!forecast && $('forecast') && !experimentalPage) {
+      try {
+        const summary=await api('summary',query(),requestController.signal);
+        if(id!==generation)return;
+        const freshness=currentReadingFreshness(summary);
+        $('city-name').textContent=summary.location.name || place.name;
+        $('temperature').textContent=freshness.expired?'—°':temperature(summary.current.temperature);
+        document.querySelector('.current-temp-label').textContent=currentSourceDisplay(summary).temperatureLabel;
+        const localTime=time=>new Intl.DateTimeFormat('en-US',{timeZone:summary.location.timeZone,hour:'numeric'}).format(new Date(time));
+        $('observation-label').textContent=summary.current.time ? 'Reading for '+localTime(summary.current.time) : 'Current reading unavailable';
+        $('hourly').textContent=summary.hours.map(h=>localTime(h.time)+' '+temperature(h.temperature)).join('  ·  ');
+        $('status').textContent='Loading forecast details…';
+      } catch { if(id!==generation)return; }
+    }
     const data = await api('forecast', query(), requestController.signal);
     if (id !== generation) return;
     receivedForecast = true;
@@ -318,7 +341,7 @@ async function load({ moveMap = false, refreshModels = false, briefingRetry = 0 
     }).catch((error) => {
       if (id === generation && error.name !== 'AbortError' && forecast) renderBulletins(forecast, {mode:'official', signature:forecast.signature});
     });
-    if (!map) initMap();
+    if (mapRequested && !map && window.L) initMap();
     if (moveMap && map) map.setView([place.latitude, place.longitude], 8);
     if (selectedLayer !== 'radar' && (refreshModels || moveMap || Date.now()-modelFetched >= 55000)) void loadModelMap(refreshModels);
     if (Date.now() - lastRadarFetch > 2 * 60000) void loadRadar();
@@ -343,8 +366,24 @@ async function load({ moveMap = false, refreshModels = false, briefingRetry = 0 
     if (!receivedForecast&&!alertSnapshot) renderBulletins({location:place,alerts:[],feeds:[]});
   } finally { clearTimeout(slowNotice);if (id === generation) { busy = false; $('refresh').classList.remove('loading'); } }
 }
+const cityKey = 'weather-fusion-selected-city';
+function readPreference(key) {
+  try { return localStorage.getItem(key); } catch { return null; }
+}
+function savePreference(key,value) {
+  try { localStorage.setItem(key,value); } catch { /* Private browsing still works. */ }
+}
+function savedCity() {
+  try { const city=JSON.parse(readPreference(cityKey)); return validPlace(city)?city:null; } catch { return null; }
+}
 function chooseLocation(value,{rememberDevice=false}={}) {
   if(!validPlace(value))return;
+  if($('forecast'))delete $('forecast').dataset.awaitingPlace;
+  if($('night-summary'))$('night-summary').hidden=true;
+  if (value.source?.startsWith('device')) savePreference(cityKey,'');
+  else if(value.id) savePreference(cityKey,JSON.stringify(value));
+  document.dispatchEvent(new Event('weather-nourie:location-changing'));
+  globalThis.__weatherNourieForecast=null;
   ++locationRequest;
   place = { ...value };
   alertController?.abort();alertController=null;alertBusy=false;alertSnapshot=null;
@@ -458,7 +497,27 @@ function initMap() {
   });
   if (forecast) renderMapWarnings(forecast);
 }
-window.addEventListener('weather-map-library-ready',()=>{if(validPlace(place)){initMap();if(forecast)void loadRadar();}});
+let mapRequested=false;
+function requestMap() {
+  if (mapRequested) return;
+  mapRequested=true;
+  const css=$('map-style'), template=$('map-library');
+  if(!template) { if(validPlace(place)&&window.L)initMap(); return; }
+  css.rel='stylesheet'; css.href=css.dataset.href;
+  const script=document.createElement('script');
+  script.integrity=template.integrity; script.crossOrigin='anonymous';
+  script.onload=()=>{if(validPlace(place)){initMap(); if(frames.length)showFrame(frameIndex);}};
+  script.onerror=()=>{mapRequested=false;mapMessage('Map unavailable. Use Official radar or tap Radar to retry.');};
+  script.src=template.dataset.src; document.head.append(script);
+}
+document.querySelector('.jump-map')?.addEventListener('click',requestMap);
+if ('IntersectionObserver' in window) {
+  const observer=new IntersectionObserver(entries=>{
+    if(entries.some(e=>e.isIntersecting)){requestMap();observer.disconnect();}
+  },{rootMargin:'250px'});
+  observer.observe($('map-panel'));
+} else requestMap();
+window.addEventListener('weather-map-library-ready',()=>{if(validPlace(place)&&window.L)initMap();});
 function renderMapWarnings(data) {
   if (!warningLayer) return;
   warningLayer.clearLayers();
@@ -611,6 +670,11 @@ $('city-search').addEventListener('keydown', (e) => { if (e.key === 'Escape') { 
 document.addEventListener('click', (e) => { if (!e.target.closest('.search-wrap')) { $('search-results').hidden = true; $('city-search').setAttribute('aria-expanded', 'false'); } });
 let locationRequest=0;
 function startDeviceLocation({explicit=false}={}){
+ if (!explicit) {
+   const previous=savedCity();
+   if (previous) { chooseLocation(previous); return; }
+   if (!readDeviceLocation()) return;
+ }
  const request=++locationRequest;
  const cached=readDeviceLocation();
  const fallback=()=>{
@@ -642,6 +706,36 @@ window.addEventListener('pageshow', (event) => { if(event.persisted&&!document.h
 setInterval(()=>{if(validPlace(place)&&!document.hidden){if(forecast)renderAlerts(forecast);else if(alertSnapshot)renderBulletins(alertSnapshot);void refreshAlerts();}},ALERT_REFRESH_MS);
 // Missing model inputs retry sooner; healthy snapshots keep their normal cadence.
 setInterval(() => { if (validPlace(place)&&!document.hidden&&!busy&&forecastRefreshDue(forecast)) void load(); }, 60000);
+const more=$('more-tools'), nav=more?.closest('nav');
+more?.addEventListener('click',()=>more.setAttribute('aria-expanded',String(nav.classList.toggle('expanded'))));
+const pin=$('pin-tool');
+if(pin) {
+  const applyPin=()=>{
+    nav.querySelector('.pinned')?.classList.remove('pinned');
+    const target=$(pin.value) || (pin.value==='jump-air'?nav.querySelector('.jump-air'):null);
+    target?.classList.add('pinned');
+  };
+  pin.value=readPreference('weather-favorite') || '';
+  applyPin();
+  pin.addEventListener('change',()=>{savePreference('weather-favorite',pin.value);applyPin();});
+}
+for(const link of document.querySelectorAll('link[data-for]')){
+  $(link.dataset.for)?.addEventListener('click',()=>{link.rel='stylesheet';link.href=link.dataset.href;},{once:true,capture:true});
+}
+const compare=$('open-compare');
+if(compare && $('more-tools')) {
+  const openCompare=async()=>{
+    compare.disabled=true;
+    try {
+      await import('./wn-blend.js?v=1.1');
+      compare.removeEventListener('click',openCompare);
+      compare.disabled=false; compare.click();
+    } catch {
+      compare.disabled=false; $('status').textContent='Comparison could not load. Tap Compare to retry.';
+    }
+  };
+  compare.addEventListener('click',openCompare);
+}
 installExperience();
 startDeviceLocation();
 

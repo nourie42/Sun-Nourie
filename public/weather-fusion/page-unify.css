@@ -126,3 +126,17 @@ html body .weather-jump-nav>.weather-jump-card .jump-label{display:block;font-fa
 html body .weather-jump-nav>.weather-jump-card:focus-visible{outline:2px solid #b8dfff;outline-offset:3px}
 @media(max-width:800px){html body .weather-jump-nav{grid-template-columns:repeat(4,minmax(0,1fr))!important;max-width:320px}}
 @media(max-width:359px){html body .weather-jump-nav>.weather-jump-card{font-size:11px!important}}
+
+#forecast[data-awaiting-place] > :not(#status,footer) { display:none !important }
+html body main #weather-change-banner { border-color:rgba(160,199,222,.5)!important; box-shadow:none!important }
+#more-tools,.pin-tool { display:none!important }
+@media (max-width:800px) {
+  html body .weather-jump-nav { grid-template-columns:repeat(5,minmax(0,1fr))!important; max-width:100% }
+  html body .weather-jump-nav>.weather-jump-card { min-height:44px; }
+  html body .weather-jump-nav #more-tools { display:flex!important; order:5 }
+  .weather-jump-nav .jump-now { order:1 } .weather-jump-nav .jump-hourly { order:2 }
+  .weather-jump-nav .jump-week { order:3 } .weather-jump-nav .jump-map { order:4 }
+  .weather-jump-nav > :not(.jump-now,.jump-hourly,.jump-week,.jump-map,#more-tools) { order:6 }
+  html body .weather-jump-nav:not(.expanded) > :not(.jump-now,.jump-hourly,.jump-week,.jump-map,#more-tools,.pinned) { display:none!important }
+  .weather-jump-nav.expanded .pin-tool { display:block!important; grid-column:1/-1; text-align:center; padding:.5rem }
+}

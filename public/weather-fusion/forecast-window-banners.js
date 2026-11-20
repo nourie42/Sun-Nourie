@@ -78,8 +78,14 @@ export function renderForecastWindowBanners(data, now = Date.now()) {
   const root=document.getElementById('forecast-window-banners');
   if(!root)return;
   latest=data;currentView=buildForecastWindows(data,now);
-  const html=['perfect','rain'].map(kind=>forecastWindowBannerHTML(currentView,kind,now)).filter(Boolean).join('');
+  const kinds=['perfect','rain'].filter(kind=>currentView[kind]?.length);
+  kinds.sort((a,b)=>currentView[a][0].start-currentView[b][0].start);
+  const html=kinds.map(kind=>forecastWindowBannerHTML(currentView,kind,now)).join('');
   root.hidden=!html;root.innerHTML=html;
+  const heading=root.querySelector('strong'), first=currentView[kinds[0]]?.[0];
+  if(heading && first && first.start>now && !lastKnownSnapshot(currentView)) {
+    heading.textContent=kinds[0]==='rain'?'Next change · Rain or storms likely':'Next change · Comfortable outdoor weather';
+  }
   root.querySelectorAll('[data-forecast-window]').forEach(button=>button.addEventListener('click',()=>openWindow(button.dataset.forecastWindow)));
   if(selectedKind)openWindow(selectedKind,now);
   if(!refreshTimer)refreshTimer=setInterval(()=>{if(latest)renderForecastWindowBanners(latest);},60000);
