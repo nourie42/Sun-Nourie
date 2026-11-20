@@ -19,6 +19,7 @@ import { registerWeatherFusionRoutes } from "./src/weatherFusion.js";
 import { registerWeatherComparisonRoutes } from "./src/weatherComparison.js";
 import { registerPrivatePageAccess, privatePageCookieSecret } from "./src/privatePageAccess.js";
 import { registerWeatherSiteAccess, weatherSiteCookieSecret } from "./src/weatherSiteAccess.js";
+import { registerNourieEnterprisesAccess, nourieEnterprisesCookieSecret } from "./src/nourieEnterprisesAccess.js";
 import { registerWhatsUpRoutes } from "./src/whatsUpRoutes.js";
 import { registerAiAgentRoutes } from "./src/aiAgent.js";
 import { registerAiCouncilRoutes } from "./src/aiCouncil.js";
@@ -36,13 +37,14 @@ const legacyPort = Number(process.env.LEGACY_PORT || (publicPort === 65535 ? 655
 const app = express();
 registerPrivatePageAccess(app);
 registerWeatherSiteAccess(app);
+registerNourieEnterprisesAccess(app);
 
 let legacyReady = false;
 let shuttingDown = false;
 
 const legacy = spawn(process.execPath, [path.join(__dirname, "legacy-server.js")], {
   cwd: __dirname,
-  env: { ...process.env, PORT: String(legacyPort), WEATHER_SITE_COOKIE_SECRET: weatherSiteCookieSecret, NOURIE_PRIVATE_COOKIE_SECRET: privatePageCookieSecret },
+  env: { ...process.env, PORT: String(legacyPort), WEATHER_SITE_COOKIE_SECRET: weatherSiteCookieSecret, NOURIE_PRIVATE_COOKIE_SECRET: privatePageCookieSecret, NOURIE_ENTERPRISES_COOKIE_SECRET: nourieEnterprisesCookieSecret },
   stdio: ["ignore", "inherit", "inherit"],
 });
 
