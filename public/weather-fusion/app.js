@@ -316,7 +316,7 @@ async function load({ moveMap = false, refreshModels = false, briefingRetry = 0 
   try {
     if (!forecast && $('forecast') && !experimentalPage) {
       try {
-        const summary=await api('summary',query(),requestController.signal);
+        const summary=await api('forecast',query({view:'summary'}),requestController.signal);
         if(id!==generation)return;
         const freshness=currentReadingFreshness(summary);
         $('city-name').textContent=summary.location.name || place.name;
