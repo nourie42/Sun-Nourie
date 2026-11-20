@@ -1,30 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildGlobalGridPayload } from '../src/weatherFusionGlobalGlobe.js';
 import { computeNourieHistoricalPoint, scoreModelAgainstTruth } from '../src/weatherFusionAccuracy.js';
-
-test('global grid builds 48 UTC frames and physically exact wind blowing vectors', () => {
-  const hrs = Array.from({ length: 48 }, (_, i) => new Date(Date.UTC(2026, 10, 20, i, 0, 0)).toISOString().slice(0, 16));
-  const points = Array.from({ length: 8 * 16 }, (_, idx) => ({
-    hourly: {
-      time: hrs,
-      cloud_cover: hrs.map(() => (idx === 0 ? 75 : 20)),
-      precipitation: hrs.map(() => 0.4),
-      // 270 deg = wind blowing FROM West TO East (+u > 0, v ~ 0)
-      wind_speed_10m: hrs.map(() => 20),
-      wind_direction_10m: hrs.map(() => 270),
-      temperature_2m: hrs.map(() => 64),
-    },
-  }));
-  const payload = buildGlobalGridPayload(points, '2026-11-20T00:00:00.000Z');
-  assert.equal(payload.nLat, 8);
-  assert.equal(payload.nLon, 16);
-  assert.equal(payload.frames.length, 48);
-  assert.equal(payload.frames[0].cloud[0], 75);
-  assert.equal(payload.frames[0].cloud[1], 20);
-  assert.ok(payload.frames[0].u[0] > 19.5, 'westerly wind (270 deg) must advect eastward (+u)');
-  assert.ok(Math.abs(payload.frames[0].v[0]) < 0.1);
-});
 
 test('historical Weather Nourie blend and multi-metric accuracy scorer compute honest MAE, bias, and overall score', () => {
   const blend24 = computeNourieHistoricalPoint({ hrrr: 60, nbm: 62, ecmwf: 58, icon: 61, ukmo: 60, gem: 62, gfs: 65 }, 24);

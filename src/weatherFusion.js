@@ -24,7 +24,6 @@ import { solarTimes } from './weatherFusionDirect.js';
 import {forecastPeriodSummary} from '../public/weather-fusion/forecast-story.js';
 import {isTonightPeriod} from '../public/weather-fusion/weather-math.js';
 import {bannerStateFromNwsPeriods} from '../public/weather-fusion/alert-banners.js';
-import {createGlobalGlobeService} from './weatherFusionGlobalGlobe.js';
 import {createAccuracyService} from './weatherFusionAccuracy.js';
 /** Weather Fusion: isolated, dependency-free Express route registration.
  * Numeric forecasts stay deterministic. AI explains supplied facts; it cannot edit them.
@@ -759,7 +758,6 @@ export function createWeatherService({ fetchImpl = globalThis.fetch, env = proce
 
 export function registerWeatherFusionRoutes(app, options = {}) {
   const service = createWeatherService({env:{...process.env,WEATHER_NOURIE_BLEND_V2:process.env.WEATHER_NOURIE_BLEND_V2||'true'},...options});
-  const globalGlobe = createGlobalGlobeService({fetchImpl: options.fetchImpl || fetch, now: options.now || Date.now});
   const accuracy = createAccuracyService({fetchImpl: options.fetchImpl || fetch, now: options.now || Date.now});
   const getForecastRecorded = async (query) => {
     const forecast = await service.getForecast(query);
@@ -906,7 +904,7 @@ export function registerWeatherFusionRoutes(app, options = {}) {
     'today.html','today.css','today.js',
     'wn.html','wn.css','wn.js',
     'ultimate.html','ultimate.css','ultimate.js',
-    'experimental-sky.js','experimental-enhance.css','experimental-enhance.js','experimental-globe-mount.js','experimental-accuracy.js',
+    'experimental-sky.js','experimental-enhance.css','experimental-enhance.js','experimental-accuracy.js',
     'comfort-cinematic.css','comfort-effects.css','comfort-outlook.js','current-inputs.js','current-temperature.js',
     'daily-uv.js','dans-summary.js','dans-take.js','day-graph.js','dewpoint-meter.js','dewpoint-meter.css',
     'experience.js','exposure-scene.js','comfort-clothing.js','snow-outlook.js','winter-outlook.css','forecast-cards.css','forecast-confidence.js','forecast-layout.css','forecast-story.js','outlook-details.js',
@@ -933,7 +931,6 @@ export function registerWeatherFusionRoutes(app, options = {}) {
   app.get('/api/weather-fusion/radar', route(service.radar));
   app.get('/api/weather-fusion/models', route(service.modelMaps));
   app.get('/api/weather-fusion/winter-map', route(service.getWinterMap));
-  app.get('/api/weather-fusion/global-weather', route(() => globalGlobe.getGlobalWeather()));
   app.get('/api/weather-fusion/accuracy', route((q) => {
     const lat = Number.isFinite(Number(q.latitude ?? q.lat)) ? Number(q.latitude ?? q.lat) : 35.787;
     const lon = Number.isFinite(Number(q.longitude ?? q.lon)) ? Number(q.longitude ?? q.lon) : -78.4806;
