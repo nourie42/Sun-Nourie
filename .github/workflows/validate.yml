@@ -25,6 +25,7 @@ jobs:
       - name: Check server and module syntax
         run: |
           node --check server.js
+          node --check src/nourieEnterprisesAccess.js
           node --check legacy-server.js
           node --check src/siteResearchExhaustive.js
           node --check src/siteEnhancements.js
@@ -48,12 +49,15 @@ jobs:
           node --check public/site-autocomplete-recovery.js
           node --check public/site-aadt-autoload.js
           node --check public/fuel-atlas.js
+          node --check public/nourie-enterprises/app.js
           node --check public/distributor-company-search.js
           node --check public/distributor-scope-ui.js
           node --check public/distributor-research-client-v2.js
           node --check public/distributor-branding-ui.js
           node --check scripts/testFuelAtlasCompanyLookup.js
           node --check scripts/testFuelAtlasLocationCompanyBridge.js
+      - name: Validate Nourie Enterprises access isolation
+        run: node --test test/nourieEnterprisesAccess.test.js
       - name: Validate household P&L startup
         run: |
           node test/householdPLData.test.js
