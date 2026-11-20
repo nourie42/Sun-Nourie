@@ -31,18 +31,24 @@ function num(value, fallback = 0) {
   return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
 }
 
-export function buildGlobalGridPayload(pointsData, fetchedAtIso) {
+export function buildGlobalGridPayload(pointsData, fetchedAtIso, nowMs = Date.parse(fetchedAtIso) || Date.now()) {
   const nLat = GRID_LATS.length;
   const nLon = GRID_LONS.length;
   const nPts = nLat * nLon;
   const sample = pointsData.find((p) => Array.isArray(p?.hourly?.time) && p.hourly.time.length > 0);
   if (!sample) throw new Error('Global weather feed returned no hourly grid.');
 
-  const hourCount = Math.min(FORECAST_HOURS, sample.hourly.time.length);
-  const hours = sample.hourly.time.slice(0, hourCount).map((t) => (t.endsWith('Z') ? t : `${t}:00Z`));
+  const allTimes = sample.hourly.time.map((t) => (t.endsWith('Z') ? t : `${t}:00Z`));
+  const currentHourMs = Math.floor(nowMs / 3600000) * 3600000;
+  let startIdx = allTimes.findIndex((t) => Date.parse(t) >= currentHourMs);
+  if (startIdx < 0 || startIdx > allTimes.length - 12) startIdx = 0;
+
+  const hourCount = Math.min(FORECAST_HOURS, allTimes.length - startIdx);
+  const hours = allTimes.slice(startIdx, startIdx + hourCount);
   const frames = [];
 
-  for (let h = 0; h < hourCount; h++) {
+  for (let offset = 0; offset < hourCount; offset++) {
+    const h = startIdx + offset;
     const cloud = new Array(nPts);
     const precip = new Array(nPts);
     const u = new Array(nPts);
@@ -63,11 +69,11 @@ export function buildGlobalGridPayload(pointsData, fetchedAtIso) {
       v[i] = vw;
       temp[i] = Math.round(tmp);
     }
-    frames.push({ time: hours[h], cloud, precip, u, v, temp });
+    frames.push({ time: hours[offset], cloud, precip, u, v, temp });
   }
 
   return {
-    version: 2,
+    version: 3,
     fetchedAt: fetchedAtIso,
     lats: GRID_LATS,
     lons: GRID_LONS,
@@ -86,7 +92,7 @@ export function createGlobalGlobeService({ fetchImpl = fetch, now = Date.now } =
   async function fetchBatch(coords) {
     const latsParam = coords.map((c) => c.lat).join(',');
     const lonsParam = coords.map((c) => c.lon).join(',');
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${latsParam}&longitude=${lonsParam}&hourly=cloud_cover,precipitation,wind_speed_10m,wind_direction_10m,temperature_2m&forecast_days=2&timezone=UTC&wind_speed_unit=kn&temperature_unit=fahrenheit`;
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${latsParam}&longitude=${lonsParam}&hourly=cloud_cover,precipitation,wind_speed_10m,wind_direction_10m,temperature_2m&forecast_days=3&timezone=UTC&wind_speed_unit=kn&temperature_unit=fahrenheit`;
     const res = await fetchImpl(url, {
       headers: { Accept: 'application/json', 'User-Agent': 'WeatherNourie/1.0' },
       signal: AbortSignal.timeout(12000),
@@ -105,7 +111,8 @@ export function createGlobalGlobeService({ fetchImpl = fetch, now = Date.now } =
     }
     const results = await Promise.all(chunks.map(fetchBatch));
     const flat = results.flat();
-    const payload = buildGlobalGridPayload(flat, new Date(now()).toISOString());
+    const tsNow = now();
+    const payload = buildGlobalGridPayload(flat, new Date(tsNow).toISOString(), tsNow);
     cached = payload;
     cachedAt = now();
     return payload;

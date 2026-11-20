@@ -18,25 +18,6 @@ export const ACCURACY_MODELS = [
   { id: 'gfs', omModel: 'gfs_global', name: 'NOAA GFS', subtitle: 'American 0.25° Global', color: '#ff8fc8' },
 ];
 
-export const CONSUMER_APP_BENCHMARKS = [
-  {
-    id: 'apple_weather',
-    name: 'Apple Weather',
-    provider: 'Apple WeatherKit (Proprietary)',
-    dataSources: 'Proprietary blend of NOAA (HRRR/NBM), ECMWF, & national radar; closed API without public historical run archives.',
-    transparency: 'Closed weights · no per-model breakdown',
-    publicArchiveAvailable: false,
-  },
-  {
-    id: 'samsung_weather',
-    name: 'Samsung Weather',
-    provider: 'The Weather Channel / IBM Weather',
-    dataSources: 'Proprietary IBM GRAF + ECMWF/GFS blend; closed commercial API without public historical run archives.',
-    transparency: 'Closed weights · no per-model breakdown',
-    publicArchiveAvailable: false,
-  },
-];
-
 const finite = (v) => typeof v === 'number' && Number.isFinite(v);
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
@@ -600,7 +581,6 @@ export function createAccuracyService({ fetchImpl = fetch, now = Date.now } = {}
         isNourie: Boolean(m.isNourie),
       })),
       rankings,
-      consumerBenchmarks: CONSUMER_APP_BENCHMARKS,
       dailySeries,
       hourlySeries,
     };

@@ -1,6 +1,7 @@
 // Mounts the upgraded photorealistic 3D WebGL Earth Globe directly onto
 // /weather-fusion/experimental-weather.html with auto user-location centering,
-// real cloud cover, directional wind streamlines, 48h timeline scrubbing, and click-anywhere inspection.
+// live SSEC geostationary satellite clouds, directional wind streamlines,
+// glitch-free click-anywhere spot forecasts, and 48h timeline scrubbing.
 
 const US_CONUS_BOUNDS = { minLat: 24, maxLat: 50, minLon: -125, maxLon: -66 };
 const QUICK_HUBS = [
@@ -14,7 +15,17 @@ const QUICK_HUBS = [
   { id: 'tokyo', name: 'Tokyo, JP', latitude: 35.6762, longitude: 139.6503 },
 ];
 
+const WMO_LABELS = {
+  0: 'Clear', 1: 'Mostly Clear', 2: 'Partly Cloudy', 3: 'Overcast',
+  45: 'Fog', 48: 'Rime Fog', 51: 'Light Drizzle', 53: 'Drizzle', 55: 'Heavy Drizzle',
+  61: 'Light Rain', 63: 'Rain', 65: 'Heavy Rain', 71: 'Light Snow', 73: 'Snow', 75: 'Heavy Snow',
+  80: 'Rain Showers', 81: 'Showers', 82: 'Heavy Showers', 95: 'Thunderstorm', 96: 'Storm + Hail', 99: 'Severe Storm',
+};
+
 const finite = (v) => typeof v === 'number' && Number.isFinite(v);
+const esc = (s) =>
+  String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
 const isConus = (lat, lon) =>
   finite(lat) &&
   finite(lon) &&
@@ -26,8 +37,8 @@ const isConus = (lat, lon) =>
 function compassFromDeg(fromDeg) {
   if (!finite(fromDeg)) return { compass: '', arrow: '' };
   const dirs = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
-  const arrows = ['↓', '↙', '←', '↖', '↑', '↗', '→', '↘']; // blowing TOWARD
-  const idx = Math.round(((fromDeg % 360) + 360) % 360 / 45) % 8;
+  const arrows = ['↓', '↙', '←', '↖', '↑', '↗', '→', '↘'];
+  const idx = Math.round((((fromDeg % 360) + 360) % 360) / 45) % 8;
   return { compass: dirs[idx], arrow: arrows[idx] };
 }
 
@@ -62,12 +73,12 @@ export function mountExperimentalGlobe() {
   section.innerHTML = `
     <div class="exp-globe-head">
       <div>
-        <span class="exp-eyebrow">LIVE SATELLITE &amp; GLOBAL MODEL FIELD · 3D WEBGL</span>
-        <h2 id="exp-globe-title">Interactive Earth · Real Clouds &amp; Wind Direction</h2>
+        <span class="exp-eyebrow">LIVE GEOSTATIONARY SATELLITE · 3D EARTH</span>
+        <h2 id="exp-globe-title">Interactive Earth · Live Clouds &amp; Wind Direction</h2>
       </div>
       <div class="exp-globe-actions">
         <button type="button" id="exp-globe-locate" class="exp-pill-btn" title="Center on your live GPS location">📍 My Location</button>
-        <button type="button" id="exp-globe-spin" class="exp-pill-btn is-active" aria-pressed="true" title="Toggle West-to-East Earth rotation">⟳ Spin</button>
+        <button type="button" id="exp-globe-spin" class="exp-pill-btn" aria-pressed="false" title="Toggle West-to-East Earth rotation">⟳ Spin</button>
         <button type="button" id="exp-globe-center" class="exp-pill-btn" title="Center on active pin">⌖ Center</button>
         <button type="button" id="exp-globe-zoom-in" class="exp-pill-btn exp-icon-btn" aria-label="Zoom in">+</button>
         <button type="button" id="exp-globe-zoom-out" class="exp-pill-btn exp-icon-btn" aria-label="Zoom out">−</button>
@@ -80,15 +91,17 @@ export function mountExperimentalGlobe() {
         <span id="exp-globe-loc-pill">Locating your weather…</span>
       </div>
       <div class="exp-globe-hud exp-hud-bottom-strip" id="exp-globe-wind-pill">
-        Real cloud cover &amp; wind vectors loading…
+        Drag to rotate · Tap anywhere on Earth to inspect live forecast
       </div>
-      <canvas id="exp-cloud-globe-canvas" aria-label="Interactive 3D Earth showing real global cloud cover and directional wind streamlines"></canvas>
+      <canvas id="exp-cloud-globe-canvas" aria-label="Interactive 3D Earth showing live satellite cloud cover and directional wind streamlines"></canvas>
       <div class="exp-globe-fallback" id="exp-globe-fallback" hidden>3D globe loading…</div>
     </div>
 
+    <div id="exp-spot-bar" class="exp-spot-bar" hidden></div>
+
     <div class="exp-globe-controls">
       <div class="exp-layer-bar" role="group" aria-label="3D Earth weather layers">
-        <button type="button" class="exp-layer-btn is-active" data-layer="clouds" aria-pressed="true">☁ Clouds</button>
+        <button type="button" class="exp-layer-btn is-active" data-layer="clouds" aria-pressed="true">☁ Live Clouds</button>
         <button type="button" class="exp-layer-btn is-active" data-layer="wind" aria-pressed="true">〰 Wind Flow</button>
         <button type="button" class="exp-layer-btn" data-layer="precip" aria-pressed="false">🌧 Precip</button>
         <button type="button" class="exp-layer-btn is-active" data-layer="terminator" aria-pressed="true">◐ Day / Night</button>
@@ -98,7 +111,7 @@ export function mountExperimentalGlobe() {
       <div class="exp-time-bar">
         <button type="button" id="exp-globe-play" class="exp-pill-btn" aria-pressed="false">▶ Play 48h</button>
         <input id="exp-globe-hour" type="range" min="0" max="47" value="0" step="1" aria-label="3D Globe forecast hour offset">
-        <span id="exp-globe-hour-label" class="exp-hour-badge">Now (+0h)</span>
+        <span id="exp-globe-hour-label" class="exp-hour-badge">Now (Live Satellite)</span>
       </div>
 
       <div class="exp-hub-strip" aria-label="Quick global hubs on 3D globe">
@@ -119,18 +132,57 @@ export function mountExperimentalGlobe() {
   let latestForecast = globalThis.__weatherNourieForecast || null;
   let activeLocation = latestForecast?.location || readSavedUserLocation() || QUICK_HUBS[0];
   let playTimer = null;
-  let userPickedRemote = false;
+  let inspectToken = 0;
+  let inspectedSpot = null;
   const hourInput = document.getElementById('exp-globe-hour');
   const hourLabel = document.getElementById('exp-globe-hour-label');
   const locPill = document.getElementById('exp-globe-loc-pill');
   const windPill = document.getElementById('exp-globe-wind-pill');
+  const spotBar = document.getElementById('exp-spot-bar');
   const spinBtn = document.getElementById('exp-globe-spin');
   const playBtn = document.getElementById('exp-globe-play');
+
+  const renderSpotBar = (spot) => {
+    if (!spotBar) return;
+    if (!spot) {
+      spotBar.hidden = true;
+      return;
+    }
+    const canSwitchPage = isConus(spot.latitude, spot.longitude);
+    spotBar.hidden = false;
+    spotBar.innerHTML = `
+      <div class="exp-spot-main">
+        <strong>${esc(spot.name)}</strong>
+        <span>${esc(spot.summary)}</span>
+      </div>
+      <div class="exp-spot-actions">
+        ${canSwitchPage ? `<button type="button" id="exp-spot-apply" class="exp-pill-btn is-active">Use for Full Forecast →</button>` : ''}
+        <button type="button" id="exp-spot-close" class="exp-pill-btn" aria-label="Close spot details">×</button>
+      </div>
+    `;
+    document.getElementById('exp-spot-apply')?.addEventListener('click', () => {
+      window.dispatchEvent(
+        new CustomEvent('weather-nourie:select-location', {
+          detail: {
+            id: spot.id || `${spot.latitude.toFixed(2)},${spot.longitude.toFixed(2)}`,
+            name: spot.name,
+            latitude: spot.latitude,
+            longitude: spot.longitude,
+          },
+        })
+      );
+      spotBar.hidden = true;
+    });
+    document.getElementById('exp-spot-close')?.addEventListener('click', () => {
+      inspectedSpot = null;
+      spotBar.hidden = true;
+    });
+  };
 
   const updateHudReadout = (hourIdx, override = null) => {
     const h = globe?.globalGrid?.hours?.[hourIdx];
     if (hourIdx === 0) {
-      hourLabel.textContent = 'Now (+0h)';
+      hourLabel.textContent = 'Now (Live Satellite)';
     } else if (h) {
       const d = new Date(h);
       hourLabel.textContent = `+${hourIdx}h · ${d.toLocaleTimeString([], { hour: 'numeric' })}`;
@@ -145,13 +197,13 @@ export function mountExperimentalGlobe() {
     }
 
     const fx = latestForecast;
-    const loc = fx?.location || activeLocation;
+    const loc = inspectedSpot || fx?.location || activeLocation;
     const gridTel =
       globe?.globalGrid?.frames?.length && finite(loc?.latitude) && finite(loc?.longitude)
         ? globe.getLocalGridTelemetry(loc.latitude, loc.longitude, hourIdx)
         : null;
 
-    if (fx?.location && !userPickedRemote) {
+    if (fx?.location && !inspectedSpot) {
       const hr = fx.hours?.[hourIdx] || fx.current;
       const t = finite(hr?.temperature) ? `${Math.round(hr.temperature)}°F` : gridTel ? `${gridTel.tempF}°F` : '--°';
       const cloud = finite(hr?.skyCover) ? `${Math.round(hr.skyCover)}% clouds` : gridTel ? `${gridTel.cloudPct}% clouds` : 'Live clouds';
@@ -175,32 +227,47 @@ export function mountExperimentalGlobe() {
     }
   };
 
-  async function inspectRemotePoint(loc, { fromUserClick = true } = {}) {
+  // Glitch-free spot inspection: never reloads the whole page on random globe clicks.
+  // Fetches accurate live Open-Meteo current + daily forecast right for the tapped spot.
+  async function inspectSpotOnGlobe(loc, { alsoSwitchPage = false } = {}) {
+    const token = ++inspectToken;
     activeLocation = loc;
-    userPickedRemote = !isConus(loc.latitude, loc.longitude);
-    locPill.textContent = `Loading ${loc.name}…`;
-    window.dispatchEvent(new CustomEvent('weather-nourie:accuracy-location', { detail: loc }));
+    inspectedSpot = loc;
+    locPill.textContent = `Checking ${loc.name}…`;
 
-    if (isConus(loc.latitude, loc.longitude)) {
-      if (fromUserClick) {
-        window.dispatchEvent(new CustomEvent('weather-nourie:select-location', { detail: loc }));
-      }
-      if (globe) globe.flyTo(loc.latitude, loc.longitude);
+    if (globe) {
+      globe.updateForecast({
+        location: loc,
+        current: { temperature: null, skyCover: null },
+      });
+    }
+
+    if (alsoSwitchPage && isConus(loc.latitude, loc.longitude)) {
+      inspectedSpot = null;
+      window.dispatchEvent(new CustomEvent('weather-nourie:select-location', { detail: loc }));
+      window.dispatchEvent(new CustomEvent('weather-nourie:accuracy-location', { detail: loc }));
+      renderSpotBar(null);
       return;
     }
 
-    // Outside US NWS grid: fetch crisp Open-Meteo current temp, clouds, wind speed & direction, precip!
     try {
-      const url = `https://api.open-meteo.com/v1/forecast?latitude=${loc.latitude.toFixed(3)}&longitude=${loc.longitude.toFixed(3)}&current=temperature_2m,cloud_cover,wind_speed_10m,wind_direction_10m,precipitation,relative_humidity_2m&temperature_unit=fahrenheit&wind_speed_unit=mph`;
+      const url = `https://api.open-meteo.com/v1/forecast?latitude=${loc.latitude.toFixed(4)}&longitude=${loc.longitude.toFixed(4)}&current=temperature_2m,weather_code,cloud_cover,wind_speed_10m,wind_direction_10m,precipitation,relative_humidity_2m&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max&forecast_days=1&temperature_unit=fahrenheit&wind_speed_unit=mph&timezone=auto`;
       const res = await fetch(url);
-      if (!res.ok) return;
+      if (token !== inspectToken || !res.ok) return;
       const data = await res.json();
+      if (token !== inspectToken) return;
       const cur = data?.current;
+      const day = data?.daily;
       if (cur) {
         const wd = compassFromDeg(cur.wind_direction_10m);
-        const locText = `${loc.name} · ${Math.round(cur.temperature_2m)}°F · ${Math.round(cur.cloud_cover)}% clouds`;
+        const cond = WMO_LABELS[cur.weather_code] || 'Live';
+        const hi = finite(day?.temperature_2m_max?.[0]) ? `${Math.round(day.temperature_2m_max[0])}°` : '—';
+        const lo = finite(day?.temperature_2m_min?.[0]) ? `${Math.round(day.temperature_2m_min[0])}°` : '—';
+        const pop = finite(day?.precipitation_probability_max?.[0]) ? `${Math.round(day.precipitation_probability_max[0])}% rain` : '';
+        const locText = `${loc.name} · ${Math.round(cur.temperature_2m)}°F · ${cond} · ${Math.round(cur.cloud_cover)}% clouds`;
         const windText = `Wind: ${Math.round(cur.wind_speed_10m)} mph ${wd.compass} ${wd.arrow} · RH ${Math.round(cur.relative_humidity_2m ?? 0)}%`;
         updateHudReadout(Number(hourInput.value), { locText, windText });
+
         if (globe) {
           globe.updateForecast({
             location: loc,
@@ -212,9 +279,14 @@ export function mountExperimentalGlobe() {
             },
           });
         }
+        renderSpotBar({
+          ...loc,
+          summary: `${Math.round(cur.temperature_2m)}°F ${cond} · High ${hi} / Low ${lo} · ${Math.round(cur.cloud_cover)}% clouds · Wind ${Math.round(cur.wind_speed_10m)} mph ${wd.compass} ${wd.arrow}${pop ? ` · ${pop}` : ''}`,
+        });
       }
     } catch {
-      updateHudReadout(Number(hourInput.value), { locText: `${loc.name}` });
+      if (token !== inspectToken) return;
+      updateHudReadout(Number(hourInput.value), { locText: loc.name });
     }
   }
 
@@ -228,21 +300,16 @@ export function mountExperimentalGlobe() {
     if (!quiet) locPill.textContent = 'Finding your location…';
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        const lat = pos.coords.latitude;
-        const lon = pos.coords.longitude;
-        const loc = {
-          id: 'device',
-          name: 'Your location',
-          latitude: Number(lat.toFixed(4)),
-          longitude: Number(lon.toFixed(4)),
-        };
+        const lat = Number(pos.coords.latitude.toFixed(4));
+        const lon = Number(pos.coords.longitude.toFixed(4));
+        const loc = { id: 'device', name: 'Your location', latitude: lat, longitude: lon };
         globe?.setAutoSpin(false);
         if (spinBtn) {
           spinBtn.classList.remove('is-active');
           spinBtn.setAttribute('aria-pressed', 'false');
         }
         globe?.flyTo(lat, lon);
-        inspectRemotePoint(loc, { fromUserClick: true });
+        inspectSpotOnGlobe(loc, { alsoSwitchPage: isConus(lat, lon) });
       },
       () => {
         if (!quiet && latestForecast?.location) {
@@ -254,16 +321,16 @@ export function mountExperimentalGlobe() {
     );
   }
 
-  import('/weather-fusion/v3/js/globe.js?v=real-clouds-dir-v3')
+  import('/weather-fusion/v3/js/globe.js?v=real-sat-noglitch-v4')
     .then(({ LiveCloudGlobe }) => {
       globe = new LiveCloudGlobe({
         canvasId: 'exp-cloud-globe-canvas',
         onSelectLocation: (loc) => {
           if (spinBtn) {
-            spinBtn.classList.toggle('is-active', Boolean(globe?.autoSpin));
-            spinBtn.setAttribute('aria-pressed', String(Boolean(globe?.autoSpin)));
+            spinBtn.classList.remove('is-active');
+            spinBtn.setAttribute('aria-pressed', 'false');
           }
-          inspectRemotePoint(loc, { fromUserClick: true });
+          inspectSpotOnGlobe(loc, { alsoSwitchPage: false });
         },
         onLayerChange: (layers) => {
           section.querySelectorAll('[data-layer]').forEach((btn) => {
@@ -273,6 +340,8 @@ export function mountExperimentalGlobe() {
           });
         },
       });
+      // Default autoSpin OFF so the globe stays steady on the user's location and is easy to inspect
+      globe.setAutoSpin(false);
       globe.init(
         latestForecast || {
           location: activeLocation,
@@ -283,7 +352,6 @@ export function mountExperimentalGlobe() {
         globe.flyTo(latestForecast.location.latitude, latestForecast.location.longitude, true);
         updateHudReadout(0);
       } else {
-        // Automatically check if geolocation permission is already granted so globe opens right on the user
         if (navigator.permissions?.query) {
           navigator.permissions
             .query({ name: 'geolocation' })
@@ -294,7 +362,6 @@ export function mountExperimentalGlobe() {
         }
         updateHudReadout(0);
       }
-      // Refresh wind/cloud HUD once global grid finishes loading
       const waitGrid = setInterval(() => {
         if (globe?.globalGrid?.frames?.length) {
           clearInterval(waitGrid);
@@ -323,8 +390,12 @@ export function mountExperimentalGlobe() {
   });
 
   document.getElementById('exp-globe-center')?.addEventListener('click', () => {
-    const loc = globe?.forecast?.location || latestForecast?.location || activeLocation;
+    const loc = latestForecast?.location || activeLocation;
+    inspectedSpot = null;
+    renderSpotBar(null);
+    if (latestForecast) globe?.updateForecast(latestForecast);
     globe?.flyTo(loc.latitude, loc.longitude);
+    updateHudReadout(Number(hourInput?.value || 0));
   });
   document.getElementById('exp-globe-zoom-in')?.addEventListener('click', () => globe?.zoomBy(1));
   document.getElementById('exp-globe-zoom-out')?.addEventListener('click', () => globe?.zoomBy(-1));
@@ -361,7 +432,7 @@ export function mountExperimentalGlobe() {
       hourInput.value = String(next);
       globe?.setHourOffset(next);
       updateHudReadout(next);
-    }, 420);
+    }, 480);
   });
 
   section.querySelectorAll('[data-hub-id]').forEach((btn) => {
@@ -375,7 +446,7 @@ export function mountExperimentalGlobe() {
         spinBtn.setAttribute('aria-pressed', 'false');
       }
       globe?.flyTo(hub.latitude, hub.longitude);
-      inspectRemotePoint(hub, { fromUserClick: true });
+      inspectSpotOnGlobe(hub, { alsoSwitchPage: isConus(hub.latitude, hub.longitude) });
     });
   });
 
@@ -384,7 +455,8 @@ export function mountExperimentalGlobe() {
     if (!fx?.location) return;
     latestForecast = fx;
     activeLocation = fx.location;
-    userPickedRemote = false;
+    inspectedSpot = null;
+    renderSpotBar(null);
     globe?.updateForecast(fx);
     globe?.flyTo(fx.location.latitude, fx.location.longitude);
     updateHudReadout(Number(hourInput?.value || 0));

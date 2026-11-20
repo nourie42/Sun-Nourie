@@ -616,8 +616,12 @@ export class LiveCloudGlobe {
           const g = raw[i * 4 + 1];
           const b = raw[i * 4 + 2];
           const a = raw[i * 4 + 3];
-          const lum = (r + g + b) / 3;
-          alphas[i] = Math.round(Math.max(a, (lum * a) / 255));
+          // Live SSEC Global IR encodes cold high/mid cloud tops as bright white/grey
+          // and clear warm surface as dark pixels. Map brightness cleanly to cloud opacity.
+          const lum = (r * 0.299 + g * 0.587 + b * 0.114) / 255;
+          const alphaNorm = a / 255;
+          const cloudDensity = smoothstep(0.24, 0.82, lum) * alphaNorm;
+          alphas[i] = Math.round(clamp(cloudDensity, 0, 0.96) * 255);
         }
         this.satAlphaPixels = alphas;
         this.satSize = { w, h };
@@ -710,11 +714,20 @@ export class LiveCloudGlobe {
     const hasSat = Boolean(this.satAlphaPixels && this.satSize?.w === w && this.satSize?.h === h);
     const hour = this.hourOffset;
 
-    if (hasGrid) {
-      this.renderedCloudHour = hour;
-      const useSatBlend = hour <= 1 && hasSat;
+    if (hour === 0 && hasSat) {
+      // At Now (+0h): display the authentic live GOES / Meteosat / Himawari satellite IR mosaic directly
+      this.renderedCloudHour = 0;
       const sat = this.satAlphaPixels;
-
+      for (let i = 0; i < w * h; i++) {
+        const p4 = i * 4;
+        out[p4] = 248;
+        out[p4 + 1] = 251;
+        out[p4 + 2] = 255;
+        out[p4 + 3] = sat[i];
+      }
+    } else if (hasGrid) {
+      // For future forecast hours (+1h..+47h), render the current-hour-aligned Open-Meteo global cloud cover
+      this.renderedCloudHour = hour;
       for (let y = 0; y < h; y++) {
         const lat = 90 - ((y + 0.5) / h) * 180;
         const rowOffset = y * w;
@@ -722,26 +735,12 @@ export class LiveCloudGlobe {
           const lon = ((x + 0.5) / w) * 360 - 180;
           const idx = rowOffset + x;
           const cover = clamp(this.sampleGridScalar('cloud', hour, lat, lon) / 100, 0, 1);
-
-          let alpha = 0;
-          if (cover > 0.05) {
-            const fbm = noise[idx];
-            const satVal = hasSat ? sat[idx] / 255 : fbm;
-            // Combine satellite IR structure at hour 0 with real meteorological cloud_cover envelope
-            // so overcast regions (e.g. 90%+) show dense realistic cloud shields while clear skies stay clear.
-            const micro = useSatBlend ? satVal * 0.55 + fbm * 0.45 : fbm;
-            const threshold = 1.0 - cover * 1.14;
-            const wispy = smoothstep(threshold - 0.20, threshold + 0.34, micro);
-            const overcastFloor = cover > 0.72 ? (cover - 0.72) * 2.1 : 0;
-            const density = clamp(Math.max(wispy * (0.32 + cover * 0.78), overcastFloor * (0.72 + fbm * 0.28)), 0, 0.96);
-            alpha = Math.round(density * 255);
-          }
-
+          const density = cover > 0.06 ? clamp((cover - 0.06) / 0.94, 0, 0.92) : 0;
           const p4 = idx * 4;
           out[p4] = 248;
           out[p4 + 1] = 251;
           out[p4 + 2] = 255;
-          out[p4 + 3] = alpha;
+          out[p4 + 3] = Math.round(density * 255);
         }
       }
     } else if (hasSat) {
@@ -1091,35 +1090,42 @@ export class LiveCloudGlobe {
     if (!this.canvas || this.canvas.__webglBound) return;
     this.canvas.__webglBound = true;
 
+    this.downPointer = { x: 0, y: 0, t: 0, id: null };
+
     this.canvas.addEventListener('pointerdown', (e) => {
+      if (!e.isPrimary) return;
       this.isDragging = true;
       this.dragMoved = false;
       this.targetCamLat = null;
       this.targetCamLon = null;
+      this.downPointer = { x: e.clientX, y: e.clientY, t: performance.now(), id: e.pointerId };
       this.lastPointer = { x: e.clientX, y: e.clientY };
       this.canvas.setPointerCapture?.(e.pointerId);
     });
 
     this.canvas.addEventListener('pointermove', (e) => {
-      if (!this.isDragging) return;
+      if (!this.isDragging || e.pointerId !== this.downPointer.id) return;
       const dx = e.clientX - this.lastPointer.x;
       const dy = e.clientY - this.lastPointer.y;
-      if (Math.abs(dx) > 4 || Math.abs(dy) > 4) {
+      const totalTravel = Math.hypot(e.clientX - this.downPointer.x, e.clientY - this.downPointer.y);
+      if (totalTravel > 10) {
         this.dragMoved = true;
       }
-      const sens = 0.0052 * (this.camDist / 2.6);
+      const sens = 0.0048 * (this.camDist / 2.6);
       this.camLon -= dx * sens;
       this.camLat = clamp(this.camLat + dy * sens, -1.32, 1.32);
-      this.velLon = -dx * sens * 0.25;
-      this.velLat = dy * sens * 0.25;
+      this.velLon = -dx * sens * 0.22;
+      this.velLat = dy * sens * 0.22;
       this.lastPointer = { x: e.clientX, y: e.clientY };
     });
 
     const handleUp = (e) => {
-      if (!this.isDragging) return;
+      if (!this.isDragging || (e && this.downPointer.id !== null && e.pointerId !== this.downPointer.id)) return;
       this.isDragging = false;
+      const elapsed = performance.now() - (this.downPointer.t || 0);
+      const totalTravel = e ? Math.hypot(e.clientX - this.downPointer.x, e.clientY - this.downPointer.y) : 999;
 
-      if (!this.dragMoved && e && e.type === 'pointerup' && this.earthMesh) {
+      if (!this.dragMoved && totalTravel < 10 && elapsed < 450 && e && e.type === 'pointerup' && this.earthMesh) {
         const rect = this.canvas.getBoundingClientRect();
         const ndc = new THREE.Vector2(
           ((e.clientX - rect.left) / rect.width) * 2 - 1,

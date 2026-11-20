@@ -1,6 +1,6 @@
 import { isExperimentalWeatherPage } from './car-wash.js?v=low-rain-display-v1';
-import { mountExperimentalGlobe } from './experimental-globe-mount.js?v=exp-v2';
-import { mountExperimentalAccuracy } from './experimental-accuracy.js?v=exp-v2';
+import { mountExperimentalGlobe } from './experimental-globe-mount.js?v=exp-v3';
+import { mountExperimentalAccuracy } from './experimental-accuracy.js?v=exp-v3';
 
 function injectExperimentalNavShortcuts() {
   const shell = document.querySelector('.shell');
@@ -50,7 +50,7 @@ function ensureExperimentalStylesheet() {
   const link = document.createElement('link');
   link.id = 'experimental-enhance-css';
   link.rel = 'stylesheet';
-  link.href = '/weather-fusion/experimental-enhance.css?v=exp-globe-acc-v6';
+  link.href = '/weather-fusion/experimental-enhance.css?v=exp-globe-acc-v7';
   document.head.appendChild(link);
 }
 

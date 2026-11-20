@@ -848,7 +848,7 @@ export function registerWeatherFusionRoutes(app, options = {}) {
     '/api/weather-fusion/v3/live-clouds.png',
     proxySatellitePng(
       'clouds',
-      'https://clouds.matteason.co.uk/images/2048x1024/clouds-alpha.png',
+      'https://realearth.ssec.wisc.edu/api/image?products=globalir&width=2048&height=1024',
       path.join(PUBLIC_DIR, 'v3', 'textures', 'clouds-fallback.png')
     )
   );

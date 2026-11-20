@@ -1,13 +1,10 @@
 // Mounts the Multi-Metric Historical Model Accuracy dashboard onto /weather-fusion/experimental-weather.html
 // Evaluates Weather Nourie vs NOAA HRRR, NOAA NBM, ECMWF IFS, DWD ICON, UK Met Office,
-// Canadian GEM, and NOAA GFS across Temperature, Rain/Precip, Wind, Cloud Cover, and Humidity,
-// plus a transparent comparison & local check-in tracker for Apple Weather and Samsung Weather.
+// Canadian GEM, and NOAA GFS across Temperature, Rain/Precip, Wind, Cloud Cover, and Humidity.
 
 const finite = (v) => typeof v === 'number' && Number.isFinite(v);
 const esc = (s) =>
   String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-
-const APP_LOG_KEY = 'weather-nourie-consumer-app-log-v1';
 
 const RANK_MODES = [
   { id: 'overall', label: '🏆 Overall (All Metrics)' },
@@ -16,26 +13,6 @@ const RANK_MODES = [
   { id: 'wind', label: '💨 Wind' },
   { id: 'sky', label: '☁ Clouds & Humidity' },
 ];
-
-function readAppLogs() {
-  try {
-    const raw = localStorage.getItem(APP_LOG_KEY);
-    const parsed = raw ? JSON.parse(raw) : [];
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-}
-
-function saveAppLogEntry(entry) {
-  const logs = readAppLogs().filter(
-    (x) => !(x.date === entry.date && x.locKey === entry.locKey)
-  );
-  logs.unshift(entry);
-  try {
-    localStorage.setItem(APP_LOG_KEY, JSON.stringify(logs.slice(0, 60)));
-  } catch {}
-}
 
 function catmullRomPath(pts) {
   const segs = [];
@@ -343,105 +320,6 @@ export function mountExperimentalAccuracy() {
     });
   }
 
-  function renderConsumerAppsSection(data) {
-    const locKey = `${Number(curLoc.latitude).toFixed(2)},${Number(curLoc.longitude).toFixed(2)}`;
-    const todayIso = new Date().toISOString().slice(0, 10);
-    const fxTodayHigh = globalThis.__weatherNourieForecast?.days?.[0]?.high;
-    const logs = readAppLogs().filter((x) => x.locKey === locKey);
-    const todayEntry = logs.find((x) => x.date === todayIso);
-
-    // Match any previously logged Apple/Samsung highs against real observed highs from data.dailySeries
-    const obsByDate = new Map((data.dailySeries || []).map((d) => [d.date, d]));
-    const verifiedLogs = logs
-      .map((entry) => {
-        const day = obsByDate.get(entry.date);
-        if (!day || !finite(day.observedHighF)) return null;
-        return {
-          ...entry,
-          obsHigh: Math.round(day.observedHighF),
-          nourieHigh: day.models?.nourie?.highF != null ? Math.round(day.models.nourie.highF) : entry.nourieHigh,
-          appleErr: finite(entry.appleHigh) ? Math.abs(entry.appleHigh - day.observedHighF) : null,
-          samsungErr: finite(entry.samsungHigh) ? Math.abs(entry.samsungHigh - day.observedHighF) : null,
-          nourieErr:
-            day.models?.nourie?.highF != null
-              ? Math.abs(day.models.nourie.highF - day.observedHighF)
-              : finite(entry.nourieHigh)
-              ? Math.abs(entry.nourieHigh - day.observedHighF)
-              : null,
-        };
-      })
-      .filter(Boolean);
-
-    const avg = (arr) => (arr.length ? (arr.reduce((s, x) => s + x, 0) / arr.length).toFixed(1) : null);
-    const appleAvg = avg(verifiedLogs.map((x) => x.appleErr).filter(finite));
-    const samsungAvg = avg(verifiedLogs.map((x) => x.samsungErr).filter(finite));
-    const nourieAvg = avg(verifiedLogs.map((x) => x.nourieErr).filter(finite));
-
-    const benchmarks = data.consumerBenchmarks || [];
-
-    return `
-      <div class="exp-consumer-box">
-        <div class="exp-consumer-head">
-          <div>
-            <span class="exp-eyebrow">CONSUMER WEATHER APPS · HONEST COMPARISON</span>
-            <h3>Weather Nourie vs Apple Weather &amp; Samsung Weather</h3>
-            <p class="exp-acc-chart-note">Apple Weather (WeatherKit) and Samsung Weather (The Weather Channel / IBM) do not publish open historical forecast archives, so we cannot auto-pull their past runs without fabricating numbers. Here is how they compare structurally — plus a live local check-in so you can verify your own phone's Apple &amp; Samsung predictions against real station observations.</p>
-          </div>
-        </div>
-
-        <div class="exp-consumer-grid">
-          <article class="exp-consumer-card is-nourie">
-            <strong>Weather Nourie</strong>
-            <small>Open Multi-Model Blend V2</small>
-            <ul>
-              <li>Live blend of NWS + HRRR + NBM + ECMWF IFS + GEFS + WeatherNext 3</li>
-              <li>Full per-model chart &amp; verified 5-metric past accuracy score</li>
-              <li>Today's forecast high: <b>${finite(fxTodayHigh) ? `${Math.round(fxTodayHigh)}°F` : 'Live'}</b></li>
-              ${nourieAvg ? `<li>Your logged high error: <b>±${nourieAvg}°F</b> (${verifiedLogs.length}d)</li>` : ''}
-            </ul>
-          </article>
-          ${benchmarks
-            .map(
-              (b) => `
-            <article class="exp-consumer-card">
-              <strong>${esc(b.name)}</strong>
-              <small>${esc(b.provider)}</small>
-              <ul>
-                <li>${esc(b.dataSources)}</li>
-                <li>${esc(b.transparency)}</li>
-                <li>Automated archive: <b>Closed API</b></li>
-                ${
-                  b.id === 'apple_weather' && appleAvg
-                    ? `<li>Your logged high error: <b>±${appleAvg}°F</b> (${verifiedLogs.length}d)</li>`
-                    : b.id === 'samsung_weather' && samsungAvg
-                    ? `<li>Your logged high error: <b>±${samsungAvg}°F</b> (${verifiedLogs.length}d)</li>`
-                    : ''
-                }
-              </ul>
-            </article>`
-            )
-            .join('')}
-        </div>
-
-        <form id="exp-consumer-checkin" class="exp-consumer-form">
-          <div class="exp-consumer-form-title">Log today's high from your phone apps (${esc(todayIso)}) to track them against real observed highs:</div>
-          <div class="exp-consumer-inputs">
-            <label>
-              <span>Apple Weather High (°F)</span>
-              <input type="number" step="1" min="-60" max="140" id="exp-apple-high" placeholder="e.g. 68" value="${todayEntry?.appleHigh ?? ''}">
-            </label>
-            <label>
-              <span>Samsung Weather High (°F)</span>
-              <input type="number" step="1" min="-60" max="140" id="exp-samsung-high" placeholder="e.g. 69" value="${todayEntry?.samsungHigh ?? ''}">
-            </label>
-            <button type="submit" class="exp-pill-btn is-active">Save Today's Check-In</button>
-          </div>
-          <p id="exp-consumer-save-msg" class="exp-acc-chart-note" aria-live="polite"></p>
-        </form>
-      </div>
-    `;
-  }
-
   function renderData(data) {
     lastData = data;
     const rawRankings = data.rankings || [];
@@ -536,8 +414,6 @@ export function mountExperimentalAccuracy() {
 
       <div id="exp-acc-timeline-box" class="exp-acc-timeline-box"></div>
 
-      ${renderConsumerAppsSection(data)}
-
       <div class="exp-acc-daily-strip">
         <h3>Recent Daily Verification (Observed High vs Predicted Highs)</h3>
         <div class="exp-acc-daily-scroll">
@@ -579,31 +455,6 @@ export function mountExperimentalAccuracy() {
         renderData(data);
       });
     });
-
-    const form = document.getElementById('exp-consumer-checkin');
-    if (form) {
-      form.addEventListener('submit', (e) => {
-        e.preventDefault();
-        const aVal = document.getElementById('exp-apple-high')?.value;
-        const sVal = document.getElementById('exp-samsung-high')?.value;
-        const appleHigh = aVal !== '' && Number.isFinite(Number(aVal)) ? Number(aVal) : null;
-        const samsungHigh = sVal !== '' && Number.isFinite(Number(sVal)) ? Number(sVal) : null;
-        if (appleHigh == null && samsungHigh == null) return;
-        const locKey = `${Number(curLoc.latitude).toFixed(2)},${Number(curLoc.longitude).toFixed(2)}`;
-        saveAppLogEntry({
-          date: new Date().toISOString().slice(0, 10),
-          locKey,
-          locName: curLoc.name,
-          appleHigh,
-          samsungHigh,
-          nourieHigh: finite(globalThis.__weatherNourieForecast?.days?.[0]?.high)
-            ? Math.round(globalThis.__weatherNourieForecast.days[0].high)
-            : null,
-        });
-        const msg = document.getElementById('exp-consumer-save-msg');
-        if (msg) msg.textContent = 'Saved! Your local Apple & Samsung Weather highs will be scored automatically against real observed highs.';
-      });
-    }
 
     const chartContainer = document.getElementById('exp-acc-timeline-box');
     if (chartContainer) renderTimelineChart(chartContainer, data);
