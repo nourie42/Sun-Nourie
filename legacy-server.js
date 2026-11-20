@@ -16,10 +16,12 @@ import PDFDocument from "pdfkit";
 import { adjustCompetitionCounts } from "./src/competition.js";
 import { registerPrivatePageAccess } from "./src/privatePageAccess.js";
 import { registerWeatherSiteAccess } from "./src/weatherSiteAccess.js";
+import { registerNourieEnterprisesAccess } from "./src/nourieEnterprisesAccess.js";
 
 const app = express();
 registerPrivatePageAccess(app);
 registerWeatherSiteAccess(app);
+registerNourieEnterprisesAccess(app);
 app.use(cors());
 app.use(express.json({ limit: "1mb" }));
 
