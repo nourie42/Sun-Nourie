@@ -1,14 +1,14 @@
 {
   "ok": true,
-  "verifiedAt": "2026-11-01T18:45:50.207Z",
-  "verifiedCommit": "c353ca21d3c135ac398608c43440a6fe8d861d16",
+  "verifiedAt": "2026-11-20T12:33:40.514Z",
+  "verifiedCommit": "f004686dca2a965aa9c7c0f55242a64e338bcc77",
   "liveUrl": "https://sun-nourie-live.onrender.com",
   "result": {
     "query": "Cary, NC",
     "geocodeLabel": "Cary, Wake County, North Carolina, United States",
     "geocodeProvider": "OpenStreetMap Nominatim",
     "locationCompanyCount": 1,
-    "totalMapResults": 20,
+    "totalMapResults": 21,
     "company": {
       "name": "Cary Oil Co., Inc.",
       "headquarters": "Cary, North Carolina",

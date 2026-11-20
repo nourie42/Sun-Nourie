@@ -2,17 +2,17 @@
   "ok": true,
   "classificationRule": "NAICS qualifies inclusion; explicit facility wording determines terminal or bulk-plant labels. Oil companies, wholesalers, suppliers and fuel dealers default to Distributor when no physical terminal/bulk wording is present. Heating-oil and propane dealers are also included in Distributor.",
   "filterVersion": "verified-distributor-categories-v3",
-  "verifiedAt": "2026-11-01T18:47:24.692Z",
-  "verifiedCommit": "c353ca21d3c135ac398608c43440a6fe8d861d16",
+  "verifiedAt": "2026-11-20T12:35:18.717Z",
+  "verifiedCommit": "f004686dca2a965aa9c7c0f55242a64e338bcc77",
   "liveUrl": "https://sun-nourie-live.onrender.com",
   "successfulSearches": 8,
   "attemptedSearches": 8,
-  "totalFacilities": 565,
+  "totalFacilities": 561,
   "categoryTotals": {
-    "distributor": 302,
+    "distributor": 301,
     "heating_oil": 3,
-    "bulk_plant": 45,
-    "terminal": 218,
+    "bulk_plant": 47,
+    "terminal": 213,
     "propane": 7
   },
   "forbiddenFacilities": 0,
@@ -49,7 +49,7 @@
         "terminal": 1,
         "propane": 0
       },
-      "elapsedMs": 83,
+      "elapsedMs": 4025,
       "sources": [
         "OpenStreetMap / Overpass",
         "EPA ECHO / FRS NAICS"
@@ -119,7 +119,7 @@
     {
       "region": "North Carolina Triangle",
       "ok": true,
-      "count": 20,
+      "count": 21,
       "forbidden": 0,
       "unqualified": 0,
       "categoryErrors": 0,
@@ -127,7 +127,7 @@
         "distributor": 5,
         "heating_oil": 0,
         "bulk_plant": 0,
-        "terminal": 15,
+        "terminal": 16,
         "propane": 0
       },
       "elapsedMs": 12779,
@@ -344,7 +344,7 @@
           "name": "SELMA TERMINAL",
           "codes": [
             "424710",
-            "457120"
+            "486910"
           ],
           "primary": "terminal",
           "categories": [
@@ -376,18 +376,18 @@
     {
       "region": "Virginia and Carolinas",
       "ok": true,
-      "count": 393,
+      "count": 389,
       "forbidden": 0,
       "unqualified": 0,
       "categoryErrors": 0,
       "categoryCounts": {
-        "distributor": 228,
+        "distributor": 226,
         "heating_oil": 2,
-        "bulk_plant": 45,
-        "terminal": 120,
+        "bulk_plant": 47,
+        "terminal": 116,
         "propane": 5
       },
-      "elapsedMs": 12891,
+      "elapsedMs": 12834,
       "sources": [
         "EPA ECHO / FRS NAICS"
       ],
@@ -641,7 +641,7 @@
         "terminal": 12,
         "propane": 0
       },
-      "elapsedMs": 12790,
+      "elapsedMs": 12890,
       "sources": [
         "EPA ECHO / FRS NAICS"
       ],
@@ -732,6 +732,21 @@
           "categoryError": ""
         },
         {
+          "name": "ENERGY TRANSFER MKT & TERM LP/TANK FARM 2",
+          "codes": [
+            "424710"
+          ],
+          "primary": "terminal",
+          "categories": [
+            "terminal"
+          ],
+          "classificationBasis": "Explicit terminal, depot, tank-farm or storage-terminal role",
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true,
+          "categoryError": ""
+        },
+        {
           "name": "ENERGY TRANSFER PHILADELPHIA TERMINAL",
           "codes": [
             "213112",
@@ -796,21 +811,6 @@
         },
         {
           "name": "KINDER MORGAN POINT BREEZE TERMINAL",
-          "codes": [
-            "424710"
-          ],
-          "primary": "terminal",
-          "categories": [
-            "terminal"
-          ],
-          "classificationBasis": "Explicit terminal, depot, tank-farm or storage-terminal role",
-          "qualification": "NAICS 424710",
-          "forbidden": false,
-          "qualified": true,
-          "categoryError": ""
-        },
-        {
-          "name": "MARCUS HOOK TANK FARM 2",
           "codes": [
             "424710"
           ],
@@ -895,7 +895,7 @@
     {
       "region": "Houston",
       "ok": true,
-      "count": 28,
+      "count": 27,
       "forbidden": 0,
       "unqualified": 0,
       "categoryErrors": 0,
@@ -903,10 +903,10 @@
         "distributor": 3,
         "heating_oil": 0,
         "bulk_plant": 0,
-        "terminal": 25,
+        "terminal": 24,
         "propane": 1
       },
-      "elapsedMs": 12787,
+      "elapsedMs": 12779,
       "sources": [
         "EPA ECHO / FRS NAICS"
       ],
@@ -998,42 +998,25 @@
         {
           "name": "GALENA PARK TERMINAL",
           "codes": [
-            "424710"
-          ],
-          "primary": "terminal",
-          "categories": [
-            "terminal"
-          ],
-          "classificationBasis": "Explicit terminal, depot, tank-farm or storage-terminal role",
-          "qualification": "NAICS 424710",
-          "forbidden": false,
-          "qualified": true,
-          "categoryError": ""
-        },
-        {
-          "name": "GALENA PARK TERMINAL",
-          "codes": [
-            "424710",
-            "486910",
-            "493190"
-          ],
-          "primary": "terminal",
-          "categories": [
-            "terminal"
-          ],
-          "classificationBasis": "Explicit terminal, depot, tank-farm or storage-terminal role",
-          "qualification": "NAICS 424710",
-          "forbidden": false,
-          "qualified": true,
-          "categoryError": ""
-        },
-        {
-          "name": "GALENA PARK TERMINAL",
-          "codes": [
             "221112",
             "424710",
             "493110",
             "493190"
+          ],
+          "primary": "terminal",
+          "categories": [
+            "terminal"
+          ],
+          "classificationBasis": "Explicit terminal, depot, tank-farm or storage-terminal role",
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true,
+          "categoryError": ""
+        },
+        {
+          "name": "GALENA PARK TERMINAL",
+          "codes": [
+            "424710"
           ],
           "primary": "terminal",
           "categories": [
@@ -1157,6 +1140,21 @@
           "forbidden": false,
           "qualified": true,
           "categoryError": ""
+        },
+        {
+          "name": "KINDER MORGAN GCBR TERMINAL",
+          "codes": [
+            "424710"
+          ],
+          "primary": "terminal",
+          "categories": [
+            "terminal"
+          ],
+          "classificationBasis": "Explicit terminal, depot, tank-farm or storage-terminal role",
+          "qualification": "NAICS 424710",
+          "forbidden": false,
+          "qualified": true,
+          "categoryError": ""
         }
       ]
     },
@@ -1174,7 +1172,7 @@
         "terminal": 16,
         "propane": 0
       },
-      "elapsedMs": 12787,
+      "elapsedMs": 12780,
       "sources": [
         "EPA ECHO / FRS NAICS"
       ],
@@ -1438,7 +1436,7 @@
         "terminal": 4,
         "propane": 0
       },
-      "elapsedMs": 12793,
+      "elapsedMs": 12902,
       "sources": [
         "EPA ECHO / FRS NAICS"
       ],
@@ -1684,13 +1682,13 @@
       "unqualified": 0,
       "categoryErrors": 0,
       "categoryCounts": {
-        "distributor": 13,
+        "distributor": 14,
         "heating_oil": 0,
         "bulk_plant": 0,
-        "terminal": 25,
+        "terminal": 24,
         "propane": 1
       },
-      "elapsedMs": 12781,
+      "elapsedMs": 12775,
       "sources": [
         "EPA ECHO / FRS NAICS"
       ],
@@ -1791,16 +1789,17 @@
           "categoryError": ""
         },
         {
-          "name": "CHEVRON MONTEBELLO TERMINAL",
+          "name": "CHEVRON HUNTINGTON BEACH TERMINAL",
           "codes": [
-            "424710"
+            "424710",
+            "424720"
           ],
           "primary": "terminal",
           "categories": [
             "terminal"
           ],
           "classificationBasis": "Explicit terminal, depot, tank-farm or storage-terminal role",
-          "qualification": "NAICS 424710",
+          "qualification": "NAICS 424710, 424720",
           "forbidden": false,
           "qualified": true,
           "categoryError": ""
@@ -1872,16 +1871,16 @@
           "categoryError": ""
         },
         {
-          "name": "EQUILON ENTERPRISES LLC-CARSON TERMINAL",
+          "name": "EQUILON ENTER. LLC, SHELL OIL PROD. US",
           "codes": [
             "324110",
             "424710"
           ],
-          "primary": "terminal",
+          "primary": "distributor",
           "categories": [
-            "terminal"
+            "distributor"
           ],
-          "classificationBasis": "Explicit terminal, depot, tank-farm or storage-terminal role",
+          "classificationBasis": "NAICS 424710 record with no explicit terminal or bulk-plant wording",
           "qualification": "NAICS 424710",
           "forbidden": false,
           "qualified": true,
