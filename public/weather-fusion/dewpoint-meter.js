@@ -22,7 +22,7 @@ export const dewpointGrossLevel=dewpointFeelLevel;
 
 export function forecastFeelLevel(dewpoint,wind=0){
  const level=dewpointFeelLevel(dewpoint,wind);
- const labels={parched:'Very dry air ahead — your doorknob may bring the sparks',crisp:'Crisp, dry air ahead — lotion gets a starring role',dry:'It should feel pleasantly dry',nice:'Moisture should feel pretty comfortable','nice-breeze':'The breeze should help with the humidity',humid:'It will feel a bit humid',gross:'It will feel sticky',nogo:'It will feel very muggy',nope:'It will feel extremely muggy',unknown:'The dew-point forecast is unavailable'};
+ const labels={parched:'The air will be very dry — your doorknob may bring the sparks',crisp:'The air will be crisp and dry — lotion gets a starring role',dry:'It should feel pleasantly dry',nice:'Moisture should feel pretty comfortable','nice-breeze':'The breeze should help with the humidity',humid:'It will feel a bit humid',gross:'It will feel sticky',nogo:'It will feel very muggy',nope:'It will feel extremely muggy',unknown:'The dew-point forecast is unavailable'};
  return {...level,label:labels[level.key]||labels.unknown};
 }
 export const forecastGrossLevel=forecastFeelLevel;

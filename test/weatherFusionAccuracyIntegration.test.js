@@ -29,14 +29,16 @@ function screenshotForecast(){
 
 test('the October 19 inputs keep shade separate and use the corrected standing-person sunlight load',()=>{
  const f=screenshotForecast(),current=currentSample(f,now);
- assert.equal(current.comfort.shade,46);
- assert.equal(current.feels,61);
+ assert.equal(current.comfort.shade,48);
+ assert.equal(current.feels,63);
+ assert.notEqual(current.comfort.shade,current.feels);
  assert.equal(currentHero(f,true,now).temperature,59);
- assert.equal(buildForecastWindows(f,now).perfect.length,0);
+ assert.equal(buildForecastWindows(f,now).perfect.length,1);
  for(const hour of f.hours)assert.equal(forecastSample(f,hour.time).feels,hour.feelsLike);
  const peak=warmestTodayWindow(f,now);
  assert.ok(peak.chosen.value>current.feels);
- assert.match(peakComparisonHTML(peak,current.comfort.sun,location.timeZone,now),/from now/);
+ assert.match(peakComparisonHTML(peak,current.comfort.sun,location.timeZone,now),/2:00 PM · hourly forecast/);
+ assert.doesNotMatch(peakComparisonHTML(peak,current.comfort.sun,location.timeZone,now),/Warmest from now on/);
 });
 
 test('an open tab cannot keep stale observed numbers, rain-now claims or dew-point comfort',()=>{

@@ -20,7 +20,7 @@ permissions:
 jobs:
   verify:
     if: github.ref == 'refs/heads/fix/weather-reviewed-integrity'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
@@ -100,7 +100,7 @@ jobs:
           retention-days: 7
   live:
     if: github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4

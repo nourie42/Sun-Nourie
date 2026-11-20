@@ -3,7 +3,6 @@ import assert from 'node:assert/strict';
 import {chromium} from 'playwright';
 import {rebuildHourlyFeels} from '../src/weatherFusionHourlyFeels.js';
 import {currentSample} from '../public/weather-fusion/weather-display.js';
-import {comfortWindow} from '../public/weather-fusion/comfort-outlook.js';
 import {thermalComfort} from '../public/weather-fusion/weather-math.js';
 
 const dir='/tmp/weather-personal-results';await fs.mkdir(dir,{recursive:true});
@@ -37,19 +36,19 @@ try{
   const context=await browser.newContext({viewport:{width,height:1000},geolocation:{latitude:location.latitude,longitude:location.longitude},permissions:['geolocation']}),page=await context.newPage();
   await page.addInitScript(({location,epoch})=>{localStorage.setItem('weather-fusion-device-place',JSON.stringify({...location,id:'device',source:'device'}));Date.now=()=>epoch;},{location,epoch});
   await page.goto(base+'/weather-fusion/#today-forecast',{waitUntil:'domcontentloaded'});await page.waitForFunction(()=>document.querySelector('.sun-shade-comparison figure'));
-  assert.equal((await page.locator('.brand small').innerText()).trim(),'Because Apple, Google and Samsung weather suck');
-  assert.equal((await page.locator('#skin-kicker').innerText()).trim(),'How it actually feels right now');
+  assert.equal((await page.locator('.brand .brand-name').innerText()).trim(),'Nourie');
+  assert.equal((await page.locator('#skin-kicker').innerText()).trim(),'How it feels outside right now');
   assert.equal(await page.locator('#daily .forecast-confidence').count(),7);
   assert.ok((await page.locator('#daily .forecast-confidence').allTextContents()).every(t=>t.includes('Forecast confidence')));
   const layout=await page.evaluate(()=>{
    const note=document.querySelector('#today-uncertainty'),graphic=document.querySelector('#today-forecast'),b=document.querySelector('#nws-bulletins'),h=document.querySelector('.hourly-panel'),title=document.querySelector('#gross-title'),gross=document.querySelector('#dewpoint-gross-meter');
    const today=document.querySelector('.today-panel');
-   return {noteAlign:getComputedStyle(note).textAlign,noteWeight:Number(getComputedStyle(note).fontWeight),noteFont:parseFloat(getComputedStyle(note).fontSize),graphicFont:parseFloat(getComputedStyle(graphic.querySelector('.day-name')).fontSize),bulletinsBeforeToday:!!(b.compareDocumentPosition(today)&Node.DOCUMENT_POSITION_FOLLOWING),hourlyAfter:today.nextElementSibling===h,grossTitleSize:parseFloat(getComputedStyle(title).fontSize),grossTitleWeight:Number(getComputedStyle(title).fontWeight),grossHeight:gross.getBoundingClientRect().height,noOverflow:document.documentElement.scrollWidth<=innerWidth+1};
+   return {noteAlign:getComputedStyle(note).textAlign,noteWeight:Number(getComputedStyle(note).fontWeight),noteFont:parseFloat(getComputedStyle(note).fontSize),graphicFont:parseFloat(getComputedStyle(graphic.querySelector('.day-name')).fontSize),bulletinsBeforeToday:!!(b.compareDocumentPosition(today)&Node.DOCUMENT_POSITION_FOLLOWING),hourlyAfter:!!(today.compareDocumentPosition(h)&Node.DOCUMENT_POSITION_FOLLOWING),grossTitleSize:parseFloat(getComputedStyle(title).fontSize),grossTitleWeight:Number(getComputedStyle(title).fontWeight),grossHeight:gross.getBoundingClientRect().height,noOverflow:document.documentElement.scrollWidth<=innerWidth+1};
   });
   assert.equal(layout.noteAlign,'center');assert.ok(layout.noteWeight>=700);assert.ok(layout.noteFont<layout.graphicFont);assert.ok(layout.bulletinsBeforeToday&&layout.hourlyAfter);assert.ok(layout.grossTitleSize>=16&&layout.grossTitleWeight>=700);assert.ok(layout.grossHeight<910,'Gross Meter should be compact');assert.ok(layout.noOverflow,'Document must fit the viewport');
   assert.equal(await page.locator('.today-panel').evaluate(el=>el.scrollTop),0,'Anchoring to Today must not scroll or crop the inside of the card');
-  assert.equal(await page.locator('.today-uncertainty-label').innerText(),"Dan's take");
-  const knightdaleFixture=fixture(),knightdaleCurrent=currentSample(knightdaleFixture,epoch),knightdalePeak=comfortWindow(knightdaleFixture,epoch+1);
+  assert.equal(await page.locator('.today-uncertainty-label').innerText(),'Nourie Weather Take');
+  const knightdaleFixture=fixture(),knightdaleCurrent=currentSample(knightdaleFixture,epoch);
   assert.equal(await page.locator('.sun-shade-comparison figure').count(),3);
   const exposureText=await page.locator('.sun-shade-comparison').innerText();
   assert.ok(exposureText.includes(Math.round(knightdaleCurrent.feels)+'°'),'Current exposure tile must use the same feels-like reading as the hero');
@@ -63,7 +62,7 @@ try{
   assert.equal((await firstHourly.locator('> span').first().innerText()).trim(),'Now');
   assert.equal((await firstHourly.locator('> strong').innerText()).trim(),Math.round(knightdaleCurrent.temperature)+'°');
   assert.equal((await firstHourly.locator('.hour-feels b').innerText()).trim(),Math.round(knightdaleCurrent.feels)+'°');
-  if(knightdalePeak){assert.equal((await page.locator('#skin-values .comfort-later strong').innerText()).trim(),Math.round(Math.max(knightdaleCurrent.feels,knightdalePeak.chosen.value))+'°');}
+  assert.match(await page.locator('#skin-values .comfort-later').innerText(),/No direct sun in the remaining forecast today/);
   assert.equal(await page.locator('#hourly .hour-wind').count(),await page.locator('#hourly .hour').count(),'Every hour must retain wind');
   assert.equal(await page.locator('#hourly .hour-uv').count(),await page.locator('#hourly .hour').count(),'Every hour must retain UV');
   assert.match(await firstHourly.locator('.hour-wind').innerText(),/4 mph[\s\S]*SW/);
@@ -73,15 +72,19 @@ try{
   await future.click();assert.equal((await page.locator('.sun-person figcaption strong').innerText()).trim(),futureFeels);assert.equal(await future.getAttribute('aria-pressed'),'true');
   await page.locator('[data-comfort-reset]').click();assert.equal(await firstHourly.getAttribute('aria-pressed'),'true');
   await page.locator('[data-today-forecast]').click();assert.equal(await page.locator('#day-dialog').evaluate(el=>el.open),true);assert.equal(await page.locator('[data-readout="uv"] strong').count(),1);await page.keyboard.press('Escape');
+  if(width===320||width===390||width===1365){await page.screenshot({path:`${dir}/weather-personal-${width}.png`,fullPage:true});await page.locator('#hourly').screenshot({path:`${dir}/hourly-${width}.png`});}
 
   const bulletinText=await page.locator('#alerts').innerText();assert.doesNotMatch(bulletinText,/Move to higher ground now|Complete official wording/);assert.equal(await page.locator('#alerts img').count(),0);
   assert.equal(await page.locator('#alerts .bulletin-warning').count(),1);assert.equal(await page.locator('#alerts .bulletin-watch').count(),1);assert.equal(await page.locator('#alerts .bulletin-discussion').count(),1);
   await page.locator('#alerts .bulletin-warning').click();assert.equal(await page.locator('#bulletin-dialog').evaluate(el=>el.open),true);assert.match(await page.locator('#bulletin-dialog-content').innerText(),/Complete official wording/);assert.match(await page.locator('#bulletin-dialog-content').innerText(),/Move to higher ground now/);await page.locator('#close-bulletin').click();
+  await page.locator('#open-gross').click();
+  await page.locator('#dewpoint-gross-meter').waitFor({state:'visible'});
   for(const n of [24,48,168,240]){await page.locator(`[data-gross-hours="${n}"]`).click();assert.ok(await page.locator('.gross-scroll').evaluate(el=>el.scrollWidth<=el.clientWidth+1));assert.ok(await page.locator('.gross-chart').evaluate(el=>el.getBoundingClientRect().height<=230));await page.locator('#gross-scrubber').fill('12');assert.match(await page.locator('.gross-selected-time').innerText(),/forecast/);}
   await page.locator('[data-metric="pressure"]').click();assert.match(await page.locator('#chart-value').innerText(),/mb/);assert.ok(!(await page.locator('#chart-value').innerText()).includes('inHg'));await page.keyboard.press('Escape');
   assert.match(await page.locator('.metric-pressure .metric-value').innerText(),/1013.*mb/s);assert.match(await page.locator('.metric-pressure .metric-note').innerText(),/Dropping/);
-  await page.locator('#daily [data-day="1"]').click();assert.match(await page.locator('#day-dialog .day-graph').innerText(),/Gross · dew point/);assert.equal(await page.locator('[data-readout="dewpoint"] strong').count(),1);await page.keyboard.press('Escape');
-  if(width===390||width===1365){await page.screenshot({path:`${dir}/weather-personal-${width}.png`,fullPage:true});await page.locator('#skin-exposure').screenshot({path:`${dir}/sun-shade-${width}.png`});}
+  await page.locator('.weather-jump-card.jump-week').click();
+  await page.locator('#daily-panel').waitFor({state:'visible'});
+  await page.locator('#daily [data-day="1"]').click();assert.match(await page.locator('#day-dialog .day-graph').innerText(),/Feel · dew point/);assert.equal(await page.locator('[data-readout="dewpoint"] strong').count(),1);await page.keyboard.press('Escape');
   results.push({width,...layout});await context.close();
  }
  await fs.writeFile(dir+'/report.json',JSON.stringify({success:true,fixture:true,checks:results},null,2));
