@@ -50,7 +50,7 @@ function ensureExperimentalStylesheet() {
   const link = document.createElement('link');
   link.id = 'experimental-enhance-css';
   link.rel = 'stylesheet';
-  link.href = '/weather-fusion/experimental-enhance.css?v=exp-globe-acc-v4';
+  link.href = '/weather-fusion/experimental-enhance.css?v=exp-globe-acc-v5';
   document.head.appendChild(link);
 }
 

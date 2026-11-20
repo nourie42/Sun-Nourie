@@ -618,22 +618,6 @@ html[data-weather-page="experimental"] .exp-top-pills > * {
 }
 
 @media (max-width: 720px) {
-  html[data-weather-page="experimental"] .exp-top-pills {
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    padding: 2px 2px 6px;
-    scrollbar-width: none;
-    -webkit-overflow-scrolling: touch;
-  }
-
-  html[data-weather-page="experimental"] .exp-top-pills::-webkit-scrollbar {
-    display: none;
-  }
-
-  html[data-weather-page="experimental"] .exp-top-pills > * {
-    flex: 0 0 auto;
-  }
-
   html[data-weather-page="experimental"] .exp-globe-card,
   html[data-weather-page="experimental"] .exp-acc-card {
     padding: 14px;
