@@ -100,6 +100,9 @@ async function loadLocationForecast(loc) {
   state.selectedDayIdx = 0;
   state.selectedDewPointIdx = 0;
   renderAll();
+  if (state.globeController) {
+    state.globeController.updateForecast(liveForecast);
+  }
 }
 
 function renderAll() {
@@ -1285,7 +1288,15 @@ function initHeaderControls() {
     document.getElementById('main-hourly-trend')?.scrollIntoView({ behavior: 'smooth' });
   });
 
-  // View Mode Switcher (Experimental, Glance, Blend, Today, Halo)
+  // Mobile Tools Drawer Toggle
+  const toolsBtn = document.getElementById('tools-drawer-btn');
+  const toolsStrip = document.getElementById('tools-strip');
+  toolsBtn?.addEventListener('click', () => {
+    const isOpen = toolsStrip?.classList.toggle('open');
+    toolsBtn.setAttribute('aria-expanded', String(Boolean(isOpen)));
+  });
+
+  // View Mode Switcher (Experimental, Globe Focus, Glance, Blend, Today)
   document.querySelectorAll('[data-view-mode]').forEach((btn) => {
     btn.addEventListener('click', () => {
       document.querySelectorAll('[data-view-mode]').forEach((b) => b.classList.remove('active'));
@@ -1318,17 +1329,22 @@ function initHeaderControls() {
 
 function applyWorkspaceViewMode(mode) {
   state.activeViewMode = mode;
+  const deck = document.getElementById('hero-globe-deck');
+  if (deck) {
+    deck.classList.toggle('globe-expanded', mode === 'halo');
+    setTimeout(() => state.globeController?.handleResize(), 60);
+  }
   const sections = document.querySelectorAll('[data-section]');
   sections.forEach((sec) => {
     const id = sec.dataset.section;
     if (mode === 'experimental' || mode === 'halo') {
       sec.style.display = '';
     } else if (mode === 'glance') {
-      sec.style.display = ['daily', 'hourly', 'your-day'].includes(id) ? '' : 'none';
+      sec.style.display = ['briefing', 'daily', 'hourly', 'your-day'].includes(id) ? '' : 'none';
     } else if (mode === 'blend') {
       sec.style.display = ['hourly', 'explanation', 'compare', 'scientific'].includes(id) ? '' : 'none';
     } else if (mode === 'today') {
-      sec.style.display = ['hourly', 'exposure', 'explanation', 'best-times'].includes(id) ? '' : 'none';
+      sec.style.display = ['briefing', 'hourly', 'exposure', 'explanation', 'best-times'].includes(id) ? '' : 'none';
     }
   });
 }
@@ -1388,11 +1404,11 @@ function initGlobeSection() {
   });
 
   zoomInBtn?.addEventListener('click', () => {
-    state.globeController.zoom = clamp(state.globeController.zoom + 0.16, 0.78, 2.35);
+    state.globeController.zoomBy(1);
   });
 
   zoomOutBtn?.addEventListener('click', () => {
-    state.globeController.zoom = clamp(state.globeController.zoom - 0.16, 0.78, 2.35);
+    state.globeController.zoomBy(-1);
   });
 
   document.querySelectorAll('[data-globe-layer]').forEach((btn) => {

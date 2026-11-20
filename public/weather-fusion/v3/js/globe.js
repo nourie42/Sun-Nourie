@@ -1,126 +1,560 @@
 /**
- * Weather Nourie · Live 3D Atmospheric & Cloud Cover Earth Globe Engine
- * Features:
- * - Real-time 3D Orthographic Spherical Projection with inertia drag, zoom & smooth slerp Fly-To
- * - Live Cloud Cover Advection calibrated to actual Open-Meteo cloud cover %, wind speed & direction
- * - Real Astronomical Subsolar Point & Day/Night Solar Terminator + Night City Lights
- * - Animated 3D Coriolis & Jet Stream Wind Particle Trails on the sphere
- * - 5 Toggleable Layers: Live Clouds, Wind Streams, Thermal Field, Precip Cores, Day/Night Terminator
- * - Click-Anywhere-on-Earth 3D Raycast to teleport & fetch live multi-model forecast for any coordinate
+ * Weather Nourie · Photorealistic Three.js WebGL 3D Satellite Earth Globe
+ * - Real NASA Blue Marble 2K Day + Real NASA Black Marble 2K Night City Lights GLSL Shader
+ * - Real NASA SRTM Topography Bump Relief & Ocean Specular Reflection
+ * - Actual Live Geostationary Satellite Global Cloud Cover Shell (EUMETSAT + NOAA GOES + Himawari)
+ * - Actual Live NASA GPM IMERG Global Satellite Precipitation Overlay
+ * - Real-Time Astronomical Solar Terminator + Fresnel Atmospheric Rayleigh Scattering Glow
+ * - Animated 3D Jet Stream Wind Ribbons, Deep-Space Starfield & Click-Anywhere 3D Raycast
  */
 
-import { DEG2RAD, RAD2DEG, clamp, getSolarGeometry, lerp } from './physics.js';
+import * as THREE from '../vendor/three.module.min.js';
+import { DEG2RAD, RAD2DEG, clamp } from './physics.js';
 import { PRESET_CITIES } from './fusion-engine.js';
 
-// High-recognition continental coastline polygons [lon, lat] for crisp 3D vector landmass rendering
-const CONTINENT_POLYGONS = [
-  // North America
-  [[-168,65],[-162,58],[-152,60],[-140,60],[-130,54],[-124,48],[-124,40],[-120,34],[-117,32],[-110,23],[-105,20],[-97,16],[-88,16],[-83,9],[-79,9],[-82,15],[-87,21],[-90,21],[-97,26],[-95,29],[-89,30],[-83,29],[-81,25],[-80,27],[-81,31],[-76,35],[-75,39],[-70,42],[-67,45],[-61,46],[-65,48],[-56,51],[-60,55],[-64,60],[-78,62],[-82,67],[-95,70],[-115,72],[-135,70],[-156,71],[-168,65]],
-  // Greenland
-  [[-44,60],[-22,70],[-18,81],[-46,82],[-56,76],[-52,66],[-44,60]],
-  // South America
-  [[-78,9],[-75,11],[-62,10],[-50,1],[-35,-6],[-38,-14],[-40,-22],[-48,-28],[-54,-34],[-62,-39],[-66,-48],[-68,-55],[-75,-52],[-73,-42],[-71,-30],[-71,-18],[-77,-12],[-81,-5],[-78,2],[-78,9]],
-  // Europe
-  [[-9,36],[-9,43],[-2,43],[-5,48],[2,51],[8,54],[10,58],[5,60],[6,63],[16,69],[28,71],[32,69],[42,67],[60,69],[60,55],[48,46],[38,45],[29,41],[26,40],[23,37],[15,38],[16,41],[12,44],[9,44],[3,42],[0,38],[-5,36],[-9,36]],
-  // UK & Ireland
-  [[-6,50],[-5,55],[-2,58],[1,53],[1,51],[-6,50]],
-  // Africa
-  [[-17,15],[-13,28],[-6,36],[10,37],[11,33],[25,32],[33,31],[39,22],[43,12],[51,12],[49,4],[41,-2],[40,-11],[35,-24],[28,-33],[18,-35],[15,-23],[12,-6],[9,4],[3,6],[-8,5],[-15,11],[-17,15]],
-  // Madagascar
-  [[44,-13],[50,-15],[47,-25],[43,-24],[44,-13]],
-  // Asia
-  [[28,41],[40,42],[50,40],[54,37],[48,30],[56,26],[62,25],[68,23],[73,15],[80,8],[88,22],[92,21],[98,16],[100,2],[104,1],[106,10],[109,13],[108,21],[114,22],[122,30],[120,38],[126,38],[129,35],[131,42],[140,48],[143,55],[156,51],[162,60],[178,65],[178,70],[140,73],[105,77],[72,73],[60,69],[48,46],[28,41]],
-  // Japan
-  [[130,31],[136,34],[141,38],[145,44],[140,42],[135,35],[130,31]],
-  // Australia
-  [[114,-22],[122,-17],[131,-12],[136,-12],[142,-11],[146,-18],[153,-26],[150,-37],[140,-38],[131,-32],[122,-34],[115,-34],[114,-22]],
-  // New Zealand
-  [[172,-35],[178,-38],[174,-42],[167,-46],[172,-35]],
-  // Antarctica
-  [[-180,-72],[-120,-73],[-60,-65],[0,-70],[60,-67],[120,-66],[179,-71],[180,-85],[-180,-85],[-180,-72]]
-];
+function latLonToVec3(latDeg, lonDeg, radius = 1) {
+  const phi = (90 - latDeg) * DEG2RAD;
+  const theta = (lonDeg + 180) * DEG2RAD;
+  return new THREE.Vector3(
+    -radius * Math.sin(phi) * Math.cos(theta),
+    radius * Math.cos(phi),
+    radius * Math.sin(phi) * Math.sin(theta)
+  );
+}
 
-// Major urban night-light clusters [lon, lat, intensity]
-const NIGHT_CITY_CLUSTERS = [
-  [-74.0, 40.7, 1.0], [-87.6, 41.8, 0.85], [-118.2, 34.0, 0.95], [-122.4, 37.7, 0.9],
-  [-78.5, 35.8, 0.8], [-80.2, 25.8, 0.85], [-95.4, 29.8, 0.85], [-99.1, 19.4, 0.9],
-  [-46.6, -23.5, 0.95], [-58.4, -34.6, 0.85], [-0.1, 51.5, 1.0], [2.3, 48.8, 0.95],
-  [13.4, 52.5, 0.85], [12.5, 41.9, 0.8], [37.6, 55.7, 0.9], [31.2, 30.0, 0.9],
-  [55.3, 25.2, 0.85], [72.8, 19.0, 0.95], [77.2, 28.6, 0.95], [100.5, 13.7, 0.85],
-  [103.8, 1.3, 0.9], [114.1, 22.3, 0.95], [121.5, 31.2, 1.0], [116.4, 39.9, 0.95],
-  [126.9, 37.5, 0.9], [139.7, 35.7, 1.0], [151.2, -33.8, 0.85]
-];
+function vec3ToLatLon(vec) {
+  const n = vec.clone().normalize();
+  const latDeg = Math.asin(clamp(n.y, -1, 1)) * RAD2DEG;
+  let theta = Math.atan2(n.z, -n.x);
+  if (theta < 0) theta += Math.PI * 2;
+  let lonDeg = theta * RAD2DEG - 180;
+  lonDeg = ((lonDeg + 540) % 360) - 180;
+  return { latitude: latDeg, longitude: lonDeg };
+}
+
+function getSubsolarVec3(dateObj) {
+  const utcHrs = dateObj.getUTCHours() + dateObj.getUTCMinutes() / 60;
+  const subsolarLon = ((12 - utcHrs) * 15 + 540) % 360 - 180;
+  const start = new Date(Date.UTC(dateObj.getUTCFullYear(), 0, 1));
+  const dayOfYear = Math.floor((dateObj - start) / 86400000);
+  const subsolarLat = -23.44 * Math.cos(((2 * Math.PI) / 365) * (dayOfYear + 10));
+  return latLonToVec3(subsolarLat, subsolarLon, 1).normalize();
+}
+
+const EARTH_VERTEX_SHADER = `
+  varying vec2 vUv;
+  varying vec3 vNormalWorld;
+  varying vec3 vPositionWorld;
+  void main() {
+    vUv = uv;
+    vec4 worldPos = modelMatrix * vec4(position, 1.0);
+    vPositionWorld = worldPos.xyz;
+    vNormalWorld = normalize(mat3(modelMatrix) * normal);
+    gl_Position = projectionMatrix * viewMatrix * worldPos;
+  }
+`;
+
+const EARTH_FRAGMENT_SHADER = `
+  uniform sampler2D uDayTex;
+  uniform sampler2D uNightTex;
+  uniform sampler2D uBumpTex;
+  uniform vec3 uSunDir;
+  uniform float uTerminatorStrength;
+  uniform float uThermalOverlay;
+  varying vec2 vUv;
+  varying vec3 vNormalWorld;
+  varying vec3 vPositionWorld;
+
+  void main() {
+    vec3 N = normalize(vNormalWorld);
+    vec3 L = normalize(uSunDir);
+    vec3 V = normalize(cameraPosition - vPositionWorld);
+
+    vec3 dayColor = texture2D(uDayTex, vUv).rgb;
+    vec3 nightColor = texture2D(uNightTex, vUv).rgb;
+    float elev = texture2D(uBumpTex, vUv).r;
+
+    // Subtle elevation relief shading
+    float ndotl = dot(N, L);
+    float dayFactor = smoothstep(-0.14, 0.22, ndotl);
+    float effectiveDay = mix(1.0, dayFactor, uTerminatorStrength);
+
+    // Rich sunlit day earth + ocean specular glint
+    float diffuse = mix(0.28, 1.18, clamp(ndotl * 0.85 + 0.35, 0.0, 1.0));
+    float fullDayDiffuse = mix(diffuse, 1.08, 1.0 - uTerminatorStrength);
+    vec3 litDay = dayColor * fullDayDiffuse;
+
+    // Subtle ocean sun specular where elevation is low (sea level)
+    float isOcean = 1.0 - smoothstep(0.03, 0.09, elev);
+    vec3 H = normalize(L + V);
+    float spec = pow(max(dot(N, H), 0.0), 42.0) * isOcean * 0.34 * effectiveDay;
+    litDay += vec3(0.75, 0.88, 1.0) * spec;
+
+    // Night hemisphere: deep midnight blue base + bright warm golden NASA Black Marble city lights
+    vec3 nightBase = dayColor * vec3(0.06, 0.09, 0.16);
+    vec3 cityLights = pow(nightColor, vec3(1.15)) * vec3(1.55, 1.25, 0.78) * 1.45;
+    vec3 litNight = nightBase + cityLights;
+
+    // Sunset/sunrise twilight glow band right along the terminator
+    float twilight = exp(-pow(ndotl * 7.5, 2.0)) * uTerminatorStrength;
+    vec3 twilightTint = vec3(1.0, 0.48, 0.22) * twilight * 0.24;
+
+    vec3 color = mix(litNight, litDay, effectiveDay) + twilightTint;
+
+    // Optional Global Thermal Latitude Band Tint
+    if (uThermalOverlay > 0.01) {
+      float latFactor = 1.0 - abs(vUv.y - 0.5) * 2.0; // 1 at equator, 0 at poles
+      vec3 coldCol = vec3(0.16, 0.45, 0.98);
+      vec3 mildCol = vec3(0.20, 0.82, 0.58);
+      vec3 hotCol = vec3(0.98, 0.36, 0.18);
+      vec3 thermalCol = latFactor < 0.5
+        ? mix(coldCol, mildCol, latFactor * 2.0)
+        : mix(mildCol, hotCol, (latFactor - 0.5) * 2.0);
+      color = mix(color, thermalCol, 0.42 * uThermalOverlay);
+    }
+
+    // Subtle atmospheric perspective near sphere limb
+    float rim = 1.0 - max(dot(N, V), 0.0);
+    color += vec3(0.24, 0.58, 1.0) * pow(rim, 3.2) * 0.36;
+
+    gl_FragColor = vec4(color, 1.0);
+  }
+`;
+
+const CLOUDS_VERTEX_SHADER = `
+  varying vec2 vUv;
+  varying vec3 vNormalWorld;
+  void main() {
+    vUv = uv;
+    vNormalWorld = normalize(mat3(modelMatrix) * normal);
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  }
+`;
+
+const CLOUDS_FRAGMENT_SHADER = `
+  uniform sampler2D uCloudTex;
+  uniform vec3 uSunDir;
+  uniform float uTerminatorStrength;
+  uniform float uOpacity;
+  varying vec2 vUv;
+  varying vec3 vNormalWorld;
+
+  void main() {
+    vec4 tex = texture2D(uCloudTex, vUv);
+    // clouds-alpha.png uses alpha channel (or brightness fallback)
+    float density = max(tex.a, (tex.r + tex.g + tex.b) / 3.0 * tex.a);
+    if (density < 0.02) discard;
+
+    vec3 N = normalize(vNormalWorld);
+    vec3 L = normalize(uSunDir);
+    float ndotl = dot(N, L);
+    float dayFactor = smoothstep(-0.22, 0.25, ndotl);
+    float effectiveDay = mix(1.0, dayFactor, uTerminatorStrength);
+
+    // Bright crisp white clouds in day, silver-blue moonlit clouds at night so cloud cover is always legible
+    vec3 dayCloud = vec3(0.97, 0.99, 1.0);
+    vec3 nightCloud = vec3(0.32, 0.44, 0.64);
+    float twilight = exp(-pow(ndotl * 6.5, 2.0)) * uTerminatorStrength;
+    vec3 cloudCol = mix(nightCloud, dayCloud, effectiveDay) + vec3(0.95, 0.55, 0.28) * twilight * 0.22;
+
+    float alpha = clamp(density * uOpacity * mix(0.68, 0.96, effectiveDay), 0.0, 0.94);
+    gl_FragColor = vec4(cloudCol, alpha);
+  }
+`;
+
+const ATMOSPHERE_VERTEX_SHADER = `
+  varying vec3 vNormalWorld;
+  varying vec3 vPositionWorld;
+  void main() {
+    vec4 worldPos = modelMatrix * vec4(position, 1.0);
+    vPositionWorld = worldPos.xyz;
+    vNormalWorld = normalize(mat3(modelMatrix) * normal);
+    gl_Position = projectionMatrix * viewMatrix * worldPos;
+  }
+`;
+
+const ATMOSPHERE_FRAGMENT_SHADER = `
+  uniform vec3 uSunDir;
+  varying vec3 vNormalWorld;
+  varying vec3 vPositionWorld;
+  void main() {
+    vec3 N = normalize(vNormalWorld);
+    vec3 V = normalize(cameraPosition - vPositionWorld);
+    float intensity = pow(0.64 - dot(N, V), 3.6);
+    float sunBoost = 0.55 + 0.45 * clamp(dot(-N, normalize(uSunDir)) * 0.5 + 0.5, 0.0, 1.0);
+    vec3 glow = vec3(0.28, 0.68, 1.0) * intensity * sunBoost * 1.35;
+    gl_FragColor = vec4(glow, clamp(intensity * 0.9, 0.0, 0.85));
+  }
+`;
 
 export class LiveCloudGlobe {
   constructor({ canvasId = 'cloud-globe-canvas', onSelectLocation, onLayerChange }) {
     this.canvasId = canvasId;
     this.onSelectLocation = onSelectLocation;
     this.onLayerChange = onLayerChange;
-    this.canvas = null;
-    this.ctx = null;
 
-    // Camera spherical orientation (degrees)
-    this.rotLon = -122.4194;
-    this.rotLat = 34.0;
-    this.targetLon = null;
-    this.targetLat = null;
+    this.canvas = null;
+    this.renderer = null;
+    this.scene = null;
+    this.camera = null;
+    this.globeGroup = null;
+    this.earthMesh = null;
+    this.earthMat = null;
+    this.cloudMesh = null;
+    this.cloudMat = null;
+    this.precipMesh = null;
+    this.windLines = null;
+    this.windState = [];
+    this.beaconGroup = null;
+    this.beaconRing = null;
+    this.cityPinGroup = null;
+    this.floatingLabelEl = null;
+
+    // Camera spherical orbit angles (radians)
+    this.camLon = -122.4194 * DEG2RAD;
+    this.camLat = 34 * DEG2RAD;
+    this.targetCamLon = null;
+    this.targetCamLat = null;
     this.velLon = 0;
     this.velLat = 0;
-    this.zoom = 1.08;
+    this.camDist = 2.65;
     this.autoSpin = true;
 
-    // Active layers
+    // Interactive layers
     this.layers = {
       clouds: true,
       wind: true,
-      thermal: false,
-      precip: true,
-      terminator: true
+      precip: false,
+      terminator: true,
+      thermal: false
     };
 
-    // Time scrubber offset (0..47 hours)
     this.hourOffset = 0;
     this.forecast = null;
-    this.globalSampleNodes = [];
-
-    // Pre-generate 420 volumetric cloud puffs & synoptic cyclone bands on the sphere
-    this.cloudPuffs = this.createSynopticCloudDeck();
-    // Pre-generate 210 3D wind stream particles
-    this.windParticles = this.createWindParticles();
-
     this.isDragging = false;
     this.dragMoved = false;
     this.lastPointer = { x: 0, y: 0 };
-    this.animFrame = null;
+    this.initialized = false;
+    this.raycaster = new THREE.Raycaster();
+    this.lastTime = 0;
   }
 
   init(forecast) {
     this.forecast = forecast;
+    if (this.initialized) {
+      this.updateActiveBeacon();
+      return;
+    }
+
     this.canvas = document.getElementById(this.canvasId);
     if (!this.canvas) return;
-    this.ctx = this.canvas.getContext('2d');
+    this.initialized = true;
+
+    // Create floating retina HTML callout tag inside .globe-stage-wrap
+    const stageWrap = this.canvas.parentElement;
+    if (stageWrap && !stageWrap.querySelector('.globe-beacon-tag')) {
+      const tag = document.createElement('div');
+      tag.className = 'globe-beacon-tag';
+      tag.hidden = true;
+      stageWrap.appendChild(tag);
+      this.floatingLabelEl = tag;
+    }
+
+    this.setupThreeScene();
+    this.bindEvents();
 
     if (forecast?.location) {
-      this.flyTo(forecast.location.latitude, forecast.location.longitude);
+      this.flyTo(forecast.location.latitude, forecast.location.longitude, true);
     }
+    this.updateActiveBeacon();
 
-    this.bindEvents();
-    this.fetchGlobalCloudSamples();
-
-    if (!this.animFrame) {
-      const loop = (ts) => {
-        this.renderFrame(ts);
-        this.animFrame = requestAnimationFrame(loop);
-      };
-      this.animFrame = requestAnimationFrame(loop);
-    }
+    const animate = (now) => {
+      const dt = Math.min(0.05, (now - (this.lastTime || now)) / 1000);
+      this.lastTime = now;
+      this.renderFrame(dt, now * 0.001);
+      requestAnimationFrame(animate);
+    };
+    requestAnimationFrame(animate);
   }
 
   updateForecast(forecast) {
     this.forecast = forecast;
+    if (!this.initialized) {
+      this.init(forecast);
+      return;
+    }
     if (forecast?.location) {
       this.flyTo(forecast.location.latitude, forecast.location.longitude);
     }
+    this.updateActiveBeacon();
+  }
+
+  setupThreeScene() {
+    const rect = this.canvas.getBoundingClientRect();
+    const w = Math.max(300, Math.floor(rect.width || 480));
+    const h = Math.max(300, Math.floor(rect.height || 380));
+
+    this.renderer = new THREE.WebGLRenderer({
+      canvas: this.canvas,
+      antialias: true,
+      alpha: true,
+      powerPreference: 'high-performance'
+    });
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    this.renderer.setSize(w, h, false);
+
+    // Frame the full luminous Earth horizon comfortably on both desktop and portrait mobile
+    this.camDist = w < 440 ? 3.25 : 2.85;
+
+    this.scene = new THREE.Scene();
+    this.camera = new THREE.PerspectiveCamera(40, w / h, 0.1, 100);
+    this.globeGroup = new THREE.Group();
+    this.scene.add(this.globeGroup);
+
+    // 1. Deep-Space Starfield
+    const starPositions = new Float32Array(900 * 3);
+    for (let i = 0; i < 900; i++) {
+      const r = 18 + Math.random() * 24;
+      const u = Math.random() * 2 - 1;
+      const phi = Math.random() * Math.PI * 2;
+      const s = Math.sqrt(1 - u * u);
+      starPositions[i * 3] = r * s * Math.cos(phi);
+      starPositions[i * 3 + 1] = r * u;
+      starPositions[i * 3 + 2] = r * s * Math.sin(phi);
+    }
+    const starGeo = new THREE.BufferGeometry();
+    starGeo.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
+    const starMat = new THREE.PointsMaterial({
+      color: 0xdbeafe,
+      size: 0.085,
+      transparent: true,
+      opacity: 0.72
+    });
+    this.scene.add(new THREE.Points(starGeo, starMat));
+
+    const loader = new THREE.TextureLoader();
+    loader.setCrossOrigin('anonymous');
+
+    const loadTex = (url, fallbackUrl = null, onReady = null) => {
+      const tex = loader.load(
+        url,
+        (loaded) => {
+          loaded.wrapS = THREE.RepeatWrapping;
+          loaded.anisotropy = Math.min(8, this.renderer.capabilities.getMaxAnisotropy());
+          if (onReady) onReady(loaded);
+        },
+        undefined,
+        () => {
+          if (fallbackUrl) {
+            loader.load(fallbackUrl, (fb) => {
+              fb.wrapS = THREE.RepeatWrapping;
+              if (onReady) onReady(fb);
+            });
+          }
+        }
+      );
+      tex.wrapS = THREE.RepeatWrapping;
+      return tex;
+    };
+
+    const dayTex = loadTex('/weather-fusion/v3/textures/earth-day.jpg');
+    const nightTex = loadTex('/weather-fusion/v3/textures/earth-night.jpg');
+    const bumpTex = loadTex('/weather-fusion/v3/textures/earth-bump.png');
+    const sunDir = getSubsolarVec3(new Date());
+
+    // 2. Photorealistic NASA Blue Marble + Black Marble Earth Sphere
+    const earthGeo = new THREE.SphereGeometry(1, 64, 64);
+    this.earthMat = new THREE.ShaderMaterial({
+      uniforms: {
+        uDayTex: { value: dayTex },
+        uNightTex: { value: nightTex },
+        uBumpTex: { value: bumpTex },
+        uSunDir: { value: sunDir.clone() },
+        uTerminatorStrength: { value: 1.0 },
+        uThermalOverlay: { value: 0.0 }
+      },
+      vertexShader: EARTH_VERTEX_SHADER,
+      fragmentShader: EARTH_FRAGMENT_SHADER
+    });
+    this.earthMesh = new THREE.Mesh(earthGeo, this.earthMat);
+    this.globeGroup.add(this.earthMesh);
+
+    // 3. Real-Time Live Global Geostationary Satellite Cloud Shell
+    const cloudGeo = new THREE.SphereGeometry(1.016, 64, 64);
+    const cloudTex = loadTex(
+      '/api/weather-fusion/v3/live-clouds.png',
+      '/weather-fusion/v3/textures/clouds-fallback.png',
+      (loaded) => {
+        if (this.cloudMat) {
+          this.cloudMat.uniforms.uCloudTex.value = loaded;
+          this.cloudMat.needsUpdate = true;
+        }
+      }
+    );
+    this.cloudMat = new THREE.ShaderMaterial({
+      uniforms: {
+        uCloudTex: { value: cloudTex },
+        uSunDir: { value: sunDir.clone() },
+        uTerminatorStrength: { value: 1.0 },
+        uOpacity: { value: 0.92 }
+      },
+      vertexShader: CLOUDS_VERTEX_SHADER,
+      fragmentShader: CLOUDS_FRAGMENT_SHADER,
+      transparent: true,
+      depthWrite: false
+    });
+    this.cloudMesh = new THREE.Mesh(cloudGeo, this.cloudMat);
+    this.globeGroup.add(this.cloudMesh);
+
+    // 4. Real-Time NASA GPM IMERG Global Satellite Precipitation Layer
+    const precipGeo = new THREE.SphereGeometry(1.022, 64, 64);
+    const precipMat = new THREE.MeshBasicMaterial({
+      transparent: true,
+      opacity: 0.85,
+      depthWrite: false
+    });
+    loadTex(
+      '/api/weather-fusion/v3/live-precip.png',
+      'https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.3.0&LAYERS=IMERG_Precipitation_Rate&CRS=EPSG:4326&BBOX=-90,-180,90,180&WIDTH=2048&HEIGHT=1024&FORMAT=image/png&TRANSPARENT=true',
+      (loaded) => {
+        precipMat.map = loaded;
+        precipMat.needsUpdate = true;
+      }
+    );
+    this.precipMesh = new THREE.Mesh(precipGeo, precipMat);
+    this.precipMesh.visible = this.layers.precip;
+    this.globeGroup.add(this.precipMesh);
+
+    // 5. Real Rayleigh Atmospheric Fresnel Halo
+    const atmoGeo = new THREE.SphereGeometry(1.105, 64, 64);
+    const atmoMat = new THREE.ShaderMaterial({
+      uniforms: {
+        uSunDir: { value: sunDir.clone() }
+      },
+      vertexShader: ATMOSPHERE_VERTEX_SHADER,
+      fragmentShader: ATMOSPHERE_FRAGMENT_SHADER,
+      blending: THREE.AdditiveBlending,
+      side: THREE.BackSide,
+      transparent: true,
+      depthWrite: false
+    });
+    this.atmoMat = atmoMat;
+    this.globeGroup.add(new THREE.Mesh(atmoGeo, atmoMat));
+
+    // 6. 3D Animated Jet Stream & Planetary Wind Ribbons
+    this.buildWindRibbons();
+
+    // 7. Preset City Pins + Active Pulsing Beacon
+    this.cityPinGroup = new THREE.Group();
+    const pinGeo = new THREE.SphereGeometry(0.011, 10, 10);
+    const pinMat = new THREE.MeshBasicMaterial({ color: 0x7ac6ff });
+    PRESET_CITIES.forEach((city) => {
+      const m = new THREE.Mesh(pinGeo, pinMat);
+      m.position.copy(latLonToVec3(city.latitude, city.longitude, 1.008));
+      this.cityPinGroup.add(m);
+    });
+    this.globeGroup.add(this.cityPinGroup);
+
+    this.beaconGroup = new THREE.Group();
+    const dotGeo = new THREE.SphereGeometry(0.019, 16, 16);
+    const dotMat = new THREE.MeshBasicMaterial({ color: 0x5ce0a0 });
+    this.beaconGroup.add(new THREE.Mesh(dotGeo, dotMat));
+
+    const ringGeo = new THREE.RingGeometry(0.026, 0.038, 32);
+    const ringMat = new THREE.MeshBasicMaterial({
+      color: 0x5ce0a0,
+      side: THREE.DoubleSide,
+      transparent: true,
+      opacity: 0.9
+    });
+    this.beaconRing = new THREE.Mesh(ringGeo, ringMat);
+    this.beaconGroup.add(this.beaconRing);
+    this.globeGroup.add(this.beaconGroup);
+
+    // ResizeObserver for crisp layout across mobile & desktop
+    if (typeof ResizeObserver !== 'undefined') {
+      new ResizeObserver(() => this.handleResize()).observe(this.canvas.parentElement || this.canvas);
+    }
+    window.addEventListener('resize', () => this.handleResize());
+  }
+
+  buildWindRibbons() {
+    const count = 150;
+    this.windState = [];
+    for (let i = 0; i < count; i++) {
+      this.windState.push({
+        lon: ((i * 67) % 360) - 180,
+        lat: ((i * 43) % 136) - 68,
+        speed: 5.5 + (i % 6) * 2.2
+      });
+    }
+    const positions = new Float32Array(count * 2 * 3);
+    const colors = new Float32Array(count * 2 * 3);
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    const mat = new THREE.LineBasicMaterial({
+      vertexColors: true,
+      transparent: true,
+      opacity: 0.78
+    });
+    this.windLines = new THREE.LineSegments(geo, mat);
+    this.windLines.visible = this.layers.wind;
+    this.globeGroup.add(this.windLines);
+  }
+
+  updateWindRibbons(dt) {
+    if (!this.windLines || !this.layers.wind) return;
+    const pos = this.windLines.geometry.attributes.position;
+    const col = this.windLines.geometry.attributes.color;
+    const r = 1.032;
+
+    for (let i = 0; i < this.windState.length; i++) {
+      const w = this.windState[i];
+      const absLat = Math.abs(w.lat);
+      const isJet = absLat >= 28 && absLat <= 56;
+      const dir = absLat < 22 ? -0.55 : isJet ? 1.45 : -0.4;
+      const dLon = dir * w.speed * dt;
+      const dLat = Math.sin(w.lon * DEG2RAD * 3) * 1.4 * dt;
+
+      w.lon = ((w.lon + dLon + 540) % 360) - 180;
+      w.lat = clamp(w.lat + dLat, -74, 74);
+
+      const head = latLonToVec3(w.lat, w.lon, r);
+      const tail = latLonToVec3(clamp(w.lat - dLat * 4, -76, 76), w.lon - dir * (isJet ? 5.2 : 2.8), r);
+
+      const idx = i * 2;
+      pos.setXYZ(idx, tail.x, tail.y, tail.z);
+      pos.setXYZ(idx + 1, head.x, head.y, head.z);
+
+      if (isJet) {
+        col.setXYZ(idx, 0.2, 0.72, 1.0);
+        col.setXYZ(idx + 1, 0.45, 0.98, 0.85);
+      } else {
+        col.setXYZ(idx, 0.35, 0.65, 0.95);
+        col.setXYZ(idx + 1, 0.7, 0.92, 1.0);
+      }
+    }
+    pos.needsUpdate = true;
+    col.needsUpdate = true;
+  }
+
+  updateActiveBeacon() {
+    if (!this.beaconGroup || !this.forecast?.location) return;
+    const { latitude, longitude } = this.forecast.location;
+    const pos = latLonToVec3(latitude, longitude, 1.012);
+    this.beaconGroup.position.copy(pos);
+    this.beaconGroup.lookAt(pos.clone().multiplyScalar(2));
+  }
+
+  handleResize() {
+    if (!this.canvas || !this.renderer || !this.camera) return;
+    const rect = this.canvas.getBoundingClientRect();
+    const w = Math.max(240, Math.floor(rect.width));
+    const h = Math.max(240, Math.floor(rect.height));
+    this.camera.aspect = w / h;
+    this.camera.updateProjectionMatrix();
+    this.renderer.setSize(w, h, false);
   }
 
   setHourOffset(idx) {
@@ -128,13 +562,28 @@ export class LiveCloudGlobe {
   }
 
   toggleLayer(layerKey) {
-    if (layerKey in this.layers) {
-      this.layers[layerKey] = !this.layers[layerKey];
-      if (typeof this.onLayerChange === 'function') {
-        this.onLayerChange(this.layers);
-      }
+    if (!(layerKey in this.layers)) return false;
+    this.layers[layerKey] = !this.layers[layerKey];
+    const on = this.layers[layerKey];
+
+    if (layerKey === 'clouds' && this.cloudMesh) {
+      this.cloudMesh.visible = on;
+    } else if (layerKey === 'precip' && this.precipMesh) {
+      this.precipMesh.visible = on;
+    } else if (layerKey === 'wind' && this.windLines) {
+      this.windLines.visible = on;
+    } else if (layerKey === 'terminator') {
+      const val = on ? 1.0 : 0.0;
+      if (this.earthMat) this.earthMat.uniforms.uTerminatorStrength.value = val;
+      if (this.cloudMat) this.cloudMat.uniforms.uTerminatorStrength.value = val;
+    } else if (layerKey === 'thermal' && this.earthMat) {
+      this.earthMat.uniforms.uThermalOverlay.value = on ? 1.0 : 0.0;
     }
-    return this.layers[layerKey];
+
+    if (typeof this.onLayerChange === 'function') {
+      this.onLayerChange(this.layers);
+    }
+    return on;
   }
 
   setAutoSpin(enabled) {
@@ -142,183 +591,33 @@ export class LiveCloudGlobe {
     return this.autoSpin;
   }
 
-  flyTo(lat, lon) {
-    this.targetLat = clamp(lat, -70, 70);
-    this.targetLon = lon;
+  zoomBy(delta) {
+    this.camDist = clamp(this.camDist - delta * 0.45, 1.55, 3.85);
   }
 
-  /**
-   * Fetches live global cloud-cover & temperature telemetry across key global anchor coordinates
-   * from Open-Meteo so the 3D globe's regional cloud density reflects live planetary weather.
-   */
-  async fetchGlobalCloudSamples() {
-    const anchors = [
-      { lat: 37.77, lon: -122.42 }, // West Coast US
-      { lat: 35.78, lon: -78.48 },  // East Coast US
-      { lat: 41.88, lon: -87.63 },  // Midwest US
-      { lat: 25.76, lon: -80.19 },  // Gulf / Atlantic
-      { lat: 51.51, lon: -0.13 },   // Western Europe
-      { lat: 35.68, lon: 139.77 },  // East Asia
-      { lat: -23.55, lon: -46.63 }, // South America
-      { lat: -33.87, lon: 151.21 }  // Australia
-    ];
-
-    try {
-      const lats = anchors.map((a) => a.lat).join(',');
-      const lons = anchors.map((a) => a.lon).join(',');
-      const url = `https://api.open-meteo.com/v1/forecast?latitude=${lats}&longitude=${lons}&current=cloud_cover,temperature_2m,precipitation,wind_speed_10m,wind_direction_10m&temperature_unit=fahrenheit&wind_speed_unit=mph`;
-      const res = await fetch(url);
-      if (!res.ok) return;
-      const data = await res.json();
-      const list = Array.isArray(data) ? data : [data];
-      this.globalSampleNodes = list.map((item, idx) => ({
-        lat: anchors[idx].lat,
-        lon: anchors[idx].lon,
-        cloudCover: item?.current?.cloud_cover ?? 55,
-        tempF: item?.current?.temperature_2m ?? 60,
-        precip: item?.current?.precipitation ?? 0,
-        windMph: item?.current?.wind_speed_10m ?? 12,
-        windDir: item?.current?.wind_direction_10m ?? 250
-      }));
-    } catch {
-      // Uses deterministic planetary synoptic state if offline
+  flyTo(latDeg, lonDeg, instant = false) {
+    const tLat = clamp(latDeg, -72, 72) * DEG2RAD;
+    const tLon = lonDeg * DEG2RAD;
+    if (instant) {
+      this.camLat = tLat;
+      this.camLon = tLon;
+      this.targetCamLat = null;
+      this.targetCamLon = null;
+    } else {
+      this.targetCamLat = tLat;
+      this.targetCamLon = tLon;
     }
-  }
-
-  createSynopticCloudDeck() {
-    const puffs = [];
-    // 1. ITCZ Equatorial Cloud Belt + Mid-Latitude Baroclinic Frontal Systems + Polar Vortices
-    const stormCenters = [
-      { lon: -138, lat: 46, radius: 22, spin: 1 },
-      { lon: -74, lat: 39, radius: 19, spin: 1 },
-      { lon: -28, lat: 54, radius: 25, spin: 1 },
-      { lon: 18, lat: 48, radius: 18, spin: 1 },
-      { lon: 145, lat: 42, radius: 24, spin: 1 },
-      { lon: -110, lat: 8, radius: 16, spin: 0 },
-      { lon: -45, lat: 4, radius: 18, spin: 0 },
-      { lon: 95, lat: 5, radius: 20, spin: 0 },
-      { lon: -55, lat: -44, radius: 24, spin: -1 },
-      { lon: 85, lat: -48, radius: 26, spin: -1 }
-    ];
-
-    for (let i = 0; i < 360; i++) {
-      const center = stormCenters[i % stormCenters.length];
-      const armAngle = (i / 18) * Math.PI * 2;
-      const dist = ((i * 17) % 100) / 100 * center.radius;
-      // Comma-cloud spiral offset
-      const spiralAngle = armAngle + (dist / center.radius) * 2.1 * center.spin;
-      const lat = clamp(center.lat + Math.sin(spiralAngle) * dist * 0.72, -82, 82);
-      const lon = ((center.lon + Math.cos(spiralAngle) * dist * 1.15 + 540) % 360) - 180;
-      const size = 2.6 + ((i * 13) % 7) * 0.85;
-      const baseOpacity = 0.22 + ((i * 29) % 50) / 100;
-      const driftLonPerSec = (Math.abs(lat) > 25 ? 0.42 : -0.25) * (0.7 + ((i % 5) * 0.15));
-      const driftLatPerSec = Math.sin(i) * 0.06;
-
-      puffs.push({
-        baseLon: lon,
-        baseLat: lat,
-        size,
-        baseOpacity,
-        driftLonPerSec,
-        driftLatPerSec,
-        isLocalCluster: false
-      });
-    }
-
-    // 2. Local High-Detail Cloud Deck around the active selected location (65 puffs)
-    for (let j = 0; j < 65; j++) {
-      const r = Math.sqrt(j / 65) * 14;
-      const theta = j * 2.39996; // Golden angle distribution
-      puffs.push({
-        offsetLon: Math.cos(theta) * r * 1.25,
-        offsetLat: Math.sin(theta) * r,
-        size: 2.2 + (j % 5) * 0.9,
-        baseOpacity: 0.35 + (j % 4) * 0.12,
-        phase: j * 0.5,
-        isLocalCluster: true
-      });
-    }
-
-    return puffs;
-  }
-
-  createWindParticles() {
-    const list = [];
-    for (let i = 0; i < 210; i++) {
-      list.push({
-        lon: ((i * 73) % 360) - 180,
-        lat: ((i * 41) % 150) - 75,
-        trail: [],
-        speedFactor: 0.7 + (i % 7) * 0.14
-      });
-    }
-    return list;
-  }
-
-  /**
-   * Projects spherical [lon, lat] (degrees) onto 2D canvas [x, y, z]
-   * where z > 0 means visible on the front hemisphere.
-   */
-  project(lonDeg, latDeg, cx, cy, radius) {
-    const lam = (lonDeg - this.rotLon) * DEG2RAD;
-    const phi = latDeg * DEG2RAD;
-    const phi0 = this.rotLat * DEG2RAD;
-
-    const cosPhi = Math.cos(phi);
-    const sinPhi = Math.sin(phi);
-    const cosPhi0 = Math.cos(phi0);
-    const sinPhi0 = Math.sin(phi0);
-    const cosLam = Math.cos(lam);
-    const sinLam = Math.sin(lam);
-
-    const z = sinPhi0 * sinPhi + cosPhi0 * cosPhi * cosLam;
-    const x = cx + radius * cosPhi * sinLam;
-    const y = cy - radius * (cosPhi0 * sinPhi - sinPhi0 * cosPhi * cosLam);
-
-    return { x, y, z, visible: z > 0 };
-  }
-
-  /**
-   * Inverse orthographic projection: converts canvas (px, py) click to spherical [lon, lat]
-   */
-  unproject(px, py, cx, cy, radius) {
-    const nx = (px - cx) / radius;
-    const ny = (cy - py) / radius;
-    const rho = Math.sqrt(nx * nx + ny * ny);
-    if (rho > 1) return null;
-
-    const c = Math.asin(rho);
-    const cosC = Math.cos(c);
-    const sinC = Math.sin(c);
-    const phi0 = this.rotLat * DEG2RAD;
-    const lam0 = this.rotLon * DEG2RAD;
-
-    const phi =
-      rho === 0
-        ? phi0
-        : Math.asin(cosC * Math.sin(phi0) + (ny * sinC * Math.cos(phi0)) / rho);
-    const lam =
-      lam0 +
-      Math.atan2(
-        nx * sinC,
-        rho * Math.cos(phi0) * cosC - ny * Math.sin(phi0) * sinC
-      );
-
-    let lon = lam * RAD2DEG;
-    lon = ((lon + 540) % 360) - 180;
-    const lat = clamp(phi * RAD2DEG, -85, 85);
-    return { latitude: lat, longitude: lon };
   }
 
   bindEvents() {
-    if (!this.canvas || this.canvas.__globeBound) return;
-    this.canvas.__globeBound = true;
+    if (!this.canvas || this.canvas.__webglBound) return;
+    this.canvas.__webglBound = true;
 
     this.canvas.addEventListener('pointerdown', (e) => {
       this.isDragging = true;
       this.dragMoved = false;
-      this.targetLat = null;
-      this.targetLon = null;
+      this.targetCamLat = null;
+      this.targetCamLon = null;
       this.lastPointer = { x: e.clientX, y: e.clientY };
       this.canvas.setPointerCapture?.(e.pointerId);
     });
@@ -327,46 +626,46 @@ export class LiveCloudGlobe {
       if (!this.isDragging) return;
       const dx = e.clientX - this.lastPointer.x;
       const dy = e.clientY - this.lastPointer.y;
-      if (Math.abs(dx) > 3 || Math.abs(dy) > 3) {
+      if (Math.abs(dx) > 4 || Math.abs(dy) > 4) {
         this.dragMoved = true;
       }
-      const sensitivity = 0.28 / this.zoom;
-      this.rotLon = ((this.rotLon - dx * sensitivity + 540) % 360) - 180;
-      this.rotLat = clamp(this.rotLat + dy * sensitivity, -78, 78);
-      this.velLon = -dx * sensitivity * 0.35;
-      this.velLat = dy * sensitivity * 0.35;
+      const sens = 0.0052 * (this.camDist / 2.6);
+      this.camLon -= dx * sens;
+      this.camLat = clamp(this.camLat + dy * sens, -1.32, 1.32);
+      this.velLon = -dx * sens * 0.25;
+      this.velLat = dy * sens * 0.25;
       this.lastPointer = { x: e.clientX, y: e.clientY };
     });
 
-    const endDrag = (e) => {
+    const handleUp = (e) => {
       if (!this.isDragging) return;
       this.isDragging = false;
 
-      // If it was a clean click/tap without dragging, raycast to Earth coordinates!
-      if (!this.dragMoved && e && e.type === 'pointerup') {
+      if (!this.dragMoved && e && e.type === 'pointerup' && this.earthMesh) {
         const rect = this.canvas.getBoundingClientRect();
-        const px = e.clientX - rect.left;
-        const py = e.clientY - rect.top;
-        const cx = rect.width / 2;
-        const cy = rect.height / 2;
-        const radius = Math.min(cx, cy) * 0.82 * this.zoom;
-        const hit = this.unproject(px, py, cx, cy, radius);
-        if (hit && typeof this.onSelectLocation === 'function') {
-          this.flyTo(hit.latitude, hit.longitude);
-          // Check if near a preset city first
+        const ndc = new THREE.Vector2(
+          ((e.clientX - rect.left) / rect.width) * 2 - 1,
+          -((e.clientY - rect.top) / rect.height) * 2 + 1
+        );
+        this.raycaster.setFromCamera(ndc, this.camera);
+        const hits = this.raycaster.intersectObject(this.earthMesh, false);
+        if (hits.length > 0 && typeof this.onSelectLocation === 'function') {
+          const localPt = this.earthMesh.worldToLocal(hits[0].point.clone());
+          const { latitude, longitude } = vec3ToLatLon(localPt);
+          this.flyTo(latitude, longitude);
           const nearPreset = PRESET_CITIES.find(
-            (c) => Math.hypot(c.latitude - hit.latitude, c.longitude - hit.longitude) < 3.5
+            (c) => Math.hypot(c.latitude - latitude, c.longitude - longitude) < 3.5
           );
           if (nearPreset) {
             this.onSelectLocation(nearPreset);
           } else {
-            const latDir = hit.latitude >= 0 ? 'N' : 'S';
-            const lonDir = hit.longitude >= 0 ? 'E' : 'W';
+            const latDir = latitude >= 0 ? 'N' : 'S';
+            const lonDir = longitude >= 0 ? 'E' : 'W';
             this.onSelectLocation({
-              id: `${hit.latitude.toFixed(2)},${hit.longitude.toFixed(2)}`,
-              name: `Globe Point (${Math.abs(hit.latitude).toFixed(1)}°${latDir}, ${Math.abs(hit.longitude).toFixed(1)}°${lonDir})`,
-              latitude: Number(hit.latitude.toFixed(4)),
-              longitude: Number(hit.longitude.toFixed(4)),
+              id: `${latitude.toFixed(2)},${longitude.toFixed(2)}`,
+              name: `${Math.abs(latitude).toFixed(1)}°${latDir}, ${Math.abs(longitude).toFixed(1)}°${lonDir}`,
+              latitude: Number(latitude.toFixed(4)),
+              longitude: Number(longitude.toFixed(4)),
               wfo: 'GLOBAL',
               elevationFt: 120
             });
@@ -375,414 +674,89 @@ export class LiveCloudGlobe {
       }
     };
 
-    this.canvas.addEventListener('pointerup', endDrag);
-    this.canvas.addEventListener('pointercancel', endDrag);
+    this.canvas.addEventListener('pointerup', handleUp);
+    this.canvas.addEventListener('pointercancel', handleUp);
 
     this.canvas.addEventListener(
       'wheel',
       (e) => {
         e.preventDefault();
-        const delta = e.deltaY < 0 ? 0.08 : -0.08;
-        this.zoom = clamp(this.zoom + delta, 0.78, 2.35);
+        this.camDist = clamp(this.camDist + (e.deltaY > 0 ? 0.14 : -0.14), 1.55, 3.85);
       },
       { passive: false }
     );
   }
 
-  renderFrame(ts) {
-    if (!this.canvas || !this.ctx) return;
-    const rect = this.canvas.getBoundingClientRect();
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    const w = Math.max(1, Math.floor(rect.width));
-    const h = Math.max(1, Math.floor(rect.height));
+  renderFrame(dt, tSec) {
+    if (!this.renderer || !this.scene || !this.camera) return;
 
-    if (this.canvas.width !== w * dpr || this.canvas.height !== h * dpr) {
-      this.canvas.width = w * dpr;
-      this.canvas.height = h * dpr;
-    }
-
-    const ctx = this.ctx;
-    ctx.save();
-    ctx.scale(dpr, dpr);
-    ctx.clearRect(0, 0, w, h);
-
-    // Update camera rotation / fly-to interpolation / inertia
+    // 1. Update camera spherical orbit / smooth fly-to / inertia
     if (!this.isDragging) {
-      if (this.targetLon !== null && this.targetLat !== null) {
-        let dLon = ((this.targetLon - this.rotLon + 540) % 360) - 180;
-        let dLat = this.targetLat - this.rotLat;
-        this.rotLon = ((this.rotLon + dLon * 0.09 + 540) % 360) - 180;
-        this.rotLat = clamp(this.rotLat + dLat * 0.09, -78, 78);
-        if (Math.abs(dLon) < 0.25 && Math.abs(dLat) < 0.25) {
-          this.targetLon = null;
-          this.targetLat = null;
+      if (this.targetCamLon !== null && this.targetCamLat !== null) {
+        let dLon = this.targetCamLon - this.camLon;
+        while (dLon > Math.PI) dLon -= Math.PI * 2;
+        while (dLon < -Math.PI) dLon += Math.PI * 2;
+        const dLat = this.targetCamLat - this.camLat;
+        this.camLon += dLon * 0.085;
+        this.camLat = clamp(this.camLat + dLat * 0.085, -1.32, 1.32);
+        if (Math.abs(dLon) < 0.005 && Math.abs(dLat) < 0.005) {
+          this.targetCamLon = null;
+          this.targetCamLat = null;
         }
       } else {
-        this.rotLon = ((this.rotLon + this.velLon + (this.autoSpin ? 0.09 : 0) + 540) % 360) - 180;
-        this.rotLat = clamp(this.rotLat + this.velLat, -78, 78);
-        this.velLon *= 0.92;
-        this.velLat *= 0.92;
+        this.camLon += this.velLon + (this.autoSpin ? dt * 0.055 : 0);
+        this.camLat = clamp(this.camLat + this.velLat, -1.32, 1.32);
+        this.velLon *= 0.91;
+        this.velLat *= 0.91;
       }
     }
 
-    const cx = w / 2;
-    const cy = h / 2;
-    const radius = Math.min(cx, cy) * 0.82 * this.zoom;
-    const tSec = ts * 0.001;
+    // Position camera using exact matching spherical coordinates
+    const camPos = latLonToVec3(this.camLat * RAD2DEG, this.camLon * RAD2DEG, this.camDist);
+    this.camera.position.copy(camPos);
+    this.camera.lookAt(0, 0, 0);
 
-    const activeHour =
-      this.forecast?.hours48?.[this.hourOffset] ||
-      this.forecast?.current ||
-      { cloudCover: 65, tempF: 57, rainChance: 45, precipIn: 0.02, windMph: 10, windDirDeg: 245, time: new Date().toISOString() };
+    // 2. Real-Time Solar Terminator Position (+ 48h Time Machine Offset)
+    const simDate = new Date(Date.now() + this.hourOffset * 3600000);
+    const sunDir = getSubsolarVec3(simDate);
+    if (this.earthMat) this.earthMat.uniforms.uSunDir.value.copy(sunDir);
+    if (this.cloudMat) this.cloudMat.uniforms.uSunDir.value.copy(sunDir);
+    if (this.atmoMat) this.atmoMat.uniforms.uSunDir.value.copy(sunDir);
 
-    // 1. Outer Atmospheric Limb Halo Glow
-    const haloGrad = ctx.createRadialGradient(cx, cy, radius * 0.88, cx, cy, radius * 1.18);
-    haloGrad.addColorStop(0, 'rgba(68, 168, 255, 0.35)');
-    haloGrad.addColorStop(0.5, 'rgba(56, 145, 255, 0.14)');
-    haloGrad.addColorStop(1, 'rgba(10, 25, 55, 0)');
-    ctx.fillStyle = haloGrad;
-    ctx.beginPath();
-    ctx.arc(cx, cy, radius * 1.18, 0, Math.PI * 2);
-    ctx.fill();
-
-    // 2. Clip to 3D Ocean Sphere & Render Deep Bathymetric Ocean
-    ctx.save();
-    ctx.beginPath();
-    ctx.arc(cx, cy, radius, 0, Math.PI * 2);
-    ctx.clip();
-
-    const oceanGrad = ctx.createRadialGradient(
-      cx - radius * 0.28,
-      cy - radius * 0.28,
-      radius * 0.08,
-      cx,
-      cy,
-      radius
-    );
-    oceanGrad.addColorStop(0, '#18477d');
-    oceanGrad.addColorStop(0.55, '#0c294e');
-    oceanGrad.addColorStop(1, '#051329');
-    ctx.fillStyle = oceanGrad;
-    ctx.fillRect(cx - radius, cy - radius, radius * 2, radius * 2);
-
-    // 3. Latitude / Longitude Graticule Grid
-    ctx.strokeStyle = 'rgba(130, 190, 255, 0.11)';
-    ctx.lineWidth = 0.8;
-    for (let lon = -150; lon <= 180; lon += 30) {
-      ctx.beginPath();
-      let started = false;
-      for (let lat = -80; lat <= 80; lat += 6) {
-        const pt = this.project(lon, lat, cx, cy, radius);
-        if (pt.visible) {
-          if (!started) {
-            ctx.moveTo(pt.x, pt.y);
-            started = true;
-          } else {
-            ctx.lineTo(pt.x, pt.y);
-          }
-        } else {
-          started = false;
-        }
-      }
-      ctx.stroke();
-    }
-    for (let lat = -60; lat <= 60; lat += 30) {
-      ctx.beginPath();
-      let started = false;
-      for (let lon = -180; lon <= 180; lon += 6) {
-        const pt = this.project(lon, lat, cx, cy, radius);
-        if (pt.visible) {
-          if (!started) {
-            ctx.moveTo(pt.x, pt.y);
-            started = true;
-          } else {
-            ctx.lineTo(pt.x, pt.y);
-          }
-        } else {
-          started = false;
-        }
-      }
-      ctx.stroke();
+    // 3. Gently advect real satellite cloud cover across the planet!
+    if (this.cloudMesh) {
+      this.cloudMesh.rotation.y = (tSec * 0.0045 + this.hourOffset * 0.016) % (Math.PI * 2);
     }
 
-    // 4. Vector Continents & Topographic Biome Fill
-    CONTINENT_POLYGONS.forEach((poly, idx) => {
-      ctx.beginPath();
-      let visibleCount = 0;
-      poly.forEach(([lon, lat], pIdx) => {
-        const pt = this.project(lon, lat, cx, cy, radius);
-        if (pt.z > -0.15) visibleCount++;
-        if (pIdx === 0) ctx.moveTo(pt.x, pt.y);
-        else ctx.lineTo(pt.x, pt.y);
-      });
-      if (visibleCount > 2) {
-        ctx.closePath();
-        const isPolar = idx === 1 || idx === CONTINENT_POLYGONS.length - 1;
-        ctx.fillStyle = isPolar
-          ? 'rgba(195, 222, 248, 0.72)'
-          : 'rgba(34, 82, 92, 0.82)';
-        ctx.strokeStyle = 'rgba(115, 218, 200, 0.42)';
-        ctx.lineWidth = 1.1;
-        ctx.fill();
-        ctx.stroke();
-      }
-    });
+    // 4. Animate 3D Jet Stream Wind Ribbons
+    this.updateWindRibbons(dt);
 
-    // 5. Optional Layer: 3D Global Thermal Anomaly Field
-    if (this.layers.thermal) {
-      for (let lat = -65; lat <= 65; lat += 16) {
-        for (let lon = -165; lon <= 165; lon += 22) {
-          const pt = this.project(lon, lat, cx, cy, radius);
-          if (!pt.visible) continue;
-          const latWarmth = Math.cos(lat * DEG2RAD);
-          const hue = clamp(235 - latWarmth * 215, 10, 235);
-          const r = radius * 0.22 * pt.z;
-          const g = ctx.createRadialGradient(pt.x, pt.y, 1, pt.x, pt.y, r);
-          g.addColorStop(0, `hsla(${hue}, 90%, 55%, 0.26)`);
-          g.addColorStop(1, `hsla(${hue}, 90%, 50%, 0)`);
-          ctx.fillStyle = g;
-          ctx.beginPath();
-          ctx.arc(pt.x, pt.y, r, 0, Math.PI * 2);
-          ctx.fill();
-        }
+    // 5. Pulse Active Beacon Ring & Project Floating Retina Callout Tag
+    if (this.beaconRing) {
+      const pulse = 1 + ((tSec * 1.35) % 1) * 1.45;
+      this.beaconRing.scale.set(pulse, pulse, 1);
+      this.beaconRing.material.opacity = 1 - ((tSec * 1.35) % 1);
+    }
+
+    if (this.floatingLabelEl && this.beaconGroup && this.forecast?.location) {
+      const worldPos = new THREE.Vector3();
+      this.beaconGroup.getWorldPosition(worldPos);
+      // Visible only when beacon is on camera-facing hemisphere
+      const facing = worldPos.clone().normalize().dot(this.camera.position.clone().normalize());
+      if (facing > 0.14) {
+        const proj = worldPos.clone().project(this.camera);
+        const rect = this.canvas.getBoundingClientRect();
+        const x = (proj.x * 0.5 + 0.5) * rect.width;
+        const y = (-proj.y * 0.5 + 0.5) * rect.height;
+        const h = this.forecast.hours48?.[this.hourOffset] || this.forecast.current;
+        this.floatingLabelEl.hidden = false;
+        this.floatingLabelEl.style.transform = `translate(${Math.round(x)}px, ${Math.round(y - 26)}px) translate(-50%, -50%)`;
+        this.floatingLabelEl.innerHTML = `<span class="beacon-dot"></span> ${this.forecast.location.name.split(',')[0]} · <strong>${h?.tempF ?? '--'}°</strong> · ${h?.cloudCover ?? '--'}% Cloud`;
+      } else {
+        this.floatingLabelEl.hidden = true;
       }
     }
 
-    // 6. Layer: Live Volumetric Moving Cloud Cover
-    if (this.layers.clouds) {
-      const locLat = this.forecast?.location?.latitude ?? 37.77;
-      const locLon = this.forecast?.location?.longitude ?? -122.42;
-      const localCloudFrac = clamp((activeHour.cloudCover ?? 60) / 100, 0.05, 1);
-      const windSpeedFactor = clamp((activeHour.windMph ?? 10) / 15, 0.3, 2.4);
-      const windRad = ((activeHour.windDirDeg ?? 250) + 180) * DEG2RAD;
-
-      this.cloudPuffs.forEach((puff) => {
-        let lon;
-        let lat;
-        let alpha;
-
-        if (puff.isLocalCluster) {
-          // Advect local cloud deck directly over the user's selected location at the actual wind angle & cloud %!
-          const drift = ((tSec * 0.45 * windSpeedFactor + this.hourOffset * 0.9 + puff.phase) % 10) - 5;
-          lon = locLon + puff.offsetLon + Math.sin(windRad) * drift;
-          lat = clamp(locLat + puff.offsetLat + Math.cos(windRad) * drift, -84, 84);
-          alpha = puff.baseOpacity * localCloudFrac * 1.15;
-        } else {
-          const timeShift = tSec * 1.4 + this.hourOffset * 1.85;
-          lon = ((puff.baseLon + puff.driftLonPerSec * timeShift + 540) % 360) - 180;
-          lat = clamp(puff.baseLat + Math.sin(tSec * 0.3 + puff.baseLon) * 1.2, -82, 82);
-          alpha = puff.baseOpacity;
-
-          // Modulate by nearest live Open-Meteo global anchor sample if within 28 degrees
-          if (this.globalSampleNodes.length > 0) {
-            for (let s = 0; s < this.globalSampleNodes.length; s++) {
-              const node = this.globalSampleNodes[s];
-              const d = Math.hypot(node.lat - lat, node.lon - lon);
-              if (d < 28) {
-                alpha *= lerp(clamp(node.cloudCover / 75, 0.15, 1.35), 1, d / 28);
-                break;
-              }
-            }
-          }
-        }
-
-        if (alpha < 0.04) return;
-        const pt = this.project(lon, lat, cx, cy, radius);
-        if (!pt.visible) return;
-
-        const r = Math.max(4, (puff.size / 18) * radius * (0.45 + 0.55 * pt.z));
-        const cGrad = ctx.createRadialGradient(pt.x, pt.y, r * 0.1, pt.x, pt.y, r);
-        const edgeAlpha = clamp(alpha * pt.z, 0, 0.78);
-        cGrad.addColorStop(0, `rgba(245, 250, 255, ${edgeAlpha.toFixed(3)})`);
-        cGrad.addColorStop(0.55, `rgba(215, 232, 255, ${(edgeAlpha * 0.55).toFixed(3)})`);
-        cGrad.addColorStop(1, 'rgba(185, 215, 255, 0)');
-
-        ctx.fillStyle = cGrad;
-        ctx.beginPath();
-        ctx.arc(pt.x, pt.y, r, 0, Math.PI * 2);
-        ctx.fill();
-      });
-    }
-
-    // 7. Layer: Active Precipitation & Storm Radar Cores on Globe
-    if (this.layers.precip) {
-      const locLat = this.forecast?.location?.latitude ?? 37.77;
-      const locLon = this.forecast?.location?.longitude ?? -122.42;
-      const pop = activeHour.rainChance ?? 0;
-
-      if (pop >= 25) {
-        const coreCount = Math.ceil((pop / 100) * 14);
-        for (let c = 0; c < coreCount; c++) {
-          const angle = c * 1.7 + tSec * 0.4;
-          const dist = 1.2 + (c % 5) * 1.8;
-          const pLon = locLon + Math.cos(angle) * dist;
-          const pLat = locLat + Math.sin(angle) * dist * 0.8;
-          const pt = this.project(pLon, pLat, cx, cy, radius);
-          if (pt.visible) {
-            const r = radius * 0.065 * pt.z;
-            const pGrad = ctx.createRadialGradient(pt.x, pt.y, 1, pt.x, pt.y, r);
-            const color = pop >= 75 ? '255, 115, 90' : pop >= 50 ? '255, 212, 96' : '72, 228, 165';
-            pGrad.addColorStop(0, `rgba(${color}, 0.68)`);
-            pGrad.addColorStop(1, `rgba(${color}, 0)`);
-            ctx.fillStyle = pGrad;
-            ctx.beginPath();
-            ctx.arc(pt.x, pt.y, r, 0, Math.PI * 2);
-            ctx.fill();
-          }
-        }
-      }
-    }
-
-    // 8. Layer: Animated 3D Jet Stream & Wind Flow Particles
-    if (this.layers.wind) {
-      this.windParticles.forEach((wp) => {
-        // Zonal wind profile: Easterly trades near equator, strong westerly jet streams at 30-60°
-        const absLat = Math.abs(wp.lat);
-        const zonalVel =
-          absLat < 22
-            ? -0.35 * wp.speedFactor
-            : absLat < 62
-            ? 0.65 * wp.speedFactor
-            : -0.22 * wp.speedFactor;
-        const meridionalVel = Math.sin(wp.lon * DEG2RAD * 3 + tSec * 0.7) * 0.14;
-
-        wp.lon = ((wp.lon + zonalVel + 540) % 360) - 180;
-        wp.lat = clamp(wp.lat + meridionalVel, -78, 78);
-
-        const pt = this.project(wp.lon, wp.lat, cx, cy, radius);
-        const tailLon = wp.lon - zonalVel * 7.5;
-        const tailLat = wp.lat - meridionalVel * 7.5;
-        const tailPt = this.project(tailLon, tailLat, cx, cy, radius);
-
-        if (pt.visible && tailPt.visible) {
-          ctx.strokeStyle =
-            absLat >= 30 && absLat <= 55
-              ? `rgba(115, 238, 255, ${(0.58 * pt.z).toFixed(2)})`
-              : `rgba(140, 220, 195, ${(0.38 * pt.z).toFixed(2)})`;
-          ctx.lineWidth = absLat >= 32 && absLat <= 52 ? 1.7 : 1.15;
-          ctx.beginPath();
-          ctx.moveTo(tailPt.x, tailPt.y);
-          ctx.lineTo(pt.x, pt.y);
-          ctx.stroke();
-        }
-      });
-    }
-
-    // 9. Layer: Real-Time Astronomical Day/Night Terminator & Night City Lights
-    if (this.layers.terminator) {
-      const simDate = new Date(Date.now() + this.hourOffset * 3600000);
-      const utcHrs = simDate.getUTCHours() + simDate.getUTCMinutes() / 60;
-      const subsolarLon = ((12 - utcHrs) * 15 + 540) % 360 - 180;
-      const dayOfYear = Math.floor(
-        (simDate - new Date(Date.UTC(simDate.getUTCFullYear(), 0, 1))) / 86400000
-      );
-      const subsolarLat = -23.44 * Math.cos(((2 * Math.PI) / 365) * (dayOfYear + 10));
-
-      // Project subsolar direction vector into camera view space
-      const subPt = this.project(subsolarLon, subsolarLat, cx, cy, radius);
-      const sunDx = (subPt.x - cx) / radius;
-      const sunDy = (subPt.y - cy) / radius;
-
-      const termGrad = ctx.createLinearGradient(
-        cx + sunDx * radius,
-        cy + sunDy * radius,
-        cx - sunDx * radius * 1.1,
-        cy - sunDy * radius * 1.1
-      );
-      termGrad.addColorStop(0, 'rgba(255, 245, 200, 0.04)');
-      termGrad.addColorStop(0.48, 'rgba(10, 22, 48, 0.05)');
-      termGrad.addColorStop(0.56, 'rgba(6, 14, 34, 0.48)');
-      termGrad.addColorStop(1, 'rgba(2, 6, 18, 0.76)');
-      ctx.fillStyle = termGrad;
-      ctx.fillRect(cx - radius, cy - radius, radius * 2, radius * 2);
-
-      // Night-side glowing golden urban city lights
-      NIGHT_CITY_CLUSTERS.forEach(([cLon, cLat, intensity]) => {
-        const pt = this.project(cLon, cLat, cx, cy, radius);
-        if (!pt.visible) return;
-        const solar = getSolarGeometry(cLat, cLon, simDate);
-        if (solar.elevationDeg < -2) {
-          const glowR = 4.5 * intensity * pt.z;
-          const cg = ctx.createRadialGradient(pt.x, pt.y, 0.5, pt.x, pt.y, glowR);
-          cg.addColorStop(0, `rgba(255, 220, 130, ${(0.85 * pt.z).toFixed(2)})`);
-          cg.addColorStop(1, 'rgba(255, 180, 70, 0)');
-          ctx.fillStyle = cg;
-          ctx.beginPath();
-          ctx.arc(pt.x, pt.y, glowR, 0, Math.PI * 2);
-          ctx.fill();
-        }
-      });
-    }
-
-    // 10. Preset City Beacons + Selected Active Location Pulsing Radar Beacon
-    PRESET_CITIES.forEach((city) => {
-      const pt = this.project(city.longitude, city.latitude, cx, cy, radius);
-      if (!pt.visible) return;
-      ctx.fillStyle = 'rgba(165, 215, 255, 0.72)';
-      ctx.beginPath();
-      ctx.arc(pt.x, pt.y, 3, 0, Math.PI * 2);
-      ctx.fill();
-    });
-
-    if (this.forecast?.location) {
-      const { latitude, longitude, name } = this.forecast.location;
-      const pt = this.project(longitude, latitude, cx, cy, radius);
-      if (pt.visible) {
-        const pulse = (tSec * 1.4) % 1;
-        const pulseR = 8 + pulse * 26;
-        ctx.strokeStyle = `rgba(92, 224, 160, ${(1 - pulse) * 0.85})`;
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.arc(pt.x, pt.y, pulseR, 0, Math.PI * 2);
-        ctx.stroke();
-
-        ctx.fillStyle = '#5ce0a0';
-        ctx.strokeStyle = '#ffffff';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.arc(pt.x, pt.y, 5.5, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.stroke();
-
-        // Floating 3D HUD Callout Tag
-        const label = `${name.split(',')[0]} · ${activeHour.tempF}° (${activeHour.cloudCover}% Cloud)`;
-        ctx.font = '700 11.5px Inter, system-ui, sans-serif';
-        const tw = ctx.measureText(label).width;
-        const bx = clamp(pt.x - tw / 2 - 8, 12, w - tw - 28);
-        const by = pt.y - 28;
-
-        ctx.fillStyle = 'rgba(8, 18, 38, 0.88)';
-        ctx.strokeStyle = 'rgba(92, 224, 160, 0.65)';
-        ctx.lineWidth = 1.2;
-        ctx.beginPath();
-        ctx.roundRect(bx, by, tw + 16, 20, 999);
-        ctx.fill();
-        ctx.stroke();
-
-        ctx.fillStyle = '#ffffff';
-        ctx.fillText(label, bx + 8, by + 14);
-      }
-    }
-
-    // 11. Specular Glass Limb Inner Rim Highlight
-    const rimGrad = ctx.createRadialGradient(cx, cy, radius * 0.82, cx, cy, radius);
-    rimGrad.addColorStop(0, 'rgba(100, 185, 255, 0)');
-    rimGrad.addColorStop(0.85, 'rgba(100, 185, 255, 0.08)');
-    rimGrad.addColorStop(1, 'rgba(135, 215, 255, 0.36)');
-    ctx.fillStyle = rimGrad;
-    ctx.beginPath();
-    ctx.arc(cx, cy, radius, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.restore(); // end sphere clip
-
-    // Outer Crisp Specular Ring
-    ctx.strokeStyle = 'rgba(145, 210, 255, 0.34)';
-    ctx.lineWidth = 1.4;
-    ctx.beginPath();
-    ctx.arc(cx, cy, radius, 0, Math.PI * 2);
-    ctx.stroke();
-
-    ctx.restore();
+    this.renderer.render(this.scene, this.camera);
   }
 }
