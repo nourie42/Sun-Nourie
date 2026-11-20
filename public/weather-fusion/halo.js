@@ -376,8 +376,23 @@ const reduced = () => typeof matchMedia !== 'undefined' && matchMedia('(prefers-
 let uid = 0;
 
 /* ---------- Interactive chart ---------- */
+function smoothSvgPolyline(d) {
+  if (!d) return '';
+  const pairs = [...d.matchAll(/[ML](-?[\d.]+),(-?[\d.]+)/g)].map((m) => [Number(m[1]), Number(m[2])]);
+  if (pairs.length < 3) return d;
+  let out = `M${pairs[0][0].toFixed(1)},${pairs[0][1].toFixed(1)}`;
+  for (let i = 0; i < pairs.length - 1; i++) {
+    const p0 = pairs[Math.max(0, i - 1)], p1 = pairs[i], p2 = pairs[i + 1], p3 = pairs[Math.min(pairs.length - 1, i + 2)];
+    const c1x = p1[0] + (p2[0] - p0[0]) / 6, c1y = p1[1] + (p2[1] - p0[1]) / 6;
+    const c2x = p2[0] - (p3[0] - p1[0]) / 6, c2y = p2[1] - (p3[1] - p1[1]) / 6;
+    out += `C${c1x.toFixed(1)},${c1y.toFixed(1)} ${c2x.toFixed(1)},${c2y.toFixed(1)} ${p2[0].toFixed(1)},${p2[1].toFixed(1)}`;
+  }
+  return out;
+}
+
 function chartSVG(L, spec, def) {
   const id = `c${++uid}`;
+  const isExp = typeof document !== 'undefined' && document.documentElement?.dataset?.weatherPage === 'experimental';
   const tempLike = def.color === 'temp';
   const solid = def.color === 'uv' ? '#f2d94e' : def.color;
   const color = tempLike ? `url(#${id}-line)` : solid;
@@ -388,7 +403,7 @@ function chartSVG(L, spec, def) {
     const stops = [0, 0.25, 0.5, 0.75, 1].map((f) => `<stop offset="${f}" stop-color="${tempColor(L.hi - f * (L.hi - L.lo))}"/>`).join('');
     defs += `<linearGradient id="${id}-line" gradientUnits="userSpaceOnUse" x1="0" y1="${top}" x2="0" y2="${bottom}">${stops}</linearGradient>`;
   }
-  defs += `<linearGradient id="${id}-area" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="${tempLike ? '#fff' : solid}" stop-opacity=".3"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>`;
+  defs += `<linearGradient id="${id}-area" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="${tempLike ? '#9ee2ff' : solid}" stop-opacity="${isExp ? '.42' : '.3'}"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>`;
   const nights = (spec.nights || []).map(([a, b]) => `<rect class="c-night" x="${L.x(a).toFixed(1)}" y="${top}" width="${(L.x(b) - L.x(a)).toFixed(1)}" height="${L.ih}"/>`).join('');
   const suffix = def.unit === '°' ? '°' : def.unit === '%' ? '%' : '';
   const grid = L.yTicks.map((tk) => `<line class="c-grid" x1="${L.pad.l}" x2="${L.W - L.pad.r}" y1="${tk.y.toFixed(1)}" y2="${tk.y.toFixed(1)}"/><text class="c-ylab" x="${L.W - L.pad.r + 7}" y="${(tk.y + 4).toFixed(1)}">${tk.v}${suffix}</text>`).join('');
@@ -398,7 +413,8 @@ function chartSVG(L, spec, def) {
     const rects = L.bars.map((b, i) => `<rect style="--d:${i * 12}ms" x="${b.x.toFixed(1)}" y="${b.y.toFixed(1)}" width="${b.w.toFixed(1)}" height="${b.h.toFixed(1)}" rx="${Math.min(3, b.w / 2).toFixed(1)}" fill="${def.color === 'uv' ? uvColor(b.v) : def.color}"${nowX != null && b.t + H <= spec.nowT ? ' opacity=".35"' : ''}/>`).join('');
     body = `<g class="c-bars">${rects}</g>`;
   } else {
-    const layer = (cls) => `${L.areas.map((d) => `<path class="c-area" d="${d}" fill="url(#${id}-area)"/>`).join('')}${L.extraPaths.map((d) => `<path class="c-extra" d="${d}" stroke="${color}"/>`).join('')}${L.paths.map((d) => `<path class="c-line ${cls}" pathLength="1" d="${d}" stroke="${color}"/>`).join('')}`;
+    const linePaths = isExp ? L.paths.map(smoothSvgPolyline) : L.paths;
+    const layer = (cls) => `${L.areas.map((d) => `<path class="c-area" d="${d}" fill="url(#${id}-area)"/>`).join('')}${L.extraPaths.map((d) => `<path class="c-extra" d="${isExp ? smoothSvgPolyline(d) : d}" stroke="${color}"/>`).join('')}${isExp ? linePaths.map((d) => `<path d="${d}" fill="none" stroke="${color}" stroke-width="11" stroke-linecap="round" opacity=".24"/>`).join('') : ''}${linePaths.map((d) => `<path class="c-line ${cls}" pathLength="1" d="${d}" stroke="${color}"${isExp ? ' style="stroke-width:4.2px"' : ''}/>`).join('')}`;
     body = nowX != null ? `<g clip-path="url(#${id}-past)" class="c-past">${layer('')}</g><g clip-path="url(#${id}-future)">${layer('draw')}</g>` : `<g>${layer('draw')}</g>`;
   }
   let marks = '';

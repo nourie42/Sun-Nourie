@@ -1,0 +1,665 @@
+/* Experimental Weather Enhancements: 3D Earth Globe, Historical Accuracy,
+   Heavier Weather Nourie Curves & Mobile-First Polished Graphs */
+
+html[data-weather-page="experimental"] .exp-eyebrow {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #7dd3fc;
+  margin-bottom: 4px;
+}
+
+/* ==================== 3D EARTH GLOBE CARD ==================== */
+html[data-weather-page="experimental"] .exp-globe-card {
+  margin: 18px 0;
+  padding: 18px;
+  border-radius: 22px;
+  background: linear-gradient(155deg, rgba(10, 22, 46, 0.88), rgba(8, 16, 36, 0.94));
+  border: 1px solid rgba(140, 205, 255, 0.22);
+  box-shadow: 0 20px 44px rgba(2, 8, 22, 0.45);
+  overflow: hidden;
+}
+
+html[data-weather-page="experimental"] .exp-globe-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+html[data-weather-page="experimental"] .exp-globe-head h2 {
+  margin: 0;
+  font-size: clamp(18px, 2.5vw, 23px);
+  color: #f8fafc;
+}
+
+html[data-weather-page="experimental"] .exp-globe-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+html[data-weather-page="experimental"] .exp-pill-btn,
+html[data-weather-page="experimental"] .exp-layer-btn,
+html[data-weather-page="experimental"] .exp-hub-chip {
+  appearance: none;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.07);
+  color: #e2e8f0;
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.16s, border-color 0.16s, transform 0.12s;
+  white-space: nowrap;
+}
+
+html[data-weather-page="experimental"] .exp-pill-btn:hover,
+html[data-weather-page="experimental"] .exp-layer-btn:hover,
+html[data-weather-page="experimental"] .exp-hub-chip:hover {
+  background: rgba(125, 211, 252, 0.18);
+  border-color: rgba(125, 211, 252, 0.45);
+}
+
+html[data-weather-page="experimental"] .exp-pill-btn.is-active,
+html[data-weather-page="experimental"] .exp-layer-btn.is-active,
+html[data-weather-page="experimental"] .exp-hub-chip.is-active {
+  background: linear-gradient(135deg, rgba(56, 189, 248, 0.34), rgba(16, 185, 129, 0.28));
+  border-color: rgba(125, 211, 252, 0.72);
+  color: #ffffff;
+}
+
+html[data-weather-page="experimental"] .exp-icon-btn {
+  padding: 6px 11px;
+  font-size: 15px;
+  line-height: 1;
+}
+
+html[data-weather-page="experimental"] .exp-globe-stage {
+  position: relative;
+  width: 100%;
+  height: 410px;
+  border-radius: 18px;
+  overflow: hidden;
+  background: radial-gradient(circle at 50% 45%, #0d1d3d 0%, #050b18 75%, #02050d 100%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+html[data-weather-page="experimental"] #exp-cloud-globe-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  cursor: grab;
+  touch-action: none;
+}
+
+html[data-weather-page="experimental"] #exp-cloud-globe-canvas:active {
+  cursor: grabbing;
+}
+
+html[data-weather-page="experimental"] .exp-globe-hud {
+  position: absolute;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(7, 15, 34, 0.76);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  font-size: 12px;
+  font-weight: 700;
+  color: #f1f5f9;
+  pointer-events: none;
+  max-width: calc(100% - 24px);
+}
+
+html[data-weather-page="experimental"] .exp-hud-top-left {
+  top: 12px;
+  left: 12px;
+}
+
+html[data-weather-page="experimental"] .exp-hud-top-right {
+  top: 12px;
+  right: 12px;
+  color: #93c5fd;
+}
+
+html[data-weather-page="experimental"] .exp-hud-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #5ce0a0;
+  box-shadow: 0 0 8px #5ce0a0;
+  flex-shrink: 0;
+}
+
+html[data-weather-page="experimental"] .globe-beacon-tag {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 4;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(6, 14, 30, 0.88);
+  border: 1px solid rgba(92, 224, 160, 0.65);
+  color: #ffffff;
+  font-size: 11.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  pointer-events: none;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
+}
+
+html[data-weather-page="experimental"] .beacon-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #5ce0a0;
+  display: inline-block;
+}
+
+html[data-weather-page="experimental"] .exp-globe-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+html[data-weather-page="experimental"] .exp-layer-bar,
+html[data-weather-page="experimental"] .exp-hub-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+html[data-weather-page="experimental"] .exp-time-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+html[data-weather-page="experimental"] .exp-time-bar input[type="range"] {
+  flex: 1;
+  min-width: 90px;
+  accent-color: #38bdf8;
+}
+
+html[data-weather-page="experimental"] .exp-hour-badge {
+  font-size: 12px;
+  font-weight: 700;
+  color: #bae6fd;
+  white-space: nowrap;
+}
+
+/* ==================== MODEL ACCURACY SECTION ==================== */
+html[data-weather-page="experimental"] .exp-acc-card {
+  margin: 18px 0;
+  padding: 20px;
+  border-radius: 22px;
+  background: linear-gradient(160deg, rgba(12, 25, 52, 0.88), rgba(8, 17, 36, 0.94));
+  border: 1px solid rgba(140, 205, 255, 0.22);
+  box-shadow: 0 20px 44px rgba(2, 8, 22, 0.4);
+}
+
+html[data-weather-page="experimental"] .exp-acc-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+html[data-weather-page="experimental"] .exp-acc-head h2 {
+  margin: 0;
+  font-size: clamp(19px, 2.6vw, 24px);
+  color: #ffffff;
+}
+
+html[data-weather-page="experimental"] .exp-acc-sub {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: #b7cae4;
+}
+
+html[data-weather-page="experimental"] .exp-acc-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+html[data-weather-page="experimental"] .exp-seg-group {
+  display: inline-flex;
+  padding: 3px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+html[data-weather-page="experimental"] .exp-seg-btn {
+  border: 0;
+  background: transparent;
+  color: #cbd5e1;
+  font-size: 12.5px;
+  font-weight: 700;
+  padding: 6px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+html[data-weather-page="experimental"] .exp-seg-btn.is-active {
+  background: rgba(125, 211, 252, 0.28);
+  color: #ffffff;
+}
+
+html[data-weather-page="experimental"] .exp-acc-banners {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+html[data-weather-page="experimental"] .exp-acc-stat {
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+html[data-weather-page="experimental"] .exp-acc-stat.is-winner {
+  background: linear-gradient(145deg, rgba(16, 185, 129, 0.18), rgba(56, 189, 248, 0.12));
+  border-color: rgba(92, 224, 160, 0.45);
+}
+
+html[data-weather-page="experimental"] .exp-acc-stat.is-nourie {
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.13), rgba(56, 189, 248, 0.16));
+  border-color: rgba(255, 255, 255, 0.42);
+}
+
+html[data-weather-page="experimental"] .exp-acc-stat small {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #93c5fd;
+  font-weight: 700;
+}
+
+html[data-weather-page="experimental"] .exp-acc-stat strong {
+  font-size: 18px;
+  color: #ffffff;
+}
+
+html[data-weather-page="experimental"] .exp-acc-stat span {
+  font-size: 12px;
+  color: #cbd5e1;
+}
+
+html[data-weather-page="experimental"] .exp-acc-rows {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+html[data-weather-page="experimental"] .exp-acc-row {
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.045);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+html[data-weather-page="experimental"] .exp-acc-row.is-nourie {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.12), rgba(56, 189, 248, 0.14));
+  border: 1.5px solid rgba(255, 255, 255, 0.52);
+  box-shadow: 0 8px 24px rgba(125, 211, 252, 0.16);
+}
+
+html[data-weather-page="experimental"] .exp-acc-row-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+html[data-weather-page="experimental"] .exp-acc-rank {
+  font-size: 15px;
+  font-weight: 800;
+  color: #7dd3fc;
+  min-width: 26px;
+}
+
+html[data-weather-page="experimental"] .exp-acc-name {
+  flex: 1;
+  min-width: 0;
+}
+
+html[data-weather-page="experimental"] .exp-acc-name strong {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  color: #ffffff;
+}
+
+html[data-weather-page="experimental"] .exp-acc-name strong i {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+}
+
+html[data-weather-page="experimental"] .exp-acc-name small {
+  display: block;
+  font-size: 11px;
+  color: #94a3b8;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+html[data-weather-page="experimental"] .exp-acc-mae {
+  text-align: right;
+}
+
+html[data-weather-page="experimental"] .exp-acc-mae b {
+  display: block;
+  font-size: 16px;
+  color: #ffffff;
+}
+
+html[data-weather-page="experimental"] .exp-acc-mae small {
+  font-size: 10px;
+  color: #94a3b8;
+}
+
+html[data-weather-page="experimental"] .exp-acc-bar-track {
+  height: 6px;
+  margin: 8px 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+html[data-weather-page="experimental"] .exp-acc-bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+}
+
+html[data-weather-page="experimental"] .exp-acc-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  font-size: 11.5px;
+  color: #cbd5e1;
+}
+
+html[data-weather-page="experimental"] .exp-acc-timeline-box {
+  margin-top: 18px;
+  padding: 16px;
+  border-radius: 18px;
+  background: rgba(5, 11, 26, 0.56);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+html[data-weather-page="experimental"] .exp-acc-chart-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+html[data-weather-page="experimental"] .exp-acc-chart-head h3,
+html[data-weather-page="experimental"] .exp-acc-table-wrap h3,
+html[data-weather-page="experimental"] .exp-acc-daily-strip h3 {
+  margin: 0 0 6px;
+  font-size: 15px;
+  color: #f8fafc;
+}
+
+html[data-weather-page="experimental"] .exp-acc-chart-note {
+  margin: 0;
+  font-size: 12px;
+  color: #b7cae4;
+}
+
+html[data-weather-page="experimental"] .exp-acc-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  align-items: center;
+}
+
+html[data-weather-page="experimental"] .exp-acc-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  color: #e2e8f0;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+html[data-weather-page="experimental"] .exp-acc-chip.is-nourie {
+  background: rgba(255, 255, 255, 0.16);
+  border-color: rgba(255, 255, 255, 0.6);
+  color: #ffffff;
+  font-weight: 800;
+}
+
+html[data-weather-page="experimental"] .exp-acc-chip.is-off {
+  opacity: 0.45;
+  text-decoration: line-through;
+}
+
+html[data-weather-page="experimental"] .exp-acc-chip i {
+  display: inline-block;
+  width: 12px;
+  border-radius: 2px;
+}
+
+html[data-weather-page="experimental"] .exp-acc-svg-wrap {
+  position: relative;
+  width: 100%;
+  touch-action: pan-y;
+}
+
+html[data-weather-page="experimental"] .exp-acc-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  cursor: crosshair;
+}
+
+html[data-weather-page="experimental"] .exp-acc-tip {
+  position: absolute;
+  top: 8px;
+  z-index: 5;
+  min-width: 175px;
+  padding: 9px 11px;
+  border-radius: 12px;
+  background: rgba(6, 13, 30, 0.92);
+  border: 1px solid rgba(125, 211, 252, 0.35);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.45);
+  font-size: 12px;
+  color: #f8fafc;
+  pointer-events: none;
+}
+
+html[data-weather-page="experimental"] .exp-tip-time {
+  font-weight: 800;
+  margin-bottom: 5px;
+  color: #7dd3fc;
+}
+
+html[data-weather-page="experimental"] .exp-tip-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  line-height: 1.5;
+}
+
+html[data-weather-page="experimental"] .exp-tip-row.is-nourie {
+  font-weight: 800;
+  color: #ffffff;
+}
+
+html[data-weather-page="experimental"] .exp-tip-row span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+html[data-weather-page="experimental"] .exp-tip-row i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+html[data-weather-page="experimental"] .exp-acc-daily-strip {
+  margin-top: 16px;
+}
+
+html[data-weather-page="experimental"] .exp-acc-daily-scroll {
+  overflow-x: auto;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+html[data-weather-page="experimental"] .exp-acc-daily-scroll table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+
+html[data-weather-page="experimental"] .exp-acc-daily-scroll th,
+html[data-weather-page="experimental"] .exp-acc-daily-scroll td {
+  padding: 9px 10px;
+  text-align: left;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  white-space: nowrap;
+}
+
+html[data-weather-page="experimental"] .exp-acc-daily-scroll th {
+  background: rgba(255, 255, 255, 0.06);
+  color: #bae6fd;
+  font-weight: 700;
+}
+
+html[data-weather-page="experimental"] .exp-acc-daily-scroll .is-nourie-col {
+  background: rgba(255, 255, 255, 0.07);
+  color: #ffffff;
+  font-weight: 700;
+}
+
+html[data-weather-page="experimental"] .exp-acc-daily-scroll .is-obs-col {
+  color: #5ce0a0;
+  font-weight: 800;
+}
+
+/* ==================== ENHANCED EXISTING EXPERIMENTAL GRAPHS ==================== */
+html[data-weather-page="experimental"] #main-hourly-trend .c-line {
+  stroke-width: 4.2px;
+  filter: drop-shadow(0 0 8px rgba(125, 211, 252, 0.35));
+}
+
+html[data-weather-page="experimental"] #wn-compare-section {
+  background: linear-gradient(155deg, rgba(11, 24, 48, 0.88), rgba(8, 17, 36, 0.94));
+  border: 1px solid rgba(140, 205, 255, 0.22);
+  border-radius: 22px;
+}
+
+html[data-weather-page="experimental"] #dewpoint-gross-meter .gross-line {
+  stroke: #a5f3fc;
+  stroke-width: 3.8px;
+}
+
+html[data-weather-page="experimental"] #dewpoint-gross-meter .gross-line-shadow {
+  stroke: rgba(103, 232, 249, 0.32);
+  stroke-width: 11px;
+}
+
+html[data-weather-page="experimental"] #chart-content svg path[fill="none"][stroke]:not([stroke-dasharray]) {
+  stroke-width: 3.8px;
+  filter: drop-shadow(0 0 7px rgba(255, 205, 121, 0.42));
+}
+
+/* ==================== RESPONSIVE MOBILE LAYOUT ==================== */
+html[data-weather-page="experimental"] .exp-top-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+html[data-weather-page="experimental"] .exp-top-pills > * {
+  margin: 0 !important;
+}
+
+@media (max-width: 720px) {
+  html[data-weather-page="experimental"] .exp-top-pills {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding: 2px 2px 6px;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  html[data-weather-page="experimental"] .exp-top-pills::-webkit-scrollbar {
+    display: none;
+  }
+
+  html[data-weather-page="experimental"] .exp-top-pills > * {
+    flex: 0 0 auto;
+  }
+
+  html[data-weather-page="experimental"] .exp-globe-card,
+  html[data-weather-page="experimental"] .exp-acc-card {
+    padding: 14px;
+    border-radius: 18px;
+  }
+
+  html[data-weather-page="experimental"] .exp-globe-stage {
+    height: 320px;
+  }
+
+  html[data-weather-page="experimental"] .exp-hud-top-right {
+    display: none;
+  }
+
+  html[data-weather-page="experimental"] .exp-acc-banners,
+  html[data-weather-page="experimental"] .exp-acc-rows {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  html[data-weather-page="experimental"] .exp-acc-timeline-box {
+    padding: 12px 10px;
+  }
+}
+
+@media (max-width: 400px) {
+  html[data-weather-page="experimental"] .exp-globe-stage {
+    height: 290px;
+  }
+}

@@ -22,6 +22,7 @@ if(typeof document!=='undefined'){
   let forecast=null,metric='temperature',observer=null;
   root.innerHTML=`<details class="main-trend-disclosure"><summary>Explore the next 48 hours</summary><div class="main-trend-content"><div class="main-trend-tabs" role="tablist" aria-label="Hourly graph weather variable">${Object.entries(TREND_METRICS).map(([id,d])=>`<button type="button" role="tab" id="main-trend-tab-${id}" aria-controls="main-trend-chart" aria-selected="${id===metric}" data-trend="${id}">${d.label}</button>`).join('')}</div><div class="main-trend-reading" aria-live="polite"><strong id="main-trend-value">—</strong><span id="main-trend-time">Waiting for forecast</span></div><div id="main-trend-chart" class="chart tall" role="tabpanel" aria-labelledby="main-trend-tab-temperature" tabindex="0"></div><p class="main-trend-note">Tap or drag for the forecast time and value. Missing hours stay blank.</p></div></details>`;
   const disclosure=root.querySelector('.main-trend-disclosure');
+  if(document.documentElement?.dataset?.weatherPage==='experimental')disclosure.open=true;
   const chart=root.querySelector('.chart'),value=root.querySelector('#main-trend-value'),stamp=root.querySelector('#main-trend-time');
   let keyboardIndex=0,available=[];
   const show=p=>{value.textContent=trendReading(metric,p);stamp.textContent=p?fmt(p.t,forecast.location.timeZone,{weekday:'short',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}):'Now · drag across the graph';};

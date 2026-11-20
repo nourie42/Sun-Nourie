@@ -423,10 +423,46 @@ export function renderChart(container, built, varDef, varId) {
   if(varId==='cloud'){lo=0;hi=100;}
   let precipitationTicks=null;
   if(varId==='rain'){lo=0;precipitationTicks=nicePrecipitationTicks(hi);hi=precipitationTicks[precipitationTicks.length-1]||hi;}
+  const isExp = typeof document !== 'undefined' && document.documentElement?.dataset?.weatherPage === 'experimental';
   const n = days.length;
   const X = (i) => PL + (i / Math.max(1, n - 1)) * (W - PL - PR);
   const Y = (v) => PT + (1 - (v - lo) / (hi - lo)) * (H - PT - PB);
-  const path = (pts) => { let d = '', pen = false; pts.forEach((p, i) => { if (p != null) { d += `${pen ? 'L' : 'M'}${X(i).toFixed(1)},${Y(p).toFixed(1)}`; pen = true; } else pen = false; }); return d; };
+  const linearPath = (pts) => { let d = '', pen = false; pts.forEach((p, i) => { if (p != null) { d += `${pen ? 'L' : 'M'}${X(i).toFixed(1)},${Y(p).toFixed(1)}`; pen = true; } else pen = false; }); return d; };
+  const smoothPath = (pts) => {
+    const segs = []; let cur = [];
+    pts.forEach((p, i) => { if (p != null) cur.push([X(i), Y(p)]); else if (cur.length) { segs.push(cur); cur = []; } });
+    if (cur.length) segs.push(cur);
+    return segs.map((seg) => {
+      if (seg.length === 1) return `M${seg[0][0].toFixed(1)},${seg[0][1].toFixed(1)}`;
+      if (seg.length === 2) return `M${seg[0][0].toFixed(1)},${seg[0][1].toFixed(1)} L${seg[1][0].toFixed(1)},${seg[1][1].toFixed(1)}`;
+      let d = `M${seg[0][0].toFixed(1)},${seg[0][1].toFixed(1)}`;
+      for (let i = 0; i < seg.length - 1; i++) {
+        const p0 = seg[Math.max(0, i - 1)], p1 = seg[i], p2 = seg[i + 1], p3 = seg[Math.min(seg.length - 1, i + 2)];
+        const c1x = p1[0] + (p2[0] - p0[0]) / 6, c1y = p1[1] + (p2[1] - p0[1]) / 6;
+        const c2x = p2[0] - (p3[0] - p1[0]) / 6, c2y = p2[1] - (p3[1] - p1[1]) / 6;
+        d += ` C${c1x.toFixed(1)},${c1y.toFixed(1)} ${c2x.toFixed(1)},${c2y.toFixed(1)} ${p2[0].toFixed(1)},${p2[1].toFixed(1)}`;
+      }
+      return d;
+    }).join(' ');
+  };
+  const path = isExp ? smoothPath : linearPath;
+  const smoothArea = (pts) => {
+    if (!isExp) return '';
+    const baseY = (H - PB).toFixed(1);
+    const segs = []; let cur = [];
+    pts.forEach((p, i) => { if (p != null) cur.push([X(i), Y(p)]); else if (cur.length) { segs.push(cur); cur = []; } });
+    if (cur.length) segs.push(cur);
+    return segs.filter((seg) => seg.length >= 2).map((seg) => {
+      let d = `M${seg[0][0].toFixed(1)},${seg[0][1].toFixed(1)}`;
+      for (let i = 0; i < seg.length - 1; i++) {
+        const p0 = seg[Math.max(0, i - 1)], p1 = seg[i], p2 = seg[i + 1], p3 = seg[Math.min(seg.length - 1, i + 2)];
+        const c1x = p1[0] + (p2[0] - p0[0]) / 6, c1y = p1[1] + (p2[1] - p0[1]) / 6;
+        const c2x = p2[0] - (p3[0] - p1[0]) / 6, c2y = p2[1] - (p3[1] - p1[1]) / 6;
+        d += ` C${c1x.toFixed(1)},${c1y.toFixed(1)} ${c2x.toFixed(1)},${c2y.toFixed(1)} ${p2[0].toFixed(1)},${p2[1].toFixed(1)}`;
+      }
+      return `${d} L${seg[seg.length - 1][0].toFixed(1)},${baseY} L${seg[0][0].toFixed(1)},${baseY} Z`;
+    }).join(' ');
+  };
   const dayName = (d, i, long) => {
     const dt = new Date(d.date + 'T12:00:00');
     if (long) return `${d.tonight ? 'Tonight · ' : ''}${dt.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}`;
@@ -439,7 +475,17 @@ export function renderChart(container, built, varDef, varId) {
     + `<text x="${PL - 6}" y="${(Y(v) + 4).toFixed(0)}" text-anchor="end" font-size="${FS}" fill="#d5e1f2">${varDef.fmt(v)}</text>`).join('');
   const style = CHART_LINE_STYLE;
   const drawOrder = CHART_DRAW_ORDER.filter((id) => visible.includes(id));
-  const lines = drawOrder.map((id) => { const s = style[id], d = path(series[id]); return d ? `<path data-series="${id}" d="${d}" fill="none" stroke="${COLORS[id]}" stroke-width="${s.w}"${s.dash ? ` stroke-dasharray="${s.dash}"` : ''} opacity="${s.op}" stroke-linecap="round" stroke-linejoin="round"/>` : ''; }).join('');
+  const areaGradient = isExp ? `<defs><linearGradient id="wn-nourie-area-grad" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stop-color="#7fd4ff" stop-opacity="0.24"/><stop offset="100%" stop-color="#7fd4ff" stop-opacity="0.0"/></linearGradient></defs>` : '';
+  const nourieArea = isExp && visible.includes('nourie') ? `<path d="${smoothArea(series.nourie)}" fill="url(#wn-nourie-area-grad)" pointer-events="none"/>` : '';
+  const lines = drawOrder.map((id) => {
+    const s = style[id], d = path(series[id]);
+    if (!d) return '';
+    const isHero = id === 'nourie' || id === 'single';
+    const strokeW = isExp ? (isHero ? 5.0 : 1.85) : s.w;
+    const strokeOp = isExp ? (isHero ? 1 : 0.78) : s.op;
+    const glow = isExp && isHero ? `<path d="${d}" fill="none" stroke="rgba(190,235,255,0.30)" stroke-width="11" stroke-linecap="round" stroke-linejoin="round" pointer-events="none"/>` : '';
+    return `${glow}<path data-series="${id}" d="${d}" fill="none" stroke="${COLORS[id]}" stroke-width="${strokeW}"${s.dash ? ` stroke-dasharray="${s.dash}"` : ''} opacity="${strokeOp}" stroke-linecap="round" stroke-linejoin="round"/>`;
+  }).join('');
   const primaryId = visible.includes('nourie') ? 'nourie' : visible.includes('single') ? 'single' : visible[0];
   const dots = primaryId ? series[primaryId].map((v, i) => v == null ? '' :
     `<circle data-series="${primaryId}" data-date="${days[i].date}" data-index="${i}" data-value="${v}" cx="${X(i).toFixed(1)}" cy="${Y(v).toFixed(1)}" r="4" fill="${COLORS[primaryId]}"/>`
@@ -457,7 +503,7 @@ export function renderChart(container, built, varDef, varId) {
   const note = built.perModel ? `<p style="font-size:11px;color:#c4d9ed;margin:6px 0 0">${built.nwsFallback?'Rain chance uses official NWS probabilities. Model rainfall amounts are available separately under Precipitation; they are not calibrated probabilities.':'Weather Nourie blend is the forecast shown on this page.'} Other lines show individual models. Tap a model to show/hide its line, or tap the graph for values.${varId === 'temp' ? ' Daily highs require every forecast hour in the displayed day. Incomplete model days are unavailable. The daily-high range includes all published model highs, including hidden lines, and excludes the blended forecast. Comparison-only models are labeled separately from contributing models. Confidence also checks same-hour disagreements, including overnight; that is a separate comparison from the daily-high range.'+(stamp?' Forecast updated '+stamp+'.':'') : varId === 'rain' ? ' Rain totals use the same local calendar dates as the daily tiles, ending at midnight.' : varId === 'wind' ? ' Wind shows the average over that forecast period.' : varId === 'cloud' ? ' Cloud cover is the average percentage across the same remaining daylight hours used for Sky/rain agreement, or remaining nighttime when daylight has ended. 0% means clear; 100% means overcast. Tap the graph to compare models. Incomplete model coverage stays unavailable.' : varId === 'dewpoint' ? ' Dew point shows the highest reading over that forecast period.' : varId === 'pop' ? ' NWS is a probability. NBM uses its published probability when that field is present; otherwise, and for every other model, Dry, Light, and Wet are rain signals rather than percentages. Values under 5% stay listed as under 5%. A starred day is only partly covered, and every line on it uses the hours that were published. A model chip ending in a day count, such as HRRR, does not cover the full period.' : varId === 'snow' ? ' Snow totals are inches for the same local calendar date. HRRR and NAM stop at their published forecast range; missing coverage is Unavailable. Overlapping zero lines mean the models forecast no snow. WPC uses different accumulation periods, and WeatherNext does not publish snowfall depth, so neither is substituted into these daily model lines.' : ''}</p>` : '';
   container.innerHTML = `<div style="display:flex;flex-wrap:wrap;gap:4px;padding:2px 0 8px">${legend}</div>`
     + `<div class="wn-chart-wrap" style="position:relative;touch-action:pan-y">`
-    + `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" style="width:100%;height:auto;display:block;cursor:crosshair" role="img" aria-label="${varId==='temp'?'Daily high temperature':varDef.label} comparison chart">${ylabels}${labels}${lines}${dots}`
+    + `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" style="width:100%;height:auto;display:block;cursor:crosshair" role="img" aria-label="${varId==='temp'?'Daily high temperature':varDef.label} comparison chart">${areaGradient}${ylabels}${labels}${nourieArea}${lines}${dots}`
     + `<line class="wn-cross" x1="0" x2="0" y1="${PT - 10}" y2="${H - PB}" stroke="#fff" stroke-width="1.5" stroke-dasharray="3,3" opacity="0"/><g class="wn-cross-dots"></g></svg>`
     + `<div class="wn-tip" role="status" aria-live="polite" style="position:absolute;top:4px;display:none;min-width:130px;max-width:calc(100% - 8px);padding:8px 10px;border-radius:12px;background:rgba(10,20,40,.88);border:1px solid rgba(255,255,255,.22);color:#fff;font-size:12px;line-height:1.45;white-space:nowrap;pointer-events:none;box-shadow:0 6px 18px rgba(0,0,0,.35)"><button type="button" class="wn-tip-close" aria-label="Close model values" style="position:absolute;top:3px;right:3px;width:32px;height:32px;border:0;border-radius:6px;background:transparent;color:#fff;font-size:24px;line-height:1;cursor:pointer;pointer-events:auto">×</button><div class="wn-tip-content"></div></div></div>${note}${sourceNote}${coverageNote}`;
   container.querySelectorAll('button.wn-chip').forEach((b) => b.addEventListener('click', () => {
@@ -555,9 +601,10 @@ async function init() {
   const hero = document.querySelector('.hero');
   if (!hero || document.getElementById('wn-compare-section')) return;
 
+  const expAuto = document.documentElement?.dataset?.weatherPage === 'experimental';
   const section = document.createElement('section');
   section.id = 'wn-compare-section';
-  section.hidden = true;
+  section.hidden = !expAuto;
   section.style.marginTop = '16px';
   section.style.marginBottom = '16px';
   section.className = 'glass wn-blend-compare';
@@ -582,6 +629,7 @@ async function init() {
   // Toggle like Car Wash
   const compareBtn = document.getElementById('open-compare');
   if (compareBtn) {
+    if (expAuto) compareBtn.setAttribute('aria-expanded', 'true');
     compareBtn.onclick = () => {
       const isHidden = section.hidden;
       section.hidden = !isHidden;
@@ -604,13 +652,20 @@ async function init() {
 
   forecastCache=globalThis.__weatherNourieForecast || null;
   let feedRequest=null;
-  compareBtn?.addEventListener('click',()=>{
-    if(section.hidden)return;
-    render();
+  const triggerWNFeed = () => {
     if(!feedRequest)feedRequest=loadWNFeed().then(wn=>{
       wnFeed=wn; wnCache=pickWN(wn,forecastCache); render();
       if(!wn)feedRequest=null;
     });
+  };
+  if (expAuto) {
+    render();
+    triggerWNFeed();
+  }
+  compareBtn?.addEventListener('click',()=>{
+    if(section.hidden)return;
+    render();
+    triggerWNFeed();
   });
   document.addEventListener('weather-nourie:location-changing',()=>{
     forecastCache=null;wnCache=null;

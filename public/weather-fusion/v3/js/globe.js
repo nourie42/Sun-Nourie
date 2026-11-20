@@ -2,17 +2,25 @@
  * Weather Nourie · Photorealistic Three.js WebGL 3D Satellite Earth Globe
  * - Real NASA Blue Marble 2K Day + Real NASA Black Marble 2K Night City Lights GLSL Shader
  * - Real NASA SRTM Topography Bump Relief & Ocean Specular Reflection
- * - Actual Live Geostationary Satellite Global Cloud Cover Shell (EUMETSAT + NOAA GOES + Himawari)
- * - Actual Live NASA GPM IMERG Global Satellite Precipitation Overlay
+ * - Accurate Hourly Global Cloud Cover Field (Open-Meteo Global 14x30 Grid + Geographically Locked Satellite Detail)
+ * - Windy/Nullschool-Style Curved Fluid Wind Streamlines driven by Real Atmospheric u/v Vectors
  * - Real-Time Astronomical Solar Terminator + Fresnel Atmospheric Rayleigh Scattering Glow
- * - Animated 3D Jet Stream Wind Ribbons, Deep-Space Starfield & Click-Anywhere 3D Raycast
+ * - Accurate Equirectangular UV Coordinate Raycasting (Verified West-to-East Earth Rotation)
  */
 
 import * as THREE from '../vendor/three.module.min.js';
 import { DEG2RAD, RAD2DEG, clamp } from './physics.js';
 import { PRESET_CITIES } from './fusion-engine.js';
 
-function latLonToVec3(latDeg, lonDeg, radius = 1) {
+const EXTRA_WORLD_PINS = [
+  { id: 'chicago', name: 'Chicago, IL', latitude: 41.8781, longitude: -87.6298 },
+  { id: 'london', name: 'London, UK', latitude: 51.5072, longitude: -0.1276 },
+  { id: 'paris', name: 'Paris, FR', latitude: 48.8566, longitude: 2.3522 },
+  { id: 'tokyo', name: 'Tokyo, JP', latitude: 35.6762, longitude: 139.6503 },
+  { id: 'sydney', name: 'Sydney, AU', latitude: -33.8688, longitude: 151.2093 },
+];
+
+export function latLonToVec3(latDeg, lonDeg, radius = 1) {
   const phi = (90 - latDeg) * DEG2RAD;
   const theta = (lonDeg + 180) * DEG2RAD;
   return new THREE.Vector3(
@@ -22,7 +30,7 @@ function latLonToVec3(latDeg, lonDeg, radius = 1) {
   );
 }
 
-function vec3ToLatLon(vec) {
+export function vec3ToLatLon(vec) {
   const n = vec.clone().normalize();
   const latDeg = Math.asin(clamp(n.y, -1, 1)) * RAD2DEG;
   let theta = Math.atan2(n.z, -n.x);
@@ -39,6 +47,36 @@ function getSubsolarVec3(dateObj) {
   const dayOfYear = Math.floor((dateObj - start) / 86400000);
   const subsolarLat = -23.44 * Math.cos(((2 * Math.PI) / 365) * (dayOfYear + 10));
   return latLonToVec3(subsolarLat, subsolarLon, 1).normalize();
+}
+
+function smoothstep(edge0, edge1, x) {
+  const t = clamp((x - edge0) / (edge1 - edge0 || 1), 0, 1);
+  return t * t * (3 - 2 * t);
+}
+
+function hash2D(ix, iy) {
+  const n = Math.sin(ix * 127.1 + iy * 311.7) * 43758.5453123;
+  return n - Math.floor(n);
+}
+
+function valueNoisePeriodicX(xNorm, yNorm, periodX, freqY) {
+  const fx = xNorm * periodX;
+  const fy = yNorm * freqY;
+  const x0 = Math.floor(fx);
+  const y0 = Math.floor(fy);
+  const tx = fx - x0;
+  const ty = fy - y0;
+  const sx = tx * tx * (3 - 2 * tx);
+  const sy = ty * ty * (3 - 2 * ty);
+  const ix0 = ((x0 % periodX) + periodX) % periodX;
+  const ix1 = (ix0 + 1) % periodX;
+  const n00 = hash2D(ix0, y0);
+  const n10 = hash2D(ix1, y0);
+  const n01 = hash2D(ix0, y0 + 1);
+  const n11 = hash2D(ix1, y0 + 1);
+  const nx0 = n00 + (n10 - n00) * sx;
+  const nx1 = n01 + (n11 - n01) * sx;
+  return nx0 + (nx1 - nx0) * sy;
 }
 
 const EARTH_VERTEX_SHADER = `
@@ -58,9 +96,11 @@ const EARTH_FRAGMENT_SHADER = `
   uniform sampler2D uDayTex;
   uniform sampler2D uNightTex;
   uniform sampler2D uBumpTex;
+  uniform sampler2D uThermalTex;
   uniform vec3 uSunDir;
   uniform float uTerminatorStrength;
   uniform float uThermalOverlay;
+  uniform float uHasThermalTex;
   varying vec2 vUv;
   varying vec3 vNormalWorld;
   varying vec3 vPositionWorld;
@@ -74,48 +114,46 @@ const EARTH_FRAGMENT_SHADER = `
     vec3 nightColor = texture2D(uNightTex, vUv).rgb;
     float elev = texture2D(uBumpTex, vUv).r;
 
-    // Subtle elevation relief shading
     float ndotl = dot(N, L);
-    float dayFactor = smoothstep(-0.14, 0.22, ndotl);
+    float dayFactor = smoothstep(-0.15, 0.22, ndotl);
     float effectiveDay = mix(1.0, dayFactor, uTerminatorStrength);
 
-    // Rich sunlit day earth + ocean specular glint
-    float diffuse = mix(0.28, 1.18, clamp(ndotl * 0.85 + 0.35, 0.0, 1.0));
+    float diffuse = mix(0.32, 1.18, clamp(ndotl * 0.85 + 0.35, 0.0, 1.0));
     float fullDayDiffuse = mix(diffuse, 1.08, 1.0 - uTerminatorStrength);
     vec3 litDay = dayColor * fullDayDiffuse;
 
-    // Subtle ocean sun specular where elevation is low (sea level)
     float isOcean = 1.0 - smoothstep(0.03, 0.09, elev);
     vec3 H = normalize(L + V);
-    float spec = pow(max(dot(N, H), 0.0), 42.0) * isOcean * 0.34 * effectiveDay;
+    float spec = pow(max(dot(N, H), 0.0), 42.0) * isOcean * 0.30 * effectiveDay;
     litDay += vec3(0.75, 0.88, 1.0) * spec;
 
-    // Night hemisphere: deep midnight blue base + bright warm golden NASA Black Marble city lights
-    vec3 nightBase = dayColor * vec3(0.06, 0.09, 0.16);
-    vec3 cityLights = pow(nightColor, vec3(1.15)) * vec3(1.55, 1.25, 0.78) * 1.45;
+    vec3 nightBase = dayColor * vec3(0.07, 0.11, 0.19);
+    vec3 cityLights = pow(nightColor, vec3(1.12)) * vec3(1.6, 1.28, 0.78) * 1.45;
     vec3 litNight = nightBase + cityLights;
 
-    // Sunset/sunrise twilight glow band right along the terminator
     float twilight = exp(-pow(ndotl * 7.5, 2.0)) * uTerminatorStrength;
-    vec3 twilightTint = vec3(1.0, 0.48, 0.22) * twilight * 0.24;
+    vec3 twilightTint = vec3(1.0, 0.48, 0.22) * twilight * 0.22;
 
     vec3 color = mix(litNight, litDay, effectiveDay) + twilightTint;
 
-    // Optional Global Thermal Latitude Band Tint
     if (uThermalOverlay > 0.01) {
-      float latFactor = 1.0 - abs(vUv.y - 0.5) * 2.0; // 1 at equator, 0 at poles
-      vec3 coldCol = vec3(0.16, 0.45, 0.98);
-      vec3 mildCol = vec3(0.20, 0.82, 0.58);
-      vec3 hotCol = vec3(0.98, 0.36, 0.18);
-      vec3 thermalCol = latFactor < 0.5
-        ? mix(coldCol, mildCol, latFactor * 2.0)
-        : mix(mildCol, hotCol, (latFactor - 0.5) * 2.0);
-      color = mix(color, thermalCol, 0.42 * uThermalOverlay);
+      vec3 thermalCol;
+      if (uHasThermalTex > 0.5) {
+        thermalCol = texture2D(uThermalTex, vUv).rgb;
+      } else {
+        float latFactor = 1.0 - abs(vUv.y - 0.5) * 2.0;
+        vec3 coldCol = vec3(0.16, 0.45, 0.98);
+        vec3 mildCol = vec3(0.20, 0.82, 0.58);
+        vec3 hotCol = vec3(0.98, 0.36, 0.18);
+        thermalCol = latFactor < 0.5
+          ? mix(coldCol, mildCol, latFactor * 2.0)
+          : mix(mildCol, hotCol, (latFactor - 0.5) * 2.0);
+      }
+      color = mix(color, thermalCol, 0.44 * uThermalOverlay);
     }
 
-    // Subtle atmospheric perspective near sphere limb
     float rim = 1.0 - max(dot(N, V), 0.0);
-    color += vec3(0.24, 0.58, 1.0) * pow(rim, 3.2) * 0.36;
+    color += vec3(0.24, 0.58, 1.0) * pow(rim, 3.2) * 0.34;
 
     gl_FragColor = vec4(color, 1.0);
   }
@@ -141,23 +179,21 @@ const CLOUDS_FRAGMENT_SHADER = `
 
   void main() {
     vec4 tex = texture2D(uCloudTex, vUv);
-    // clouds-alpha.png uses alpha channel (or brightness fallback)
-    float density = max(tex.a, (tex.r + tex.g + tex.b) / 3.0 * tex.a);
-    if (density < 0.02) discard;
+    float density = max(tex.a, tex.r * tex.a);
+    if (density < 0.025) discard;
 
     vec3 N = normalize(vNormalWorld);
     vec3 L = normalize(uSunDir);
     float ndotl = dot(N, L);
-    float dayFactor = smoothstep(-0.22, 0.25, ndotl);
+    float dayFactor = smoothstep(-0.22, 0.24, ndotl);
     float effectiveDay = mix(1.0, dayFactor, uTerminatorStrength);
 
-    // Bright crisp white clouds in day, silver-blue moonlit clouds at night so cloud cover is always legible
     vec3 dayCloud = vec3(0.97, 0.99, 1.0);
-    vec3 nightCloud = vec3(0.32, 0.44, 0.64);
+    vec3 nightCloud = vec3(0.34, 0.46, 0.68);
     float twilight = exp(-pow(ndotl * 6.5, 2.0)) * uTerminatorStrength;
-    vec3 cloudCol = mix(nightCloud, dayCloud, effectiveDay) + vec3(0.95, 0.55, 0.28) * twilight * 0.22;
+    vec3 cloudCol = mix(nightCloud, dayCloud, effectiveDay) + vec3(0.95, 0.55, 0.28) * twilight * 0.20;
 
-    float alpha = clamp(density * uOpacity * mix(0.68, 0.96, effectiveDay), 0.0, 0.94);
+    float alpha = clamp(density * uOpacity * mix(0.68, 0.94, effectiveDay), 0.0, 0.92);
     gl_FragColor = vec4(cloudCol, alpha);
   }
 `;
@@ -203,15 +239,32 @@ export class LiveCloudGlobe {
     this.cloudMesh = null;
     this.cloudMat = null;
     this.precipMesh = null;
-    this.windLines = null;
-    this.windState = [];
+    this.precipMat = null;
+    this.windMesh = null;
+    this.windCanvas = null;
+    this.windCtx = null;
+    this.windTex = null;
+    this.windParticles = [];
+    this.cloudCanvas = null;
+    this.cloudCtx = null;
+    this.cloudDynTex = null;
+    this.precipCanvas = null;
+    this.precipDynTex = null;
+    this.thermalCanvas = null;
+    this.thermalDynTex = null;
+    this.satAlphaPixels = null;
+    this.satSize = null;
+    this.cloudNoiseGrid = null;
+
+    this.globalGrid = null;
+    this.renderedCloudHour = -1;
+
     this.beaconGroup = null;
     this.beaconRing = null;
     this.cityPinGroup = null;
     this.floatingLabelEl = null;
 
-    // Camera spherical orbit angles (radians)
-    this.camLon = -122.4194 * DEG2RAD;
+    this.camLon = -78.4806 * DEG2RAD;
     this.camLat = 34 * DEG2RAD;
     this.targetCamLon = null;
     this.targetCamLat = null;
@@ -220,13 +273,12 @@ export class LiveCloudGlobe {
     this.camDist = 2.65;
     this.autoSpin = true;
 
-    // Interactive layers
     this.layers = {
       clouds: true,
       wind: true,
       precip: false,
       terminator: true,
-      thermal: false
+      thermal: false,
     };
 
     this.hourOffset = 0;
@@ -237,6 +289,7 @@ export class LiveCloudGlobe {
     this.initialized = false;
     this.raycaster = new THREE.Raycaster();
     this.lastTime = 0;
+    this.windAccumulator = 0;
   }
 
   init(forecast) {
@@ -250,7 +303,6 @@ export class LiveCloudGlobe {
     if (!this.canvas) return;
     this.initialized = true;
 
-    // Create floating retina HTML callout tag inside .globe-stage-wrap
     const stageWrap = this.canvas.parentElement;
     if (stageWrap && !stageWrap.querySelector('.globe-beacon-tag')) {
       const tag = document.createElement('div');
@@ -262,6 +314,7 @@ export class LiveCloudGlobe {
 
     this.setupThreeScene();
     this.bindEvents();
+    this.loadGlobalWeather();
 
     if (forecast?.location) {
       this.flyTo(forecast.location.latitude, forecast.location.longitude, true);
@@ -289,22 +342,44 @@ export class LiveCloudGlobe {
     this.updateActiveBeacon();
   }
 
+  async loadGlobalWeather() {
+    if (this.globalGrid) return;
+    try {
+      const res = await fetch('/api/weather-fusion/global-weather', { cache: 'default' });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data?.frames?.length) {
+        this.setGlobalWeatherData(data);
+      }
+    } catch {
+      // Keeps fallback satellite + climatological winds gracefully
+    }
+  }
+
+  setGlobalWeatherData(gridData) {
+    this.globalGrid = gridData;
+    this.renderedCloudHour = -1;
+    this.updateDynamicCloudTexture();
+    this.updateDynamicPrecipTexture();
+    this.updateDynamicThermalTexture();
+    this.warmWindFluidLayer();
+  }
+
   setupThreeScene() {
     const rect = this.canvas.getBoundingClientRect();
-    const w = Math.max(300, Math.floor(rect.width || 480));
-    const h = Math.max(300, Math.floor(rect.height || 380));
+    const w = Math.max(280, Math.floor(rect.width || 480));
+    const h = Math.max(260, Math.floor(rect.height || 380));
 
     this.renderer = new THREE.WebGLRenderer({
       canvas: this.canvas,
       antialias: true,
       alpha: true,
-      powerPreference: 'high-performance'
+      powerPreference: 'high-performance',
     });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     this.renderer.setSize(w, h, false);
 
-    // Frame the full luminous Earth horizon comfortably on both desktop and portrait mobile
-    this.camDist = w < 440 ? 3.25 : 2.85;
+    this.camDist = w < 440 ? 3.56 : 2.78;
 
     this.scene = new THREE.Scene();
     this.camera = new THREE.PerspectiveCamera(40, w / h, 0.1, 100);
@@ -328,7 +403,7 @@ export class LiveCloudGlobe {
       color: 0xdbeafe,
       size: 0.085,
       transparent: true,
-      opacity: 0.72
+      opacity: 0.72,
     });
     this.scene.add(new THREE.Points(starGeo, starMat));
 
@@ -364,181 +439,518 @@ export class LiveCloudGlobe {
     const bumpTex = loadTex('/weather-fusion/v3/textures/earth-bump.png');
     const sunDir = getSubsolarVec3(new Date());
 
-    // 2. Photorealistic NASA Blue Marble + Black Marble Earth Sphere
+    // 2. Dynamic Global Temperature Contour CanvasTexture (Real model temps)
+    this.thermalCanvas = document.createElement('canvas');
+    this.thermalCanvas.width = 256;
+    this.thermalCanvas.height = 128;
+    this.thermalDynTex = new THREE.CanvasTexture(this.thermalCanvas);
+    this.thermalDynTex.wrapS = THREE.RepeatWrapping;
+
+    // 3. Earth Sphere (NASA Blue Marble + Black Marble + Real Elevation + Dynamic Thermal Contour)
     const earthGeo = new THREE.SphereGeometry(1, 64, 64);
     this.earthMat = new THREE.ShaderMaterial({
       uniforms: {
         uDayTex: { value: dayTex },
         uNightTex: { value: nightTex },
         uBumpTex: { value: bumpTex },
+        uThermalTex: { value: this.thermalDynTex },
         uSunDir: { value: sunDir.clone() },
         uTerminatorStrength: { value: 1.0 },
-        uThermalOverlay: { value: 0.0 }
+        uThermalOverlay: { value: 0.0 },
+        uHasThermalTex: { value: 0.0 },
       },
       vertexShader: EARTH_VERTEX_SHADER,
-      fragmentShader: EARTH_FRAGMENT_SHADER
+      fragmentShader: EARTH_FRAGMENT_SHADER,
     });
     this.earthMesh = new THREE.Mesh(earthGeo, this.earthMat);
     this.globeGroup.add(this.earthMesh);
 
-    // 3. Real-Time Live Global Geostationary Satellite Cloud Shell
-    const cloudGeo = new THREE.SphereGeometry(1.016, 64, 64);
-    const cloudTex = loadTex(
-      '/api/weather-fusion/v3/live-clouds.png',
-      '/weather-fusion/v3/textures/clouds-fallback.png',
-      (loaded) => {
-        if (this.cloudMat) {
-          this.cloudMat.uniforms.uCloudTex.value = loaded;
-          this.cloudMat.needsUpdate = true;
-        }
-      }
-    );
+    // 4. Geographically Locked Cloud Layer (Hourly Global Open-Meteo Cloud Cover + Satellite Detail)
+    this.initCloudCanvasTexture();
+    const cloudGeo = new THREE.SphereGeometry(1.015, 64, 64);
     this.cloudMat = new THREE.ShaderMaterial({
       uniforms: {
-        uCloudTex: { value: cloudTex },
+        uCloudTex: { value: this.cloudDynTex },
         uSunDir: { value: sunDir.clone() },
         uTerminatorStrength: { value: 1.0 },
-        uOpacity: { value: 0.92 }
+        uOpacity: { value: 0.92 },
       },
       vertexShader: CLOUDS_VERTEX_SHADER,
       fragmentShader: CLOUDS_FRAGMENT_SHADER,
       transparent: true,
-      depthWrite: false
+      depthWrite: false,
     });
     this.cloudMesh = new THREE.Mesh(cloudGeo, this.cloudMat);
+    this.cloudMesh.rotation.y = 0; // Locked strictly to geographic coordinates!
     this.globeGroup.add(this.cloudMesh);
 
-    // 4. Real-Time NASA GPM IMERG Global Satellite Precipitation Layer
-    const precipGeo = new THREE.SphereGeometry(1.022, 64, 64);
-    const precipMat = new THREE.MeshBasicMaterial({
+    // Load live satellite cloud alpha map as geographically locked spatial microstructure
+    this.loadSatelliteDetailImage('/api/weather-fusion/v3/live-clouds.png', '/weather-fusion/v3/textures/clouds-fallback.png');
+
+    // 5. Dynamic Precipitation Overlay Sphere (Satellite IMERG + Hourly Model Precip)
+    this.precipCanvas = document.createElement('canvas');
+    this.precipCanvas.width = 512;
+    this.precipCanvas.height = 256;
+    this.precipDynTex = new THREE.CanvasTexture(this.precipCanvas);
+    this.precipDynTex.wrapS = THREE.RepeatWrapping;
+
+    const precipGeo = new THREE.SphereGeometry(1.020, 64, 64);
+    this.precipMat = new THREE.MeshBasicMaterial({
+      map: this.precipDynTex,
       transparent: true,
-      opacity: 0.85,
-      depthWrite: false
+      opacity: 0.9,
+      depthWrite: false,
     });
-    loadTex(
-      '/api/weather-fusion/v3/live-precip.png',
-      'https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.3.0&LAYERS=IMERG_Precipitation_Rate&CRS=EPSG:4326&BBOX=-90,-180,90,180&WIDTH=2048&HEIGHT=1024&FORMAT=image/png&TRANSPARENT=true',
-      (loaded) => {
-        precipMat.map = loaded;
-        precipMat.needsUpdate = true;
-      }
-    );
-    this.precipMesh = new THREE.Mesh(precipGeo, precipMat);
+    this.precipMesh = new THREE.Mesh(precipGeo, this.precipMat);
     this.precipMesh.visible = this.layers.precip;
     this.globeGroup.add(this.precipMesh);
 
-    // 5. Real Rayleigh Atmospheric Fresnel Halo
+    // 6. Smooth Fluid Atmospheric Wind Streamline Shell (Windy/Nullschool-style CanvasTexture)
+    this.initWindFluidLayer(w < 460);
+
+    // 7. Rayleigh Atmospheric Fresnel Halo
     const atmoGeo = new THREE.SphereGeometry(1.105, 64, 64);
     const atmoMat = new THREE.ShaderMaterial({
       uniforms: {
-        uSunDir: { value: sunDir.clone() }
+        uSunDir: { value: sunDir.clone() },
       },
       vertexShader: ATMOSPHERE_VERTEX_SHADER,
       fragmentShader: ATMOSPHERE_FRAGMENT_SHADER,
       blending: THREE.AdditiveBlending,
       side: THREE.BackSide,
       transparent: true,
-      depthWrite: false
+      depthWrite: false,
     });
     this.atmoMat = atmoMat;
     this.globeGroup.add(new THREE.Mesh(atmoGeo, atmoMat));
 
-    // 6. 3D Animated Jet Stream & Planetary Wind Ribbons
-    this.buildWindRibbons();
-
-    // 7. Preset City Pins + Active Pulsing Beacon
+    // 8. Reference City Pins + Pulsing Active Beacon
     this.cityPinGroup = new THREE.Group();
     const pinGeo = new THREE.SphereGeometry(0.011, 10, 10);
     const pinMat = new THREE.MeshBasicMaterial({ color: 0x7ac6ff });
-    PRESET_CITIES.forEach((city) => {
+    for (const city of [...PRESET_CITIES, ...EXTRA_WORLD_PINS]) {
       const m = new THREE.Mesh(pinGeo, pinMat);
       m.position.copy(latLonToVec3(city.latitude, city.longitude, 1.008));
       this.cityPinGroup.add(m);
-    });
+    }
     this.globeGroup.add(this.cityPinGroup);
 
     this.beaconGroup = new THREE.Group();
-    const dotGeo = new THREE.SphereGeometry(0.019, 16, 16);
+    const dotGeo = new THREE.SphereGeometry(0.018, 16, 16);
     const dotMat = new THREE.MeshBasicMaterial({ color: 0x5ce0a0 });
     this.beaconGroup.add(new THREE.Mesh(dotGeo, dotMat));
 
-    const ringGeo = new THREE.RingGeometry(0.026, 0.038, 32);
+    const ringGeo = new THREE.RingGeometry(0.025, 0.037, 32);
     const ringMat = new THREE.MeshBasicMaterial({
       color: 0x5ce0a0,
       side: THREE.DoubleSide,
       transparent: true,
-      opacity: 0.9
+      opacity: 0.9,
     });
     this.beaconRing = new THREE.Mesh(ringGeo, ringMat);
     this.beaconGroup.add(this.beaconRing);
     this.globeGroup.add(this.beaconGroup);
 
-    // ResizeObserver for crisp layout across mobile & desktop
     if (typeof ResizeObserver !== 'undefined') {
       new ResizeObserver(() => this.handleResize()).observe(this.canvas.parentElement || this.canvas);
     }
     window.addEventListener('resize', () => this.handleResize());
   }
 
-  buildWindRibbons() {
-    const count = 150;
-    this.windState = [];
-    for (let i = 0; i < count; i++) {
-      this.windState.push({
-        lon: ((i * 67) % 360) - 180,
-        lat: ((i * 43) % 136) - 68,
-        speed: 5.5 + (i % 6) * 2.2
-      });
-    }
-    const positions = new Float32Array(count * 2 * 3);
-    const colors = new Float32Array(count * 2 * 3);
-    const geo = new THREE.BufferGeometry();
-    geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-    geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-    const mat = new THREE.LineBasicMaterial({
-      vertexColors: true,
-      transparent: true,
-      opacity: 0.78
-    });
-    this.windLines = new THREE.LineSegments(geo, mat);
-    this.windLines.visible = this.layers.wind;
-    this.globeGroup.add(this.windLines);
-  }
+  initCloudCanvasTexture() {
+    const cw = 720;
+    const ch = 360;
+    this.cloudCanvas = document.createElement('canvas');
+    this.cloudCanvas.width = cw;
+    this.cloudCanvas.height = ch;
+    this.cloudCtx = this.cloudCanvas.getContext('2d');
 
-  updateWindRibbons(dt) {
-    if (!this.windLines || !this.layers.wind) return;
-    const pos = this.windLines.geometry.attributes.position;
-    const col = this.windLines.geometry.attributes.color;
-    const r = 1.032;
-
-    for (let i = 0; i < this.windState.length; i++) {
-      const w = this.windState[i];
-      const absLat = Math.abs(w.lat);
-      const isJet = absLat >= 28 && absLat <= 56;
-      const dir = absLat < 22 ? -0.55 : isJet ? 1.45 : -0.4;
-      const dLon = dir * w.speed * dt;
-      const dLat = Math.sin(w.lon * DEG2RAD * 3) * 1.4 * dt;
-
-      w.lon = ((w.lon + dLon + 540) % 360) - 180;
-      w.lat = clamp(w.lat + dLat, -74, 74);
-
-      const head = latLonToVec3(w.lat, w.lon, r);
-      const tail = latLonToVec3(clamp(w.lat - dLat * 4, -76, 76), w.lon - dir * (isJet ? 5.2 : 2.8), r);
-
-      const idx = i * 2;
-      pos.setXYZ(idx, tail.x, tail.y, tail.z);
-      pos.setXYZ(idx + 1, head.x, head.y, head.z);
-
-      if (isJet) {
-        col.setXYZ(idx, 0.2, 0.72, 1.0);
-        col.setXYZ(idx + 1, 0.45, 0.98, 0.85);
-      } else {
-        col.setXYZ(idx, 0.35, 0.65, 0.95);
-        col.setXYZ(idx + 1, 0.7, 0.92, 1.0);
+    // Precompute periodic multi-octave swirl noise for organic cloud morphology
+    const noise = new Float32Array(cw * ch);
+    for (let y = 0; y < ch; y++) {
+      const yn = y / ch;
+      for (let x = 0; x < cw; x++) {
+        const xn = x / cw;
+        const n1 = valueNoisePeriodicX(xn, yn, 24, 12);
+        const n2 = valueNoisePeriodicX(xn + n1 * 0.04, yn + n1 * 0.04, 54, 27);
+        const n3 = valueNoisePeriodicX(xn, yn, 108, 54);
+        noise[y * cw + x] = n1 * 0.50 + n2 * 0.34 + n3 * 0.16;
       }
     }
-    pos.needsUpdate = true;
-    col.needsUpdate = true;
+    this.cloudNoiseGrid = noise;
+
+    this.cloudDynTex = new THREE.CanvasTexture(this.cloudCanvas);
+    this.cloudDynTex.wrapS = THREE.RepeatWrapping;
+  }
+
+  loadSatelliteDetailImage(url, fallbackUrl) {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      try {
+        const w = 720;
+        const h = 360;
+        const c = document.createElement('canvas');
+        c.width = w;
+        c.height = h;
+        const ctx = c.getContext('2d');
+        ctx.drawImage(img, 0, 0, w, h);
+        const raw = ctx.getImageData(0, 0, w, h).data;
+        const alphas = new Uint8Array(w * h);
+        for (let i = 0; i < w * h; i++) {
+          const r = raw[i * 4];
+          const g = raw[i * 4 + 1];
+          const b = raw[i * 4 + 2];
+          const a = raw[i * 4 + 3];
+          const lum = (r + g + b) / 3;
+          alphas[i] = Math.round(Math.max(a, (lum * a) / 255));
+        }
+        this.satAlphaPixels = alphas;
+        this.satSize = { w, h };
+        this.renderedCloudHour = -1;
+        this.updateDynamicCloudTexture();
+      } catch {
+        // Ignore CORS canvas taint if any
+      }
+    };
+    img.onerror = () => {
+      if (fallbackUrl && url !== fallbackUrl) {
+        this.loadSatelliteDetailImage(fallbackUrl, null);
+      }
+    };
+    img.src = url;
+  }
+
+  sampleGridScalar(fieldKey, hourIdx, latDeg, lonDeg) {
+    const g = this.globalGrid;
+    if (!g?.frames?.length) return 0;
+    const h = clamp(Math.round(hourIdx), 0, g.frames.length - 1);
+    const frame = g.frames[h];
+    const arr = frame?.[fieldKey];
+    if (!arr) return 0;
+
+    const lats = g.lats; // Descending +74 .. -66
+    const nLat = g.nLat;
+    const nLon = g.nLon;
+
+    let latIdx0 = 0;
+    let latT = 0;
+    if (latDeg >= lats[0]) {
+      latIdx0 = 0;
+      latT = 0;
+    } else if (latDeg <= lats[nLat - 1]) {
+      latIdx0 = nLat - 2;
+      latT = 1;
+    } else {
+      for (let i = 0; i < nLat - 1; i++) {
+        if (latDeg <= lats[i] && latDeg >= lats[i + 1]) {
+          latIdx0 = i;
+          latT = (lats[i] - latDeg) / (lats[i] - lats[i + 1] || 1);
+          break;
+        }
+      }
+    }
+
+    const wrappedLon = ((((lonDeg + 180) % 360) + 360) % 360) - 180;
+    const lonStep = 360 / nLon;
+    const lonPos = (wrappedLon + 180) / lonStep;
+    const lonIdx0 = Math.floor(lonPos) % nLon;
+    const lonIdx1 = (lonIdx0 + 1) % nLon;
+    const lonT = lonPos - Math.floor(lonPos);
+
+    const v00 = arr[latIdx0 * nLon + lonIdx0] || 0;
+    const v10 = arr[latIdx0 * nLon + lonIdx1] || 0;
+    const v01 = arr[(latIdx0 + 1) * nLon + lonIdx0] || 0;
+    const v11 = arr[(latIdx0 + 1) * nLon + lonIdx1] || 0;
+
+    const top = v00 + (v10 - v00) * lonT;
+    const bot = v01 + (v11 - v01) * lonT;
+    return top + (bot - top) * latT;
+  }
+
+  sampleWindUv(hourIdx, latDeg, lonDeg) {
+    const g = this.globalGrid;
+    if (!g?.frames?.length) {
+      // Climatological synoptic fallback only until global grid resolves
+      const absLat = Math.abs(latDeg);
+      const u = absLat < 22 ? -14 : absLat <= 58 ? 28 + Math.cos(lonDeg * DEG2RAD * 3) * 10 : -8;
+      const v = Math.sin(lonDeg * DEG2RAD * 3) * 9 * (latDeg >= 0 ? 1 : -1);
+      return [u, v];
+    }
+    return [
+      this.sampleGridScalar('u', hourIdx, latDeg, lonDeg),
+      this.sampleGridScalar('v', hourIdx, latDeg, lonDeg),
+    ];
+  }
+
+  updateDynamicCloudTexture() {
+    if (!this.cloudCanvas || !this.cloudCtx || !this.cloudDynTex) return;
+    if (this.renderedCloudHour === this.hourOffset && this.globalGrid) return;
+
+    const w = this.cloudCanvas.width;
+    const h = this.cloudCanvas.height;
+    const imgData = this.cloudCtx.createImageData(w, h);
+    const out = imgData.data;
+    const noise = this.cloudNoiseGrid;
+    const hasGrid = Boolean(this.globalGrid?.frames?.length);
+    const hasSat = Boolean(this.satAlphaPixels && this.satSize?.w === w && this.satSize?.h === h);
+    const hour = this.hourOffset;
+
+    if (hasGrid) {
+      this.renderedCloudHour = hour;
+      const useSatBlend = hour <= 1 && hasSat;
+      const sat = this.satAlphaPixels;
+
+      for (let y = 0; y < h; y++) {
+        const lat = 90 - ((y + 0.5) / h) * 180;
+        const rowOffset = y * w;
+        for (let x = 0; x < w; x++) {
+          const lon = ((x + 0.5) / w) * 360 - 180;
+          const idx = rowOffset + x;
+          const cover = clamp(this.sampleGridScalar('cloud', hour, lat, lon) / 100, 0, 1);
+
+          let alpha = 0;
+          if (cover > 0.04) {
+            const fbm = noise[idx];
+            const satVal = hasSat ? sat[idx] / 255 : fbm;
+            // Combine satellite structure at hour 0 with real meteorological cover envelope so
+            // clear places like cloudless coasts stay clear while cloudy fronts look swirled & vivid!
+            const micro = useSatBlend ? satVal * 0.58 + fbm * 0.42 : fbm;
+            const threshold = 1.0 - cover * 1.12;
+            const shaped = smoothstep(threshold - 0.18, threshold + 0.36, micro);
+            alpha = Math.min(1, shaped * (0.28 + cover * 0.78) * 255);
+          }
+
+          const p4 = idx * 4;
+          out[p4] = 248;
+          out[p4 + 1] = 251;
+          out[p4 + 2] = 255;
+          out[p4 + 3] = Math.round(alpha);
+        }
+      }
+    } else if (hasSat) {
+      const sat = this.satAlphaPixels;
+      for (let i = 0; i < w * h; i++) {
+        const p4 = i * 4;
+        out[p4] = 248;
+        out[p4 + 1] = 251;
+        out[p4 + 2] = 255;
+        out[p4 + 3] = sat[i];
+      }
+    }
+
+    this.cloudCtx.putImageData(imgData, 0, 0);
+    this.cloudDynTex.needsUpdate = true;
+  }
+
+  updateDynamicPrecipTexture() {
+    if (!this.precipCanvas || !this.precipDynTex || !this.globalGrid?.frames?.length) return;
+    const ctx = this.precipCanvas.getContext('2d');
+    const w = this.precipCanvas.width;
+    const h = this.precipCanvas.height;
+    const imgData = ctx.createImageData(w, h);
+    const out = imgData.data;
+
+    for (let y = 0; y < h; y++) {
+      const lat = 90 - ((y + 0.5) / h) * 180;
+      for (let x = 0; x < w; x++) {
+        const lon = ((x + 0.5) / w) * 360 - 180;
+        const mm = this.sampleGridScalar('precip', this.hourOffset, lat, lon);
+        const p4 = (y * w + x) * 4;
+        if (mm < 0.08) {
+          out[p4 + 3] = 0;
+          continue;
+        }
+        // Radar green -> cyan -> amber -> magenta precip ramp
+        let r = 45, g = 212, b = 191, a = 155;
+        if (mm >= 5.0) {
+          r = 244; g = 63; b = 94; a = 230;
+        } else if (mm >= 2.0) {
+          r = 250; g = 204; b = 21; a = 210;
+        } else if (mm >= 0.6) {
+          r = 56; g = 189; b = 248; a = 185;
+        } else {
+          a = Math.round(smoothstep(0.08, 0.6, mm) * 165);
+        }
+        out[p4] = r;
+        out[p4 + 1] = g;
+        out[p4 + 2] = b;
+        out[p4 + 3] = a;
+      }
+    }
+    ctx.putImageData(imgData, 0, 0);
+    this.precipDynTex.needsUpdate = true;
+  }
+
+  updateDynamicThermalTexture() {
+    if (!this.thermalCanvas || !this.thermalDynTex || !this.globalGrid?.frames?.length) return;
+    const ctx = this.thermalCanvas.getContext('2d');
+    const w = this.thermalCanvas.width;
+    const h = this.thermalCanvas.height;
+    const imgData = ctx.createImageData(w, h);
+    const out = imgData.data;
+
+    for (let y = 0; y < h; y++) {
+      const lat = 90 - ((y + 0.5) / h) * 180;
+      for (let x = 0; x < w; x++) {
+        const lon = ((x + 0.5) / w) * 360 - 180;
+        const tF = this.sampleGridScalar('temp', this.hourOffset, lat, lon);
+        const p4 = (y * w + x) * 4;
+        const n = clamp((tF - 10) / 85, 0, 1); // 10°F .. 95°F
+        let r, g, b;
+        if (n < 0.28) {
+          const t = n / 0.28;
+          r = 58 + (56 - 58) * t;
+          g = 90 + (189 - 90) * t;
+          b = 248 + (248 - 248) * t;
+        } else if (n < 0.58) {
+          const t = (n - 0.28) / 0.30;
+          r = 56 + (52 - 56) * t;
+          g = 189 + (211 - 189) * t;
+          b = 248 + (153 - 248) * t;
+        } else if (n < 0.80) {
+          const t = (n - 0.58) / 0.22;
+          r = 52 + (250 - 52) * t;
+          g = 211 + (204 - 211) * t;
+          b = 153 + (21 - 153) * t;
+        } else {
+          const t = (n - 0.80) / 0.20;
+          r = 250 + (239 - 250) * t;
+          g = 204 + (68 - 204) * t;
+          b = 21 + (68 - 21) * t;
+        }
+        out[p4] = Math.round(r);
+        out[p4 + 1] = Math.round(g);
+        out[p4 + 2] = Math.round(b);
+        out[p4 + 3] = 255;
+      }
+    }
+    ctx.putImageData(imgData, 0, 0);
+    this.thermalDynTex.needsUpdate = true;
+    if (this.earthMat) this.earthMat.uniforms.uHasThermalTex.value = 1.0;
+  }
+
+  initWindFluidLayer(compact) {
+    const ww = compact ? 768 : 1024;
+    const hh = compact ? 384 : 512;
+    this.windCanvas = document.createElement('canvas');
+    this.windCanvas.width = ww;
+    this.windCanvas.height = hh;
+    this.windCtx = this.windCanvas.getContext('2d');
+
+    const count = compact ? 1300 : 1900;
+    this.windParticles = Array.from({ length: count }, () => ({
+      lon: Math.random() * 360 - 180,
+      lat: (Math.random() * 2 - 1) * 74,
+      age: Math.floor(Math.random() * 75),
+      maxAge: 55 + Math.floor(Math.random() * 45),
+    }));
+
+    this.windTex = new THREE.CanvasTexture(this.windCanvas);
+    this.windTex.wrapS = THREE.RepeatWrapping;
+
+    const windGeo = new THREE.SphereGeometry(1.024, 64, 64);
+    const windMat = new THREE.MeshBasicMaterial({
+      map: this.windTex,
+      transparent: true,
+      opacity: 0.94,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    });
+    this.windMesh = new THREE.Mesh(windGeo, windMat);
+    this.windMesh.visible = this.layers.wind;
+    this.globeGroup.add(this.windMesh);
+    this.warmWindFluidLayer();
+  }
+
+  warmWindFluidLayer() {
+    if (!this.windCtx || !this.windParticles.length) return;
+    this.windCtx.clearRect(0, 0, this.windCanvas.width, this.windCanvas.height);
+    for (let i = 0; i < 16; i++) {
+      this.stepWindFluidLayer(0.042, true);
+    }
+  }
+
+  stepWindFluidLayer(dt, force = false) {
+    if (!this.windMesh || !this.layers.wind || !this.windCtx || !this.windTex) return;
+    if (!force) {
+      this.windAccumulator += dt;
+      if (this.windAccumulator < 0.032) return;
+    }
+    const stepDt = force ? dt : Math.min(0.065, this.windAccumulator);
+    if (!force) this.windAccumulator = 0;
+
+    const ctx = this.windCtx;
+    const w = this.windCanvas.width;
+    const h = this.windCanvas.height;
+
+    // Gentle silky exponential tail fade
+    ctx.save();
+    ctx.globalCompositeOperation = 'destination-out';
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.068)';
+    ctx.fillRect(0, 0, w, h);
+    ctx.restore();
+
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    const advectScale = stepDt * 0.56;
+
+    for (let i = 0; i < this.windParticles.length; i++) {
+      const p = this.windParticles[i];
+      p.age += 1;
+      if (p.age >= p.maxAge || Math.abs(p.lat) > 80) {
+        p.lon = Math.random() * 360 - 180;
+        p.lat = (Math.random() * 2 - 1) * 74;
+        p.age = 0;
+        p.maxAge = 60 + Math.floor(Math.random() * 50);
+        continue;
+      }
+
+      const [u0, v0] = this.sampleWindUv(this.hourOffset, p.lat, p.lon);
+      const spd = Math.hypot(u0, v0);
+      if (spd < 0.4) continue;
+
+      const x0 = ((p.lon + 180) / 360) * w;
+      const y0 = ((90 - p.lat) / 180) * h;
+
+      // RK2 midpoint sample for silky curved fluid flow trajectories
+      const cos0 = Math.max(0.28, Math.cos(p.lat * DEG2RAD));
+      const midLon = ((((p.lon + (u0 / cos0) * advectScale * 0.5 + 180) % 360) + 360) % 360) - 180;
+      const midLat = clamp(p.lat + v0 * advectScale * 0.5, -80, 80);
+      const [uMid, vMid] = this.sampleWindUv(this.hourOffset, midLat, midLon);
+
+      const cosMid = Math.max(0.28, Math.cos(midLat * DEG2RAD));
+      let nextLon = p.lon + (uMid / cosMid) * advectScale;
+      if (nextLon > 180) nextLon -= 360;
+      if (nextLon < -180) nextLon += 360;
+      const nextLat = clamp(p.lat + vMid * advectScale, -80, 80);
+
+      const xMid = ((midLon + 180) / 360) * w;
+      const yMid = ((90 - midLat) / 180) * h;
+      const x1 = ((nextLon + 180) / 360) * w;
+      const y1 = ((90 - nextLat) / 180) * h;
+
+      p.lon = nextLon;
+      p.lat = nextLat;
+
+      if (Math.abs(x1 - x0) > w * 0.35 || Math.abs(xMid - x0) > w * 0.35) continue;
+
+      const lifeFade = Math.sin((p.age / p.maxAge) * Math.PI);
+      const alpha = clamp(lifeFade * (0.22 + Math.min(0.46, spd / 42)), 0.07, 0.68);
+
+      let rgb = '125, 226, 255';
+      if (spd >= 28) rgb = '253, 224, 118';
+      else if (spd >= 14) rgb = '94, 242, 200';
+
+      ctx.strokeStyle = `rgba(${rgb}, ${alpha.toFixed(2)})`;
+      ctx.lineWidth = spd >= 24 ? 1.2 : 0.85;
+      ctx.beginPath();
+      ctx.moveTo(x0, y0);
+      ctx.quadraticCurveTo(xMid, yMid, x1, y1);
+      ctx.stroke();
+    }
+
+    this.windTex.needsUpdate = true;
   }
 
   updateActiveBeacon() {
@@ -560,7 +972,12 @@ export class LiveCloudGlobe {
   }
 
   setHourOffset(idx) {
-    this.hourOffset = clamp(idx, 0, 47);
+    const next = clamp(Math.round(idx), 0, 47);
+    if (next === this.hourOffset) return;
+    this.hourOffset = next;
+    this.updateDynamicCloudTexture();
+    this.updateDynamicPrecipTexture();
+    this.updateDynamicThermalTexture();
   }
 
   toggleLayer(layerKey) {
@@ -572,14 +989,16 @@ export class LiveCloudGlobe {
       this.cloudMesh.visible = on;
     } else if (layerKey === 'precip' && this.precipMesh) {
       this.precipMesh.visible = on;
-    } else if (layerKey === 'wind' && this.windLines) {
-      this.windLines.visible = on;
+      if (on) this.updateDynamicPrecipTexture();
+    } else if (layerKey === 'wind' && this.windMesh) {
+      this.windMesh.visible = on;
     } else if (layerKey === 'terminator') {
       const val = on ? 1.0 : 0.0;
       if (this.earthMat) this.earthMat.uniforms.uTerminatorStrength.value = val;
       if (this.cloudMat) this.cloudMat.uniforms.uTerminatorStrength.value = val;
     } else if (layerKey === 'thermal' && this.earthMat) {
       this.earthMat.uniforms.uThermalOverlay.value = on ? 1.0 : 0.0;
+      if (on) this.updateDynamicThermalTexture();
     }
 
     if (typeof this.onLayerChange === 'function') {
@@ -652,10 +1071,19 @@ export class LiveCloudGlobe {
         this.raycaster.setFromCamera(ndc, this.camera);
         const hits = this.raycaster.intersectObject(this.earthMesh, false);
         if (hits.length > 0 && typeof this.onSelectLocation === 'function') {
-          const localPt = this.earthMesh.worldToLocal(hits[0].point.clone());
-          const { latitude, longitude } = vec3ToLatLon(localPt);
+          let latitude;
+          let longitude;
+          if (hits[0].uv) {
+            longitude = (((hits[0].uv.x * 360 - 180) + 540) % 360) - 180;
+            latitude = clamp(hits[0].uv.y * 180 - 90, -85, 85);
+          } else {
+            const localPt = this.earthMesh.worldToLocal(hits[0].point.clone());
+            ({ latitude, longitude } = vec3ToLatLon(localPt));
+          }
+          this.setAutoSpin(false);
           this.flyTo(latitude, longitude);
-          const nearPreset = PRESET_CITIES.find(
+          const allPins = [...PRESET_CITIES, ...EXTRA_WORLD_PINS];
+          const nearPreset = allPins.find(
             (c) => Math.hypot(c.latitude - latitude, c.longitude - longitude) < 3.5
           );
           if (nearPreset) {
@@ -669,7 +1097,7 @@ export class LiveCloudGlobe {
               latitude: Number(latitude.toFixed(4)),
               longitude: Number(longitude.toFixed(4)),
               wfo: 'GLOBAL',
-              elevationFt: 120
+              elevationFt: 120,
             });
           }
         }
@@ -692,46 +1120,43 @@ export class LiveCloudGlobe {
   renderFrame(dt, tSec) {
     if (!this.renderer || !this.scene || !this.camera) return;
 
-    // 1. Update camera spherical orbit / smooth fly-to / inertia
+    // 1. Update camera spherical orbit / smooth fly-to / natural West-to-East Earth spin!
     if (!this.isDragging) {
       if (this.targetCamLon !== null && this.targetCamLat !== null) {
         let dLon = this.targetCamLon - this.camLon;
         while (dLon > Math.PI) dLon -= Math.PI * 2;
         while (dLon < -Math.PI) dLon += Math.PI * 2;
         const dLat = this.targetCamLat - this.camLat;
-        this.camLon += dLon * 0.085;
-        this.camLat = clamp(this.camLat + dLat * 0.085, -1.32, 1.32);
-        if (Math.abs(dLon) < 0.005 && Math.abs(dLat) < 0.005) {
+        this.camLon += dLon * 0.095;
+        this.camLat = clamp(this.camLat + dLat * 0.095, -1.32, 1.32);
+        if (Math.abs(dLon) < 0.004 && Math.abs(dLat) < 0.004) {
           this.targetCamLon = null;
           this.targetCamLat = null;
         }
       } else {
-        this.camLon += this.velLon + (this.autoSpin ? dt * 0.055 : 0);
+        // Real Earth rotates West -> East, meaning sub-camera longitude drifts slowly Westward (-=)
+        this.camLon += this.velLon - (this.autoSpin ? dt * 0.026 : 0);
         this.camLat = clamp(this.camLat + this.velLat, -1.32, 1.32);
         this.velLon *= 0.91;
         this.velLat *= 0.91;
       }
     }
 
-    // Position camera using exact matching spherical coordinates
     const camPos = latLonToVec3(this.camLat * RAD2DEG, this.camLon * RAD2DEG, this.camDist);
     this.camera.position.copy(camPos);
     this.camera.lookAt(0, 0, 0);
 
-    // 2. Real-Time Solar Terminator Position (+ 48h Time Machine Offset)
+    // 2. Real-Time Astronomical Solar Terminator
     const simDate = new Date(Date.now() + this.hourOffset * 3600000);
     const sunDir = getSubsolarVec3(simDate);
     if (this.earthMat) this.earthMat.uniforms.uSunDir.value.copy(sunDir);
     if (this.cloudMat) this.cloudMat.uniforms.uSunDir.value.copy(sunDir);
     if (this.atmoMat) this.atmoMat.uniforms.uSunDir.value.copy(sunDir);
 
-    // 3. Gently advect real satellite cloud cover across the planet!
-    if (this.cloudMesh) {
-      this.cloudMesh.rotation.y = (tSec * 0.0045 + this.hourOffset * 0.016) % (Math.PI * 2);
-    }
+    // 3. Clouds stay 100% geographically locked (NO drifting rotation.y!)
 
-    // 4. Animate 3D Jet Stream Wind Ribbons
-    this.updateWindRibbons(dt);
+    // 4. Advance Fluid Atmospheric Wind Streamlines
+    this.stepWindFluidLayer(dt);
 
     // 5. Pulse Active Beacon Ring & Project Floating Retina Callout Tag
     if (this.beaconRing) {
@@ -743,17 +1168,21 @@ export class LiveCloudGlobe {
     if (this.floatingLabelEl && this.beaconGroup && this.forecast?.location) {
       const worldPos = new THREE.Vector3();
       this.beaconGroup.getWorldPosition(worldPos);
-      // Visible only when beacon is on camera-facing hemisphere
       const facing = worldPos.clone().normalize().dot(this.camera.position.clone().normalize());
       if (facing > 0.14) {
         const proj = worldPos.clone().project(this.camera);
         const rect = this.canvas.getBoundingClientRect();
         const x = (proj.x * 0.5 + 0.5) * rect.width;
         const y = (-proj.y * 0.5 + 0.5) * rect.height;
-        const h = this.forecast.hours48?.[this.hourOffset] || this.forecast.current;
+        const h = this.forecast.hours48?.[this.hourOffset] || this.forecast.hours?.[this.hourOffset] || this.forecast.current;
+        const temp = h?.tempF ?? h?.temperature;
+        const cloud = h?.cloudCover ?? h?.skyCover;
+        const tempTxt = typeof temp === 'number' && Number.isFinite(temp) ? `${Math.round(temp)}°` : '--°';
+        const cloudTxt = typeof cloud === 'number' && Number.isFinite(cloud) ? `${Math.round(cloud)}% Cloud` : 'Live';
+        const cityName = (this.forecast.location.name || 'Selected').split(',')[0];
         this.floatingLabelEl.hidden = false;
         this.floatingLabelEl.style.transform = `translate(${Math.round(x)}px, ${Math.round(y - 26)}px) translate(-50%, -50%)`;
-        this.floatingLabelEl.innerHTML = `<span class="beacon-dot"></span> ${this.forecast.location.name.split(',')[0]} · <strong>${h?.tempF ?? '--'}°</strong> · ${h?.cloudCover ?? '--'}% Cloud`;
+        this.floatingLabelEl.innerHTML = `<span class="beacon-dot"></span> ${cityName} · <strong>${tempTxt}</strong> · ${cloudTxt}`;
       } else {
         this.floatingLabelEl.hidden = true;
       }

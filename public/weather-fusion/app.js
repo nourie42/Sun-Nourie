@@ -699,9 +699,10 @@ for(const link of document.querySelectorAll('link[data-for]')){
 const compare=$('open-compare');
 if(compare && !document.querySelector('script[src*="/wn-blend.js"]')) {
   const openCompare=async()=>{
+    if(document.getElementById('wn-compare-section')){compare.removeEventListener('click',openCompare);return;}
     compare.disabled=true;
     try {
-      await import('./wn-blend.js?v=1.1-controls');
+      await import('./wn-blend.js?v=exp-compare-v1');
       compare.removeEventListener('click',openCompare);
       compare.disabled=false; compare.click();
     } catch {
@@ -712,6 +713,9 @@ if(compare && !document.querySelector('script[src*="/wn-blend.js"]')) {
 }
 installExperience();
 startDeviceLocation();
+window.addEventListener('weather-nourie:select-location', (e) => {
+  if (e.detail && validPlace(e.detail)) chooseLocation(e.detail);
+});
 
 // Expire passed discussion periods even while this page remains open.
 setInterval(()=>{if(currentBriefing&&forecast)renderBriefing(currentBriefing);},30000);
