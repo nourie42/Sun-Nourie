@@ -59,11 +59,12 @@ async def main(args):
     if e['label']!='Sat':assert all('Today peak' not in t for t in texts)
     passed(city+' '+e['label']+' preview uses that local day’s actual concrete and asphalt peaks',e)
    monday=next(e for e in expected if e['label']=='Mon')
+   if not await page.locator('#unit-toggle').is_visible():await page.locator('#tools-drawer-btn').click()
    await page.locator('#unit-toggle').click()
    text=' '.join(await page.locator('[data-exp-id=pets] .pave-row-head strong').all_text_contents())
    c=lambda f:int((f-32)*5/9+.5)
    assert f"Mon peak {c(monday['asphalt'])}°" in text
-   await page.locator('#unit-toggle').click();passed(city+' selected-day peaks retain Celsius conversion')
+   await page.locator('#unit-toggle').click();await page.locator('#tools-drawer-btn').click();passed(city+' selected-day peaks retain Celsius conversion')
    await page.locator('[data-exp-id=pets]').screenshot(path=str(args.artifacts/(city+'-monday-pets.png')))
    await page.locator('[data-exp-toggle=pets]').click();await set_hour(0)
    # Controlled warning markup exercises the otherwise-empty alert stack.

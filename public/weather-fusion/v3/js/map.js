@@ -88,19 +88,21 @@ export class WeatherMapController {
       }
       setTimeout(() => this.map?.invalidateSize({ pan: false }), 120);
     } else {
+      if(this.lastPoint===`${latitude},${longitude}`&&Date.now()-(this.lastRadarFetch||0)<120000){this.renderAlertPolygons(forecast.alerts||[]);return;}
       this.map.setView([latitude, longitude], this.map.getZoom(), { animate: true });
       await this.fetchRadarFrames(latitude, longitude);
       this.setLayer('radar');
     }
 
+    this.lastPoint=`${latitude},${longitude}`;this.lastRadarFetch=Date.now();
     this.renderLocationAndProximityRings(forecast);
     this.renderAlertPolygons(forecast.alerts || []);
   }
 
-  async fetchRadarFrames(lat = 35.78, lon = -78.48) {
+  async fetchRadarFrames(lat, lon) {
     // Primary: official NOAA MRMS observed reflectivity WMS via our verified /api/weather-fusion/radar endpoint
     try {
-      const res = await fetch(`/api/weather-fusion/radar?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}`, {
+      const res = await fetch(`/api/weather-fusion/radar?latitude=${encodeURIComponent(lat)}&longitude=${encodeURIComponent(lon)}`, {
         cache: 'no-store'
       });
       if (res.ok) {
@@ -233,7 +235,7 @@ export class WeatherMapController {
       this.onFrameChange({
         frameIdx: this.currentFrameIdx,
         totalFrames: this.frames.length,
-        label: frame?.label || 'Live Radar',
+        label: frame?.label || 'Radar unavailable',
         layer: MAP_LAYERS[0]
       });
     }

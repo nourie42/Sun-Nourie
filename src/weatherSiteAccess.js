@@ -19,8 +19,8 @@ const SESSION_MS = 12 * 60 * 60 * 1000;
 // Set WEATHER_FUSION_PUBLIC=0 to re-lock public weather access.
 const PUBLIC_PAGES = new Set(['/weather-fusion', '/weather-fusion/', '/weather-fusion/index.html', '/weather-fusion/v3', '/weather-fusion/v3/', '/weather-fusion/v3/index.html']);
 const PUBLIC_ASSET = /^\/weather-fusion\/[a-z0-9][a-z0-9._-]*\.(?:js|css|webp|png|jpe?g|svg|json|webmanifest|ico)$/;
-const PUBLIC_BETA_ASSET = /^\/weather-fusion\/v3\/(?:js\/[a-z0-9][a-z0-9._-]*\.js|css\/[a-z0-9][a-z0-9._-]*\.css)$/;
-const PUBLIC_APIS = new Set(['forecast', 'alerts', 'briefing', 'bulletins', 'outlook', 'search', 'radar', 'models', 'winter-map', 'accuracy'].map(name => `/api/weather-fusion/${name}`));
+const PUBLIC_BETA_ASSET = /^\/weather-fusion\/v3\/(?:js\/[a-z0-9][a-z0-9._-]*\.js|css\/[a-z0-9][a-z0-9._-]*\.css|vendor\/three\.module\.min\.js|textures\/earth-(?:day|night)\.jpg)$/;
+const PUBLIC_APIS = new Set(['forecast', 'alerts', 'briefing', 'bulletins', 'outlook', 'search', 'radar', 'models', 'winter-map', 'accuracy', 'globe', 'globe-image'].map(name => `/api/weather-fusion/${name}`));
 export function isPublicWeatherPath(url, method = 'GET') {
   if (!['GET', 'HEAD'].includes(String(method).toUpperCase())) return false;
   let pathname;

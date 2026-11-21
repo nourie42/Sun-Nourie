@@ -24,11 +24,12 @@ import {
 } from './charts.js?v=v3-accuracy-7';
 import {
   WeatherMapController
-} from './map.js?v=v3-accuracy-5';
+} from './map.js?v=accurate-point-v6';
 import { dogWalkerScene, referenceScene } from '../../exposure-scene.js?v=true-night-art-v6';
 import { danCard, danOverview, danTakeDisplay } from '../../dans-summary.js?v=afd-discussion-section-v1';
 import { activeRiskOutlooks, outlookDetailHTML } from '../../risk-outlooks.js?v=risk-outlooks-v5';
 import { forecastWindowDetailHTML } from '../../forecast-window-banners.js?v=current-rain-20261017-v3';
+import {GlobePanel} from './globe-panel.js?v=globe-v1';
 import {outlookItems,renderOutlookPanel,openOutlookNote} from '../../outlook-panel.js?v=compact-v1';
 
 const LEGACY_LOC_KEY = 'weather-nourie-v3-location';
@@ -114,6 +115,7 @@ const state = {
   selectedDewPointIdx: 0,
   aqiExpanded: false,
   mapController: null,
+  globePanel: null,
   skyAudioActive: false,
   audioCtx: null,
   audioGainNode: null,
@@ -207,6 +209,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initHeaderControls();
   initModalSystem();
   initMapSection();
+  state.globePanel = new GlobePanel();
   initBottomNavDock();
 
   const initialLoc = state.location;
@@ -231,7 +234,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 function initBrandIcon() {
-  // Exact main-site Weather Nourie SVG logo is rendered directly in index.html (#brand-icon-slot)
+  // The header reuses the main app’s actual Weather Nourie artwork.
 }
 
 async function loadLocationForecast(loc, { forceRefresh = false } = {}) {
@@ -324,9 +327,8 @@ function renderAll() {
   renderBestTimesHeatmap(f);
   renderCompareModelsSection(f);
 
-  if (state.mapController) {
-    state.mapController.init(f);
-  }
+  state.globePanel?.updateForecast(f);
+  if (state.mapController?.map) state.mapController.init(f);
 }
 
 function applyBackdropPhotoForSky(f) {
@@ -1219,7 +1221,7 @@ function renderOutdoorExposureCards(f) {
     (!cur.hasDirectSun || (cur.cloudCover || 0) >= 70 || /overcast|mostly cloudy|\bcloudy\b|fog/i.test(cur.condition || ''));
   const titleEl = document.getElementById('exposure-section-title');
   if (titleEl) {
-    titleEl.textContent = hIdx === 0 ? 'Outside Right Now' : 'Outside Forecast';
+    titleEl.textContent = hIdx === 0 ? 'How it feels outside right now' : 'Outside Forecast';
   }
   const noteEl = document.getElementById('exposure-time-note');
   if (noteEl) {
@@ -1232,7 +1234,7 @@ function renderOutdoorExposureCards(f) {
   const sceneCtx = { pop: cur.rainChance, rainExpected: isRaining, snowExpected: /snow|flurr/i.test(cur.condition || '') };
 
   const shadeSvg = referenceScene(0, Boolean(cur.isDay), cur.condition || 'Overcast', cur.shadeFeelsF, sceneCtx);
-  const sunTileFeels = isRaining ? cur.rainFeelsF : isCloudyNoSun ? cur.feelsLikeF : cur.sunFeelsF;
+  const sunTileFeels = isRaining ? cur.rainFeelsF : isCloudyNoSun || !cur.isDay ? cur.feelsLikeF : cur.sunFeelsF;
   const sunSvg = referenceScene(1, Boolean(cur.isDay), cur.condition || 'Overcast', sunTileFeels, sceneCtx);
   const petsSvg = dogWalkerScene(Boolean(cur.isDay), cur.condition || 'Overcast', cur.feelsLikeF, sceneCtx);
 
@@ -1348,36 +1350,16 @@ function renderOutdoorExposureCards(f) {
     }
   ];
 
-  container.innerHTML = items
-    .map((item) => {
-      const isOpen = state.expandedExposureIds.has(item.id);
-      return `
-        <article class="glass exposure-teaser-card ${isOpen ? 'expanded' : ''}" data-exp-id="${item.id}">
-          <button type="button" class="exposure-teaser-btn" data-exp-toggle="${item.id}" aria-expanded="${isOpen}">
-            <div class="exposure-teaser-left">
-              <div class="exposure-teaser-thumb">${item.svg}</div>
-              <div style="min-width:0;">
-                <div class="exposure-teaser-title">${item.title}</div>
-                <div class="exposure-teaser-sub">${item.shortLine}</div>
-              </div>
-            </div>
-            <div class="exposure-teaser-right">
-              <span class="exposure-teaser-temp" style="color:${item.badgeColor};">${item.badgeVal}</span>
-              <span class="bar-chevron" aria-hidden="true">›</span>
-            </div>
-          </button>
-          ${
-            isOpen
-              ? `<div class="exposure-expanded-body">
-                  <div class="exposure-expanded-scene">${item.svg}</div>
-                  <div>${item.detailsHtml}</div>
-                </div>`
-              : ''
-          }
-        </article>
-      `;
-    })
-    .join('');
+  const contextEl=document.getElementById('exposure-weather-context');
+  if(contextEl)contextEl.textContent=`Air ${fmtTemp(cur.tempF)} · ${cur.condition} · Wind ${Number.isFinite(cur.windMph)?Math.round(cur.windMph)+' mph':'unavailable'}`;
+  const titles={shade:'Shade',sun:isRaining?'Rain':!cur.isDay?'Night':isCloudyNoSun?'Day':'Sun',pets:'For Pets'};
+  container.innerHTML=items.map(item=>{
+    const isOpen=state.expandedExposureIds.has(item.id),pets=item.id==='pets';
+    const value=pets?fmtTemp(pave.concreteTempF):item.badgeVal;
+    const subtitle=pets?pave.pawSafety.label:!Number.isFinite(item.id==='shade'?cur.shadeFeelsF:sunTileFeels)?'Estimate unavailable':item.id==='shade'?getFeelsVerdict(cur.shadeFeelsF,isRaining).label:getFeelsVerdict(sunTileFeels,isRaining).label;
+    const caption=pets?'Concrete surface':item.id==='shade'?'Feels like in shade':!cur.isDay?'Feels like at night':isRaining||isCloudyNoSun?'Feels like outdoors':'Feels like in sun';
+    return `<article class="glass exposure-person-card" data-exp-card="${item.id}"><button type="button" class="exposure-person-button" data-exp-toggle="${item.id}" aria-expanded="${isOpen}" aria-controls="exposure-detail-${item.id}"><span class="person-card-title">${titles[item.id]}</span><span class="person-card-description">${subtitle}</span><span class="person-card-scene">${item.svg}</span><span class="person-card-reading"><strong>${value}</strong><span>${caption}</span>${pets?`<b>Asphalt ${fmtTemp(pave.asphaltTempF)}</b><small>Est. surface temp</small>`:''}<small class="person-card-detail-hint">Details ${isOpen?'⌃':'⌄'}</small></span></button></article>`;
+  }).join('')+items.filter(item=>state.expandedExposureIds.has(item.id)).map(item=>`<section class="exposure-expanded-body" id="exposure-detail-${item.id}" data-exp-id="${item.id}" aria-label="${titles[item.id]} details">${item.detailsHtml}</section>`).join('');
 
   container.querySelectorAll('[data-exp-toggle]').forEach((btn) => {
     btn.addEventListener('click', () => {
@@ -2449,7 +2431,7 @@ function initHeaderControls() {
     }
   });
   cityPickerBtn?.addEventListener('click', () => {
-    locateBtn?.click();
+    openSearchBar();
   });
   document.getElementById('location-retry-btn')?.addEventListener('click', () => {
     locateBtn?.click();
@@ -2629,6 +2611,10 @@ function initMapSection() {
       }
     }
   });
+
+  const mapPanel=document.getElementById('map-panel');
+  const mapObserver=new IntersectionObserver(entries=>{if(entries.some(e=>e.isIntersecting)&&state.forecast&&!state.mapController.map)void state.mapController.init(state.forecast);},{rootMargin:'80px'});
+  if(mapPanel)mapObserver.observe(mapPanel);
 
   document.querySelectorAll('[data-basemap]').forEach((btn) => {
     btn.addEventListener('click', () => {

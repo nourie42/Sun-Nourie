@@ -4,7 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="theme-color" content="#071324" />
-  <title>Weather Nourie · V3</title>
+  <title>Weather Nourie · Beta</title>
+  <link rel="icon" href="/weather-fusion/logo.svg" type="image/svg+xml" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
   <link rel="stylesheet" href="/weather-fusion/car-wash.css?v=center-answer-v43" />
   <link rel="stylesheet" href="/weather-fusion/risk-outlooks.css?v=risk-outlooks-v5" />
@@ -12,6 +13,7 @@
   <link rel="stylesheet" href="/weather-fusion/weather-glass.css?v=ice-v2" />
   <link rel="stylesheet" href="/weather-fusion/outlook-panel.css?v=compact-v3" />
   <link rel="stylesheet" href="/weather-fusion/v3/css/styles.css?v=v3-sky-8" />
+  <link rel="stylesheet" href="/weather-fusion/v3/css/people-globe.css?v=beta-polish-v1" />
 </head>
 <body data-sky="cloudy">
   <!-- Full-Viewport Fixed Dynamic Living Sky Backdrop (Flows Behind Every Glass Tile) -->
@@ -31,23 +33,7 @@
         <div class="topbar-left">
           <button id="tools-drawer-btn" class="icon-btn compact-btn glass-chip-btn" type="button" aria-expanded="false" aria-controls="tools-strip" aria-label="Menu & tools">☰</button>
           <a class="brand" href="#top" aria-label="Weather Nourie home">
-            <div class="brand-mark" id="brand-icon-slot">
-              <svg viewBox="0 0 64 64" width="32" height="32" aria-hidden="true">
-                <defs>
-                  <radialGradient id="hs-sun" cx=".4" cy=".35"><stop offset="0" stop-color="#fff3b0"/><stop offset="1" stop-color="#f5a623"/></radialGradient>
-                  <linearGradient id="hs-cl" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff"/><stop offset="1" stop-color="#bcd6f5"/></linearGradient>
-                  <linearGradient id="hs-w" x1="0" x2="1"><stop offset="0" stop-color="#2f8cff"/><stop offset="1" stop-color="#7fd3ff"/></linearGradient>
-                </defs>
-                <circle cx="38" cy="22" r="12" fill="url(#hs-sun)"/>
-                <path d="M14 34a8 8 0 0 1 8-8 11 11 0 0 1 21 3 6 6 0 0 1 0 12H18a6 6 0 0 1-4-7z" fill="url(#hs-cl)"/>
-                <path d="M8 44c6-5 12 5 18 0s12 5 18 0 10 4 14 1" fill="none" stroke="url(#hs-w)" stroke-width="4" stroke-linecap="round"/>
-                <path d="M12 52c6-4 11 4 17 0s11 4 17 0" fill="none" stroke="#5fb4ff" stroke-width="3" stroke-linecap="round" opacity=".8"/>
-              </svg>
-            </div>
-            <div class="brand-text">
-              <span class="brand-kicker">WEATHER</span>
-              <span class="brand-name">Nourie</span>
-            </div>
+            <svg class="main-brand-art" viewBox="50 18 525 180" role="img" aria-label="Weather Nourie"><image href="/weather-fusion/header-cloudy.webp" width="1440" height="273" /></svg>
           </a>
         </div>
 
@@ -79,6 +65,7 @@
     <div id="tools-strip" class="tools-strip">
       <div class="shell tools-strip-inner">
         <div class="pill-scroll-row">
+          <button class="mode-pill" id="unit-toggle" type="button" title="Toggle Fahrenheit / Celsius" aria-label="Toggle Fahrenheit or Celsius">°F / °C</button>
           <button class="mode-pill" id="open-carwash-menu" type="button">🚗 Car Wash</button>
           <button class="mode-pill" id="open-rankings-modal" type="button">🏆 Accuracy Rankings</button>
           <button class="mode-pill" id="open-wardrobe-modal" type="button">👕 What to Wear</button>
@@ -100,8 +87,8 @@
     <!-- Hero Current Conditions -->
     <section class="shell hero-stage" aria-label="Current Conditions">
       <div class="hero-city-row">
-        <button id="city-picker-btn" class="hero-city-trigger" type="button" aria-label="Refresh my current location" title="Tap to refresh your current location">
-          <span class="city-pin-ico" aria-hidden="true">📍</span>
+        <button id="city-picker-btn" class="hero-city-trigger" type="button" aria-label="Change weather location" title="Search for another location">
+          <span class="city-pin-ico" aria-hidden="true">⌖</span>
           <span id="city-name">Finding your location…</span>
         </button>
         <span id="hero-date" class="hero-date-pill">Today</span>
@@ -201,6 +188,13 @@
       <div id="pollutant-bars" class="pollutant-list"></div>
     </section>
 
+    <section id="weather-globe-panel" class="glass weather-globe-panel" aria-label="Interactive weather globe">
+      <button id="open-weather-globe" class="globe-preview-button" type="button" aria-haspopup="dialog" aria-label="Expand weather globe">
+        <span class="globe-preview-copy"><strong>Weather around the world</strong><span id="globe-location-label">Your selected location</span><small>Radar · Satellite · Moving wind</small><span class="globe-expand-hint">Explore globe <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 13 13 3M4 3h9v9" fill="none" stroke="currentColor" stroke-width="1.6" /></svg></span></span>
+        <span id="globe-preview-mount" class="globe-preview-mount"><span class="globe-loading" id="globe-loading">Loading Earth…</span></span>
+      </button>
+    </section>
+
     <!-- Next 24 Hours Smooth Luminous Spline Card -->
     <section id="next-24-panel" class="glass section-panel card-compact">
       <div class="n24-header">
@@ -280,11 +274,12 @@
     </section>
 
     <!-- Outside Right Now (Immediately Below How It Feels & What to Wear) -->
-    <section id="skin-exposure">
+    <section id="skin-exposure" class="glass comfort-people-panel">
       <div class="section-inline-head">
-        <h2 id="exposure-section-title" class="card-title-clean">Outside Right Now</h2>
+        <h2 id="exposure-section-title" class="card-title-clean">How it feels outside right now</h2>
         <span id="exposure-time-note" class="subtle-note">Right now</span>
       </div>
+      <p id="exposure-weather-context" class="comfort-current-context"></p>
       <div id="exposure-cards-grid" class="exposure-teaser-stack"></div>
     </section>
 
@@ -468,6 +463,17 @@
     <div id="modal-body"></div>
   </dialog>
 
+  <dialog id="weather-globe-dialog" class="weather-globe-dialog" aria-labelledby="weather-globe-title">
+    <header class="globe-dialog-header"><div><h2 id="weather-globe-title">Weather globe</h2><p id="globe-point-label"></p></div><button id="close-weather-globe" class="icon-btn" type="button" aria-label="Close globe">×</button></header>
+    <div class="globe-toolbar" role="group" aria-label="Weather globe layers"><button data-globe-layer="radar" class="mode-pill active" aria-pressed="true" type="button">Radar</button><button data-globe-layer="clouds" class="mode-pill active" aria-pressed="true" type="button">Satellite</button><button data-globe-layer="wind" class="mode-pill active" aria-pressed="true" type="button">Wind</button><button id="globe-recenter" class="mode-pill" type="button">⌖ My location</button><button id="globe-motion" class="mode-pill" type="button" aria-pressed="true">Pause motion</button></div>
+    <div id="globe-expanded-mount" class="globe-expanded-mount"></div>
+    <div class="globe-view-controls"><button id="globe-zoom-in" class="icon-btn" type="button" aria-label="Zoom in">+</button><button id="globe-zoom-out" class="icon-btn" type="button" aria-label="Zoom out">−</button><span>Drag to rotate · Pinch or use + / − to zoom</span></div>
+    <div class="globe-radar-time"><button id="globe-radar-play" class="mode-pill" type="button" aria-pressed="false">Play radar</button><input id="globe-radar-time" type="range" min="0" max="0" value="0" aria-label="Observed radar frame" /><output id="globe-radar-stamp">Radar loading…</output></div>
+    <p id="globe-layer-status" class="globe-layer-status" aria-live="polite">Checking current radar, satellite and wind feeds…</p>
+    <p class="globe-attribution">Earth: NASA · Radar: NOAA MRMS, continental US · Satellite infrared: UW–Madison SSEC RealEarth · Wind: GFS via Open-Meteo. Bright infrared areas can include cold ground. Wind paths show model flow, not storm tracks.</p>
+    <button id="globe-open-radar-map" class="mode-pill" type="button">Open detailed local radar map ›</button>
+  </dialog>
+
   <footer class="site-footer">
     <div class="shell">
       <div style="font-weight:700;color:var(--text);margin-bottom:4px;">Weather Nourie · V3</div>
@@ -476,6 +482,6 @@
   </footer>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
-  <script type="module" src="/weather-fusion/v3/js/app.js?v=v3-sky-8"></script>
+  <script type="module" src="/weather-fusion/v3/js/app.js?v=v3-globe-people-10"></script>
 </body>
 </html>

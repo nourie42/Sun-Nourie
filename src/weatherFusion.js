@@ -5,6 +5,7 @@ import {BLEND_V2_VERSION,BLEND_V2_CONFIG} from './weatherFusionBlendV2.js';
 import {createWeatherNext3} from './weatherFusionWeatherNext3.js';
 import {forecastProseConflict} from '../public/weather-fusion/forecast-consistency.js';
 import {clientIp} from './clientIp.js';
+import {registerGlobeRoutes} from './weatherGlobe.js';
 import { weatherDateTimeFormat } from './weatherDateTimeFormat.js';
 import {createDiscussionSource,DISCUSSION_SOURCE_VERSION} from './weatherFusionDiscussionSource.js';
 import {createExposureWeatherService,addExposureWeather} from './weatherFusionExposure.js';
@@ -758,6 +759,7 @@ export function createWeatherService({ fetchImpl = globalThis.fetch, env = proce
 }
 
 export function registerWeatherFusionRoutes(app, options = {}) {
+  registerGlobeRoutes(app,{fetchImpl:options.fetchImpl,now:options.now,parseRadarTimes});
   const service = createWeatherService({env:{...process.env,WEATHER_NOURIE_BLEND_V2:process.env.WEATHER_NOURIE_BLEND_V2||'true'},...options});
   const accuracy = createAccuracyService({fetchImpl: options.fetchImpl || fetch, now: options.now || Date.now});
   const getForecastRecorded = async (query) => {
@@ -801,6 +803,9 @@ export function registerWeatherFusionRoutes(app, options = {}) {
   });
   for (const v3Asset of [
     'v3/css/styles.css',
+    'v3/css/people-globe.css',
+    'v3/js/globe-panel.js','v3/js/globe-renderer.js','v3/js/globe-math.js',
+    'v3/vendor/three.module.min.js','v3/textures/earth-day.jpg','v3/textures/earth-night.jpg',
     'v3/js/app.js',
     'v3/js/charts.js',
     'v3/js/fusion-engine.js',
