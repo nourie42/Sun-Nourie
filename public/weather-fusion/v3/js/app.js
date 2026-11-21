@@ -20,21 +20,23 @@ import {
   extractHourMetricValue,
   renderDewPointFeelChart,
   renderHourlyExplorerChart,
-  renderModelCompareChart
+  renderModelCompareChart,
+  renderNext24HoursSplineChart,
+  renderSevenDayDualSplineChart
 } from './charts.js';
 import {
   MAP_LAYERS,
   WeatherMapController
 } from './map.js';
-import { LiveCloudGlobe } from './globe.js';
 
 const state = {
-  location: PRESET_CITIES[0],
+  location: PRESET_CITIES[1] || PRESET_CITIES[0],
   forecast: null,
   useCelsius: false,
   skyOverride: 'auto',
   activeViewMode: 'experimental',
   selectedHourIdx: 0,
+  n24MetricId: 'temp',
   selectedMetricId: 'temp',
   selectedDayIdx: 0,
   explanationPeriod: 'all',
@@ -43,7 +45,6 @@ const state = {
   dewPointRangeHours: 48,
   selectedDewPointIdx: 0,
   mapController: null,
-  globeController: null,
   skyAudioActive: false,
   audioCtx: null,
   audioGainNode: null,
@@ -62,12 +63,12 @@ document.addEventListener('DOMContentLoaded', () => {
   initHeaderControls();
   initPresetCityChips();
   initModalSystem();
-  initGlobeSection();
   initMapSection();
+  initBottomNavDock();
 
   // 1. Instant zero-latency initial render with synthetic seed
   state.forecast = buildUnifiedFusionPayload(state.location, null, null, null, {
-    wfo: state.location.wfo || 'MTR',
+    wfo: state.location.wfo || 'RAH',
     alerts: [],
     afdText: null,
     nwsHourlyMap: new Map(),
@@ -100,9 +101,6 @@ async function loadLocationForecast(loc) {
   state.selectedDayIdx = 0;
   state.selectedDewPointIdx = 0;
   renderAll();
-  if (state.globeController) {
-    state.globeController.updateForecast(liveForecast);
-  }
 }
 
 function renderAll() {
@@ -113,6 +111,7 @@ function renderAll() {
   renderStatusAndAlerts(f);
   renderWindowBanners(f);
   renderHeroAndBriefing(f);
+  renderNext24QuickCard(f);
   renderSevenDayForecast(f);
   renderHourlyExplorerSection(f);
   renderOutdoorExposureCards(f);
@@ -122,11 +121,7 @@ function renderAll() {
   renderDewPointFeelMeter(f);
   renderAqiAndGlanceTiles(f);
   renderScientificFeedsAndAfd(f);
-  updateGlobeHUD(f, state.selectedHourIdx);
 
-  if (state.globeController) {
-    state.globeController.init(f);
-  }
   if (state.mapController) {
     state.mapController.init(f);
   }
@@ -226,107 +221,247 @@ function renderWindowBanners(f) {
   });
 }
 
+function selectHeroBackdropPhoto(cur) {
+  const cond = String(cur.condition || '').toLowerCase();
+  const isStorm = /storm|thunder|t-storm|lightning/.test(cond);
+  const isRain = /rain|shower|drizzle|snow|sleet|flurr|ice|freez/.test(cond) || (cur.precipIn || 0) >= 0.02 || (cur.rainChance || 0) >= 60;
+  const isCloudy = /cloud|overcast|fog|mist|haze/.test(cond) || (cur.cloudCover || 0) >= 50;
+  const isNight = !cur.isDay;
+
+  if (isStorm) return '/weather-fusion/today-sky-storm.webp';
+  if (isRain) return '/weather-fusion/today-sky-rain.webp';
+  if (isNight) return '/weather-fusion/today-sky-night-v2.webp';
+  if (isCloudy) return '/weather-fusion/today-sky-clouds.webp';
+  return '/weather-fusion/today-sky-clear.webp';
+}
+
+function computeWeatherMeterScore(cur, today, aqi) {
+  let score = 96;
+  const feels = cur.feelsLikeF ?? cur.tempF ?? 65;
+  // Optimal outdoor comfort is around 64–75°F
+  if (feels < 64) score -= Math.min(34, (64 - feels) * 1.05);
+  else if (feels > 76) score -= Math.min(38, (feels - 76) * 1.4);
+
+  const dp = cur.dewPointF ?? 50;
+  if (dp > 62) score -= Math.min(22, (dp - 62) * 1.3);
+  else if (dp < 28) score -= Math.min(10, (28 - dp) * 0.4);
+
+  const rain = Math.max(cur.rainChance || 0, Math.round((today?.rainChance || 0) * 0.6));
+  if (rain >= 20) score -= Math.min(28, (rain - 15) * 0.35);
+
+  const wind = cur.windMph || 0;
+  if (wind > 12) score -= Math.min(16, (wind - 12) * 0.85);
+
+  if (aqi > 100) score -= Math.min(20, (aqi - 100) * 0.2);
+  else if (aqi > 50) score -= Math.min(6, (aqi - 50) * 0.1);
+
+  const clamped = Math.round(clamp(score, 12, 99));
+  let label = 'Ideal Outdoors';
+  if (clamped < 45) label = 'Challenging';
+  else if (clamped < 65) label = 'Fair Conditions';
+  else if (clamped < 80) label = 'Pleasant';
+  else if (clamped < 90) label = 'Mostly Comfortable';
+  return { score: clamped, label };
+}
+
+function renderWeatherMeterArcSvg(score) {
+  const pct = clamp(score / 100, 0.05, 0.99);
+  const cx = 56;
+  const cy = 50;
+  const r = 38;
+  const startAngle = Math.PI; // 180 deg (left)
+  const endAngle = 0; // 0 deg (right)
+  const angle = startAngle - pct * Math.PI;
+  const dotX = cx + r * Math.cos(angle);
+  const dotY = cy - r * Math.sin(angle);
+  const arcLen = Math.PI * r;
+  const dashOffset = arcLen * (1 - pct);
+
+  return `
+    <svg class="meter-arc-svg" viewBox="0 0 112 60" role="img" aria-label="Weather Meter ${score} out of 100">
+      <defs>
+        <linearGradient id="wm-arc-grad" x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" stop-color="#22c55e"/>
+          <stop offset="55%" stop-color="#eab308"/>
+          <stop offset="100%" stop-color="#f97316"/>
+        </linearGradient>
+      </defs>
+      <path d="M ${cx - r} ${cy} A ${r} ${r} 0 0 1 ${cx + r} ${cy}" fill="none" stroke="rgba(255,255,255,0.14)" stroke-width="7" stroke-linecap="round"/>
+      <path d="M ${cx - r} ${cy} A ${r} ${r} 0 0 1 ${cx + r} ${cy}" fill="none" stroke="url(#wm-arc-grad)" stroke-width="7" stroke-linecap="round" stroke-dasharray="${arcLen.toFixed(1)}" stroke-dashoffset="${dashOffset.toFixed(1)}"/>
+      <circle cx="${dotX.toFixed(1)}" cy="${dotY.toFixed(1)}" r="4.5" fill="#ffffff" stroke="#081426" stroke-width="1.5"/>
+      <text x="${cx}" y="${cy - 4}" text-anchor="middle" fill="#ffffff" font-size="18" font-weight="800">${score}<tspan font-size="10.5" fill="rgba(200,218,244,0.72)" font-weight="600">/100</tspan></text>
+    </svg>
+  `;
+}
+
+function renderCompassSvg(deg = 0) {
+  const rot = Number.isFinite(deg) ? deg : 45;
+  return `
+    <svg class="compass-dial-svg" viewBox="0 0 46 46" aria-hidden="true">
+      <circle cx="23" cy="23" r="20" fill="rgba(10, 26, 52, 0.55)" stroke="rgba(140, 196, 255, 0.35)" stroke-width="1.5"/>
+      <circle cx="23" cy="5.5" r="1.4" fill="rgba(255,255,255,0.5)"/>
+      <circle cx="23" cy="40.5" r="1.4" fill="rgba(255,255,255,0.28)"/>
+      <circle cx="5.5" cy="23" r="1.4" fill="rgba(255,255,255,0.28)"/>
+      <circle cx="40.5" cy="23" r="1.4" fill="rgba(255,255,255,0.28)"/>
+      <g transform="rotate(${rot.toFixed(0)} 23 23)">
+        <polygon points="23,9 28.5,28 23,24.5 17.5,28" fill="#7ac6ff" stroke="#ffffff" stroke-width="0.9" stroke-linejoin="round"/>
+      </g>
+    </svg>
+  `;
+}
+
+function renderOutfitGraphicSvg(feelsF, isRain) {
+  if (isRain) {
+    return `
+      <svg viewBox="0 0 64 64" width="54" height="54" aria-hidden="true">
+        <defs><linearGradient id="coatG" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#4e7a5a"/><stop offset="100%" stop-color="#2c4a38"/></linearGradient></defs>
+        <path d="M18 20 L25 12 Q32 16 39 12 L46 20 L54 34 L46 38 L43 29 L43 54 L21 54 L21 29 L18 38 L10 34 Z" fill="url(#coatG)" stroke="rgba(255,255,255,0.35)" stroke-width="1.4" stroke-linejoin="round"/>
+        <line x1="32" y1="16" x2="32" y2="54" stroke="rgba(255,255,255,0.28)" stroke-width="1.5"/>
+        <path d="M25 12 Q32 4 39 12" fill="none" stroke="#9be2ff" stroke-width="2" stroke-linecap="round"/>
+      </svg>`;
+  }
+  if (feelsF < 46) {
+    return `
+      <svg viewBox="0 0 64 64" width="54" height="54" aria-hidden="true">
+        <defs><linearGradient id="parkaG" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#4c6482"/><stop offset="100%" stop-color="#26384d"/></linearGradient></defs>
+        <path d="M17 19 L25 11 Q32 16 39 11 L47 19 L55 36 L47 40 L44 30 L44 55 L20 55 L20 30 L17 40 L9 36 Z" fill="url(#parkaG)" stroke="rgba(255,255,255,0.38)" stroke-width="1.5" stroke-linejoin="round"/>
+        <line x1="32" y1="15" x2="32" y2="55" stroke="rgba(255,255,255,0.3)" stroke-width="1.6"/>
+        <line x1="21" y1="30" x2="43" y2="30" stroke="rgba(255,255,255,0.16)" stroke-width="1.4"/>
+        <line x1="21" y1="42" x2="43" y2="42" stroke="rgba(255,255,255,0.16)" stroke-width="1.4"/>
+      </svg>`;
+  }
+  if (feelsF < 64) {
+    return `
+      <svg viewBox="0 0 64 64" width="54" height="54" aria-hidden="true">
+        <defs><linearGradient id="jktG" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#7c8752"/><stop offset="100%" stop-color="#464f2d"/></linearGradient></defs>
+        <path d="M18 19 L25 11 Q32 16 39 11 L46 19 L54 35 L46 39 L43 29 L43 54 L21 54 L21 29 L18 39 L10 35 Z" fill="url(#jktG)" stroke="rgba(255,255,255,0.35)" stroke-width="1.5" stroke-linejoin="round"/>
+        <path d="M25 11 Q32 5 39 11" fill="#3a4225" stroke="rgba(255,255,255,0.28)" stroke-width="1.2"/>
+        <line x1="32" y1="16" x2="32" y2="54" stroke="rgba(255,255,255,0.26)" stroke-width="1.5"/>
+        <rect x="24" y="37" width="5" height="7" rx="1.5" fill="rgba(0,0,0,0.22)"/>
+        <rect x="35" y="37" width="5" height="7" rx="1.5" fill="rgba(0,0,0,0.22)"/>
+      </svg>`;
+  }
+  return `
+    <svg viewBox="0 0 64 64" width="54" height="54" aria-hidden="true">
+      <defs><linearGradient id="teeG" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#4ba8e8"/><stop offset="100%" stop-color="#2563a8"/></linearGradient></defs>
+      <path d="M19 18 L26 12 Q32 17 38 12 L45 18 L54 27 L47 34 L43 29 L43 54 L21 54 L21 29 L17 34 L10 27 Z" fill="url(#teeG)" stroke="rgba(255,255,255,0.36)" stroke-width="1.5" stroke-linejoin="round"/>
+    </svg>`;
+}
+
+function getFeelsVerdict(feelsF, isRain) {
+  if (isRain && feelsF < 55) return { label: 'Cool & Damp', note: 'Rain shell recommended' };
+  if (isRain) return { label: 'Wet & Breezy', note: 'Bring an umbrella' };
+  if (feelsF < 34) return { label: 'Freezing Cold', note: 'Heavy coat & gloves' };
+  if (feelsF < 46) return { label: 'Chilly', note: 'Warm jacket weather' };
+  if (feelsF < 62) return { label: 'Cool & Comfortable', note: 'Light jacket or hoodie' };
+  if (feelsF < 76) return { label: 'Mild & Pleasant', note: 'Comfortable outdoor air' };
+  if (feelsF < 86) return { label: 'Warm', note: 'Short sleeves weather' };
+  return { label: 'Hot & Humid', note: 'Stay hydrated & shaded' };
+}
+
+function getDewPointVerdict(dpF) {
+  if (dpF < 35) return 'Very Dry';
+  if (dpF < 50) return 'Crisp & Dry';
+  if (dpF < 60) return 'Comfortable';
+  if (dpF < 66) return 'Noticeably Humid';
+  if (dpF < 72) return 'Sticky & Muggy';
+  return 'Oppressive';
+}
+
 function renderHeroAndBriefing(f) {
   const cur = f.current;
   const today = f.days[0];
+  const aqi = f.airQuality?.currentAqi ?? 38;
+
+  // Dynamic cinematic photographic backdrop matching current conditions
+  const heroBg = document.getElementById('hero-bg-photo');
+  if (heroBg) {
+    const nextSrc = selectHeroBackdropPhoto(cur);
+    if (heroBg.getAttribute('src') !== nextSrc) {
+      heroBg.setAttribute('src', nextSrc);
+    }
+  }
 
   const dateEl = document.getElementById('hero-date');
-  const wfoEl = document.getElementById('hero-wfo');
   const cityEl = document.getElementById('city-name');
   const sceneEl = document.getElementById('hero-scene');
   const tempEl = document.getElementById('temperature');
   const condEl = document.getElementById('hero-condition');
+  const feelsLineEl = document.getElementById('hero-feels-line');
   const hiloEl = document.getElementById('hero-hilo');
-  const uvEl = document.getElementById('hero-uv');
-  const chipsEl = document.getElementById('hero-telemetry-chips');
-  const radarPillEl = document.getElementById('radar-proximity-pill');
 
   if (dateEl) {
     dateEl.textContent = cur.dateObj.toLocaleDateString('en-US', {
-      weekday: 'long',
+      weekday: 'short',
       month: 'short',
       day: 'numeric'
     });
   }
-  if (wfoEl) wfoEl.textContent = `NWS WFO ${f.location.wfo} · Blend V2 (${cur.tempFusion.baseWeights.label})`;
   if (cityEl) cityEl.textContent = f.location.name;
-  if (sceneEl) sceneEl.innerHTML = renderWeatherIconSvg(cur.icon, 86);
+  if (sceneEl) sceneEl.innerHTML = renderWeatherIconSvg(cur.icon, 68);
   if (tempEl) tempEl.textContent = fmtTemp(cur.tempF);
   if (condEl) condEl.textContent = cur.condition;
+  if (feelsLineEl) feelsLineEl.textContent = `Feels Like ${fmtTemp(cur.feelsLikeF)}`;
   if (hiloEl) {
-    hiloEl.textContent = `High ${fmtTemp(today.highF)} · Low ${fmtTemp(today.lowF)} · Confidence ${today.confidence.level} (±${today.confidence.spreadF}°F)`;
-  }
-  if (uvEl) {
-    const uvTier = today.maxUvIndex >= 8 ? 'Very High' : today.maxUvIndex >= 6 ? 'High' : today.maxUvIndex >= 3 ? 'Moderate' : 'Low';
-    uvEl.textContent = `Peak UV today ${today.maxUvIndex} · ${uvTier}`;
+    hiloEl.innerHTML = `High <strong>${fmtTemp(today.highF)}</strong> &nbsp;|&nbsp; Low <strong>${fmtTemp(today.lowF)}</strong>`;
   }
 
-  if (chipsEl) {
-    chipsEl.innerHTML = `
-      <span class="telemetry-chip">🌡 Feels Like <strong>${fmtTemp(cur.feelsLikeF)}</strong> (Shade ${fmtTemp(cur.shadeFeelsF)} · Sun ${fmtTemp(cur.sunFeelsF)})</span>
-      <span class="telemetry-chip">💧 Rain Score <strong>${cur.rainChance}/100 pts</strong> (${cur.precipIn}"/hr)</span>
-      <span class="telemetry-chip">💨 Wind <strong>${cur.windCardinal} ${cur.windMph} mph</strong> (Gusts ${cur.windGustMph})</span>
-      <span class="telemetry-chip">🐾 Sidewalk <strong>${fmtTemp(f.pavement.asphaltTempF, true)}</strong> Asphalt</span>
-    `;
+  // Frosted "Weather Take" Banner Copy
+  const takeBannerCopy = document.getElementById('take-banner-copy');
+  if (takeBannerCopy) {
+    takeBannerCopy.textContent = f.briefing.headline || f.briefing.summary || 'Live multi-model consensus active.';
   }
 
-  const celestialEl = document.getElementById('hero-celestial-strip');
-  if (celestialEl) {
-    const hrNow = cur.dateObj.getHours() + cur.dateObj.getMinutes() / 60;
-    const sunPct = clamp(((hrNow - 6.75) / 10.5) * 100, 0, 100);
-    celestialEl.innerHTML = `
-      <span style="font-size:12px;color:var(--gold);font-weight:700;">🌅 ${today.sunrise}</span>
-      <div class="sun-arc-bar" title="Solar Daylight Arc">
-        <div class="sun-arc-fill" style="width:${sunPct.toFixed(0)}%;"></div>
-        <span class="sun-arc-dot" style="left:${sunPct.toFixed(0)}%;"></span>
-      </div>
-      <span style="font-size:12px;color:var(--blue);font-weight:700;">🌇 ${today.sunset}</span>
-      <span style="font-size:11.5px;color:var(--muted);">Solar Flux: <strong>${cur.shortwaveWm2} W/m²</strong> · Cloud Deck: <strong>${cur.cloudCover}%</strong></span>
-    `;
-  }
+  // 4-Column Quick Stats Glass Strip
+  const next24Precip = (f.hours48 || [])
+    .slice(0, 24)
+    .reduce((acc, h) => acc + (Number(h.precipIn) || 0), 0);
+  const rainEl = document.getElementById('qs-rain-val');
+  const precipEl = document.getElementById('qs-precip-val');
+  const aqiValEl = document.getElementById('qs-aqi-val');
+  const aqiSubEl = document.getElementById('qs-aqi-sub');
+  const meterArcEl = document.getElementById('qs-weather-meter-arc');
+  const meterSubEl = document.getElementById('qs-meter-sub');
 
-  if (radarPillEl) {
-    if (cur.rainChance >= 55 || cur.precipIn >= 0.01) {
-      radarPillEl.style.color = '#7ac6ff';
-      radarPillEl.textContent = `● Precip echoes active within 12 mi (${cur.rainChance}% score)`;
-    } else {
-      radarPillEl.style.color = '#5ce0a0';
-      radarPillEl.textContent = '● Radar clear within 36 mi proximity rings';
+  if (rainEl) rainEl.textContent = `${Math.round(today.rainChance ?? cur.rainChance ?? 0)}%`;
+  if (precipEl) precipEl.textContent = `${next24Precip.toFixed(2)}"`;
+  if (aqiValEl) {
+    aqiValEl.textContent = String(Math.round(aqi));
+    const aqiColor = aqi <= 50 ? '#4ade80' : aqi <= 100 ? '#facc15' : aqi <= 150 ? '#fb923c' : '#f87171';
+    aqiValEl.style.color = aqiColor;
+    if (aqiSubEl) {
+      aqiSubEl.textContent = f.airQuality?.category || (aqi <= 50 ? 'Good' : aqi <= 100 ? 'Moderate' : 'Sensitive');
+      aqiSubEl.style.color = aqiColor;
     }
   }
+  const meter = computeWeatherMeterScore(cur, today, aqi);
+  if (meterArcEl) meterArcEl.innerHTML = renderWeatherMeterArcSvg(meter.score);
+  if (meterSubEl) meterSubEl.textContent = meter.label;
 
-  // Remainder of Today stats grid
-  const remGrid = document.getElementById('remainder-stats-grid');
-  if (remGrid) {
-    remGrid.innerHTML = `
-      <div class="rem-stat">
-        <span class="rem-stat-label">Low – High</span>
-        <span class="rem-stat-val">${fmtTemp(today.lowF)} – ${fmtTemp(today.highF)}</span>
-      </div>
-      <div class="rem-stat">
-        <span class="rem-stat-label">Peak Feels-Like</span>
-        <span class="rem-stat-val">${fmtTemp(today.peakFeelsF)}</span>
-      </div>
-      <div class="rem-stat">
-        <span class="rem-stat-label">Rain Now / Peak</span>
-        <span class="rem-stat-val">${cur.rainChance}% / ${today.rainChance}%</span>
-      </div>
-      <div class="rem-stat">
-        <span class="rem-stat-label">Expected Rain (QPF)</span>
-        <span class="rem-stat-val">${today.totalQpfIn} in</span>
-      </div>
-      <div class="rem-stat">
-        <span class="rem-stat-label">Peak Wind / Gust</span>
-        <span class="rem-stat-val">${today.maxWindMph} / ${today.maxGustMph} mph</span>
-      </div>
-      <div class="rem-stat">
-        <span class="rem-stat-label">Local AQI / Peak UV</span>
-        <span class="rem-stat-val">${f.airQuality.currentAqi} AQI · UV ${today.maxUvIndex}</span>
-      </div>
-    `;
-  }
+  // 3-Column Bottom Comfort Trio (How It Feels | Dew Point | Wind)
+  const isRainNow = (cur.rainChance || 0) >= 55 || (cur.precipIn || 0) >= 0.02;
+  const feelsVerdict = getFeelsVerdict(cur.feelsLikeF ?? cur.tempF, isRainNow);
+  const trioFeelsLbl = document.getElementById('trio-feels-label');
+  const trioFeelsNote = document.getElementById('trio-feels-note');
+  const trioOutfitEl = document.getElementById('trio-outfit-visual');
+  const trioDpVal = document.getElementById('trio-dewpoint-val');
+  const trioDpLbl = document.getElementById('trio-dewpoint-label');
+  const trioWindSpd = document.getElementById('trio-wind-speed');
+  const trioWindUnit = document.getElementById('trio-wind-unit');
+  const trioWindGust = document.getElementById('trio-wind-gust');
+  const trioCompass = document.getElementById('trio-wind-compass');
 
-  // Nourie Weather Take
+  if (trioFeelsLbl) trioFeelsLbl.textContent = feelsVerdict.label;
+  if (trioFeelsNote) trioFeelsNote.textContent = feelsVerdict.note;
+  if (trioOutfitEl) trioOutfitEl.innerHTML = renderOutfitGraphicSvg(cur.feelsLikeF ?? cur.tempF, isRainNow);
+  if (trioDpVal) trioDpVal.textContent = fmtTemp(cur.dewPointF);
+  if (trioDpLbl) trioDpLbl.textContent = getDewPointVerdict(cur.dewPointF ?? 50);
+  if (trioWindSpd) trioWindSpd.textContent = String(Math.round(cur.windMph ?? 0));
+  if (trioWindUnit) trioWindUnit.textContent = `mph ${cur.windCardinal || 'N'}`;
+  if (trioWindGust) trioWindGust.textContent = `Gusts ${Math.round(cur.windGustMph ?? cur.windMph ?? 0)} mph`;
+  if (trioCompass) trioCompass.innerHTML = renderCompassSvg(cur.windDirDeg ?? 45);
+
+  // Full Nourie Weather Take Section
   const takeHead = document.getElementById('take-headline');
   const takeSum = document.getElementById('take-summary');
   const takeBullets = document.getElementById('take-bullets');
@@ -346,59 +481,42 @@ function renderHeroAndBriefing(f) {
   }
 }
 
-function renderSevenDayForecast(f) {
-  const container = document.getElementById('experimental-week');
-  if (!container) return;
+function renderNext24QuickCard(f) {
+  const stage = document.getElementById('next24-spline-stage');
+  if (!stage) return;
 
-  const days7 = f.days.slice(0, 7);
-  const weekMin = Math.min(...days7.map((d) => d.lowF));
-  const weekMax = Math.max(...days7.map((d) => d.highF));
-  const weekSpan = Math.max(4, weekMax - weekMin);
-
-  container.innerHTML = days7
-    .map((d, idx) => {
-      const isActive = idx === state.selectedDayIdx;
-      const leftPct = clamp(((d.lowF - weekMin) / weekSpan) * 100, 0, 88);
-      const widthPct = clamp(((d.highF - d.lowF) / weekSpan) * 100, 12, 100 - leftPct);
-      return `
-        <article class="day-card ${isActive ? 'active' : ''}" data-day-idx="${idx}" role="button" tabindex="0">
-          <div class="day-card-title">${d.shortWeekday}</div>
-          <div class="day-card-date">${d.dateLabel}</div>
-          <div>${renderWeatherIconSvg(d.icon, 46)}</div>
-          <div class="day-card-temps">
-            <span class="day-hi">${fmtTemp(d.highF)}</span>
-            <span class="day-lo">${fmtTemp(d.lowF)}</span>
-          </div>
-          <div class="day-temp-range-track" title="Daily temperature range vs 7-day span">
-            <div class="day-temp-range-fill" style="left:${leftPct.toFixed(1)}%;width:${widthPct.toFixed(1)}%;"></div>
-          </div>
-          <div class="day-metrics-list">
-            <span style="color:${d.rainChance >= 45 ? '#7ac6ff' : 'var(--muted)'};font-weight:700;">💧 ${d.rainChance}% · ${d.totalQpfIn} in</span>
-            <span>💨 ${d.maxWindMph} mph</span>
-            ${d.snowPossible ? `<span class="snow-badge">❄ Snow possible</span>` : ''}
-          </div>
-          <div class="confidence-box">
-            <div class="confidence-label-row">
-              <span style="color:var(--faint);">Confidence</span>
-              <strong style="color:${d.confidence.color};">${d.confidence.level}</strong>
-            </div>
-            <div class="confidence-bar-track">
-              <span class="confidence-pip" style="left:${d.confidence.score}%;"></span>
-            </div>
-          </div>
-        </article>
-      `;
-    })
-    .join('');
-
-  container.querySelectorAll('.day-card').forEach((card) => {
-    card.addEventListener('click', () => {
-      state.selectedDayIdx = Number(card.dataset.dayIdx) || 0;
-      renderSevenDayForecast(f);
-      renderModelExplanationSection(f);
-      renderCompareModelsSection(f);
-    });
+  renderNext24HoursSplineChart({
+    containerEl: stage,
+    hours: f.hours48,
+    metricId: state.n24MetricId,
+    selectedHourIdx: state.selectedHourIdx,
+    useCelsius: state.useCelsius,
+    renderIconFn: renderWeatherIconSvg,
+    onSelectHour: (idx) => {
+      state.selectedHourIdx = idx;
+      renderNext24QuickCard(f);
+      renderHourlyExplorerSection(f);
+    }
   });
+}
+
+function renderSevenDayForecast(f) {
+  const dualStage = document.getElementById('seven-day-dual-stage');
+  if (dualStage) {
+    renderSevenDayDualSplineChart({
+      containerEl: dualStage,
+      days7: f.days.slice(0, 7),
+      selectedDayIdx: state.selectedDayIdx,
+      useCelsius: state.useCelsius,
+      renderIconFn: renderWeatherIconSvg,
+      onSelectDay: (idx) => {
+        state.selectedDayIdx = idx;
+        renderSevenDayForecast(f);
+        renderModelExplanationSection(f);
+        renderCompareModelsSection(f);
+      }
+    });
+  }
 }
 
 function renderHourlyExplorerSection(f) {
@@ -459,7 +577,6 @@ function renderHourlyExplorerSection(f) {
         tile.classList.toggle('active', tIdx === state.selectedHourIdx);
       });
     }
-    updateGlobeHUD(f, state.selectedHourIdx);
   }
 
   // Render 48-hour strip cards
@@ -1296,13 +1413,41 @@ function initHeaderControls() {
     toolsBtn.setAttribute('aria-expanded', String(Boolean(isOpen)));
   });
 
-  // View Mode Switcher (Experimental, Globe Focus, Glance, Blend, Today)
-  document.querySelectorAll('[data-view-mode]').forEach((btn) => {
+  // Mobile Search Toggle & Hero City Picker Trigger
+  const searchCluster = document.getElementById('search-cluster');
+  const mobileSearchBtn = document.getElementById('mobile-search-toggle');
+  const cityPickerBtn = document.getElementById('city-picker-btn');
+  mobileSearchBtn?.addEventListener('click', () => {
+    const open = searchCluster?.classList.toggle('open');
+    if (open) searchInput?.focus();
+  });
+  cityPickerBtn?.addEventListener('click', () => {
+    if (searchCluster) {
+      searchCluster.classList.add('open');
+    }
+    searchInput?.focus();
+  });
+
+  // Weather Take Banner Click -> Smooth scroll to Full Weather Take
+  const takeBanner = document.getElementById('weather-take-banner');
+  takeBanner?.addEventListener('click', () => {
+    document.getElementById('full-weather-take')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+
+  // Next 24 Hours Quick Spline Metric Pills (Temp | Feels Like | Rain | Wind)
+  document.querySelectorAll('[data-n24-metric]').forEach((btn) => {
     btn.addEventListener('click', () => {
-      document.querySelectorAll('[data-view-mode]').forEach((b) => b.classList.remove('active'));
+      document.querySelectorAll('[data-n24-metric]').forEach((b) => b.classList.remove('active'));
       btn.classList.add('active');
-      applyWorkspaceViewMode(btn.dataset.viewMode);
+      state.n24MetricId = btn.dataset.n24Metric || 'temp';
+      if (state.forecast) renderNext24QuickCard(state.forecast);
     });
+  });
+
+  // Sky Audio Button
+  const audioBtn = document.getElementById('sky-audio-btn');
+  audioBtn?.addEventListener('click', () => {
+    toggleProceduralSkyAudio(audioBtn);
   });
 
   // Explanation period pills
@@ -1324,28 +1469,6 @@ function initHeaderControls() {
       state.selectedDewPointIdx = 0;
       if (state.forecast) renderDewPointFeelMeter(state.forecast);
     });
-  });
-}
-
-function applyWorkspaceViewMode(mode) {
-  state.activeViewMode = mode;
-  const deck = document.getElementById('hero-globe-deck');
-  if (deck) {
-    deck.classList.toggle('globe-expanded', mode === 'halo');
-    setTimeout(() => state.globeController?.handleResize(), 60);
-  }
-  const sections = document.querySelectorAll('[data-section]');
-  sections.forEach((sec) => {
-    const id = sec.dataset.section;
-    if (mode === 'experimental' || mode === 'halo') {
-      sec.style.display = '';
-    } else if (mode === 'glance') {
-      sec.style.display = ['briefing', 'daily', 'hourly', 'your-day'].includes(id) ? '' : 'none';
-    } else if (mode === 'blend') {
-      sec.style.display = ['hourly', 'explanation', 'compare', 'scientific'].includes(id) ? '' : 'none';
-    } else if (mode === 'today') {
-      sec.style.display = ['briefing', 'hourly', 'exposure', 'explanation', 'best-times'].includes(id) ? '' : 'none';
-    }
   });
 }
 
@@ -1374,91 +1497,15 @@ function updatePresetChipSelection() {
   });
 }
 
-function initGlobeSection() {
-  state.globeController = new LiveCloudGlobe({
-    canvasId: 'cloud-globe-canvas',
-    onSelectLocation: (loc) => {
-      loadLocationForecast(loc);
-    }
-  });
-
-  const spinBtn = document.getElementById('globe-spin-btn');
-  const centerBtn = document.getElementById('globe-center-btn');
-  const zoomInBtn = document.getElementById('globe-zoom-in');
-  const zoomOutBtn = document.getElementById('globe-zoom-out');
-  const timeSlider = document.getElementById('globe-time-slider');
-  const audioBtn = document.getElementById('sky-audio-btn');
-
-  spinBtn?.addEventListener('click', () => {
-    const active = state.globeController.setAutoSpin(!state.globeController.autoSpin);
-    spinBtn.classList.toggle('active', active);
-  });
-
-  centerBtn?.addEventListener('click', () => {
-    if (state.forecast?.location) {
-      state.globeController.flyTo(
-        state.forecast.location.latitude,
-        state.forecast.location.longitude
-      );
-    }
-  });
-
-  zoomInBtn?.addEventListener('click', () => {
-    state.globeController.zoomBy(1);
-  });
-
-  zoomOutBtn?.addEventListener('click', () => {
-    state.globeController.zoomBy(-1);
-  });
-
-  document.querySelectorAll('[data-globe-layer]').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      const key = btn.dataset.globeLayer;
-      const isOn = state.globeController.toggleLayer(key);
-      btn.classList.toggle('active', isOn);
+function initBottomNavDock() {
+  const items = Array.from(document.querySelectorAll('.bnav-item'));
+  if (!items.length) return;
+  items.forEach((item) => {
+    item.addEventListener('click', () => {
+      items.forEach((i) => i.classList.remove('active'));
+      item.classList.add('active');
     });
   });
-
-  timeSlider?.addEventListener('input', () => {
-    const idx = Number(timeSlider.value) || 0;
-    state.globeController.setHourOffset(idx);
-    if (state.forecast) {
-      updateGlobeHUD(state.forecast, idx);
-    }
-  });
-
-  audioBtn?.addEventListener('click', () => {
-    toggleProceduralSkyAudio(audioBtn);
-  });
-}
-
-function updateGlobeHUD(f, hourIdx = 0) {
-  const h = f.hours48?.[clamp(hourIdx, 0, f.hours48.length - 1)] || f.current;
-  if (!h) return;
-
-  const cloudHud = document.getElementById('globe-cloud-hud');
-  const windHud = document.getElementById('globe-wind-hud');
-  const timeLbl = document.getElementById('globe-time-label');
-  const timeSlider = document.getElementById('globe-time-slider');
-
-  if (cloudHud) {
-    cloudHud.textContent = `☁️ Cloud Deck: ${h.cloudCover}% · Rain ${h.rainChance}%`;
-  }
-  if (windHud) {
-    windHud.textContent = `💨 Flow: ${h.windCardinal} ${h.windMph} mph (Gusts ${h.windGustMph})`;
-  }
-  if (timeLbl) {
-    timeLbl.textContent =
-      hourIdx === 0
-        ? 'Now (Live)'
-        : `+${hourIdx}h · ${h.dateObj.toLocaleDateString('en-US', { weekday: 'short' })} ${h.hourLabel}`;
-  }
-  if (timeSlider && Number(timeSlider.value) !== hourIdx) {
-    timeSlider.value = hourIdx;
-  }
-  if (state.globeController) {
-    state.globeController.setHourOffset(hourIdx);
-  }
 }
 
 function toggleProceduralSkyAudio(btnEl) {

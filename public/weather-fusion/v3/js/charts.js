@@ -23,13 +23,13 @@ export const HOURLY_METRICS = [
 ];
 
 export const COMPARE_MODELS = [
-  { id: 'blend', label: 'Weather Nourie blend', color: '#ffffff', width: 3.4, alwaysOn: true },
-  { id: 'nws', label: 'NWS Official', color: '#6bc5ff', width: 2.1 },
-  { id: 'hrrr', label: 'HRRR 3km', color: '#ff9f5a', width: 2.1 },
-  { id: 'nbm', label: 'National Blend (NBM)', color: '#5ce0a0', width: 2.1 },
-  { id: 'ecmwf', label: 'ECMWF IFS 0.25°', color: '#b88cff', width: 2.1 },
-  { id: 'gefs', label: 'GEFS Ensemble', color: '#ffd166', width: 1.9 },
-  { id: 'weathernext', label: 'WeatherNext AI', color: '#ff7eb6', width: 2.1 }
+  { id: 'blend', label: 'Weather Nourie blend', color: '#ffffff', width: 4.4, alwaysOn: true },
+  { id: 'nws', label: 'NWS Official', color: '#6bc5ff', width: 2.0 },
+  { id: 'hrrr', label: 'HRRR 3km', color: '#ff9f5a', width: 2.0 },
+  { id: 'nbm', label: 'National Blend (NBM)', color: '#5ce0a0', width: 2.0 },
+  { id: 'ecmwf', label: 'ECMWF IFS 0.25°', color: '#b88cff', width: 2.0 },
+  { id: 'gefs', label: 'GEFS Ensemble', color: '#ffd166', width: 1.8 },
+  { id: 'weathernext', label: 'WeatherNext AI', color: '#ff7eb6', width: 2.0 }
 ];
 
 export const COMPARE_VARIABLES = [
@@ -631,6 +631,321 @@ export function renderDewPointFeelChart({
       const relX = ((e.clientX - rect.left) / Math.max(1, rect.width)) * W;
       const ratio = clamp((relX - padL) / plotW, 0, 1);
       onSelectHour(Math.round(ratio * (slice.length - 1)));
+    });
+  }
+}
+
+/**
+ * Renders the sleek "Next 24 Hours" luminous smooth gradient spline card (Temp | Feels Like | Rain | Wind).
+ * Displays 7–8 cleanly spaced points in view (scrollable across 12h) with glowing gradient curve,
+ * white dots, crisp value labels above, and aligned weather icons + hour stamps below.
+ */
+export function renderNext24HoursSplineChart({
+  containerEl,
+  hours,
+  metricId = 'temp',
+  selectedHourIdx = 0,
+  useCelsius = false,
+  renderIconFn,
+  onSelectHour
+}) {
+  if (!containerEl || !Array.isArray(hours) || hours.length === 0) return;
+
+  // Pick 7 primary hours for the crisp mockup framing (Now .. +6h)
+  const slice = hours.slice(0, 7);
+  const convT = (f) => (useCelsius ? Math.round(((f - 32) * 5) / 9) : Math.round(f));
+
+  const getVal = (h) => {
+    if (metricId === 'feels') return convT(h.feelsLikeF);
+    if (metricId === 'rain') return Math.round(h.rainChance ?? 0);
+    if (metricId === 'wind') return Math.round(h.windMph ?? 0);
+    return convT(h.tempF);
+  };
+  const fmtVal = (v) => {
+    if (metricId === 'rain') return `${v}%`;
+    if (metricId === 'wind') return `${v}`;
+    return `${v}°`;
+  };
+  const unitSuffix = metricId === 'rain' ? '%' : metricId === 'wind' ? ' mph' : '°';
+
+  const vals = slice.map(getVal);
+  let minVal = metricId === 'rain' || metricId === 'wind' ? 0 : Math.min(...vals);
+  let maxVal = metricId === 'rain' ? Math.max(40, Math.max(...vals)) : Math.max(...vals);
+
+  if (metricId === 'temp' || metricId === 'feels') {
+    minVal = Math.floor((minVal - 4) / 5) * 5;
+    maxVal = Math.ceil((maxVal + 5) / 5) * 5;
+    if (maxVal - minVal < 15) maxVal = minVal + 20;
+  } else if (metricId === 'rain') {
+    maxVal = Math.min(100, Math.ceil(maxVal / 20) * 20);
+  } else {
+    maxVal = Math.max(12, Math.ceil((maxVal + 4) / 5) * 5);
+  }
+
+  const W = 700;
+  const H = 152;
+  const padL = 46;
+  const padR = 26;
+  const padT = 30;
+  const padB = 18;
+  const plotW = W - padL - padR;
+  const plotH = H - padT - padB;
+
+  const colW = plotW / slice.length;
+  const xForIdx = (i) => padL + colW * (i + 0.5);
+  const yForVal = (v) => padT + plotH - clamp((v - minVal) / (maxVal - minVal || 1), 0, 1) * plotH;
+
+  const points = vals.map((v, i) => ({ x: xForIdx(i), y: yForVal(v), val: v, hour: slice[i] }));
+  const smoothPath = buildSmoothSvgPath(points, 0.2);
+  // Extend slightly to edges for seamless look
+  const areaPath = `M ${padL} ${(padT + plotH).toFixed(1)} L ${points[0].x.toFixed(1)} ${points[0].y.toFixed(1)} ${smoothPath.slice(smoothPath.indexOf('C'))} L ${(W - padR).toFixed(1)} ${points[points.length - 1].y.toFixed(1)} L ${(W - padR).toFixed(1)} ${(padT + plotH).toFixed(1)} Z`;
+
+  const tickCount = 4;
+  const yTicks = [];
+  for (let t = 0; t <= tickCount; t++) {
+    const v = minVal + ((maxVal - minVal) * t) / tickCount;
+    yTicks.push({
+      y: yForVal(v),
+      label: `${Math.round(v)}${metricId === 'wind' ? '' : unitSuffix}`
+    });
+  }
+
+  const strokeGradId = `n24-stroke-${metricId}`;
+  const fillGradId = `n24-fill-${metricId}`;
+  const isRain = metricId === 'rain';
+  const isWind = metricId === 'wind';
+  const cStart = isRain ? '#38bdf8' : isWind ? '#5ce0a0' : '#ff8e3c';
+  const cMid = isRain ? '#60a5fa' : isWind ? '#38bdf8' : '#ffb347';
+  const cEnd = isRain ? '#818cf8' : isWind ? '#7dd3fc' : '#38d9f5';
+
+  const activeLocalIdx = clamp(selectedHourIdx, 0, slice.length - 1);
+
+  containerEl.innerHTML = `
+    <div class="n24-chart-shell">
+      <svg class="n24-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Next 24 hours ${metricId} spline chart">
+        <defs>
+          <linearGradient id="${strokeGradId}" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stop-color="${cStart}"/>
+            <stop offset="55%" stop-color="${cMid}"/>
+            <stop offset="100%" stop-color="${cEnd}"/>
+          </linearGradient>
+          <linearGradient id="${fillGradId}" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="${cStart}" stop-opacity="0.46"/>
+            <stop offset="55%" stop-color="${cMid}" stop-opacity="0.16"/>
+            <stop offset="100%" stop-color="${cEnd}" stop-opacity="0.0"/>
+          </linearGradient>
+          <filter id="n24-glow" x="-10%" y="-25%" width="120%" height="150%">
+            <feGaussianBlur stdDeviation="3.5" result="blur"/>
+            <feMerge>
+              <feMergeNode in="blur"/>
+              <feMergeNode in="SourceGraphic"/>
+            </feMerge>
+          </filter>
+        </defs>
+
+        ${yTicks
+          .map(
+            (t) => `
+          <line x1="${padL}" y1="${t.y.toFixed(1)}" x2="${W - padR}" y2="${t.y.toFixed(1)}" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>
+          <text x="${padL - 10}" y="${(t.y + 4).toFixed(1)}" text-anchor="end" fill="rgba(198,215,240,0.72)" font-size="13.5" font-weight="500">${t.label}</text>
+        `
+          )
+          .join('')}
+
+        <path d="${areaPath}" fill="url(#${fillGradId})"/>
+        <path d="${smoothPath}" fill="none" stroke="url(#${strokeGradId})" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" filter="url(#n24-glow)"/>
+
+        ${points
+          .map(
+            (p, idx) => `
+          <g class="n24-pt ${idx === activeLocalIdx ? 'active' : ''}" data-h-idx="${idx}" style="cursor:pointer;">
+            <circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="${idx === activeLocalIdx ? '6.5' : '4.5'}" fill="#ffffff" stroke="${cStart}" stroke-width="${idx === activeLocalIdx ? '2.5' : '1.5'}"/>
+            <text x="${p.x.toFixed(1)}" y="${Math.max(18, p.y - 13).toFixed(1)}" text-anchor="middle" fill="#ffffff" font-size="16" font-weight="700">${fmtVal(p.val)}</text>
+          </g>
+        `
+          )
+          .join('')}
+      </svg>
+
+      <div class="n24-cols-footer" style="padding-left:${((padL / W) * 100).toFixed(2)}%;padding-right:${((padR / W) * 100).toFixed(2)}%;">
+        ${slice
+          .map((h, idx) => {
+            const lbl = idx === 0 ? 'Now' : h.hourLabel;
+            return `
+              <button type="button" class="n24-col-btn ${idx === activeLocalIdx ? 'active' : ''}" data-h-idx="${idx}">
+                <span class="n24-col-icon">${typeof renderIconFn === 'function' ? renderIconFn(h.icon, 28) : ''}</span>
+                <span class="n24-col-time">${lbl}</span>
+              </button>
+            `;
+          })
+          .join('')}
+      </div>
+    </div>
+  `;
+
+  if (typeof onSelectHour === 'function') {
+    containerEl.querySelectorAll('[data-h-idx]').forEach((el) => {
+      el.addEventListener('click', () => {
+        onSelectHour(Number(el.dataset.hIdx) || 0);
+      });
+    });
+  }
+}
+
+/**
+ * Renders the "7-Day Outlook" unified Dual-Curve High & Low Spline Card.
+ * Warm amber-orange High curve + cool cyan-blue Low curve + shaded thermal band +
+ * aligned weather icon, Day/Date, and rain probability columns underneath.
+ */
+export function renderSevenDayDualSplineChart({
+  containerEl,
+  days7,
+  selectedDayIdx = 0,
+  useCelsius = false,
+  renderIconFn,
+  onSelectDay
+}) {
+  if (!containerEl || !Array.isArray(days7) || days7.length === 0) return;
+
+  const days = days7.slice(0, 7);
+  const convT = (f) => (useCelsius ? Math.round(((f - 32) * 5) / 9) : Math.round(f));
+  const highs = days.map((d) => convT(d.highF));
+  const lows = days.map((d) => convT(d.lowF));
+
+  let minVal = Math.floor((Math.min(...lows) - 6) / 10) * 10;
+  let maxVal = Math.ceil((Math.max(...highs) + 6) / 10) * 10;
+  if (maxVal - minVal < 25) {
+    minVal -= 5;
+    maxVal += 5;
+  }
+
+  const W = 700;
+  const H = 178;
+  const padL = 46;
+  const padR = 20;
+  const padT = 32;
+  const padB = 28;
+  const plotW = W - padL - padR;
+  const plotH = H - padT - padB;
+
+  const colW = plotW / days.length;
+  const xForIdx = (i) => padL + colW * (i + 0.5);
+  const yForVal = (v) => padT + plotH - clamp((v - minVal) / (maxVal - minVal || 1), 0, 1) * plotH;
+
+  const hiPts = highs.map((v, i) => ({ x: xForIdx(i), y: yForVal(v), val: v }));
+  const loPts = lows.map((v, i) => ({ x: xForIdx(i), y: yForVal(v), val: v }));
+
+  const hiPath = buildSmoothSvgPath(hiPts, 0.22);
+  const loPath = buildSmoothSvgPath(loPts, 0.22);
+
+  // Shaded band between High and Low curves
+  const bandPts = [
+    ...hiPts.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`),
+    ...[...loPts].reverse().map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`)
+  ].join(' ');
+
+  const loAreaPath = `${loPath} L ${loPts[loPts.length - 1].x.toFixed(1)} ${(padT + plotH).toFixed(1)} L ${loPts[0].x.toFixed(1)} ${(padT + plotH).toFixed(1)} Z`;
+
+  const yTicks = [];
+  const step = Math.max(10, Math.round((maxVal - minVal) / 4 / 5) * 5);
+  for (let v = minVal; v <= maxVal; v += step) {
+    yTicks.push({ y: yForVal(v), label: `${v}°` });
+  }
+
+  const activeIdx = clamp(selectedDayIdx, 0, days.length - 1);
+
+  containerEl.innerHTML = `
+    <div class="d7-dual-shell">
+      <svg class="d7-dual-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="7-day high and low temperature dual spline chart">
+        <defs>
+          <linearGradient id="d7-hi-stroke" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stop-color="#ff8c42"/>
+            <stop offset="50%" stop-color="#ff6b35"/>
+            <stop offset="100%" stop-color="#ff9f43"/>
+          </linearGradient>
+          <linearGradient id="d7-lo-stroke" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stop-color="#38bdf8"/>
+            <stop offset="50%" stop-color="#0ea5e9"/>
+            <stop offset="100%" stop-color="#60a5fa"/>
+          </linearGradient>
+          <linearGradient id="d7-band-fill" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#ff7a3d" stop-opacity="0.34"/>
+            <stop offset="100%" stop-color="#0ea5e9" stop-opacity="0.14"/>
+          </linearGradient>
+          <linearGradient id="d7-lo-fill" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#0ea5e9" stop-opacity="0.22"/>
+            <stop offset="100%" stop-color="#0ea5e9" stop-opacity="0.0"/>
+          </linearGradient>
+          <filter id="d7-glow" x="-10%" y="-20%" width="120%" height="140%">
+            <feGaussianBlur stdDeviation="3" result="blur"/>
+            <feMerge>
+              <feMergeNode in="blur"/>
+              <feMergeNode in="SourceGraphic"/>
+            </feMerge>
+          </filter>
+        </defs>
+
+        ${yTicks
+          .map(
+            (t) => `
+          <line x1="${padL}" y1="${t.y.toFixed(1)}" x2="${W - padR}" y2="${t.y.toFixed(1)}" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>
+          <text x="${padL - 10}" y="${(t.y + 4).toFixed(1)}" text-anchor="end" fill="rgba(198,215,240,0.7)" font-size="13" font-weight="500">${t.label}</text>
+        `
+          )
+          .join('')}
+
+        <!-- Subtle vertical stems connecting High -> Low -> axis -->
+        ${hiPts
+          .map(
+            (hp, idx) => `
+          <line x1="${hp.x.toFixed(1)}" y1="${hp.y.toFixed(1)}" x2="${hp.x.toFixed(1)}" y2="${(padT + plotH).toFixed(1)}" stroke="${idx === activeIdx ? 'rgba(255,255,255,0.34)' : 'rgba(255,255,255,0.12)'}" stroke-width="${idx === activeIdx ? '1.5' : '1'}"/>
+        `
+          )
+          .join('')}
+
+        <polygon points="${bandPts}" fill="url(#d7-band-fill)"/>
+        <path d="${loAreaPath}" fill="url(#d7-lo-fill)"/>
+        <path d="${hiPath}" fill="none" stroke="url(#d7-hi-stroke)" stroke-width="3.6" stroke-linecap="round" filter="url(#d7-glow)"/>
+        <path d="${loPath}" fill="none" stroke="url(#d7-lo-stroke)" stroke-width="3.2" stroke-linecap="round" filter="url(#d7-glow)"/>
+
+        ${hiPts
+          .map((hp, idx) => {
+            const lp = loPts[idx];
+            const isSel = idx === activeIdx;
+            return `
+              <g data-d7-idx="${idx}" style="cursor:pointer;">
+                <circle cx="${hp.x.toFixed(1)}" cy="${hp.y.toFixed(1)}" r="${isSel ? '5.5' : '4'}" fill="#ffffff" stroke="#ff7a3d" stroke-width="1.6"/>
+                <text x="${hp.x.toFixed(1)}" y="${Math.max(17, hp.y - 12).toFixed(1)}" text-anchor="middle" fill="#ffffff" font-size="15.5" font-weight="700">${hp.val}°</text>
+                <circle cx="${lp.x.toFixed(1)}" cy="${lp.y.toFixed(1)}" r="${isSel ? '5.5' : '4'}" fill="#ffffff" stroke="#38bdf8" stroke-width="1.6"/>
+                <text x="${lp.x.toFixed(1)}" y="${Math.min(H - 6, lp.y + 21).toFixed(1)}" text-anchor="middle" fill="#9cd8ff" font-size="15" font-weight="600">${lp.val}°</text>
+              </g>
+            `;
+          })
+          .join('')}
+      </svg>
+
+      <div class="d7-cols-footer" style="padding-left:${((padL / W) * 100).toFixed(2)}%;padding-right:${((padR / W) * 100).toFixed(2)}%;">
+        ${days
+          .map(
+            (d, idx) => `
+          <button type="button" class="d7-col-btn ${idx === activeIdx ? 'active' : ''}" data-d7-idx="${idx}">
+            <span class="d7-col-icon">${typeof renderIconFn === 'function' ? renderIconFn(d.icon, 28) : ''}</span>
+            <span class="d7-col-day">${d.shortWeekday}</span>
+            <span class="d7-col-date">${d.dateLabel}</span>
+            <span class="d7-col-rain ${d.rainChance >= 35 ? 'wet' : ''}">💧 ${d.rainChance}%</span>
+          </button>
+        `
+          )
+          .join('')}
+      </div>
+    </div>
+  `;
+
+  if (typeof onSelectDay === 'function') {
+    containerEl.querySelectorAll('[data-d7-idx]').forEach((el) => {
+      el.addEventListener('click', () => {
+        onSelectDay(Number(el.dataset.d7Idx) || 0);
+      });
     });
   }
 }

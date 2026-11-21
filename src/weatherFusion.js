@@ -799,64 +799,14 @@ export function registerWeatherFusionRoutes(app, options = {}) {
     'v3/js/app.js',
     'v3/js/charts.js',
     'v3/js/fusion-engine.js',
-    'v3/js/globe.js',
     'v3/js/icons.js',
     'v3/js/map.js',
     'v3/js/physics.js',
-    'v3/vendor/three.module.min.js',
-    'v3/textures/earth-day.jpg',
-    'v3/textures/earth-night.jpg',
-    'v3/textures/earth-bump.png',
-    'v3/textures/clouds-fallback.png',
   ]) app.get(`/weather-fusion/${v3Asset}`, (_req, res) => {
-    res.setHeader('Cache-Control', v3Asset.includes('textures/') || v3Asset.includes('vendor/') ? 'public, max-age=86400' : 'no-cache');
+    res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.sendFile(path.join(PUBLIC_DIR, v3Asset));
   });
-  const liveSatCache = new Map();
-  const proxySatellitePng = (cacheKey, upstreamUrl, fallbackFile = null) => async (_req, res) => {
-    const cached = liveSatCache.get(cacheKey);
-    if (cached && Date.now() - cached.ts < 15 * 60 * 1000) {
-      res.setHeader('Cache-Control', 'public, max-age=600');
-      res.setHeader('X-Content-Type-Options', 'nosniff');
-      res.type('image/png').send(cached.buf);
-      return;
-    }
-    try {
-      const upstream = await fetch(upstreamUrl, { signal: AbortSignal.timeout(10000) });
-      if (upstream.ok) {
-        const buf = Buffer.from(await upstream.arrayBuffer());
-        if (buf.length > 4096) {
-          liveSatCache.set(cacheKey, { ts: Date.now(), buf });
-          res.setHeader('Cache-Control', 'public, max-age=600');
-          res.setHeader('X-Content-Type-Options', 'nosniff');
-          res.type('image/png').send(buf);
-          return;
-        }
-      }
-    } catch {}
-    if (fallbackFile) {
-      res.setHeader('Cache-Control', 'public, max-age=300');
-      res.type('image/png').sendFile(fallbackFile);
-      return;
-    }
-    res.status(204).end();
-  };
-  app.get(
-    '/api/weather-fusion/v3/live-clouds.png',
-    proxySatellitePng(
-      'clouds',
-      'https://realearth.ssec.wisc.edu/api/image?products=globalir&width=2048&height=1024',
-      path.join(PUBLIC_DIR, 'v3', 'textures', 'clouds-fallback.png')
-    )
-  );
-  app.get(
-    '/api/weather-fusion/v3/live-precip.png',
-    proxySatellitePng(
-      'precip',
-      'https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.3.0&LAYERS=IMERG_Precipitation_Rate&CRS=EPSG:4326&BBOX=-90,-180,90,180&WIDTH=2048&HEIGHT=1024&FORMAT=image/png&TRANSPARENT=true'
-    )
-  );
   app.get(['/weather-fusion/halo', '/weather-fusion/halo/'], (_req, res) => res.redirect(302, '/weather-fusion/halo.html'));
   app.get('/weather-fusion/weathernext-site.html', (req,res) => {
     // The standalone data explorer lives at its explicit file route. The public

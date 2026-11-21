@@ -3,195 +3,207 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <meta name="theme-color" content="#071124" />
-  <title>Weather Nourie · Live 3D Cloud Globe &amp; Fusion V3</title>
+  <meta name="theme-color" content="#081426" />
+  <title>Weather Nourie · Fusion V3</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
-  <link rel="stylesheet" href="/weather-fusion/v3/css/styles.css?v=globe-webgl-v4" />
+  <link rel="stylesheet" href="/weather-fusion/v3/css/styles.css?v=v3-cinematic-2" />
 </head>
 <body data-sky="day">
-  <!-- Living Sky Atmosphere & Particle Canvas -->
+  <!-- Living Sky Atmosphere & Subtle Particle Canvas -->
   <div class="atmosphere" aria-hidden="true"></div>
   <canvas id="sky-canvas" aria-hidden="true"></canvas>
 
-  <!-- Sleek Single-Row Top Header (Mobile-First, Never Bloated) -->
-  <header class="topbar">
-    <div class="shell topbar-row">
-      <a class="brand" href="#top">
-        <div class="brand-mark" id="brand-icon-slot"></div>
-        <div class="brand-text">
-          <span class="brand-kicker">WEATHER</span>
-          <span class="brand-name">Nourie <em class="v3-tag">V3</em></span>
-        </div>
-      </a>
+  <!-- Full-Bleed Cinematic Hero Wrapper -->
+  <div id="top" class="hero-cinematic-shell">
+    <div class="hero-backdrop-layer" aria-hidden="true">
+      <img id="hero-bg-photo" class="hero-bg-photo" src="/weather-fusion/today-sky-clouds.webp" alt="" />
+      <div class="hero-bg-scrim"></div>
+    </div>
 
-      <!-- City / ZIP Search + GPS -->
-      <div class="search-cluster">
-        <div class="search-box-wrap">
-          <div class="search-input-shell">
-            <span class="search-icon" aria-hidden="true">⌕</span>
-            <input id="city-search" type="search" placeholder="Search city or ZIP…" autocomplete="off" />
+    <!-- Sleek Translucent Top Navigation Header -->
+    <header class="topbar">
+      <div class="shell topbar-row">
+        <div class="topbar-left">
+          <button id="tools-drawer-btn" class="icon-btn compact-btn glass-chip-btn" type="button" aria-expanded="false" aria-controls="tools-strip" aria-label="Menu & tools">☰</button>
+          <a class="brand" href="#top">
+            <div class="brand-mark" id="brand-icon-slot"></div>
+            <div class="brand-text">
+              <span class="brand-name">Nourie</span>
+            </div>
+          </a>
+        </div>
+
+        <!-- City / ZIP Search + GPS (collapsible cleanly on mobile) -->
+        <div id="search-cluster" class="search-cluster">
+          <div class="search-box-wrap">
+            <div class="search-input-shell">
+              <span class="search-icon" aria-hidden="true">⌕</span>
+              <input id="city-search" type="search" placeholder="Search city or ZIP…" autocomplete="off" />
+            </div>
+            <div id="search-results" class="search-dropdown" hidden></div>
           </div>
-          <div id="search-results" class="search-dropdown" hidden></div>
+          <button id="locate-btn" class="icon-btn compact-btn glass-chip-btn" type="button" title="Use my current GPS location" aria-label="Use my location">⌖</button>
         </div>
-        <button id="locate-btn" class="icon-btn compact-btn" type="button" title="Use my current GPS location" aria-label="Use my location">⌖</button>
-      </div>
 
-      <!-- Compact Action Cluster -->
-      <div class="header-actions">
-        <button id="unit-toggle" class="icon-btn compact-btn" type="button" title="Toggle Fahrenheit / Celsius">°F</button>
-        <button id="refresh-btn" class="icon-btn compact-btn" type="button" title="Refresh multi-model fusion" aria-label="Refresh">↻</button>
-        <button id="tools-drawer-btn" class="icon-btn" type="button" aria-expanded="false" aria-controls="tools-strip">⚙ Tools</button>
+        <!-- Compact Right Action Cluster -->
+        <div class="header-actions">
+          <button id="mobile-search-toggle" class="icon-btn compact-btn glass-chip-btn" type="button" title="Search location" aria-label="Search">⌕</button>
+          <button id="unit-toggle" class="icon-btn compact-btn glass-chip-btn" type="button" title="Toggle Fahrenheit / Celsius">°F</button>
+          <button id="refresh-btn" class="icon-btn compact-btn glass-chip-btn" type="button" title="Refresh multi-model fusion" aria-label="Refresh">↻</button>
+        </div>
       </div>
-    </div>
-  </header>
+    </header>
 
-  <!-- Expandable Tools & Workspace Mode Strip (Always visible on desktop, 1-tap toggle on mobile) -->
-  <div id="tools-strip" class="tools-strip">
-    <div class="shell tools-strip-inner">
-      <div class="pill-scroll-row" role="tablist" aria-label="Workspace View Modes">
-        <button class="mode-pill active" data-view-mode="experimental" type="button">⚡ Fusion V3</button>
-        <button class="mode-pill" data-view-mode="halo" type="button">🌍 Globe Focus</button>
-        <button class="mode-pill" data-view-mode="glance" type="button">◔ Glance</button>
-        <button class="mode-pill" data-view-mode="blend" type="button">◑ Blend Lab</button>
-        <button class="mode-pill" data-view-mode="today" type="button">☀ Today</button>
-      </div>
-      <div class="pill-scroll-row">
-        <button id="sky-audio-btn" class="mode-pill" type="button">🔊 Sky Audio</button>
-        <select id="sky-mood-select" class="sky-select" aria-label="Atmosphere Sky Mode">
-          <option value="auto">Sky: Auto</option>
-          <option value="day">Clear Day</option>
-          <option value="rain">Rain / Storm</option>
-          <option value="sunset">Sunset</option>
-          <option value="night">Starry Night</option>
-        </select>
-        <button class="mode-pill" id="open-car-wash-modal" type="button">🚗 Car Wash</button>
-        <button class="mode-pill" id="open-snow-modal" type="button">❄️ Snow</button>
-        <button class="mode-pill" id="open-afd-modal" type="button">📡 NWS AFD</button>
-        <a class="mode-pill" href="/weather-fusion/">← Classic</a>
+    <!-- Expandable Tools & Saved Cities Drawer -->
+    <div id="tools-strip" class="tools-strip">
+      <div class="shell tools-strip-inner">
+        <div id="preset-city-chips" class="pill-scroll-row" aria-label="Saved Cities"></div>
+        <div class="pill-scroll-row">
+          <button id="sky-audio-btn" class="mode-pill" type="button">🔊 Sky Audio</button>
+          <select id="sky-mood-select" class="sky-select" aria-label="Atmosphere Sky Mode">
+            <option value="auto">Sky: Auto</option>
+            <option value="day">Clear Day</option>
+            <option value="rain">Rain / Storm</option>
+            <option value="sunset">Sunset</option>
+            <option value="night">Starry Night</option>
+          </select>
+          <button class="mode-pill" id="open-car-wash-modal" type="button">🚗 Car Wash</button>
+          <button class="mode-pill" id="open-snow-modal" type="button">❄️ Snow</button>
+          <button class="mode-pill" id="open-afd-modal" type="button">📡 NWS AFD</button>
+          <a class="mode-pill" href="/weather-fusion/">← Classic</a>
+        </div>
       </div>
     </div>
+
+    <!-- Cinematic Hero Foreground Content -->
+    <section class="shell hero-stage" aria-label="Current Conditions">
+      <div class="hero-city-row">
+        <button id="city-picker-btn" class="hero-city-trigger" type="button" aria-label="Change city">
+          <span id="city-name">Knightdale, NC</span>
+          <span class="city-chevron" aria-hidden="true">▾</span>
+        </button>
+        <span id="hero-date" class="hero-date-pill">Today</span>
+      </div>
+
+      <div class="hero-visual-split">
+        <div class="hero-scene-col" aria-hidden="true"></div>
+        <div class="hero-temp-col">
+          <div class="hero-temp-icon-row">
+            <div id="temperature" class="hero-temp" title="Tap to jump to hourly curve">--°</div>
+            <div id="hero-scene" class="hero-weather-icon"></div>
+          </div>
+          <div id="hero-condition" class="hero-condition">Loading…</div>
+          <div id="hero-feels-line" class="hero-feels-line">Feels Like --°</div>
+          <div id="hero-hilo" class="hero-hilo-line">High --° &nbsp;|&nbsp; Low --°</div>
+        </div>
+      </div>
+
+      <!-- Frosted "Weather Take" Banner (Mockup signature emerald-bar callout) -->
+      <button id="weather-take-banner" class="glass weather-take-bar" type="button" aria-label="Open full Weather Take details">
+        <span class="weather-take-accent" aria-hidden="true"></span>
+        <span class="weather-take-label">Weather Take</span>
+        <span id="take-banner-copy" class="weather-take-copy">Synthesizing live multi-model trends for your area…</span>
+        <span class="weather-take-chevron" aria-hidden="true">›</span>
+      </button>
+    </section>
   </div>
 
-  <!-- Non-Sticky Swipeable Saved Cities + Jump Navigation -->
-  <div class="shell subnav-stack">
-    <div id="preset-city-chips" class="pill-scroll-row" aria-label="Saved Cities"></div>
-    <nav class="pill-scroll-row" aria-label="Jump to section">
-      <a class="jump-pill" href="#globe-panel">🌍 3D Globe</a>
-      <a class="jump-pill" href="#daily-panel">7-Day</a>
-      <a class="jump-pill" href="#main-hourly-trend">48h Graph</a>
-      <a class="jump-pill" href="#skin-exposure">Shade &amp; Pets</a>
-      <a class="jump-pill" href="#model-explanation">Why Forecast</a>
-      <a class="jump-pill" href="#wn-compare-section">Compare</a>
-      <a class="jump-pill" href="#best-times">Best Times</a>
-      <a class="jump-pill" href="#dewpoint-gross-meter">Feel Meter</a>
-      <a class="jump-pill" href="#air-quality">AQI &amp; Day</a>
-      <a class="jump-pill" href="#map-panel">Radar Map</a>
-    </nav>
-  </div>
+  <main class="shell v3-main-stack">
+    <!-- Urgent Official NWS Warnings (when active) -->
+    <div id="urgent-alerts-container"></div>
 
-  <main id="top" class="shell">
-    <!-- Live Status Line -->
+    <!-- 4-Column Quick Stats Glass Strip: Rain | Total Precip | AQI | Weather Meter -->
+    <section id="quick-stats-strip" class="glass quick-stats-strip" aria-label="Key Weather Metrics">
+      <div class="qs-col">
+        <div class="qs-head"><span class="qs-ico qs-ico-rain" aria-hidden="true">💧</span> Rain</div>
+        <div id="qs-rain-val" class="qs-val">--%</div>
+        <div class="qs-sub">Today</div>
+      </div>
+      <div class="qs-col">
+        <div class="qs-head"><span class="qs-ico qs-ico-precip" aria-hidden="true">🌧</span> Total Precip</div>
+        <div id="qs-precip-val" class="qs-val">0.00"</div>
+        <div class="qs-sub">Next 24h</div>
+      </div>
+      <div class="qs-col">
+        <div class="qs-head"><span class="qs-ico qs-ico-aqi" aria-hidden="true">🍃</span> AQI</div>
+        <div id="qs-aqi-val" class="qs-val qs-aqi-num">--</div>
+        <div id="qs-aqi-sub" class="qs-sub qs-aqi-label">Loading</div>
+      </div>
+      <div class="qs-col qs-meter-col">
+        <div class="qs-head">Weather Meter</div>
+        <div id="qs-weather-meter-arc" class="qs-meter-arc"></div>
+        <div id="qs-meter-sub" class="qs-sub">Comfortable</div>
+      </div>
+    </section>
+
+    <!-- Next 24 Hours Smooth Luminous Spline Card -->
+    <section id="next-24-panel" class="glass section-panel card-compact" data-section="hourly-quick">
+      <div class="n24-header">
+        <h2 class="card-title-clean">Next 24 Hours</h2>
+        <div id="n24-metric-pills" class="n24-pill-group" role="tablist" aria-label="Next 24 hours metric">
+          <button class="n24-pill active" data-n24-metric="temp" type="button">Temp</button>
+          <button class="n24-pill" data-n24-metric="feels" type="button">Feels Like</button>
+          <button class="n24-pill" data-n24-metric="rain" type="button">Rain</button>
+          <button class="n24-pill" data-n24-metric="wind" type="button">Wind</button>
+        </div>
+      </div>
+      <div id="next24-spline-stage"></div>
+    </section>
+
+    <!-- 7-Day Outlook Dual-Curve High & Low Spline Card -->
+    <section id="daily-panel" class="glass section-panel card-compact" data-section="daily">
+      <div class="n24-header">
+        <h2 class="card-title-clean">7-Day Outlook</h2>
+        <span class="d7-mode-chip">Temp &amp; Rain ▾</span>
+      </div>
+      <div id="seven-day-dual-stage"></div>
+    </section>
+
+    <!-- 3-Column Bottom Comfort & Conditions Cards: How It Feels | Dew Point | Wind -->
+    <section id="comfort-trio-section" class="comfort-trio-grid" aria-label="Comfort, Dew Point, and Wind">
+      <article class="glass trio-card trio-feels-card">
+        <div class="trio-head"><span aria-hidden="true">🌡</span> How It Feels</div>
+        <div class="trio-feels-body">
+          <div class="trio-feels-text">
+            <div id="trio-feels-label" class="trio-feels-verdict">Cool &amp; Comfortable</div>
+            <div id="trio-feels-note" class="trio-sub">Light jacket weather</div>
+          </div>
+          <div id="trio-outfit-visual" class="trio-outfit-visual" aria-hidden="true"></div>
+        </div>
+      </article>
+
+      <article class="glass trio-card trio-center-card">
+        <div class="trio-head"><span class="qs-ico-rain" aria-hidden="true">💧</span> Dew Point</div>
+        <div id="trio-dewpoint-val" class="trio-big-val">--°</div>
+        <div id="trio-dewpoint-label" class="trio-sub">Comfortable</div>
+      </article>
+
+      <article class="glass trio-card trio-wind-card">
+        <div class="trio-head"><span aria-hidden="true">💨</span> Wind</div>
+        <div class="trio-wind-body">
+          <div>
+            <div class="trio-wind-val-row">
+              <span id="trio-wind-speed" class="trio-big-val">--</span>
+              <span id="trio-wind-unit" class="trio-wind-meta">mph --</span>
+            </div>
+            <div id="trio-wind-gust" class="trio-sub">Gusts -- mph</div>
+          </div>
+          <div id="trio-wind-compass" class="trio-compass-wrap" aria-hidden="true"></div>
+        </div>
+      </article>
+    </section>
+
+    <!-- Forecast Window Banners -->
+    <div id="forecast-window-banners" class="window-banners-grid"></div>
+
+    <!-- Live Status Meta Line -->
     <div id="status-bar" class="status-line">
       <div><span class="live-dot"></span><span id="status-text">Fusing live multi-model telemetry…</span></div>
       <div id="coords-text" class="coords-meta"></div>
     </div>
 
-    <!-- Urgent Official NWS Warnings -->
-    <div id="urgent-alerts-container"></div>
-
-    <!-- Forecast Window Banners -->
-    <div id="forecast-window-banners" class="window-banners-grid"></div>
-
-    <!-- Primary Command Deck: Hero Telemetry + Photorealistic 3D WebGL Live Satellite Cloud Globe -->
-    <section id="hero-globe-deck" class="hero-bento" aria-label="Current Conditions and Real 3D Satellite Cloud Globe">
-      <!-- Left Column: Hero Card + Remainder of Today -->
-      <div class="hero-left-column">
-        <article class="glass hero-card">
-          <div>
-            <div class="hero-top-meta">
-              <span id="hero-date" class="hero-date-badge">Today</span>
-              <span id="hero-wfo" class="wfo-pill">Blend V2</span>
-            </div>
-            <h1 id="city-name" class="hero-city">San Francisco, CA</h1>
-
-            <div class="hero-main-row">
-              <div id="hero-scene"></div>
-              <div id="temperature" class="hero-temp" title="Tap to view 48-hour temperature curve">--°</div>
-              <div class="hero-cond-stack">
-                <div id="hero-condition" class="hero-condition">Loading…</div>
-                <div id="hero-hilo" class="hero-hi-lo">High --° · Low --°</div>
-                <div id="hero-uv" class="hero-uv-line">Peak UV --</div>
-              </div>
-            </div>
-
-            <div id="hero-telemetry-chips" class="hero-feels-strip"></div>
-
-            <!-- Celestial Sun & Daylight Progress -->
-            <div id="hero-celestial-strip" class="celestial-strip"></div>
-          </div>
-
-          <div class="hero-obs-footer">
-            <span id="observation-label">NOAA NWS · HRRR · NBM · ECMWF IFS · WeatherNext AI</span>
-            <span id="radar-proximity-pill" class="radar-status-text">● Radar Scanned</span>
-          </div>
-        </article>
-
-        <article class="glass today-remainder-card">
-          <div class="card-kicker-row">
-            <span class="section-kicker">Remainder of Today &amp; Tonight</span>
-            <button id="open-today-scrubber" class="mode-pill" type="button">Hourly Table ▸</button>
-          </div>
-          <div id="remainder-stats-grid" class="remainder-grid"></div>
-        </article>
-      </div>
-
-      <!-- Right Column: REAL Photorealistic Three.js WebGL 3D Earth Globe w/ Live Satellite Cloud Cover -->
-      <article id="globe-panel" class="glass globe-command-card">
-        <div class="globe-header-row">
-          <div>
-            <span class="section-kicker">Real-Time Geostationary Satellite · WebGL 3D</span>
-            <h2 class="section-title globe-title">Live 3D Satellite Cloud Globe</h2>
-            <p class="section-subtitle">Real NASA Blue/Black Marble + live EUMETSAT/GOES/Himawari clouds. Drag to spin · Tap anywhere on Earth to forecast.</p>
-          </div>
-          <div class="globe-top-actions">
-            <button id="globe-spin-btn" class="mode-pill active" type="button">⟳ Spin</button>
-            <button id="globe-center-btn" class="mode-pill" type="button">⌖ Center</button>
-          </div>
-        </div>
-
-        <div class="globe-stage-wrap">
-          <canvas id="cloud-globe-canvas" aria-label="Photorealistic 3D WebGL Earth globe with real live satellite cloud cover"></canvas>
-          <div class="globe-hud-overlay-top">
-            <span id="globe-cloud-hud" class="globe-hud-pill">☁️ Cloud Deck: --%</span>
-            <span id="globe-wind-hud" class="globe-hud-pill">💨 Wind: -- mph</span>
-          </div>
-          <div class="globe-hint-tag">NASA Blue Marble · Live Global Clouds</div>
-          <div class="globe-zoom-dock">
-            <button id="globe-zoom-in" class="globe-mini-btn" type="button" aria-label="Zoom in">＋</button>
-            <button id="globe-zoom-out" class="globe-mini-btn" type="button" aria-label="Zoom out">－</button>
-          </div>
-        </div>
-
-        <div class="globe-footer-controls">
-          <div class="globe-layer-pills">
-            <button class="mode-pill active" data-globe-layer="clouds" type="button">☁️ Live Clouds</button>
-            <button class="mode-pill active" data-globe-layer="wind" type="button">💨 Jet Stream 3D</button>
-            <button class="mode-pill active" data-globe-layer="terminator" type="button">🌗 Day / Night</button>
-            <button class="mode-pill" data-globe-layer="precip" type="button">🌧️ NASA Precip</button>
-            <button class="mode-pill" data-globe-layer="thermal" type="button">🌡️ Thermal</button>
-          </div>
-
-          <div class="globe-scrubber-row">
-            <span class="section-kicker" style="white-space:nowrap;">48h Orbit</span>
-            <input id="globe-time-slider" type="range" min="0" max="47" value="0" aria-label="Scrub 3D globe forward 48 hours" />
-            <span id="globe-time-label" class="wfo-pill" style="white-space:nowrap;">Now (Live)</span>
-          </div>
-        </div>
-      </article>
-    </section>
-
-    <!-- Full-Width Nourie Weather Take & Official Outlooks -->
-    <section class="glass section-panel nourie-take-wide" data-section="briefing">
+    <!-- Full Nourie Weather Take & Official Outlooks (Expanded Synthesis) -->
+    <section id="full-weather-take" class="glass section-panel nourie-take-wide" data-section="briefing">
       <div class="card-kicker-row">
         <span class="section-kicker">Nourie Weather Take · Forecaster &amp; AI Synthesis</span>
         <span id="risk-outlook-pill" class="wfo-pill">SPC / WPC Outlook</span>
@@ -201,26 +213,29 @@
       <ul id="take-bullets" class="take-bullets take-bullets-grid"></ul>
     </section>
 
-    <!-- 7-Day / 10-Day Forecast with Confidence Meters & Temperature Range Bars -->
-    <section id="daily-panel" class="glass section-panel" data-section="daily">
+    <!-- 10-Day Multi-Model Comparison Lab -->
+    <section id="wn-compare-section" class="glass section-panel" data-section="compare">
       <div class="section-header">
         <div>
-          <span class="section-kicker">Multi-Model Consensus</span>
-          <h2 class="section-title">7-Day Forecast &amp; Confidence Meters</h2>
-          <p class="section-subtitle">Tap any day to inspect its 100-point rain math and model spread.</p>
+          <span class="section-kicker">Ensemble &amp; Deterministic Divergence</span>
+          <h2 class="section-title">10-Day Multi-Model Comparison Lab</h2>
+          <p class="section-subtitle">Compare individual models against the Weather Nourie Blend across 10 variables.</p>
         </div>
-        <span class="wfo-pill">Confidence = Model Spread</span>
       </div>
-      <div id="experimental-week" class="seven-day-track"></div>
+
+      <div id="compare-var-tabs" class="metric-tabs-bar"></div>
+      <div id="compare-model-toggles" class="pill-scroll-row" style="margin-bottom:12px;"></div>
+      <div id="compare-chart-stage"></div>
+      <div id="compare-day-breakdown" style="margin-top:14px;"></div>
     </section>
 
     <!-- 48-Hour Multi-Metric Interactive Explorer + Scrubber Strip -->
     <section id="main-hourly-trend" class="glass section-panel" data-section="hourly">
       <div class="section-header">
         <div>
-          <span class="section-kicker">High-Resolution Timeline</span>
-          <h2 class="section-title">Explore the Next 48 Hours</h2>
-          <p id="hourly-metric-desc" class="section-subtitle">Swipe or drag across the curve to inspect every hour and sync the 3D globe.</p>
+          <span class="section-kicker">High-Resolution 48h Timeline</span>
+          <h2 class="section-title">Explore All 12 Hourly Variables</h2>
+          <p id="hourly-metric-desc" class="section-subtitle">Swipe or drag across the curve to inspect every hour.</p>
         </div>
       </div>
 
@@ -270,22 +285,6 @@
         <summary style="cursor:pointer;font-weight:700;font-size:13.5px;color:var(--blue);">▸ View all hourly raw model inputs for this day</summary>
         <div id="all-hours-matrix" class="table-scroll-wrap" style="margin-top:12px;"></div>
       </details>
-    </section>
-
-    <!-- 10-Day Multi-Model Comparison Lab -->
-    <section id="wn-compare-section" class="glass section-panel" data-section="compare">
-      <div class="section-header">
-        <div>
-          <span class="section-kicker">Ensemble &amp; Deterministic Divergence</span>
-          <h2 class="section-title">10-Day Multi-Model Comparison Lab</h2>
-          <p class="section-subtitle">Toggle individual models against the Weather Nourie Blend across 10 variables.</p>
-        </div>
-      </div>
-
-      <div id="compare-var-tabs" class="metric-tabs-bar"></div>
-      <div id="compare-model-toggles" class="pill-scroll-row" style="margin-bottom:12px;"></div>
-      <div id="compare-chart-stage"></div>
-      <div id="compare-day-breakdown" style="margin-top:14px;"></div>
     </section>
 
     <!-- Best Times to Be Outside 7×24 Comfort Heatmap -->
@@ -443,6 +442,30 @@
     </section>
   </main>
 
+  <!-- Fixed Bottom Navigation Bar (Mockup 5-Tab Dock) -->
+  <nav class="bottom-nav-dock" aria-label="Primary sections">
+    <a class="bnav-item active" href="#top" data-bnav="today">
+      <svg class="bnav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 10v10h14V10"/></svg>
+      <span>Today</span>
+    </a>
+    <a class="bnav-item" href="#next-24-panel" data-bnav="hourly">
+      <svg class="bnav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+      <span>Hourly</span>
+    </a>
+    <a class="bnav-item" href="#daily-panel" data-bnav="daily">
+      <svg class="bnav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+      <span>7-Day</span>
+    </a>
+    <a class="bnav-item" href="#map-panel" data-bnav="map">
+      <svg class="bnav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/></svg>
+      <span>Map</span>
+    </a>
+    <a class="bnav-item" href="#wn-compare-section" data-bnav="compare">
+      <svg class="bnav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l9 4.5-9 4.5-9-4.5L12 3z"/><path d="M3 12l9 4.5 9-4.5"/><path d="M3 16.5L12 21l9-4.5"/></svg>
+      <span>Compare</span>
+    </a>
+  </nav>
+
   <!-- Modal Dialog -->
   <dialog id="nourie-dialog" class="nourie-modal">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;gap:10px;">
@@ -454,12 +477,12 @@
 
   <footer class="site-footer">
     <div class="shell">
-      <div style="font-weight:700;color:var(--text);margin-bottom:4px;">Weather Nourie · Live 3D Satellite Cloud Globe &amp; Fusion V3</div>
-      <div>NASA Blue/Black Marble &amp; GPM IMERG · EUMETSAT/GOES/Himawari Live Global Clouds · NOAA/NWS · HRRR &amp; NBM · ECMWF Open Data · Open-Meteo / CAMS · USGS</div>
+      <div style="font-weight:700;color:var(--text);margin-bottom:4px;">Weather Nourie · Fusion V3</div>
+      <div>NOAA / NWS · HRRR &amp; NBM · ECMWF Open Data · GEFS · WeatherNext AI · Open-Meteo / CAMS · USGS</div>
     </div>
   </footer>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
-  <script type="module" src="/weather-fusion/v3/js/app.js?v=globe-webgl-v4"></script>
+  <script type="module" src="/weather-fusion/v3/js/app.js?v=v3-cinematic-2"></script>
 </body>
 </html>
