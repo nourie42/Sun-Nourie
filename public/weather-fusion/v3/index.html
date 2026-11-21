@@ -465,7 +465,7 @@
 
   <dialog id="weather-globe-dialog" class="weather-globe-dialog" aria-labelledby="weather-globe-title">
     <header class="globe-dialog-header"><div><h2 id="weather-globe-title">Weather globe</h2><p id="globe-point-label"></p></div><button id="close-weather-globe" class="icon-btn" type="button" aria-label="Close globe">×</button></header>
-    <div class="globe-toolbar" role="group" aria-label="Weather globe layers"><button data-globe-layer="radar" class="mode-pill active" aria-pressed="true" type="button">Radar</button><button data-globe-layer="clouds" class="mode-pill active" aria-pressed="true" type="button">Satellite</button><button data-globe-layer="wind" class="mode-pill active" aria-pressed="true" type="button">Wind</button><button id="globe-recenter" class="mode-pill" type="button">⌖ My location</button><button id="globe-motion" class="mode-pill" type="button" aria-pressed="true">Pause motion</button></div>
+    <div class="globe-toolbar" role="group" aria-label="Weather globe layers"><button data-globe-layer="radar" class="mode-pill active" aria-pressed="true" type="button">Radar</button><button data-globe-layer="clouds" class="mode-pill active" aria-pressed="true" type="button">Satellite</button><button data-globe-layer="wind" class="mode-pill active" aria-pressed="true" type="button">Wind</button><button id="globe-recenter" class="mode-pill" type="button">⌖ My location</button><button id="globe-refresh" class="mode-pill" type="button">Refresh layers</button><button id="globe-motion" class="mode-pill" type="button" aria-pressed="true">Pause motion</button></div>
     <div id="globe-expanded-mount" class="globe-expanded-mount"></div>
     <div class="globe-view-controls"><button id="globe-zoom-in" class="icon-btn" type="button" aria-label="Zoom in">+</button><button id="globe-zoom-out" class="icon-btn" type="button" aria-label="Zoom out">−</button><span>Drag to rotate · Pinch or use + / − to zoom</span></div>
     <div class="globe-radar-time"><button id="globe-radar-play" class="mode-pill" type="button" aria-pressed="false">Play radar</button><input id="globe-radar-time" type="range" min="0" max="0" value="0" aria-label="Observed radar frame" /><output id="globe-radar-stamp">Radar loading…</output></div>
@@ -482,6 +482,6 @@
   </footer>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
-  <script type="module" src="/weather-fusion/v3/js/app.js?v=v3-globe-people-10"></script>
+  <script type="module" src="/weather-fusion/v3/js/app.js?v=v3-globe-people-11"></script>
 </body>
 </html>

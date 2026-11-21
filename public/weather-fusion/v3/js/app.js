@@ -29,7 +29,7 @@ import { dogWalkerScene, referenceScene } from '../../exposure-scene.js?v=true-n
 import { danCard, danOverview, danTakeDisplay } from '../../dans-summary.js?v=afd-discussion-section-v1';
 import { activeRiskOutlooks, outlookDetailHTML } from '../../risk-outlooks.js?v=risk-outlooks-v5';
 import { forecastWindowDetailHTML } from '../../forecast-window-banners.js?v=current-rain-20261017-v3';
-import {GlobePanel} from './globe-panel.js?v=globe-v1';
+import {GlobePanel} from './globe-panel.js?v=globe-v2';
 import {outlookItems,renderOutlookPanel,openOutlookNote} from '../../outlook-panel.js?v=compact-v1';
 
 const LEGACY_LOC_KEY = 'weather-nourie-v3-location';
