@@ -33,16 +33,13 @@ export const COMPARE_MODELS = [
 ];
 
 export const COMPARE_VARIABLES = [
-  { id: 'highTemp', label: 'Daily high temperature', unit: '°' },
-  { id: 'lowTemp', label: 'Daily low temperature', unit: '°' },
-  { id: 'qpf', label: 'Precipitation (in)', unit: '"', decimals: 2 },
-  { id: 'rainChance', label: 'Rain chance', unit: '%' },
-  { id: 'wind', label: 'Peak wind', unit: ' mph' },
-  { id: 'dewPoint', label: 'Peak dewpoint', unit: '°' },
-  { id: 'cloudCover', label: 'Cloud cover', unit: '%' },
-  { id: 'uvIndex', label: 'UV Index', unit: '', decimals: 1 },
-  { id: 'snow', label: 'Snowfall', unit: '"', decimals: 1 },
-  { id: 'aqi', label: 'Air quality (AQI)', unit: '' }
+  { id: 'highTemp', label: 'High Temp', unit: '°' },
+  { id: 'lowTemp', label: 'Low Temp', unit: '°' },
+  { id: 'rainChance', label: 'Rain Chance', unit: '%', min: 0, max: 100 },
+  { id: 'qpf', label: 'Rain Amount', unit: '"', decimals: 2, min: 0 },
+  { id: 'wind', label: 'Peak Wind', unit: ' mph', min: 0 },
+  { id: 'dewPoint', label: 'Dew Point', unit: '°' },
+  { id: 'cloudCover', label: 'Cloud Cover', unit: '%', min: 0, max: 100 }
 ];
 
 /**
@@ -354,44 +351,22 @@ export function renderHourlyExplorerChart({
  */
 export function extractDayModelCompareValue(day, modelId, variableId = 'highTemp', useCelsius = false) {
   if (!day) return null;
-  const convT = (f) => (f === null || f === undefined ? null : useCelsius ? Math.round(((f - 32) * 5) / 9) : f);
+  const convT = (f) => (f === null || f === undefined || Number.isNaN(f) ? null : useCelsius ? Math.round(((f - 32) * 5) / 9) : f);
   switch (variableId) {
     case 'highTemp':
-      return convT(modelId === 'blend' ? day.highF : day.modelHighs?.[modelId]);
+      return convT(modelId === 'blend' ? day.highF : day.modelHighs?.[modelId] ?? null);
     case 'lowTemp':
-      return convT(modelId === 'blend' ? day.lowF : day.modelLows?.[modelId]);
+      return convT(modelId === 'blend' ? day.lowF : day.modelLows?.[modelId] ?? null);
     case 'qpf':
-      return modelId === 'blend' ? day.totalQpfIn : day.modelQpf?.[modelId];
+      return modelId === 'blend' ? day.totalQpfIn : (day.modelQpf?.[modelId] ?? null);
     case 'rainChance':
-      return modelId === 'blend' ? day.rainChance : day.modelRainChance?.[modelId];
-    case 'wind': {
-      if (modelId === 'blend') return day.maxWindMph;
-      if (modelId === 'hrrr' && day.index > 2) return null;
-      const offset = { nws: 0, hrrr: 2, nbm: -1, ecmwf: 1, gefs: -2, weathernext: 0 }[modelId] || 0;
-      return Math.max(2, day.maxWindMph + offset);
-    }
-    case 'dewPoint': {
-      const base = day.maxDewPointF;
-      if (modelId === 'blend') return convT(base);
-      if (modelId === 'hrrr' && day.index > 2) return null;
-      const offset = { nws: -1, hrrr: 1, nbm: 0, ecmwf: 1.5, gefs: -1.5, weathernext: 0.5 }[modelId] || 0;
-      return convT(Math.round(base + offset));
-    }
-    case 'cloudCover': {
-      if (modelId === 'blend') return day.avgCloudCover;
-      if (modelId === 'hrrr' && day.index > 2) return null;
-      const offset = { nws: 3, hrrr: -4, nbm: 0, ecmwf: 5, gefs: -3, weathernext: 2 }[modelId] || 0;
-      return clamp(day.avgCloudCover + offset, 0, 100);
-    }
-    case 'uvIndex':
-      if (modelId === 'hrrr' && day.index > 2) return null;
-      return day.maxUvIndex;
-    case 'snow':
-      if (modelId === 'hrrr' && day.index > 2) return null;
-      return day.totalSnowIn;
-    case 'aqi':
-      if (modelId === 'hrrr' && day.index > 2) return null;
-      return day.maxAqi;
+      return modelId === 'blend' ? day.rainChance : (day.modelRainChance?.[modelId] ?? null);
+    case 'wind':
+      return modelId === 'blend' ? day.maxWindMph : (day.modelWind?.[modelId] ?? null);
+    case 'dewPoint':
+      return convT(modelId === 'blend' ? day.maxDewPointF : (day.modelDewPoint?.[modelId] ?? null));
+    case 'cloudCover':
+      return modelId === 'blend' ? day.avgCloudCover : (day.modelCloudCover?.[modelId] ?? null);
     default:
       return convT(day.highF);
   }
@@ -413,13 +388,13 @@ export function renderModelCompareChart({
   const variable = COMPARE_VARIABLES.find((v) => v.id === variableId) || COMPARE_VARIABLES[0];
   const getDayModelValue = (day, modelId) => extractDayModelCompareValue(day, modelId, variableId, useCelsius);
 
-  // Use a 460px-wide coordinate space so SVG text stays large and crisp on mobile screens
-  const W = 460;
-  const H = 310;
-  const padL = 48;
-  const padR = 26;
-  const padT = 34;
-  const padB = 48;
+  // 340px-wide native coordinate space -> 1:1 physical pixel scale on mobile with zero shrinking
+  const W = 340;
+  const H = 285;
+  const padL = 50;
+  const padR = 24;
+  const padT = 32;
+  const padB = 50;
   const plotW = W - padL - padR;
   const plotH = H - padT - padB;
 
@@ -432,19 +407,21 @@ export function renderModelCompareChart({
     });
   });
 
-  // Tight bounds so model differences stand out clearly (not zoomed way out!)
+  // Tight bounds so real model differences stand out clearly, while clamping percentages 0..100%
   let minV = allNums.length ? Math.min(...allNums) : 40;
   let maxV = allNums.length ? Math.max(...allNums) : 80;
   if (maxV - minV < (variable.decimals ? 0.35 : 4)) {
-    minV = Math.max(0, minV - (variable.decimals ? 0.15 : 2));
-    maxV += variable.decimals ? 0.2 : 2.5;
+    minV = minV - (variable.decimals ? 0.15 : 2);
+    maxV = maxV + (variable.decimals ? 0.2 : 3);
   } else {
     const span = maxV - minV;
     minV = Math.floor(minV - span * 0.08);
     maxV = Math.ceil(maxV + span * 0.12);
-    if (['qpf', 'rainChance', 'wind', 'cloudCover', 'uvIndex', 'snow', 'aqi'].includes(variableId)) {
-      minV = Math.max(0, minV);
-    }
+  }
+  if (variable.min !== undefined) minV = Math.max(variable.min, minV);
+  if (variable.max !== undefined) {
+    maxV = Math.min(variable.max, maxV);
+    if (maxV - minV < 10) minV = Math.max(variable.min ?? 0, maxV - 10);
   }
 
   const xForDay = (i) => padL + (i / Math.max(1, visibleDays.length - 1)) * plotW;
@@ -468,29 +445,34 @@ export function renderModelCompareChart({
         pts.push({ x: xForDay(idx), y: yForVal(val), val, dayIdx: idx });
       }
     });
-    if (pts.length < 2) return '';
-    const pathD = buildSmoothSvgPath(pts, 0.18);
+    if (pts.length === 0) return '';
+    const pathD = pts.length >= 2 ? buildSmoothSvgPath(pts, 0.18) : '';
     const isBlend = m.id === 'blend';
     return `
       <g class="compare-model-series" data-model="${m.id}">
         ${
-          isBlend
-            ? `<path d="${pathD}" fill="none" stroke="rgba(6, 16, 34, 0.92)" stroke-width="9.5" stroke-linecap="round"/>`
+          pathD && isBlend
+            ? `<path d="${pathD}" fill="none" stroke="rgba(6, 16, 34, 0.92)" stroke-width="8.5" stroke-linecap="round"/>`
             : ''
         }
-        <path d="${pathD}" fill="none" stroke="${m.color}" stroke-width="${isBlend ? 5.4 : m.width}" stroke-dasharray="${m.dash || ''}" stroke-linecap="round" stroke-linejoin="round" opacity="${isBlend ? '1' : '0.9'}"/>
+        ${
+          pathD
+            ? `<path d="${pathD}" fill="none" stroke="${m.color}" stroke-width="${isBlend ? 4.8 : 2.2}" stroke-dasharray="${m.dash || ''}" stroke-linecap="round" stroke-linejoin="round" opacity="${isBlend ? '1' : '0.92'}"/>`
+            : ''
+        }
         ${pts
           .map((p, idx) => {
             const isSel = p.dayIdx === selIdx;
-            const showLabel = isBlend && (isSel || visibleDays.length <= 7 || idx % 2 === 0);
+            const showLabel = isBlend && (isSel || visibleDays.length <= 5 || idx % 2 === 0);
             const pillY = p.y - 16 < 16 ? p.y + 22 : p.y - 16;
+            const pillX = clamp(p.x, padL + 16, W - 26);
             return `
-              <circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="${isBlend ? (isSel ? '7' : '5') : (isSel ? '4.8' : '3.2')}" fill="${m.color}" stroke="#081426" stroke-width="${isBlend ? '2.2' : '1.2'}"/>
+              <circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="${isBlend ? (isSel ? '6' : '4.5') : (isSel ? '4.2' : '2.8')}" fill="${m.color}" stroke="#081426" stroke-width="${isBlend ? '2' : '1.1'}"/>
               ${
                 showLabel
-                  ? `<g transform="translate(${p.x.toFixed(1)}, ${pillY.toFixed(1)})">
-                      <rect x="-24" y="-15" width="48" height="21" rx="9" fill="${isSel ? 'rgba(14, 165, 233, 0.96)' : 'rgba(8, 19, 38, 0.94)'}" stroke="${isSel ? '#ffffff' : 'rgba(255, 255, 255, 0.5)'}" stroke-width="${isSel ? '1.5' : '1'}"/>
-                      <text text-anchor="middle" y="0" fill="#ffffff" font-size="13.5" font-weight="800">${
+                  ? `<g transform="translate(${pillX.toFixed(1)}, ${pillY.toFixed(1)})">
+                      <rect x="-22" y="-14" width="44" height="20" rx="8" fill="${isSel ? 'rgba(14, 165, 233, 0.96)' : 'rgba(8, 19, 38, 0.94)'}" stroke="${isSel ? '#ffffff' : 'rgba(255, 255, 255, 0.5)'}" stroke-width="${isSel ? '1.4' : '1'}"/>
+                      <text text-anchor="middle" y="0" fill="#ffffff" font-size="12.5" font-weight="800">${
                         variable.decimals ? p.val.toFixed(variable.decimals) : Math.round(p.val)
                       }${variable.unit}</text>
                     </g>`
@@ -519,12 +501,12 @@ export function renderModelCompareChart({
         .map(
           (t) => `
         <line x1="${padL}" y1="${t.y.toFixed(1)}" x2="${W - padR}" y2="${t.y.toFixed(1)}" stroke="rgba(255,255,255,0.12)"/>
-        <text x="${padL - 8}" y="${(t.y + 5).toFixed(1)}" text-anchor="end" fill="#dcebff" font-size="14" font-weight="700">${t.label}</text>
+        <text x="${padL - 7}" y="${(t.y + 4.5).toFixed(1)}" text-anchor="end" fill="#dcebff" font-size="12.5" font-weight="700">${t.label}</text>
       `
         )
         .join('')}
 
-      <line x1="${selX.toFixed(1)}" y1="${padT}" x2="${selX.toFixed(1)}" y2="${padT + plotH}" stroke="rgba(122, 198, 255, 0.72)" stroke-width="2" stroke-dasharray="4 4"/>
+      <line x1="${selX.toFixed(1)}" y1="${padT}" x2="${selX.toFixed(1)}" y2="${padT + plotH}" stroke="rgba(122, 198, 255, 0.72)" stroke-width="1.8" stroke-dasharray="4 4"/>
 
       ${modelPathsSvg}
 
@@ -533,12 +515,12 @@ export function renderModelCompareChart({
           const x = xForDay(i).toFixed(1);
           const dateNum = d.dateLabel.replace(/^[A-Za-z]+\s+/, '');
           const isSel = i === selIdx;
-          const labelStep = visibleDays.length > 8 && i % 2 === 1 && !isSel;
+          const labelStep = visibleDays.length > 7 && i % 2 === 1 && !isSel;
           if (labelStep) return '';
           return `
             <g>
-              <text x="${x}" y="${H - 22}" text-anchor="middle" fill="${isSel ? '#ffffff' : '#d2e4fc'}" font-size="14" font-weight="${isSel ? '800' : '700'}">${d.shortWeekday}</text>
-              <text x="${x}" y="${H - 6}" text-anchor="middle" fill="${isSel ? '#7dd3fc' : 'rgba(190,214,248,0.75)'}" font-size="11.5" font-weight="600">${d.index === 0 ? d.dateLabel : dateNum}</text>
+              <text x="${x}" y="${H - 25}" text-anchor="middle" fill="${isSel ? '#ffffff' : '#d2e4fc'}" font-size="13.5" font-weight="${isSel ? '800' : '700'}">${d.shortWeekday}</text>
+              <text x="${x}" y="${H - 8}" text-anchor="middle" fill="${isSel ? '#7dd3fc' : 'rgba(190,214,248,0.82)'}" font-size="11.5" font-weight="600">${d.index === 0 ? d.dateLabel : dateNum}</text>
             </g>
           `;
         })
@@ -663,8 +645,8 @@ export function renderDewPointFeelChart({
 }
 
 /**
- * Renders all 24 upcoming hours in the "Next 24 Hours" smooth luminous spline card
- * (Temp | Feels Like | Rain | Wind) inside a swipeable horizontal track with scroll arrows.
+ * Renders ALL 24 upcoming hours in the "Next 24 Hours" card on screen simultaneously
+ * (Zero horizontal scrolling!) with 8 evenly spaced 3-hour anchor icons/values + interactive 24-hour scrubber.
  */
 export function renderNext24HoursSplineChart({
   containerEl,
@@ -677,9 +659,6 @@ export function renderNext24HoursSplineChart({
 }) {
   if (!containerEl || !Array.isArray(hours) || hours.length === 0) return;
 
-  const prevScroll = containerEl.querySelector('.n24-scroll-wrap')?.scrollLeft ?? 0;
-
-  // Render ALL 24 upcoming hours (Now .. +23h)
   const slice = hours.slice(0, 24);
   const convT = (f) => (useCelsius ? Math.round(((f - 32) * 5) / 9) : Math.round(f));
 
@@ -691,11 +670,18 @@ export function renderNext24HoursSplineChart({
   };
   const fmtVal = (v) => {
     if (metricId === 'rain') return `${v}%`;
+    if (metricId === 'wind') return `${v} mph`;
+    return `${v}°`;
+  };
+  const fmtShort = (v) => {
+    if (metricId === 'rain') return `${v}%`;
     if (metricId === 'wind') return `${v}`;
     return `${v}°`;
   };
-  const unitSuffix = metricId === 'rain' ? '%' : metricId === 'wind' ? ' mph' : '°';
+  const compactTime = (lbl, idx) =>
+    idx === 0 ? 'Now' : String(lbl || '').replace(/AM$/i, 'a').replace(/PM$/i, 'p');
 
+  const unitSuffix = metricId === 'rain' ? '%' : metricId === 'wind' ? '' : '°';
   const vals = slice.map(getVal);
   let minVal = metricId === 'rain' || metricId === 'wind' ? 0 : Math.min(...vals);
   let maxVal = metricId === 'rain' ? Math.max(40, Math.max(...vals)) : Math.max(...vals);
@@ -710,33 +696,30 @@ export function renderNext24HoursSplineChart({
     maxVal = Math.max(12, Math.ceil((maxVal + 4) / 5) * 5);
   }
 
-  const colPx = 58;
+  // Native 340px width fits 1:1 inside mobile card with zero scrolling & large readable text
+  const W = 340;
+  const H = 160;
   const padL = 42;
-  const padR = 18;
-  const W = padL + slice.length * colPx + padR;
-  const H = 154;
-  const padT = 32;
-  const padB = 16;
+  const padR = 14;
+  const padT = 26;
+  const padB = 12;
   const plotW = W - padL - padR;
   const plotH = H - padT - padB;
 
-  const colW = plotW / slice.length;
-  const xForIdx = (i) => padL + colW * (i + 0.5);
+  const xForIdx = (i) => padL + (i / Math.max(1, slice.length - 1)) * plotW;
   const yForVal = (v) => padT + plotH - clamp((v - minVal) / (maxVal - minVal || 1), 0, 1) * plotH;
 
   const points = vals.map((v, i) => ({ x: xForIdx(i), y: yForVal(v), val: v, hour: slice[i] }));
-  const smoothPath = buildSmoothSvgPath(points, 0.2);
-  const cIdx = smoothPath.indexOf('C');
-  const curveTail = cIdx >= 0 ? smoothPath.slice(cIdx) : '';
-  const areaPath = `M ${padL} ${(padT + plotH).toFixed(1)} L ${points[0].x.toFixed(1)} ${points[0].y.toFixed(1)} ${curveTail} L ${(W - padR).toFixed(1)} ${points[points.length - 1].y.toFixed(1)} L ${(W - padR).toFixed(1)} ${(padT + plotH).toFixed(1)} Z`;
+  const smoothPath = buildSmoothSvgPath(points, 0.22);
+  const areaPath = `${smoothPath} L ${points[points.length - 1].x.toFixed(1)} ${(padT + plotH).toFixed(1)} L ${points[0].x.toFixed(1)} ${(padT + plotH).toFixed(1)} Z`;
 
-  const tickCount = 4;
+  const tickCount = 3;
   const yTicks = [];
   for (let t = 0; t <= tickCount; t++) {
     const v = minVal + ((maxVal - minVal) * t) / tickCount;
     yTicks.push({
       y: yForVal(v),
-      label: `${Math.round(v)}${metricId === 'wind' ? '' : unitSuffix}`
+      label: `${Math.round(v)}${unitSuffix}`
     });
   }
 
@@ -748,100 +731,154 @@ export function renderNext24HoursSplineChart({
   const cMid = isRain ? '#60a5fa' : isWind ? '#38bdf8' : '#ffb347';
   const cEnd = isRain ? '#818cf8' : isWind ? '#7dd3fc' : '#38d9f5';
 
+  // 8 evenly spaced 3-hour anchor points across the full 24 hours
+  const anchorIndices = [0, 3, 6, 9, 12, 15, 18, 21].filter((idx) => idx < slice.length);
   const activeLocalIdx = clamp(selectedHourIdx, 0, slice.length - 1);
+  const activePt = points[activeLocalIdx];
+
+  const colDx = anchorIndices.length > 1 ? xForIdx(anchorIndices[1]) - xForIdx(anchorIndices[0]) : plotW / 8;
+  const footLeftPct = clamp(((xForIdx(anchorIndices[0]) - colDx / 2) / W) * 100, 0, 20);
+  const footRightPct = clamp(((W - (xForIdx(anchorIndices[anchorIndices.length - 1]) + colDx / 2)) / W) * 100, 0, 20);
+
+  const readoutText = (idx) => {
+    const h = slice[idx];
+    const lbl = idx === 0 ? 'Now' : h.hourLabel;
+    const vStr = fmtVal(vals[idx]);
+    return `<strong>${lbl}</strong> · <span style="color:${cMid};font-weight:800;">${vStr}</span> · ${h.condition} · 💧 ${h.rainChance}% · ${h.windMph} mph`;
+  };
 
   containerEl.innerHTML = `
-    <div class="n24-chart-shell">
-      <div class="n24-scroll-wrap">
-        <div class="n24-scroll-track" style="width:${W}px;">
-          <svg class="n24-svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="Next 24 hours ${metricId} spline chart">
-            <defs>
-              <linearGradient id="${strokeGradId}" x1="0%" y1="0%" x2="100%" y2="0%">
-                <stop offset="0%" stop-color="${cStart}"/>
-                <stop offset="55%" stop-color="${cMid}"/>
-                <stop offset="100%" stop-color="${cEnd}"/>
-              </linearGradient>
-              <linearGradient id="${fillGradId}" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stop-color="${cStart}" stop-opacity="0.46"/>
-                <stop offset="55%" stop-color="${cMid}" stop-opacity="0.16"/>
-                <stop offset="100%" stop-color="${cEnd}" stop-opacity="0.0"/>
-              </linearGradient>
-              <filter id="n24-glow" x="-5%" y="-25%" width="110%" height="150%">
-                <feGaussianBlur stdDeviation="3.5" result="blur"/>
-                <feMerge>
-                  <feMergeNode in="blur"/>
-                  <feMergeNode in="SourceGraphic"/>
-                </feMerge>
-              </filter>
-            </defs>
-
-            ${yTicks
-              .map(
-                (t) => `
-              <line x1="${padL}" y1="${t.y.toFixed(1)}" x2="${W - padR}" y2="${t.y.toFixed(1)}" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>
-              <text x="${padL - 8}" y="${(t.y + 4).toFixed(1)}" text-anchor="end" fill="rgba(210,226,250,0.78)" font-size="12.5" font-weight="600">${t.label}</text>
-            `
-              )
-              .join('')}
-
-            <path d="${areaPath}" fill="url(#${fillGradId})"/>
-            <path d="${smoothPath}" fill="none" stroke="url(#${strokeGradId})" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" filter="url(#n24-glow)"/>
-
-            ${points
-              .map(
-                (p, idx) => `
-              <g class="n24-pt ${idx === activeLocalIdx ? 'active' : ''}" data-h-idx="${idx}" style="cursor:pointer;">
-                <circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="${idx === activeLocalIdx ? '6.5' : '4.5'}" fill="#ffffff" stroke="${cStart}" stroke-width="${idx === activeLocalIdx ? '2.5' : '1.5'}"/>
-                <text x="${p.x.toFixed(1)}" y="${Math.max(18, p.y - 13).toFixed(1)}" text-anchor="middle" fill="#ffffff" font-size="15.5" font-weight="800">${fmtVal(p.val)}</text>
-              </g>
-            `
-              )
-              .join('')}
-          </svg>
-
-          <div class="n24-cols-footer" style="grid-template-columns:repeat(${slice.length}, 1fr);padding-left:${padL}px;padding-right:${padR}px;">
-            ${slice
-              .map((h, idx) => {
-                const lbl = idx === 0 ? 'Now' : h.hourLabel;
-                return `
-                  <button type="button" class="n24-col-btn ${idx === activeLocalIdx ? 'active' : ''}" data-h-idx="${idx}">
-                    <span class="n24-col-icon">${typeof renderIconFn === 'function' ? renderIconFn(h.icon, 26) : ''}</span>
-                    <span class="n24-col-time">${lbl}</span>
-                  </button>
-                `;
-              })
-              .join('')}
-          </div>
-        </div>
+    <div class="n24-chart-shell n24-no-scroll">
+      <div class="n24-live-readout">
+        <span id="n24-live-readout-text">${readoutText(activeLocalIdx)}</span>
+        <span class="n24-scrub-tip">All 24h · slide</span>
       </div>
 
-      <div class="n24-nav-hint">
-        <button type="button" class="n24-scroll-arrow" data-n24-scroll="-240" aria-label="Earlier hours">‹</button>
-        <span class="n24-scroll-label">All 24 Hours (${slice[0].hourLabel} → ${slice[slice.length - 1].hourLabel}) · Swipe or tap arrows</span>
-        <button type="button" class="n24-scroll-arrow" data-n24-scroll="240" aria-label="Later hours">›</button>
+      <svg class="n24-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Next 24 hours ${metricId} spline chart">
+        <defs>
+          <linearGradient id="${strokeGradId}" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stop-color="${cStart}"/>
+            <stop offset="55%" stop-color="${cMid}"/>
+            <stop offset="100%" stop-color="${cEnd}"/>
+          </linearGradient>
+          <linearGradient id="${fillGradId}" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="${cStart}" stop-opacity="0.44"/>
+            <stop offset="60%" stop-color="${cMid}" stop-opacity="0.14"/>
+            <stop offset="100%" stop-color="${cEnd}" stop-opacity="0.0"/>
+          </linearGradient>
+          <filter id="n24-glow" x="-5%" y="-25%" width="110%" height="150%">
+            <feGaussianBlur stdDeviation="2.5" result="blur"/>
+            <feMerge>
+              <feMergeNode in="blur"/>
+              <feMergeNode in="SourceGraphic"/>
+            </feMerge>
+          </filter>
+        </defs>
+
+        ${yTicks
+          .map(
+            (t) => `
+          <line x1="${padL}" y1="${t.y.toFixed(1)}" x2="${W - padR}" y2="${t.y.toFixed(1)}" stroke="rgba(255,255,255,0.09)" stroke-width="1"/>
+          <text x="${padL - 8}" y="${(t.y + 4).toFixed(1)}" text-anchor="end" fill="rgba(210,226,250,0.82)" font-size="11.5" font-weight="700">${t.label}</text>
+        `
+          )
+          .join('')}
+
+        <path d="${areaPath}" fill="url(#${fillGradId})"/>
+        <path d="${smoothPath}" fill="none" stroke="url(#${strokeGradId})" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round" filter="url(#n24-glow)"/>
+
+        <line id="n24-cursor-line" x1="${activePt.x.toFixed(1)}" y1="${padT - 4}" x2="${activePt.x.toFixed(1)}" y2="${(padT + plotH).toFixed(1)}" stroke="rgba(255,255,255,0.48)" stroke-width="1.4" stroke-dasharray="3 3"/>
+
+        ${anchorIndices
+          .map((idx) => {
+            const p = points[idx];
+            const valX = idx === 0 ? p.x + 8 : p.x;
+            return `
+              <g class="n24-anchor-pt" data-h-idx="${idx}" style="cursor:pointer;">
+                <circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="3.6" fill="#ffffff" stroke="${cStart}" stroke-width="1.5"/>
+                <text x="${valX.toFixed(1)}" y="${Math.max(15, p.y - 11).toFixed(1)}" text-anchor="middle" fill="#ffffff" font-size="12.5" font-weight="800">${fmtShort(p.val)}</text>
+              </g>
+            `;
+          })
+          .join('')}
+
+        <circle id="n24-cursor-dot" cx="${activePt.x.toFixed(1)}" cy="${activePt.y.toFixed(1)}" r="5.5" fill="#ffffff" stroke="${cStart}" stroke-width="2.4"/>
+      </svg>
+
+      <div class="n24-cols-footer-8" style="padding-left:${footLeftPct.toFixed(2)}%;padding-right:${footRightPct.toFixed(2)}%;">
+        ${anchorIndices
+          .map((idx) => {
+            const h = slice[idx];
+            const bucketIdx = Math.floor(activeLocalIdx / 3) * 3;
+            return `
+              <button type="button" class="n24-col-btn ${bucketIdx === idx ? 'active' : ''}" data-h-idx="${idx}">
+                <span class="n24-col-icon">${typeof renderIconFn === 'function' ? renderIconFn(h.icon, 24) : ''}</span>
+                <span class="n24-col-time">${compactTime(h.hourLabel, idx)}</span>
+              </button>
+            `;
+          })
+          .join('')}
       </div>
     </div>
   `;
 
-  const scrollWrap = containerEl.querySelector('.n24-scroll-wrap');
-  if (scrollWrap && prevScroll > 0) {
-    scrollWrap.scrollLeft = prevScroll;
+  const svg = containerEl.querySelector('.n24-svg');
+  const readoutSpan = containerEl.querySelector('#n24-live-readout-text');
+  const cursorLine = containerEl.querySelector('#n24-cursor-line');
+  const cursorDot = containerEl.querySelector('#n24-cursor-dot');
+
+  function updateVisualScrub(idx, commit = false) {
+    const clamped = clamp(idx, 0, slice.length - 1);
+    const p = points[clamped];
+    if (readoutSpan) readoutSpan.innerHTML = readoutText(clamped);
+    if (cursorLine) {
+      cursorLine.setAttribute('x1', p.x.toFixed(1));
+      cursorLine.setAttribute('x2', p.x.toFixed(1));
+    }
+    if (cursorDot) {
+      cursorDot.setAttribute('cx', p.x.toFixed(1));
+      cursorDot.setAttribute('cy', p.y.toFixed(1));
+    }
+    const bucketIdx = Math.floor(clamped / 3) * 3;
+    containerEl.querySelectorAll('.n24-col-btn').forEach((btn) => {
+      btn.classList.toggle('active', Number(btn.dataset.hIdx) === bucketIdx);
+    });
+    if (typeof onSelectHour === 'function') {
+      onSelectHour(clamped, { commit });
+    }
   }
 
-  containerEl.querySelectorAll('[data-n24-scroll]').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      const delta = Number(btn.dataset.n24Scroll) || 0;
-      scrollWrap?.scrollBy({ left: delta, behavior: 'smooth' });
+  if (svg) {
+    let dragging = false;
+    const idxFromClientX = (clientX) => {
+      const rect = svg.getBoundingClientRect();
+      const relX = ((clientX - rect.left) / Math.max(1, rect.width)) * W;
+      const ratio = clamp((relX - padL) / plotW, 0, 1);
+      return Math.round(ratio * (slice.length - 1));
+    };
+    svg.addEventListener('pointerdown', (e) => {
+      dragging = true;
+      updateVisualScrub(idxFromClientX(e.clientX), false);
+      window.addEventListener(
+        'pointerup',
+        () => {
+          dragging = false;
+        },
+        { once: true, passive: true }
+      );
+    });
+    svg.addEventListener('pointermove', (e) => {
+      if (dragging || e.pointerType === 'mouse') {
+        updateVisualScrub(idxFromClientX(e.clientX), false);
+      }
+    });
+  }
+
+  containerEl.querySelectorAll('[data-h-idx]').forEach((el) => {
+    el.addEventListener('click', () => {
+      updateVisualScrub(Number(el.dataset.hIdx) || 0, true);
     });
   });
-
-  if (typeof onSelectHour === 'function') {
-    containerEl.querySelectorAll('[data-h-idx]').forEach((el) => {
-      el.addEventListener('click', () => {
-        onSelectHour(Number(el.dataset.hIdx) || 0);
-      });
-    });
-  }
 }
 
 /**
@@ -871,11 +908,12 @@ export function renderSevenDayDualSplineChart({
     maxVal += 5;
   }
 
-  const W = 700;
-  const H = 178;
-  const padL = 46;
-  const padR = 20;
-  const padT = 32;
+  // Native 350px coordinate space renders at ~1:1 scale on phones for ~2x larger, ultra-legible labels
+  const W = 350;
+  const H = 192;
+  const padL = 34;
+  const padR = 10;
+  const padT = 28;
   const padB = 28;
   const plotW = W - padL - padR;
   const plotH = H - padT - padB;
@@ -929,7 +967,7 @@ export function renderSevenDayDualSplineChart({
             <stop offset="100%" stop-color="#0ea5e9" stop-opacity="0.0"/>
           </linearGradient>
           <filter id="d7-glow" x="-10%" y="-20%" width="120%" height="140%">
-            <feGaussianBlur stdDeviation="3" result="blur"/>
+            <feGaussianBlur stdDeviation="2.5" result="blur"/>
             <feMerge>
               <feMergeNode in="blur"/>
               <feMergeNode in="SourceGraphic"/>
@@ -940,8 +978,8 @@ export function renderSevenDayDualSplineChart({
         ${yTicks
           .map(
             (t) => `
-          <line x1="${padL}" y1="${t.y.toFixed(1)}" x2="${W - padR}" y2="${t.y.toFixed(1)}" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>
-          <text x="${padL - 10}" y="${(t.y + 4).toFixed(1)}" text-anchor="end" fill="rgba(198,215,240,0.7)" font-size="13" font-weight="500">${t.label}</text>
+          <line x1="${padL}" y1="${t.y.toFixed(1)}" x2="${W - padR}" y2="${t.y.toFixed(1)}" stroke="rgba(255,255,255,0.09)" stroke-width="1"/>
+          <text x="${padL - 6}" y="${(t.y + 4).toFixed(1)}" text-anchor="end" fill="rgba(210,226,250,0.82)" font-size="11.5" font-weight="600">${t.label}</text>
         `
           )
           .join('')}
@@ -950,15 +988,15 @@ export function renderSevenDayDualSplineChart({
         ${hiPts
           .map(
             (hp, idx) => `
-          <line x1="${hp.x.toFixed(1)}" y1="${hp.y.toFixed(1)}" x2="${hp.x.toFixed(1)}" y2="${(padT + plotH).toFixed(1)}" stroke="${idx === activeIdx ? 'rgba(255,255,255,0.34)' : 'rgba(255,255,255,0.12)'}" stroke-width="${idx === activeIdx ? '1.5' : '1'}"/>
+          <line x1="${hp.x.toFixed(1)}" y1="${hp.y.toFixed(1)}" x2="${hp.x.toFixed(1)}" y2="${(padT + plotH).toFixed(1)}" stroke="${idx === activeIdx ? 'rgba(255,255,255,0.38)' : 'rgba(255,255,255,0.12)'}" stroke-width="${idx === activeIdx ? '1.5' : '1'}"/>
         `
           )
           .join('')}
 
         <polygon points="${bandPts}" fill="url(#d7-band-fill)"/>
         <path d="${loAreaPath}" fill="url(#d7-lo-fill)"/>
-        <path d="${hiPath}" fill="none" stroke="url(#d7-hi-stroke)" stroke-width="3.6" stroke-linecap="round" filter="url(#d7-glow)"/>
-        <path d="${loPath}" fill="none" stroke="url(#d7-lo-stroke)" stroke-width="3.2" stroke-linecap="round" filter="url(#d7-glow)"/>
+        <path d="${hiPath}" fill="none" stroke="url(#d7-hi-stroke)" stroke-width="3.4" stroke-linecap="round" filter="url(#d7-glow)"/>
+        <path d="${loPath}" fill="none" stroke="url(#d7-lo-stroke)" stroke-width="3.0" stroke-linecap="round" filter="url(#d7-glow)"/>
 
         ${hiPts
           .map((hp, idx) => {
@@ -966,10 +1004,10 @@ export function renderSevenDayDualSplineChart({
             const isSel = idx === activeIdx;
             return `
               <g data-d7-idx="${idx}" style="cursor:pointer;">
-                <circle cx="${hp.x.toFixed(1)}" cy="${hp.y.toFixed(1)}" r="${isSel ? '5.5' : '4'}" fill="#ffffff" stroke="#ff7a3d" stroke-width="1.6"/>
-                <text x="${hp.x.toFixed(1)}" y="${Math.max(17, hp.y - 12).toFixed(1)}" text-anchor="middle" fill="#ffffff" font-size="15.5" font-weight="700">${hp.val}°</text>
-                <circle cx="${lp.x.toFixed(1)}" cy="${lp.y.toFixed(1)}" r="${isSel ? '5.5' : '4'}" fill="#ffffff" stroke="#38bdf8" stroke-width="1.6"/>
-                <text x="${lp.x.toFixed(1)}" y="${Math.min(H - 6, lp.y + 21).toFixed(1)}" text-anchor="middle" fill="#9cd8ff" font-size="15" font-weight="600">${lp.val}°</text>
+                <circle cx="${hp.x.toFixed(1)}" cy="${hp.y.toFixed(1)}" r="${isSel ? '4.8' : '3.6'}" fill="#ffffff" stroke="#ff7a3d" stroke-width="1.6"/>
+                <text x="${hp.x.toFixed(1)}" y="${Math.max(15, hp.y - 10).toFixed(1)}" text-anchor="middle" fill="#ffffff" font-size="13.5" font-weight="800">${hp.val}°</text>
+                <circle cx="${lp.x.toFixed(1)}" cy="${lp.y.toFixed(1)}" r="${isSel ? '4.8' : '3.6'}" fill="#ffffff" stroke="#38bdf8" stroke-width="1.6"/>
+                <text x="${lp.x.toFixed(1)}" y="${Math.min(H - 6, lp.y + 18).toFixed(1)}" text-anchor="middle" fill="#9cd8ff" font-size="13" font-weight="700">${lp.val}°</text>
               </g>
             `;
           })
@@ -981,7 +1019,7 @@ export function renderSevenDayDualSplineChart({
           .map(
             (d, idx) => `
           <button type="button" class="d7-col-btn ${idx === activeIdx ? 'active' : ''}" data-d7-idx="${idx}">
-            <span class="d7-col-icon">${typeof renderIconFn === 'function' ? renderIconFn(d.icon, 28) : ''}</span>
+            <span class="d7-col-icon">${typeof renderIconFn === 'function' ? renderIconFn(d.icon, 26) : ''}</span>
             <span class="d7-col-day">${d.shortWeekday}</span>
             <span class="d7-col-date">${d.dateLabel}</span>
             <span class="d7-col-rain ${d.rainChance >= 35 ? 'wet' : ''}">💧 ${d.rainChance}%</span>

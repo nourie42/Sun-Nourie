@@ -62,7 +62,7 @@ export function renderWeatherIconSvg(iconId = 'partly-day', size = 48) {
 
     case 'drizzle':
       return `<svg class="wx-svg wx-drizzle" width="${size}" height="${size}" viewBox="0 0 64 64" fill="none">
-        <circle cx="23" cy="21" r="8" fill="#FFD15C" opacity="0.9"/>
+        <path d="M24 38h22a8 8 0 0 0 1-15.9A11 11 0 0 0 26 19.5a7.5 7.5 0 0 0-2 18.5z" fill="rgba(148,172,208,0.58)"/>
         <path d="M19 43h25a9.5 9.5 0 0 0 1.2-18.9A13 13 0 0 0 20.5 21 9 9 0 0 0 19 43z" fill="rgba(220,234,255,0.92)"/>
         <g stroke="#6EC6FF" stroke-width="2.4" stroke-linecap="round">
           <line x1="24" y1="48" x2="22" y2="54"/>

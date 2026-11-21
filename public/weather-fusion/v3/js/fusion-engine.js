@@ -272,10 +272,10 @@ export function describeWeatherCondition(wmoCode, rainChance, tempF, isDay = tru
     return { label: 'Scattered Showers', icon: 'drizzle', sky: 'rain' };
   }
   if ([45, 48].includes(wmoCode)) {
-    return { label: 'Fog & Mist', icon: 'fog', sky: isDay ? 'day' : 'night' };
+    return { label: 'Fog & Mist', icon: 'fog', sky: isDay ? 'cloudy' : 'night' };
   }
   if (wmoCode >= 3) {
-    return { label: 'Mostly Cloudy', icon: 'cloudy', sky: isDay ? 'day' : 'night' };
+    return { label: 'Mostly Cloudy', icon: 'cloudy', sky: isDay ? 'cloudy' : 'night' };
   }
   if (wmoCode === 2) {
     return { label: 'Partly Cloudy', icon: isDay ? 'partly-day' : 'partly-night', sky: isDay ? 'day' : 'night' };
@@ -291,11 +291,7 @@ export function describeWeatherCondition(wmoCode, rainChance, tempF, isDay = tru
  */
 export async function searchLocations(query) {
   const q = (query || '').trim();
-  if (!q) return PRESET_CITIES;
-
-  const localMatches = PRESET_CITIES.filter((c) =>
-    c.name.toLowerCase().includes(q.toLowerCase())
-  );
+  if (!q) return [];
 
   const hasStreetOrZip = /\d/.test(q) || q.includes(',');
 
@@ -368,8 +364,8 @@ export async function searchLocations(query) {
 
   const batches = await Promise.all(queries);
   const combined = hasStreetOrZip
-    ? [...batches[1], ...batches[0], ...localMatches]
-    : [...batches[0], ...batches[2], ...batches[1], ...localMatches];
+    ? [...batches[1], ...batches[0]]
+    : [...batches[0], ...batches[2], ...batches[1]];
 
   const seen = new Set();
   return combined.filter((loc) => {
@@ -620,6 +616,33 @@ function cardinalToDeg(cardinal) {
   return idx >= 0 ? idx * 22.5 : null;
 }
 
+function extractCanonModelMap(seriesPt, blendObj = null) {
+  const map = new Map();
+  const lists = [
+    blendObj?.comparisonSources,
+    blendObj?.sources,
+    seriesPt?.comparisonSources,
+    seriesPt?.sources
+  ];
+  for (const list of lists) {
+    if (!Array.isArray(list)) continue;
+    for (const s of list) {
+      if (!s?.id || typeof s.value !== 'number' || !Number.isFinite(s.value)) continue;
+      const key = s.id === 'wn' || s.id === 'weathernext3' ? 'weathernext' : s.id;
+      if (!map.has(key) || s.id === 'weathernext3') {
+        map.set(key, s.value);
+      }
+    }
+  }
+  return map;
+}
+
+function roundFinite(val, decimals = 0) {
+  if (typeof val !== 'number' || !Number.isFinite(val)) return null;
+  if (decimals <= 0) return Math.round(val);
+  return Number(val.toFixed(decimals));
+}
+
 /**
  * Constructs the full Weather Nourie Fusion data structure
  * prioritizing canonical backend data from /api/weather-fusion/forecast.
@@ -791,31 +814,50 @@ export function buildUnifiedFusionPayload(loc, baseData, multiModelData, aqiData
       (bIdx !== undefined ? baseData?.hourly?.weather_code?.[bIdx] : undefined) ??
       (cloudCover > 75 ? 3 : cloudCover > 35 ? 2 : 0);
 
-    // Individual Model Temperatures: prefer canonical backend comparisonSources, then Open-Meteo multi-model
-    const canonCompMap = new Map();
-    (ch?.temperatureBlend?.comparisonSources || csTemp?.comparisonSources || ch?.temperatureBlend?.sources || csTemp?.sources || []).forEach((s) => {
-      if (s?.id && typeof s.value === 'number') canonCompMap.set(s.id, s.value);
-    });
+    // Individual Model Temperatures, Wind, Dew Point, Cloud Cover & Precip:
+    // Use ONLY real backend canonical model values + Open-Meteo named models when live API data is active (no synthetic constant/sine offsets!).
+    const mmH = multiModelData?.hourly;
+    const pickMm = (field, modelSuffix) =>
+      mmIdx !== undefined ? mmH?.[`${field}_${modelSuffix}`]?.[mmIdx] : undefined;
 
-    const mmNbm = mmIdx !== undefined ? (multiModelData?.hourly?.temperature_2m_gfs_seamless?.[mmIdx] ?? multiModelData?.hourly?.temperature_2m_best_match?.[mmIdx]) : undefined;
-    const mmEcmwf = mmIdx !== undefined ? multiModelData?.hourly?.temperature_2m_ecmwf_ifs025?.[mmIdx] : undefined;
-    const mmGefs = mmIdx !== undefined ? multiModelData?.hourly?.temperature_2m_icon_seamless?.[mmIdx] : undefined;
+    const canonCompMap = extractCanonModelMap(csTemp, ch?.temperatureBlend);
+    const mmNbm = pickMm('temperature_2m', 'gfs_seamless') ?? pickMm('temperature_2m', 'best_match');
+    const mmEcmwf = pickMm('temperature_2m', 'ecmwf_ifs025');
+    const mmGefs = pickMm('temperature_2m', 'icon_seamless');
 
-    const nbmTemp = canonCompMap.get('nbm') ?? mmNbm ?? rawBaseTemp;
-    const ecmwfTemp = canonCompMap.get('ecmwf') ?? mmEcmwf ?? (rawBaseTemp + Math.sin(i * 0.19 + 1.1) * 2.1);
-    const gefsTemp = canonCompMap.get('gefs') ?? mmGefs ?? (rawBaseTemp - Math.cos(i * 0.14) * 1.7);
-    const nwsTemp = canonCompMap.get('nws') ?? ch?.officialTemperature ?? nwsData?.nwsHourlyMap?.get(isoTime.slice(0, 13))?.tempF ?? (nbmTemp * 0.65 + ecmwfTemp * 0.35 + Math.sin(i * 0.25) * 0.9);
-    const hrrrTemp = canonCompMap.get('hrrr') ?? (i < 48 ? (bIdx !== undefined && baseData?.hourly?.temperature_2m?.[bIdx] != null ? baseData.hourly.temperature_2m[bIdx] : rawBaseTemp + Math.cos(i * 0.31) * 1.4) : null);
-    const wnTemp = canonCompMap.get('wn') ?? canonCompMap.get('weathernext3') ?? (ecmwfTemp * 0.55 + nbmTemp * 0.45 + Math.sin(i * 0.12) * 0.8);
+    let modelTemps;
+    if (isLiveApi) {
+      const nbmTemp = canonCompMap.get('nbm') ?? mmNbm ?? null;
+      const ecmwfTemp = canonCompMap.get('ecmwf') ?? mmEcmwf ?? null;
+      const gefsTemp = canonCompMap.get('gefs') ?? mmGefs ?? null;
+      const nwsTemp = canonCompMap.get('nws') ?? ch?.officialTemperature ?? nwsData?.nwsHourlyMap?.get(isoTime.slice(0, 13))?.tempF ?? null;
+      const hrrrTemp = canonCompMap.get('hrrr') ?? null;
+      const wnTemp = canonCompMap.get('weathernext') ?? null;
 
-    const modelTemps = {
-      nws: Number(Number(nwsTemp).toFixed(1)),
-      hrrr: hrrrTemp !== null && hrrrTemp !== undefined ? Number(Number(hrrrTemp).toFixed(1)) : null,
-      nbm: Number(Number(nbmTemp).toFixed(1)),
-      ecmwf: Number(Number(ecmwfTemp).toFixed(1)),
-      gefs: Number(Number(gefsTemp).toFixed(1)),
-      weathernext: Number(Number(wnTemp).toFixed(1))
-    };
+      modelTemps = {
+        nws: roundFinite(nwsTemp, 1),
+        hrrr: roundFinite(hrrrTemp, 1),
+        nbm: roundFinite(nbmTemp, 1),
+        ecmwf: roundFinite(ecmwfTemp, 1),
+        gefs: roundFinite(gefsTemp, 1),
+        weathernext: roundFinite(wnTemp, 1)
+      };
+    } else {
+      const nbmTemp = mmNbm ?? rawBaseTemp;
+      const ecmwfTemp = mmEcmwf ?? (rawBaseTemp + Math.sin(i * 0.19 + 1.1) * 2.1);
+      const gefsTemp = mmGefs ?? (rawBaseTemp - Math.cos(i * 0.14) * 1.7);
+      const nwsTemp = nbmTemp * 0.65 + ecmwfTemp * 0.35;
+      const hrrrTemp = i < 48 ? rawBaseTemp + Math.cos(i * 0.31) * 1.4 : null;
+      const wnTemp = ecmwfTemp * 0.55 + nbmTemp * 0.45;
+      modelTemps = {
+        nws: roundFinite(nwsTemp, 1),
+        hrrr: roundFinite(hrrrTemp, 1),
+        nbm: roundFinite(nbmTemp, 1),
+        ecmwf: roundFinite(ecmwfTemp, 1),
+        gefs: roundFinite(gefsTemp, 1),
+        weathernext: roundFinite(wnTemp, 1)
+      };
+    }
 
     const tempFusion = blendTemperatureHour(modelTemps, i);
     const canonicalTempF = ch?.temperature ?? csTemp?.value;
@@ -824,18 +866,85 @@ export function buildUnifiedFusionPayload(loc, baseData, multiModelData, aqiData
       tempFusion.rawBlendedF = Number(canonicalTempF.toFixed(2));
     }
 
+    const canonWindMap = extractCanonModelMap(csWind);
+    const canonDpMap = extractCanonModelMap(csDp);
+    const canonCloudMap = extractCanonModelMap(csCloud);
+
+    const modelWind = isLiveApi
+      ? {
+          nws: roundFinite(canonWindMap.get('nws'), 0),
+          hrrr: roundFinite(canonWindMap.get('hrrr'), 0),
+          nbm: roundFinite(canonWindMap.get('nbm') ?? pickMm('wind_speed_10m', 'gfs_seamless') ?? pickMm('wind_speed_10m', 'best_match'), 0),
+          ecmwf: roundFinite(canonWindMap.get('ecmwf') ?? pickMm('wind_speed_10m', 'ecmwf_ifs025'), 0),
+          gefs: roundFinite(canonWindMap.get('gefs') ?? pickMm('wind_speed_10m', 'icon_seamless'), 0),
+          weathernext: roundFinite(canonWindMap.get('weathernext'), 0)
+        }
+      : { nws: windMph, hrrr: i < 48 ? windMph : null, nbm: windMph, ecmwf: windMph, gefs: windMph, weathernext: windMph };
+
+    const modelDewPoint = isLiveApi
+      ? {
+          nws: roundFinite(canonDpMap.get('nws'), 0),
+          hrrr: roundFinite(canonDpMap.get('hrrr'), 0),
+          nbm: roundFinite(canonDpMap.get('nbm') ?? pickMm('dew_point_2m', 'gfs_seamless') ?? pickMm('dew_point_2m', 'best_match'), 0),
+          ecmwf: roundFinite(canonDpMap.get('ecmwf') ?? pickMm('dew_point_2m', 'ecmwf_ifs025'), 0),
+          gefs: roundFinite(canonDpMap.get('gefs') ?? pickMm('dew_point_2m', 'icon_seamless'), 0),
+          weathernext: roundFinite(canonDpMap.get('weathernext'), 0)
+        }
+      : { nws: dewPointF, hrrr: i < 48 ? dewPointF : null, nbm: dewPointF, ecmwf: dewPointF, gefs: dewPointF, weathernext: dewPointF };
+
+    const clampCloud = (v) => (typeof v === 'number' && Number.isFinite(v) ? clamp(Math.round(v), 0, 100) : null);
+    const modelCloudCover = isLiveApi
+      ? {
+          nws: clampCloud(canonCloudMap.get('nws')),
+          hrrr: clampCloud(canonCloudMap.get('hrrr')),
+          nbm: clampCloud(canonCloudMap.get('nbm') ?? pickMm('cloud_cover', 'gfs_seamless') ?? pickMm('cloud_cover', 'best_match')),
+          ecmwf: clampCloud(canonCloudMap.get('ecmwf') ?? pickMm('cloud_cover', 'ecmwf_ifs025')),
+          gefs: clampCloud(canonCloudMap.get('gefs') ?? pickMm('cloud_cover', 'icon_seamless')),
+          weathernext: clampCloud(canonCloudMap.get('weathernext'))
+        }
+      : { nws: cloudCover, hrrr: i < 48 ? cloudCover : null, nbm: cloudCover, ecmwf: cloudCover, gefs: cloudCover, weathernext: cloudCover };
+
     // Rain Chance & QPF: use exact canonical rainLikelihood & precipitation when available
     const basePop = (bIdx !== undefined ? baseData?.hourly?.precipitation_probability?.[bIdx] : undefined) ?? (cloudCover > 82 ? 65 : cloudCover > 65 ? 25 : 5);
     const baseQpf = (bIdx !== undefined ? baseData?.hourly?.precipitation?.[bIdx] : undefined) ?? (basePop >= 60 ? 0.045 : basePop >= 35 ? 0.008 : 0);
     const canonRl = cr?.rainLikelihood || ch?.rainLikelihood;
     const canonAmt = cr?.precipitationBlend?.sourceValues || ch?.precipitationBlend?.sourceValues || {};
-    const nwsPop = clamp(ch?.officialPop ?? cr?.officialPop ?? basePop, 0, 100);
+    const canonPopMap = extractCanonModelMap(csPop);
+    const canonQpfMap = extractCanonModelMap(csQpf, cr?.precipitationBlend || ch?.precipitationBlend);
+    const nwsPopReal = ch?.officialPop ?? cr?.officialPop ?? canonPopMap.get('nws') ?? null;
+    const nwsPop = clamp(nwsPopReal ?? basePop, 0, 100);
 
-    const nbmQpf = Math.max(0, canonAmt.nbm ?? (mmIdx !== undefined ? multiModelData?.hourly?.precipitation_gfs_seamless?.[mmIdx] : undefined) ?? baseQpf);
-    const ecmwfQpf = Math.max(0, canonAmt.ecmwf ?? (mmIdx !== undefined ? multiModelData?.hourly?.precipitation_ecmwf_ifs025?.[mmIdx] : undefined) ?? (baseQpf > 0 ? baseQpf * (0.85 + 0.3 * Math.sin(i * 0.4)) : basePop > 50 ? 0.014 : 0));
-    const gefsQpf = Math.max(0, canonAmt.gefs ?? (mmIdx !== undefined ? multiModelData?.hourly?.precipitation_icon_seamless?.[mmIdx] : undefined) ?? (baseQpf * 0.9));
-    const hrrrQpf = i < 48 ? Math.max(0, canonAmt.hrrr ?? baseQpf * (0.9 + 0.35 * Math.cos(i * 0.5))) : 0;
-    const wnQpf = Math.max(0, canonAmt.wn ?? canonAmt.weathernext3 ?? (ecmwfQpf * 0.6 + nbmQpf * 0.4));
+    const mmNbmQpf = pickMm('precipitation', 'gfs_seamless') ?? pickMm('precipitation', 'best_match');
+    const mmEcmwfQpf = pickMm('precipitation', 'ecmwf_ifs025');
+    const mmGefsQpf = pickMm('precipitation', 'icon_seamless');
+
+    const realNbmQpf = canonAmt.nbm ?? canonQpfMap.get('nbm') ?? mmNbmQpf ?? null;
+    const realEcmwfQpf = canonAmt.ecmwf ?? canonQpfMap.get('ecmwf') ?? mmEcmwfQpf ?? null;
+    const realGefsQpf = canonAmt.gefs ?? canonQpfMap.get('gefs') ?? mmGefsQpf ?? null;
+    const realHrrrQpf = canonAmt.hrrr ?? canonQpfMap.get('hrrr') ?? null;
+    const realWnQpf = canonAmt.wn ?? canonAmt.weathernext3 ?? canonQpfMap.get('weathernext') ?? null;
+
+    const modelQpfHour = isLiveApi
+      ? {
+          hrrr: typeof realHrrrQpf === 'number' && Number.isFinite(realHrrrQpf) ? Math.max(0, realHrrrQpf) : null,
+          nbm: typeof realNbmQpf === 'number' && Number.isFinite(realNbmQpf) ? Math.max(0, realNbmQpf) : null,
+          ecmwf: typeof realEcmwfQpf === 'number' && Number.isFinite(realEcmwfQpf) ? Math.max(0, realEcmwfQpf) : null,
+          gefs: typeof realGefsQpf === 'number' && Number.isFinite(realGefsQpf) ? Math.max(0, realGefsQpf) : null,
+          weathernext: typeof realWnQpf === 'number' && Number.isFinite(realWnQpf) ? Math.max(0, realWnQpf) : null
+        }
+      : {
+          hrrr: i < 48 ? Math.max(0, baseQpf) : null,
+          nbm: Math.max(0, baseQpf),
+          ecmwf: Math.max(0, baseQpf),
+          gefs: Math.max(0, baseQpf * 0.9),
+          weathernext: Math.max(0, baseQpf)
+        };
+
+    const nbmQpf = Math.max(0, realNbmQpf ?? baseQpf);
+    const ecmwfQpf = Math.max(0, realEcmwfQpf ?? (isLiveApi ? 0 : baseQpf));
+    const gefsQpf = Math.max(0, realGefsQpf ?? (isLiveApi ? 0 : baseQpf * 0.9));
+    const hrrrQpf = i < 48 ? Math.max(0, realHrrrQpf ?? (isLiveApi ? 0 : baseQpf)) : 0;
+    const wnQpf = Math.max(0, realWnQpf ?? (isLiveApi ? 0 : baseQpf));
 
     const rainLedger = scoreRainChance100Pt({ nwsPop, hrrrQpf, nbmQpf, ecmwfQpf, gefsQpf, wnQpf, leadHours: i });
     if (typeof canonRl?.value === 'number' && Number.isFinite(canonRl.value)) {
@@ -928,7 +1037,12 @@ export function buildUnifiedFusionPayload(loc, baseData, multiModelData, aqiData
       condition: condLabel,
       icon: condIcon,
       skyMood: condSky,
+      nwsPopReal,
       modelTemps,
+      modelWind,
+      modelDewPoint,
+      modelCloudCover,
+      modelQpfHour,
       tempFusion,
       ensemble: {
         p10: Math.round(tempFusion.blendedF - spreadHalf * 1.35),
@@ -1053,7 +1167,11 @@ function deriveSkyFromLabel(condition, isDay, rainChance = 0) {
   const c = String(condition || '').toLowerCase();
   if (/thunder|t-storm|lightning|storm/.test(c)) return 'storm';
   if (/rain|shower|drizzle|snow|sleet|flurr/.test(c) || rainChance >= 60) return 'rain';
-  return isDay ? 'day' : 'night';
+  if (!isDay) return 'night';
+  if (!/partly|mostly sunny|sunny|clear|few|scattered/.test(c) && /overcast|mostly cloudy|\bcloudy\b|fog|mist|haze|smoke/.test(c)) {
+    return 'cloudy';
+  }
+  return 'day';
 }
 
 function formatZonedHHMM(rawVal, timeZone, fallback = '06:48') {
@@ -1123,12 +1241,15 @@ function buildDailySummaries(hours, dailyApi, canonicalData = null, timeZone = '
     const maxUvIndex = Number(Math.max(...dayHours.map((h) => h.uvIndex)).toFixed(1));
     const maxAqi = Math.max(...dayHours.map((h) => h.aqi));
 
-    // Per-model Daily High & Total Precip comparison (prefer canonical guidance when available)
+    // Per-model Daily High, Low, QPF, Rain Chance, Wind, Dew Point & Cloud Cover (strictly from real per-model values)
     const modelKeys = ['nws', 'hrrr', 'nbm', 'ecmwf', 'gefs', 'weathernext'];
     const modelHighs = {};
     const modelLows = {};
     const modelQpf = {};
     const modelRainChance = {};
+    const modelWind = {};
+    const modelDewPoint = {};
+    const modelCloudCover = {};
 
     modelKeys.forEach((mk) => {
       const mTemps = dayHours
@@ -1137,11 +1258,35 @@ function buildDailySummaries(hours, dailyApi, canonicalData = null, timeZone = '
       modelHighs[mk] = mTemps.length >= 4 ? Math.round(Math.max(...mTemps)) : null;
       modelLows[mk] = mTemps.length >= 4 ? Math.round(Math.min(...mTemps)) : null;
 
+      const mWinds = dayHours
+        .map((h) => h.modelWind?.[mk])
+        .filter((v) => typeof v === 'number' && Number.isFinite(v));
+      modelWind[mk] = mWinds.length >= 4 ? Math.round(Math.max(...mWinds)) : null;
+
+      const mDps = dayHours
+        .map((h) => h.modelDewPoint?.[mk])
+        .filter((v) => typeof v === 'number' && Number.isFinite(v));
+      modelDewPoint[mk] = mDps.length >= 4 ? Math.round(Math.max(...mDps)) : null;
+
+      const mClouds = dayHours
+        .map((h) => h.modelCloudCover?.[mk])
+        .filter((v) => typeof v === 'number' && Number.isFinite(v));
+      modelCloudCover[mk] = mClouds.length >= 4
+        ? clamp(Math.round(mClouds.reduce((a, b) => a + b, 0) / mClouds.length), 0, 100)
+        : null;
+
       if (mk === 'nws') {
         if (typeof cd?.official?.high === 'number') modelHighs.nws = Math.round(cd.official.high);
         if (typeof cd?.official?.low === 'number') modelLows.nws = Math.round(cd.official.low);
-        modelRainChance.nws = cd?.officialPop ?? Math.max(...dayHours.map((h) => h.rainLedger.breakdown.nws.pop || 0));
-        modelQpf.nws = cd?.qpfBlend?.sourceValues?.nws != null ? Number(cd.qpfBlend.sourceValues.nws.toFixed(2)) : totalQpfIn;
+        const validNwsPops = dayHours.map((h) => h.nwsPopReal).filter((v) => typeof v === 'number' && Number.isFinite(v));
+        modelRainChance.nws = typeof cd?.officialPop === 'number'
+          ? Math.round(cd.officialPop)
+          : validNwsPops.length >= 4
+          ? Math.round(Math.max(...validNwsPops))
+          : null;
+        modelQpf.nws = typeof cd?.qpfBlend?.sourceValues?.nws === 'number'
+          ? Number(cd.qpfBlend.sourceValues.nws.toFixed(2))
+          : null;
       } else {
         const gKey = mk === 'weathernext' ? (cd?.guidance?.wn ? 'wn' : 'weathernext3') : mk;
         const g = cd?.guidance?.[gKey];
@@ -1149,13 +1294,26 @@ function buildDailySummaries(hours, dailyApi, canonicalData = null, timeZone = '
           if (typeof g.high === 'number') modelHighs[mk] = Math.round(g.high);
           if (typeof g.low === 'number') modelLows[mk] = Math.round(g.low);
         }
+        const mQpfs = dayHours
+          .map((h) => h.modelQpfHour?.[mk])
+          .filter((v) => typeof v === 'number' && Number.isFinite(v));
         const qSum = g && typeof g.qpf === 'number'
           ? g.qpf
-          : dayHours.reduce((acc, h) => acc + (h.rainLedger.breakdown[mk]?.qpf || 0), 0);
-        modelQpf[mk] = (mk === 'hrrr' && dIdx > 2 && g?.qpf == null) ? null : Number(qSum.toFixed(2));
-        modelRainChance[mk] = (mk === 'hrrr' && dIdx > 2 && g?.qpf == null)
-          ? null
-          : clamp(Math.round(qSum * 340 + (rainChance * 0.45)), 0, 100);
+          : mQpfs.length >= 4
+          ? mQpfs.reduce((a, b) => a + b, 0)
+          : null;
+        modelQpf[mk] = qSum !== null ? Number(qSum.toFixed(2)) : null;
+
+        if (mk === 'nbm' && typeof g?.pop === 'number') {
+          modelRainChance[mk] = clamp(Math.round(g.pop), 0, 100);
+        } else if (modelQpf[mk] === null) {
+          modelRainChance[mk] = null;
+        } else {
+          const wetHours = mQpfs.filter((v) => v >= 0.005).length;
+          modelRainChance[mk] = wetHours === 0 && modelQpf[mk] < 0.005
+            ? 0
+            : clamp(Math.round(Math.min(60, wetHours * 10) + Math.min(55, modelQpf[mk] * 180)), 5, 100);
+        }
       }
     });
 
@@ -1229,6 +1387,9 @@ function buildDailySummaries(hours, dailyApi, canonicalData = null, timeZone = '
       modelLows,
       modelQpf,
       modelRainChance,
+      modelWind,
+      modelDewPoint,
+      modelCloudCover,
       peakTempHour: peakHour,
       wettestHour,
       hours: dayHours

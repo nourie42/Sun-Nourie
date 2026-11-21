@@ -2,15 +2,14 @@
  * Weather Nourie · Experimental Fusion V3 Main Application Controller
  */
 
-import { clamp, computePavementProfile } from './physics.js';
+import { clamp, computePavementProfile } from './physics.js?v=v3-accuracy-3';
 import {
-  PRESET_CITIES,
   buildUnifiedFusionPayload,
   fetchCompleteFusionForecast,
   reverseGeocodeLocation,
   searchLocations
-} from './fusion-engine.js';
-import { renderWeatherIconSvg } from './icons.js';
+} from './fusion-engine.js?v=v3-accuracy-3';
+import { renderWeatherIconSvg } from './icons.js?v=v3-accuracy-3';
 import {
   COMPARE_MODELS,
   COMPARE_VARIABLES,
@@ -22,24 +21,51 @@ import {
   renderModelCompareChart,
   renderNext24HoursSplineChart,
   renderSevenDayDualSplineChart
-} from './charts.js';
+} from './charts.js?v=v3-accuracy-3';
 import {
   MAP_LAYERS,
   WeatherMapController
-} from './map.js';
+} from './map.js?v=v3-accuracy-3';
 import { dogWalkerScene, referenceScene } from '../../exposure-scene.js?v=true-night-art-v6';
 import { danCard, danOverview, danTakeDisplay } from '../../dans-summary.js?v=afd-discussion-section-v1';
-import { activeRiskOutlooks, outlookDetailHTML, riskOutlookButtonHTML } from '../../risk-outlooks.js?v=risk-outlooks-v5';
+import { activeRiskOutlooks, outlookDetailHTML } from '../../risk-outlooks.js?v=risk-outlooks-v5';
 import { buildForecastWindows } from '../../forecast-windows.js?v=current-rain-20261017-v3';
-import { forecastWindowBannerHTML, forecastWindowDetailHTML } from '../../forecast-window-banners.js?v=current-rain-20261017-v3';
+import { forecastWindowDetailHTML } from '../../forecast-window-banners.js?v=current-rain-20261017-v3';
 import { weatherChangeMessages, WEATHER_CHANGE_TITLE } from '../../weather-changes.js?v=current-rain-20261017-v3';
-import { forecastOutlookDetails } from '../../outlook-details.js?v=current-rain-20261017-v3';
 
 const SAVED_LOC_KEY = 'weather-nourie-v3-location';
 const DEVICE_LOC_KEY = 'weather-fusion-device-place';
 const RISK_COLORS = { Marginal: '#74d36a', Slight: '#f4e14a', Enhanced: '#e67a22', Moderate: '#e03b3b', High: '#d34cff' };
+const SILENT_FALLBACK_LOC = {
+  id: 'fallback',
+  name: 'Raleigh, NC',
+  latitude: 35.7796,
+  longitude: -78.6382,
+  timezone: 'America/New_York',
+  wfo: 'RAH',
+  isFallback: true
+};
 
-function loadSavedLocation() {
+function readLastSearchedFallback() {
+  try {
+    const raw = localStorage.getItem(SAVED_LOC_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (
+        parsed &&
+        parsed.source === 'search' &&
+        Number.isFinite(parsed.latitude) &&
+        Number.isFinite(parsed.longitude) &&
+        (parsed.latitude !== 0 || parsed.longitude !== 0)
+      ) {
+        return parsed;
+      }
+    }
+  } catch {}
+  return SILENT_FALLBACK_LOC;
+}
+
+function loadInitialLocationContext() {
   try {
     const params = new URLSearchParams(window.location.search);
     const rawLat = params.get('latitude') ?? params.get('lat');
@@ -48,32 +74,44 @@ function loadSavedLocation() {
     const qLon = rawLon !== null && rawLon !== '' ? Number(rawLon) : NaN;
     const qName = params.get('name');
     if (Number.isFinite(qLat) && Number.isFinite(qLon) && qLat >= -90 && qLat <= 90 && qLon >= -180 && qLon <= 180) {
-      return { id: 'query', name: qName || 'Selected Location', latitude: qLat, longitude: qLon, explicitChoice: true };
-    }
-    const raw = localStorage.getItem(SAVED_LOC_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (parsed && Number.isFinite(parsed.latitude) && Number.isFinite(parsed.longitude) && (parsed.latitude !== 0 || parsed.longitude !== 0)) {
-        return parsed;
-      }
+      return { id: 'query', name: qName || 'Selected Location', latitude: qLat, longitude: qLon, explicitChoice: true, fromQuery: true };
     }
     const devRaw = localStorage.getItem(DEVICE_LOC_KEY);
     if (devRaw) {
       const dev = JSON.parse(devRaw);
       if (dev && Number.isFinite(dev.latitude) && Number.isFinite(dev.longitude) && (dev.latitude !== 0 || dev.longitude !== 0)) {
-        return { ...dev, id: 'gps', name: dev.name === 'Device location' ? 'Current Location' : dev.name };
+        return {
+          ...dev,
+          id: 'gps',
+          name: dev.name && dev.name !== 'Device location' ? dev.name : 'Current Location',
+          fromCache: true
+        };
+      }
+    }
+    const raw = localStorage.getItem(SAVED_LOC_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (
+        parsed &&
+        parsed.id === 'gps' &&
+        Number.isFinite(parsed.latitude) &&
+        Number.isFinite(parsed.longitude) &&
+        (parsed.latitude !== 0 || parsed.longitude !== 0)
+      ) {
+        return { ...parsed, fromCache: true };
       }
     }
   } catch {}
-  return PRESET_CITIES[1] || PRESET_CITIES[0];
+  return null;
 }
 
 const state = {
-  location: loadSavedLocation(),
+  location: loadInitialLocationContext(),
   forecast: null,
   liveAlerts: null,
   liveBriefing: null,
   loadToken: 0,
+  geoDenied: false,
   useCelsius: false,
   skyOverride: 'auto',
   activeViewMode: 'experimental',
@@ -94,7 +132,7 @@ const state = {
   skyAudioActive: false,
   audioCtx: null,
   audioGainNode: null,
-  skyMood: 'day'
+  skyMood: 'cloudy'
 };
 
 export function fmtTemp(tempF, includeUnit = false) {
@@ -103,24 +141,60 @@ export function fmtTemp(tempF, includeUnit = false) {
   return `${v}°${includeUnit ? (state.useCelsius ? 'C' : 'F') : ''}`;
 }
 
-function requestAutoDeviceLocation() {
-  if (!navigator.geolocation || state.location?.explicitChoice) return;
+function requestAutoDeviceLocation({ hasCachedLoc = false, fromQuery = false } = {}) {
+  if (fromQuery) return;
+  const fallbackLoc = readLastSearchedFallback();
+
+  if (!navigator.geolocation) {
+    if (!hasCachedLoc) {
+      state.geoDenied = true;
+      loadLocationForecast(fallbackLoc);
+    }
+    return;
+  }
+
+  let resolvedGeo = false;
+  const fallbackTimer = !hasCachedLoc
+    ? setTimeout(() => {
+        if (!resolvedGeo && !state.forecast && !state.location) {
+          state.geoDenied = true;
+          loadLocationForecast(fallbackLoc);
+        }
+      }, 4000)
+    : null;
+
   navigator.geolocation.getCurrentPosition(
     async (pos) => {
+      resolvedGeo = true;
+      if (fallbackTimer) clearTimeout(fallbackTimer);
+      state.geoDenied = false;
+
       const lat = pos.coords.latitude;
       const lon = pos.coords.longitude;
-      try {
-        localStorage.setItem(DEVICE_LOC_KEY, JSON.stringify({ id: 'device', name: 'Device location', latitude: lat, longitude: lon, source: 'device' }));
-      } catch {}
       const movedFar =
-        !Number.isFinite(state.location?.latitude) ||
-        Math.abs(lat - state.location.latitude) > 0.015 ||
-        Math.abs(lon - state.location.longitude) > 0.015;
-      if (movedFar || state.location?.id !== 'gps') {
-        const resolvedName = await reverseGeocodeLocation(lat, lon);
+        !state.location ||
+        state.location.isFallback ||
+        state.location.id !== 'gps' ||
+        Math.abs(lat - state.location.latitude) > 0.01 ||
+        Math.abs(lon - state.location.longitude) > 0.01;
+
+      const resolvedName = await Promise.race([
+        reverseGeocodeLocation(lat, lon),
+        new Promise((r) => setTimeout(() => r(''), 1600))
+      ]);
+      const cleanName = resolvedName || state.location?.name || 'Current Location';
+
+      try {
+        localStorage.setItem(
+          DEVICE_LOC_KEY,
+          JSON.stringify({ id: 'device', name: cleanName, latitude: lat, longitude: lon, source: 'device' })
+        );
+      } catch {}
+
+      if (movedFar || !state.forecast) {
         loadLocationForecast({
           id: 'gps',
-          name: resolvedName || 'Current Location',
+          name: cleanName,
           latitude: lat,
           longitude: lon,
           wfo: 'NWS'
@@ -128,9 +202,14 @@ function requestAutoDeviceLocation() {
       }
     },
     () => {
-      // Keep current/saved fallback if user declined location access
+      resolvedGeo = true;
+      if (fallbackTimer) clearTimeout(fallbackTimer);
+      if (!hasCachedLoc && !state.forecast) {
+        state.geoDenied = true;
+        loadLocationForecast(fallbackLoc);
+      }
     },
-    { enableHighAccuracy: false, timeout: 9000, maximumAge: 300000 }
+    { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
   );
 }
 
@@ -138,26 +217,28 @@ document.addEventListener('DOMContentLoaded', () => {
   initBrandIcon();
   initSkyCanvas();
   initHeaderControls();
-  initPresetCityChips();
   initModalSystem();
   initMapSection();
   initBottomNavDock();
 
-  // 1. Instant zero-latency initial render with synthetic seed
-  state.forecast = buildUnifiedFusionPayload(state.location, null, null, null, {
-    wfo: state.location.wfo || 'RAH',
-    alerts: [],
-    afdText: null,
-    nwsHourlyMap: new Map(),
-    available: false
-  });
-  renderAll();
-
-  // 2. Canonical backend + multi-model hydration
-  loadLocationForecast(state.location);
-
-  // 3. Automatically detect user's actual local location when permitted
-  requestAutoDeviceLocation();
+  const initialLoc = state.location;
+  if (initialLoc) {
+    // Load cached GPS / explicit URL query coordinates immediately (never fake Knightdale before GPS!)
+    state.forecast = buildUnifiedFusionPayload(initialLoc, null, null, null, {
+      wfo: initialLoc.wfo || 'NWS',
+      alerts: [],
+      afdText: null,
+      nwsHourlyMap: new Map(),
+      available: false
+    });
+    renderAll();
+    loadLocationForecast(initialLoc);
+    requestAutoDeviceLocation({ hasCachedLoc: true, fromQuery: Boolean(initialLoc.fromQuery) });
+  } else {
+    const cityNameEl = document.getElementById('city-name');
+    if (cityNameEl) cityNameEl.textContent = 'Finding your location…';
+    requestAutoDeviceLocation({ hasCachedLoc: false, fromQuery: false });
+  }
 });
 
 function initBrandIcon() {
@@ -171,11 +252,10 @@ async function loadLocationForecast(loc) {
   const token = ++state.loadToken;
   state.location = loc;
   try {
-    localStorage.setItem(SAVED_LOC_KEY, JSON.stringify(loc));
+    if (!loc.isFallback) localStorage.setItem(SAVED_LOC_KEY, JSON.stringify(loc));
   } catch {}
   state.liveAlerts = null;
   state.liveBriefing = null;
-  updatePresetChipSelection();
 
   const [liveForecast, alertsRes] = await Promise.all([
     fetchCompleteFusionForecast(loc),
@@ -220,7 +300,7 @@ function renderAll() {
   updateSkyAtmosphere(f);
   renderStatusAndAlerts(f);
   renderWeatherHazards(f);
-  renderWindowBanners(f);
+  renderTopCompactPills(f);
   renderHeroAndBriefing(f);
   renderFeelsTimeAndTrio(f);
   renderNext24QuickCard(f);
@@ -311,36 +391,25 @@ function renderWeatherHazards(f) {
       strip.innerHTML = '';
     } else {
       strip.hidden = false;
-      strip.innerHTML = risks.map((r, idx) => riskOutlookButtonHTML(r, idx)).join('');
+      strip.innerHTML = risks
+        .map((r, idx) => {
+          const isSevere = /Moderate|Enhanced|High/i.test(r.level);
+          const color = RISK_COLORS[r.level] || '#f4e14a';
+          const shortTitle = r.title || `${r.level} Weather Risk`;
+          return `
+            <button type="button" class="hazard-slim-btn ${isSevere ? 'severe' : ''}" data-risk-kind="${r.kind}" data-risk-index="${idx}" style="border-left:4px solid ${color};">
+              <span class="hazard-slim-left">
+                <span class="hazard-slim-dot" style="background:${color};"></span>
+                <span>${shortTitle}</span>
+              </span>
+              <span class="hazard-slim-action">Map ›</span>
+            </button>
+          `;
+        })
+        .join('');
       strip.querySelectorAll('[data-risk-kind]').forEach((btn) => {
         btn.addEventListener('click', () => {
           const r = risks[Number(btn.dataset.riskIndex)];
-          if (r) openRiskOutlookModal(r, f);
-        });
-      });
-    }
-  }
-
-  const takeBadges = document.getElementById('take-hazards-badges');
-  if (takeBadges) {
-    if (!risks.length) {
-      takeBadges.hidden = true;
-      takeBadges.innerHTML = '';
-    } else {
-      takeBadges.hidden = false;
-      takeBadges.innerHTML = risks
-        .map(
-          (r, idx) => `
-          <button type="button" class="take-hazard-chip ${/Moderate|Enhanced|High/i.test(r.level) ? 'severe' : ''}" data-take-risk-idx="${idx}">
-            <span>⚠ ${r.title || `${r.level} risk`}</span>
-            <span aria-hidden="true">›</span>
-          </button>
-        `
-        )
-        .join('');
-      takeBadges.querySelectorAll('[data-take-risk-idx]').forEach((btn) => {
-        btn.addEventListener('click', () => {
-          const r = risks[Number(btn.dataset.takeRiskIdx)];
           if (r) openRiskOutlookModal(r, f);
         });
       });
@@ -407,97 +476,108 @@ async function openRiskOutlookModal(risk, f) {
   }
 }
 
-function renderWindowBanners(f) {
-  const container = document.getElementById('forecast-window-banners');
-  const trackerBar = document.getElementById('perfect-tracker-bar');
+function renderTopCompactPills(f) {
+  const container = document.getElementById('top-compact-pills');
+  if (!container) return;
 
-  if (f.canonical) {
-    const view = buildForecastWindows(f.canonical, Date.now());
-    const kinds = ['perfect', 'rain'].filter((k) => view[k]?.length);
-    kinds.sort((a, b) => view[a][0].start - view[b][0].start);
+  const changeMsgs = f.canonical
+    ? weatherChangeMessages(f.canonical, Date.now())
+    : (f.briefing?.changeAlerts || []);
+  const canonicalView = f.canonical ? buildForecastWindows(f.canonical, Date.now()) : null;
+  const rainWinCount = canonicalView?.rain?.length ?? f.windows?.rainHours?.length ?? 0;
+  const perfectHrCount = canonicalView?.perfect
+    ? canonicalView.perfect.reduce((s, w) => s + (w.hours?.length || 0), 0)
+    : (f.windows?.perfectHours?.length || 0);
+  const peakRain = Math.max(f.days?.[0]?.rainChance || 0, ...((f.hours48 || []).slice(0, 24).map((h) => h.rainChance || 0)));
 
-    if (container) {
-      container.innerHTML = kinds.map((k) => forecastWindowBannerHTML(view, k, Date.now())).join('');
-      container.hidden = !kinds.length;
-      container.querySelectorAll('[data-forecast-window]').forEach((btn) => {
-        btn.addEventListener('click', () => {
-          const kind = btn.dataset.forecastWindow;
-          openModal(
-            kind === 'perfect' ? `Perfect Weather Tracker · ${f.location.name}` : `Rain & Storm Outlook · ${f.location.name}`,
-            forecastWindowDetailHTML(view, kind, f.location.name, Date.now())
-          );
-        });
-      });
-    }
-
-    if (trackerBar) {
-      const perfectWinCount = view.perfect?.length || 0;
-      const perfectHrCount = (view.perfect || []).reduce((s, w) => s + (w.hours?.length || 0), 0);
-      trackerBar.innerHTML = `
-        <div class="perfect-tracker-copy">
-          <strong>🌤 Perfect Weather Tracker</strong>
-          <span>${
-            perfectHrCount > 0
-              ? `${perfectHrCount} golden outdoor ${perfectHrCount === 1 ? 'hour' : 'hours'} across ${perfectWinCount} ${perfectWinCount === 1 ? 'window' : 'windows'} in next 5 days (70–75° feels, low clouds & dew point)`
-              : 'No 70–75° sunny golden windows in next 5 days · Tap to view comfortable windows & tracker'
-          }</span>
-        </div>
-        <div class="perfect-tracker-actions">
-          <button id="open-perfect-tracker-modal" class="mode-pill" type="button">5-Day Windows ›</button>
-          <a class="mode-pill" href="/whats-up">All Cities Tracker ↗</a>
-        </div>
-      `;
-      document.getElementById('open-perfect-tracker-modal')?.addEventListener('click', () => {
-        openModal(
-          `Perfect Weather Tracker · ${f.location.name}`,
-          forecastWindowDetailHTML(view, 'perfect', f.location.name, Date.now())
-        );
-      });
-    }
-    return;
+  const pills = [];
+  if (changeMsgs.length) {
+    pills.push(`<button id="top-pill-change" class="top-mini-pill pill-change" type="button">⚡ Weather Change ›</button>`);
+  }
+  pills.push(
+    rainWinCount > 0 || peakRain >= 35
+      ? `<button id="top-pill-rain" class="top-mini-pill pill-rain" type="button">🌧 Rain Outlook · Peak ${peakRain}% ›</button>`
+      : `<button id="top-pill-rain" class="top-mini-pill pill-rain" type="button">☀ Dry Next 48h ›</button>`
+  );
+  pills.push(
+    `<button id="top-pill-perfect" class="top-mini-pill pill-perfect" type="button">${
+      perfectHrCount > 0 ? `🌤 Perfect Weather · ${perfectHrCount}h ›` : '🌤 Perfect Weather ›'
+    }</button>`
+  );
+  if (state.geoDenied) {
+    pills.push(`<button id="top-pill-gps" class="top-mini-pill pill-gps" type="button">⌖ Enable Current Location</button>`);
   }
 
-  if (container) {
-    container.innerHTML = (f.windows?.banners || [])
-      .map(
-        (b, idx) => `
-        <div class="glass window-banner-card" data-type="${b.type}" data-win-idx="${idx}">
-          <div style="display:flex;align-items:center;gap:12px;">
-            <div>${renderWeatherIconSvg(b.type === 'rain' ? 'rain' : 'clear-day', 34)}</div>
-            <div>
-              <div style="font-size:14.5px;font-weight:800;color:#ffffff;">${b.title}</div>
-              <div style="font-size:12.5px;color:var(--muted);">${b.subtitle}</div>
-            </div>
-          </div>
-          <span class="wfo-pill" style="white-space:nowrap;">${b.badge} ▸</span>
-        </div>
-      `
-      )
-      .join('');
+  container.innerHTML = pills.join('');
 
-    container.querySelectorAll('.window-banner-card').forEach((card) => {
-      card.addEventListener('click', () => {
-        const b = f.windows.banners[Number(card.dataset.winIdx)];
-        if (!b) return;
-        state.selectedMetricId = b.type === 'rain' ? 'rainChance' : 'temp';
-        open48hExplorerModal(f);
-      });
-    });
-  }
+  document.getElementById('top-pill-change')?.addEventListener('click', () => {
+    openModal(
+      `${WEATHER_CHANGE_TITLE} · ${f.location.name}`,
+      `<div style="display:grid;gap:10px;">
+        ${changeMsgs.map((m) => `<div class="take-modal-card" style="font-size:14px;line-height:1.5;">${m}</div>`).join('')}
+      </div>`
+    );
+  });
+
+  document.getElementById('top-pill-rain')?.addEventListener('click', () => {
+    if (canonicalView) {
+      openModal(
+        `Rain & Storm Outlook · ${f.location.name}`,
+        forecastWindowDetailHTML(canonicalView, 'rain', f.location.name, Date.now())
+      );
+    } else {
+      state.selectedMetricId = 'rainChance';
+      open48hExplorerModal(f);
+    }
+  });
+
+  document.getElementById('top-pill-perfect')?.addEventListener('click', () => {
+    const trackerHtml = canonicalView
+      ? forecastWindowDetailHTML(canonicalView, 'perfect', f.location.name, Date.now())
+      : `<p style="color:var(--muted);line-height:1.5;">${
+          perfectHrCount > 0
+            ? `${perfectHrCount} comfortable golden hours (70–75° feels, low clouds) coming up over the next 48 hours.`
+            : 'No 70–75° sunny golden windows expected in the next 5 days.'
+        }</p>`;
+    openModal(
+      `Perfect Weather Tracker · ${f.location.name}`,
+      `${trackerHtml}
+       <div style="margin-top:14px;">
+         <a class="mode-pill" href="/whats-up" style="display:inline-flex;">Open All Cities Tracker ↗</a>
+       </div>`
+    );
+  });
+
+  document.getElementById('top-pill-gps')?.addEventListener('click', () => {
+    document.getElementById('locate-btn')?.click();
+  });
 }
 
 function selectHeroBackdropPhoto(cur) {
   const cond = String(cur.condition || '').toLowerCase();
-  const isStorm = /storm|thunder|t-storm|lightning/.test(cond);
-  const isRain = /rain|shower|drizzle|snow|sleet|flurr|ice|freez/.test(cond) || (cur.precipIn || 0) >= 0.02 || (cur.rainChance || 0) >= 60;
-  const isCloudy = /cloud|overcast|fog|mist|haze/.test(cond) || (cur.cloudCover || 0) >= 50;
   const isNight = !cur.isDay;
+  const isStorm = /storm|thunder|t-storm|lightning/.test(cond);
+  const isRain = /rain|shower|drizzle|snow|sleet|flurr|ice|freez|wintry/.test(cond) || (cur.precipIn || 0) >= 0.02 || (cur.rainChance || 0) >= 60;
+  const isExplicitSunny = /partly|mostly sunny|sunny|clear/.test(cond);
+  const isOvercastCloudy = /overcast|mostly cloudy|\bcloudy\b|fog|mist|haze|smoke/.test(cond) || (!isExplicitSunny && (cur.cloudCover || 0) >= 70);
+  const isPartly = /partly|mostly sunny|few clouds|scattered/.test(cond) || (cur.cloudCover || 0) >= 30;
 
-  if (isStorm) return '/weather-fusion/today-sky-storm.webp';
-  if (isRain) return '/weather-fusion/today-sky-rain.webp';
-  if (isNight) return '/weather-fusion/today-sky-night-v2.webp';
-  if (isCloudy) return '/weather-fusion/today-sky-clouds.webp';
-  return '/weather-fusion/today-sky-clear.webp';
+  if (isNight && !isRain && !isStorm) {
+    return { src: '/weather-fusion/today-sky-night-v2.webp', cls: '' };
+  }
+  if (isStorm) {
+    return { src: '/weather-fusion/today-sky-rain.webp', cls: 'sky-storm' };
+  }
+  if (isRain) {
+    return { src: '/weather-fusion/today-sky-rain.webp', cls: '' };
+  }
+  if (isOvercastCloudy) {
+    return { src: '/weather-fusion/today-sky-rain.webp', cls: 'sky-overcast' };
+  }
+  if (isPartly) {
+    return { src: '/weather-fusion/today-sky-clouds.webp', cls: '' };
+  }
+  return { src: '/weather-fusion/today-sky-clear.webp', cls: '' };
 }
 
 function computeWeatherMeterScore(cur, today, aqi) {
@@ -644,37 +724,27 @@ function formatZonedHourStamp(h, idx, timeZone) {
   }
 }
 
+function cleanTakeJargon(text) {
+  return String(text || '')
+    .replace(/\bour CWA\b/gi, 'our area')
+    .replace(/\bCWA\b/g, 'local area')
+    .replace(/\bPrecip\b/g, 'Rain');
+}
+
 function renderHeroAndBriefing(f) {
   const cur = f.current;
   const today = f.days[0];
   const aqi = f.airQuality?.currentAqi ?? 38;
   const tz = f.timeZone || f.location?.timeZone || 'America/New_York';
 
-  // Dynamic clean photographic sky backdrop matching current conditions (no lady portrait!)
+  // Dynamic clean photographic sky backdrop matching current conditions (zero false sun on cloudy days)
   const heroBg = document.getElementById('hero-bg-photo');
   if (heroBg) {
-    const nextSrc = selectHeroBackdropPhoto(cur);
-    if (heroBg.getAttribute('src') !== nextSrc) {
-      heroBg.setAttribute('src', nextSrc);
+    const photo = selectHeroBackdropPhoto(cur);
+    if (heroBg.getAttribute('src') !== photo.src) {
+      heroBg.setAttribute('src', photo.src);
     }
-  }
-
-  // Render Large Weather Change Alert Banner (canonical main-site messages when available)
-  const changeBanner = document.getElementById('weather-change-banner');
-  if (changeBanner) {
-    const msgs = f.canonical
-      ? weatherChangeMessages(f.canonical, Date.now())
-      : (f.briefing?.changeAlerts || []);
-    if (msgs.length) {
-      changeBanner.hidden = false;
-      changeBanner.innerHTML = `
-        <div class="wc-kicker">${WEATHER_CHANGE_TITLE.toUpperCase()}</div>
-        <div class="wc-body">${msgs.join(' ')}</div>
-      `;
-    } else {
-      changeBanner.hidden = true;
-      changeBanner.innerHTML = '';
-    }
+    heroBg.className = photo.cls ? `hero-bg-photo ${photo.cls}` : 'hero-bg-photo';
   }
 
   const dateEl = document.getElementById('hero-date');
@@ -702,98 +772,29 @@ function renderHeroAndBriefing(f) {
     hiloEl.innerHTML = `High <strong>${fmtTemp(today.highF)}</strong> &nbsp;|&nbsp; Low <strong>${fmtTemp(today.lowF)}</strong>`;
   }
 
-  // Main-site Nourie Weather Take (Layman's Terms AFD + Official Hazard Alerts)
+  // Top Slim Clickable Nourie Take Preview
   const canonical = f.canonical;
   const b = state.liveBriefing || canonical;
-  const activeRisks = canonical ? activeRiskOutlooks(canonical, Date.now()) : [];
   const card = canonical ? danCard(b, canonical, Date.now()) : null;
   const overview = canonical ? danOverview(b, canonical, Date.now()) : null;
   const takeDisplay = canonical ? danTakeDisplay(b, canonical, Date.now()) : '';
-  const localDetails = canonical ? forecastOutlookDetails(canonical, Date.now()) : null;
 
-  const cleanWindowProse = (txt) =>
-    String(txt || '').replace(/\bBest window:\s*12 AM to 12 AM\.?/gi, 'Wet weather possible off and on through the day.');
-
-  const isUnavailableNote = /discussion is unavailable right now/i.test(overview?.text || '');
-  const takeLeadText =
-    card?.text ||
-    b?.headline ||
-    f.briefing.headline;
-  const takeDetailText = cleanWindowProse(
-    localDetails?.summary ||
-    b?.summary ||
-    f.briefing.summary
-  );
-  let rawLayman =
+  const validTakeText =
     takeDisplay && !/unavailable right now/i.test(takeDisplay)
       ? takeDisplay
-      : !isUnavailableNote && overview?.text
+      : overview?.text && !/unavailable right now/i.test(overview.text)
       ? overview.text
       : '';
-  // Avoid repeating card.text inside the layman discussion box when it is already the card headline
-  if (card?.text && rawLayman.includes(card.text)) {
-    rawLayman = rawLayman.replace(card.text, '').trim();
-  }
-  const laymanText =
-    rawLayman || (!isUnavailableNote && overview?.text ? overview.text : '');
+  const firstSentence = cleanTakeJargon(
+    validTakeText
+      .split(/\n+/)
+      .map((s) => s.trim())
+      .find(Boolean) || f.briefing.headline
+  );
 
   const takeBannerCopy = document.getElementById('take-banner-copy');
   if (takeBannerCopy) {
-    takeBannerCopy.textContent = card?.text || (laymanText ? laymanText.split('\n')[0] : takeLeadText);
-  }
-
-  const takeHead = document.getElementById('take-headline');
-  const takeSum = document.getElementById('take-summary');
-  const takeLayman = document.getElementById('take-layman-discussion');
-  const takeBullets = document.getElementById('take-bullets');
-  const riskPill = document.getElementById('risk-outlook-pill');
-
-  if (takeHead) takeHead.textContent = takeLeadText;
-  if (takeSum) takeSum.textContent = takeDetailText;
-  if (takeLayman) {
-    if (laymanText) {
-      takeLayman.hidden = false;
-      takeLayman.textContent = `Plain-English Weather Office Notes:\n${laymanText}`;
-    } else {
-      takeLayman.hidden = true;
-      takeLayman.textContent = '';
-    }
-  }
-
-  if (riskPill) {
-    if (activeRisks.length > 0) {
-      const top = activeRisks[0];
-      const kindWord = top.kind === 'wpc' ? 'Flooding' : top.kind === 'spc' ? 'Severe Storms' : 'Winter';
-      const c = RISK_COLORS[top.level] || '#f4e14a';
-      riskPill.textContent = `⚠ ${top.level} Risk of ${kindWord} ›`;
-      riskPill.style.color = c;
-      riskPill.style.borderColor = c;
-      riskPill.onclick = () => openRiskOutlookModal(top, f);
-    } else if (f.briefing.riskOutlook) {
-      riskPill.textContent = `${f.briefing.riskOutlook.agency}: ${f.briefing.riskOutlook.level}`;
-      riskPill.style.color = f.briefing.riskOutlook.color;
-      riskPill.style.borderColor = f.briefing.riskOutlook.color;
-      riskPill.onclick = () => openWeatherTakeModal(f);
-    }
-  }
-
-  if (takeBullets) {
-    if (localDetails?.nearTerm) {
-      const lines = cleanWindowProse(localDetails.nearTerm).split('\n').filter(Boolean);
-      takeBullets.innerHTML = lines
-        .map((ln) => {
-          const colon = ln.indexOf(':');
-          return colon > 0
-            ? `<li><strong>${ln.slice(0, colon)}:</strong> ${ln.slice(colon + 1).trim()}</li>`
-            : `<li>${ln}</li>`;
-        })
-        .join('');
-    } else {
-      const bulletItems = f.briefing.bullets || [];
-      takeBullets.innerHTML = bulletItems
-        .map((item) => `<li><strong>${item.label}:</strong> ${item.text}</li>`)
-        .join('');
-    }
+    takeBannerCopy.textContent = card?.text ? cleanTakeJargon(card.text.replace(/\n+/g, ' · ')) : firstSentence;
   }
 
   // 4-Column Quick Stats Glass Strip
@@ -923,8 +924,6 @@ function renderNext24QuickCard(f) {
     renderIconFn: renderWeatherIconSvg,
     onSelectHour: (idx) => {
       state.selectedHourIdx = idx;
-      renderNext24QuickCard(f);
-      renderHourlyExplorerSection(f);
     }
   });
 }
@@ -1481,6 +1480,9 @@ function renderCompareModelsSection(f) {
   const chartStage = document.getElementById('compare-chart-stage');
   const breakdownEl = document.getElementById('compare-day-breakdown');
 
+  const visibleCount = clamp(state.compareHorizonDays, 3, f.days.length);
+  const visibleDays = f.days.slice(0, visibleCount);
+
   if (varTabs) {
     varTabs.innerHTML = COMPARE_VARIABLES.map(
       (v) => `
@@ -1498,8 +1500,17 @@ function renderCompareModelsSection(f) {
     });
   }
 
+  const availableModels = COMPARE_MODELS.filter(
+    (m) =>
+      m.alwaysOn ||
+      visibleDays.some((d) => {
+        const v = extractDayModelCompareValue(d, m.id, state.compareVariableId, state.useCelsius);
+        return typeof v === 'number' && !Number.isNaN(v);
+      })
+  );
+
   if (modelToggles) {
-    modelToggles.innerHTML = COMPARE_MODELS.map((m) => {
+    modelToggles.innerHTML = availableModels.map((m) => {
       const isOn = state.enabledCompareModels.has(m.id) || m.alwaysOn;
       return `
         <button class="mode-pill ${isOn ? 'active' : ''}" data-comp-model="${m.id}" type="button" style="border-color:${isOn ? m.color : 'rgba(255,255,255,0.16)'};">
@@ -1539,14 +1550,12 @@ function renderCompareModelsSection(f) {
   });
 
   if (breakdownEl) {
-    const visibleCount = clamp(state.compareHorizonDays, 3, f.days.length);
-    const visibleDays = f.days.slice(0, visibleCount);
     const variable = COMPARE_VARIABLES.find((v) => v.id === state.compareVariableId) || COMPARE_VARIABLES[0];
     const fmtCmp = (val) => {
       if (val === null || val === undefined || Number.isNaN(val)) return '—';
       return `${variable.decimals ? Number(val).toFixed(variable.decimals) : Math.round(val)}${variable.unit}`;
     };
-    const activeModels = COMPARE_MODELS.filter((m) => state.enabledCompareModels.has(m.id) || m.alwaysOn);
+    const activeModels = availableModels.filter((m) => state.enabledCompareModels.has(m.id) || m.alwaysOn);
     const selDayIdx = clamp(state.selectedDayIdx, 0, visibleDays.length - 1);
 
     breakdownEl.innerHTML = `
@@ -2078,37 +2087,30 @@ function initHeaderControls() {
           dropdown.hidden = true;
           searchInput.value = '';
           document.getElementById('search-cluster')?.classList.remove('open');
-          if (picked) loadLocationForecast({ ...picked, explicitChoice: true });
+          if (picked) loadLocationForecast({ ...picked, source: 'search', explicitChoice: true });
         });
       });
     }, 180);
   });
 
-  searchInput?.addEventListener('focus', async () => {
-    if (!searchInput.value.trim()) {
-      const results = PRESET_CITIES;
-      if (!dropdown) return;
+  const showSearchEmptyHelper = () => {
+    if (!searchInput?.value.trim() && dropdown) {
       dropdown.hidden = false;
-      dropdown.innerHTML = results
-        .map(
-          (r, idx) => `
-          <button class="search-result-item" data-res-idx="${idx}" type="button">
-            <span><strong>${r.name}</strong></span>
-            <span style="font-size:11.5px;color:var(--faint);">WFO ${r.wfo}</span>
-          </button>
-        `
-        )
-        .join('');
-      dropdown.querySelectorAll('.search-result-item').forEach((item) => {
-        item.addEventListener('click', () => {
-          const picked = results[Number(item.dataset.resIdx)];
-          dropdown.hidden = true;
-          document.getElementById('search-cluster')?.classList.remove('open');
-          if (picked) loadLocationForecast({ ...picked, explicitChoice: true });
-        });
+      dropdown.innerHTML = `
+        <button id="search-use-gps-btn" class="search-result-item" type="button">
+          <span><strong>⌖ Use my current location</strong></span>
+          <span style="font-size:11.5px;color:var(--blue);">Auto GPS</span>
+        </button>
+        <div class="search-helper-row">Type any US street address, ZIP code, or city above</div>
+      `;
+      document.getElementById('search-use-gps-btn')?.addEventListener('click', () => {
+        dropdown.hidden = true;
+        locateBtn?.click();
       });
     }
-  });
+  };
+
+  searchInput?.addEventListener('focus', showSearchEmptyHelper);
 
   document.addEventListener('click', (e) => {
     if (dropdown && !e.target.closest('.search-box-wrap')) {
@@ -2117,29 +2119,44 @@ function initHeaderControls() {
   });
 
   locateBtn?.addEventListener('click', () => {
-    if (!navigator.geolocation) return;
+    if (!navigator.geolocation) {
+      openModal('Location Not Supported', `<p style="color:var(--muted);">Your browser does not support automatic location lookup. Type your city, ZIP, or street address in the search bar.</p>`);
+      return;
+    }
     const cityNameEl = document.getElementById('city-name');
-    if (cityNameEl) cityNameEl.textContent = 'Finding location…';
+    if (cityNameEl) cityNameEl.textContent = 'Finding your location…';
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
+        state.geoDenied = false;
         const lat = pos.coords.latitude;
         const lon = pos.coords.longitude;
+        const resolvedName = await Promise.race([
+          reverseGeocodeLocation(lat, lon),
+          new Promise((r) => setTimeout(() => r('Current Location'), 1600))
+        ]);
+        const cleanName = resolvedName || 'Current Location';
         try {
-          localStorage.setItem(DEVICE_LOC_KEY, JSON.stringify({ id: 'device', name: 'Device location', latitude: lat, longitude: lon, source: 'device' }));
+          localStorage.setItem(DEVICE_LOC_KEY, JSON.stringify({ id: 'device', name: cleanName, latitude: lat, longitude: lon, source: 'device' }));
         } catch {}
-        const resolvedName = await reverseGeocodeLocation(lat, lon);
         document.getElementById('search-cluster')?.classList.remove('open');
         loadLocationForecast({
           id: 'gps',
-          name: resolvedName,
+          name: cleanName,
           latitude: lat,
           longitude: lon,
           wfo: 'NWS'
         });
       },
       () => {
-        loadLocationForecast(PRESET_CITIES[1] || PRESET_CITIES[0]);
-      }
+        state.geoDenied = true;
+        if (cityNameEl) cityNameEl.textContent = state.forecast?.location?.name || 'Location needed';
+        renderTopCompactPills(state.forecast);
+        openModal(
+          'Allow Location Access',
+          `<p style="color:var(--muted);line-height:1.5;margin-top:0;">To show weather for your exact spot automatically, allow location permission in your browser settings and tap <strong>⌖ Enable Current Location</strong> — or search any address/ZIP above.</p>`
+        );
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
     );
   });
 
@@ -2177,12 +2194,16 @@ function initHeaderControls() {
   const cityPickerBtn = document.getElementById('city-picker-btn');
   mobileSearchBtn?.addEventListener('click', () => {
     const open = searchCluster?.classList.toggle('open');
-    if (open) searchInput?.focus();
+    if (open) {
+      showSearchEmptyHelper();
+      searchInput?.focus();
+    }
   });
   cityPickerBtn?.addEventListener('click', () => {
     if (searchCluster) {
       searchCluster.classList.add('open');
     }
+    showSearchEmptyHelper();
     searchInput?.focus();
   });
 
@@ -2247,31 +2268,6 @@ function initHeaderControls() {
   const audioBtn = document.getElementById('sky-audio-btn');
   audioBtn?.addEventListener('click', () => {
     toggleProceduralSkyAudio(audioBtn);
-  });
-}
-
-function initPresetCityChips() {
-  const wrap = document.getElementById('preset-city-chips');
-  if (!wrap) return;
-  wrap.innerHTML = PRESET_CITIES.map(
-    (c) => `
-      <button class="city-chip ${c.id === state.location.id ? 'active' : ''}" data-city-id="${c.id}" type="button">
-        ${c.name}
-      </button>
-    `
-  ).join('');
-
-  wrap.querySelectorAll('.city-chip').forEach((chip) => {
-    chip.addEventListener('click', () => {
-      const found = PRESET_CITIES.find((c) => c.id === chip.dataset.cityId);
-      if (found) loadLocationForecast({ ...found, explicitChoice: true });
-    });
-  });
-}
-
-function updatePresetChipSelection() {
-  document.querySelectorAll('.city-chip').forEach((chip) => {
-    chip.classList.toggle('active', chip.dataset.cityId === state.location.id);
   });
 }
 
@@ -2555,14 +2551,19 @@ function openWeatherTakeModal(f) {
   const card = canonical ? danCard(b, canonical, Date.now()) : null;
   const overview = canonical ? danOverview(b, canonical, Date.now()) : null;
   const takeDisplay = canonical ? danTakeDisplay(b, canonical, Date.now()) : '';
-  const localDetails = canonical ? forecastOutlookDetails(canonical, Date.now()) : null;
-  const tomorrow = f.days[1] || f.days[0];
-  const laymanCopy =
+
+  const rawTake = cleanTakeJargon(
     takeDisplay && !/unavailable right now/i.test(takeDisplay)
       ? takeDisplay
-      : !/unavailable right now/i.test(overview?.text || '')
+      : overview?.text && !/unavailable right now/i.test(overview.text)
       ? overview.text
-      : f.briefing.summary;
+      : card?.text || f.briefing.summary
+  );
+
+  const paragraphs = String(rawTake || '')
+    .split(/\n{2,}/)
+    .map((p) => p.trim())
+    .filter(Boolean);
 
   openModal(
     `Nourie Weather Take · ${f.location.name}`,
@@ -2580,22 +2581,8 @@ function openWeatherTakeModal(f) {
             </div>`
           : ''
       }
-      <div class="take-modal-card">
-        <div style="font-size:18px;font-weight:800;color:#ffffff;margin-bottom:6px;">${card?.text || b?.headline || f.briefing.headline}</div>
-        <p style="font-size:14px;color:var(--muted);line-height:1.55;margin:0 0 10px;">${localDetails?.summary || b?.summary || f.briefing.summary}</p>
-        <div class="take-layman-box" style="margin-bottom:12px;">Plain-English Weather Office Discussion:\n${laymanCopy}</div>
-        ${
-          localDetails?.extended
-            ? `<div style="font-size:12.5px;color:var(--muted);line-height:1.5;white-space:pre-line;margin-bottom:10px;"><strong>Week Ahead:</strong>\n${localDetails.extended}</div>`
-            : ''
-        }
-        <div class="take-modal-row">
-          <div>
-            <strong>Tomorrow (${tomorrow.dayName})</strong>
-            <div style="font-size:13px;color:var(--muted);">${fmtTemp(tomorrow.lowF)} to ${fmtTemp(tomorrow.highF)} · ${tomorrow.rainChance}% chance of rain</div>
-          </div>
-          <span class="wfo-pill">${tomorrow.confidence.level} agreement</span>
-        </div>
+      <div class="take-layman-box" style="margin:0;white-space:normal;">
+        ${paragraphs.map((p, idx) => `<p style="margin:${idx === 0 ? '0' : '10px 0 0'};line-height:1.58;font-size:14.5px;color:#eaf2ff;">${p.replace(/\n/g, '<br/>')}</p>`).join('')}
       </div>
     `
   );
@@ -2787,7 +2774,7 @@ function openBehindForecastModal(f) {
             ${modelRows.map((m) => `
               <tr>
                 <td><strong style="color:${m.color};">${m.name}</strong></td>
-                <td>${mt[m.key] !== null ? fmtTemp(mt[m.key]) : '—'}</td>
+                <td>${mt[m.key] != null ? fmtTemp(mt[m.key]) : '—'}</td>
                 <td><strong>${ew[m.key] ? Math.round(ew[m.key] * 100) : 0}%</strong></td>
               </tr>
             `).join('')}
@@ -2837,9 +2824,17 @@ async function openModelRankingsModal(f) {
 
     const wn = list.find((r) => r.id === 'weather_nourie');
     const wnPos = wn ? list.indexOf(wn) + 1 : null;
+    const modeExplanation =
+      rankMode === 'temp'
+        ? 'Average degrees off from real recorded temperatures (lower = more accurate).'
+        : rankMode === 'rain'
+        ? 'How often rain vs. dry calls matched real weather (higher % = more accurate).'
+        : rankMode === 'wind'
+        ? 'Average mph off from real recorded wind speeds (lower = more accurate).'
+        : 'Combined 0–100 score from real past temperature, rain & wind checks (higher = better).';
 
     host.innerHTML = `
-      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;justify-content:space-between;align-items:center;">
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;justify-content:space-between;align-items:center;">
         <div style="display:flex;gap:4px;flex-wrap:wrap;">
           ${[
             ['overall', '🏆 Overall'],
@@ -2854,15 +2849,17 @@ async function openModelRankingsModal(f) {
         </div>
       </div>
 
+      <p style="font-size:12.5px;color:var(--muted);margin:0 0 10px;line-height:1.45;">${modeExplanation}</p>
+
       ${wn ? `
         <div style="padding:11px 14px;border-radius:14px;background:rgba(56,189,248,0.14);border:1px solid rgba(56,189,248,0.38);margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;gap:10px;">
           <div>
-            <div style="font-size:11px;font-weight:800;color:#7dd3fc;text-transform:uppercase;">Weather Nourie Standing (${days}d · ${horizon}h lead)</div>
+            <div style="font-size:11px;font-weight:800;color:#7dd3fc;text-transform:uppercase;">Weather Nourie (${days} days · ${horizon}h ahead)</div>
             <div style="font-size:17px;font-weight:800;">Rank #${wnPos} of ${list.length} · Score ${(wn.overallScore ?? wn.accuracyScore ?? 0).toFixed(1)}/100</div>
           </div>
           <div style="text-align:right;font-size:12px;color:var(--muted);">
-            <div>Temp MAE: <strong>${wn.maeF?.toFixed(2) ?? '—'}°F</strong></div>
-            <div>Rain Hit: <strong>${wn.precipHitPct != null ? Math.round(wn.precipHitPct) + '%' : '—'}</strong></div>
+            <div>Avg Temp Diff: <strong>${wn.maeF?.toFixed(1) ?? '—'}°F off</strong></div>
+            <div>Rain Right: <strong>${wn.precipHitPct != null ? Math.round(wn.precipHitPct) + '%' : '—'}</strong></div>
           </div>
         </div>
       ` : ''}
@@ -2870,11 +2867,11 @@ async function openModelRankingsModal(f) {
       <div style="display:flex;flex-direction:column;gap:7px;max-height:360px;overflow-y:auto;">
         ${list.map((r, i) => {
           const scoreVal = rankMode === 'temp'
-            ? `${r.maeF?.toFixed(2) ?? '—'}°F MAE`
+            ? `avg ${r.maeF?.toFixed(1) ?? '—'}°F off`
             : rankMode === 'rain'
-            ? `${r.precipHitPct != null ? Math.round(r.precipHitPct) + '% hit' : '—'}`
+            ? `${r.precipHitPct != null ? Math.round(r.precipHitPct) + '% right' : '—'}`
             : rankMode === 'wind'
-            ? `${r.windMaeMph?.toFixed(1) ?? '—'} mph MAE`
+            ? `avg ${r.windMaeMph?.toFixed(1) ?? '—'} mph off`
             : `${(r.overallScore ?? r.accuracyScore ?? 0).toFixed(1)} / 100`;
           const barPct = rankMode === 'temp'
             ? clamp(r.scores?.temp ?? 65, 10, 100)
@@ -2971,8 +2968,8 @@ function initSkyCanvas() {
         ctx.arc(p.x, p.y * 0.65, p.radius, 0, Math.PI * 2);
         ctx.fill();
       });
-    } else {
-      // Subtle floating solar light motes
+    } else if (mood !== 'cloudy') {
+      // Subtle floating solar light motes (never on overcast/cloudy days)
       particles.slice(0, 35).forEach((p) => {
         ctx.fillStyle = `rgba(255, 232, 175, ${(p.alpha * 0.38).toFixed(2)})`;
         ctx.beginPath();
