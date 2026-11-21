@@ -3523,3 +3523,9 @@ body.awaiting-location .v3-main-stack > :not(#location-needed-card) {
 #skin-exposure, #your-day { display: grid; gap: var(--tile-gap); }
 #skin-exposure > .section-inline-head, #your-day > .section-inline-head { margin: 0 2px; }
 .pavement-peak-note { margin: 10px 0 0; font-size: 11.5px; line-height: 1.45; color: var(--muted); }
+
+/* Always-visible return navigation, independent of the tools drawer. */
+.main-app-return { display: flex; justify-content: flex-end; padding-block: 0 6px; }
+.main-app-button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 40px; padding: 7px 12px; border: 1px solid rgba(209,234,255,.46); border-radius: 9px; background: rgba(12,35,59,.60); color: #f6fbff; font: 600 12px/1.3 var(--font-sans); text-decoration: none; }
+.main-app-button:hover { background: rgba(32,72,109,.82); }
+.main-app-button:focus-visible { outline: 2px solid #d4eaff; outline-offset: 3px; }
