@@ -21,8 +21,9 @@ export function forecastSky(forecast,now=Date.now()){
  if(typeof isDay!=='boolean')return {kind:'unknown',state:'unknown',header:'unknown',image:null};
  if(!isDay){
   const covered=['cloudy','fog','rain','storm','snow'].includes(kind);
-  return {kind,state:'night',header:covered?'night-cloudy':'night',image:covered?'weather-her-bg-cloudy-night-feels-32-59f.webp':'today-sky-night-v2.webp'};
+  return {kind,state:'night',header:covered?'night-cloudy':'night',image:'today-sky-night-v2.webp',overcastCrop:false};
  }
- const image={cloudy:'weather-her-bg-cloudy-day-feels-32-59f.webp',fog:'weather-her-bg-fog-day-feels-32-59f.webp',rain:'today-sky-rain.webp',storm:'today-sky-storm.webp',snow:'weather-her-bg-snow-day-feels-32-49f.webp',clear:'today-sky-clear.webp','partly-cloudy':'today-sky-clouds.webp'}[kind]||null;
- return {kind,state:['rain','storm'].includes(kind)?'rain':kind==='clear'||kind==='partly-cloudy'?'day':kind,header:kind==='clear'?'clear':kind==='partly-cloudy'?'cloudy':kind==='fog'?'cloudy':kind==='storm'?'rain':kind,image};
+ const overcastCrop=['cloudy','fog','snow'].includes(kind);
+ const image={cloudy:'today-sky-rain.webp',fog:'today-sky-rain.webp',rain:'today-sky-rain.webp',storm:'today-sky-storm.webp',snow:'today-sky-rain.webp',clear:'today-sky-clear.webp','partly-cloudy':'today-sky-clouds.webp'}[kind]||null;
+ return {kind,state:['rain','storm'].includes(kind)?'rain':kind==='clear'||kind==='partly-cloudy'?'day':kind,header:kind==='clear'?'clear':kind==='partly-cloudy'?'cloudy':kind==='fog'?'cloudy':kind==='storm'?'rain':kind,image,overcastCrop};
 }

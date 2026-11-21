@@ -732,9 +732,9 @@ export function renderNext24HoursSplineChart({
   const fillGradId = `n24-fill-${metricId}`;
   const isRain = metricId === 'rain';
   const isWind = metricId === 'wind';
-  const cStart = isRain ? '#38bdf8' : isWind ? '#5ce0a0' : '#ff8e3c';
-  const cMid = isRain ? '#60a5fa' : isWind ? '#38bdf8' : '#ffb347';
-  const cEnd = isRain ? '#818cf8' : isWind ? '#7dd3fc' : '#38d9f5';
+  const cStart = isRain ? '#8dc4f0' : isWind ? '#9fd3c7' : '#ecc18d';
+  const cMid = isRain ? '#7db7ea' : isWind ? '#8ec4d8' : '#e5a77e';
+  const cEnd = isRain ? '#9cbbe8' : isWind ? '#9ecae0' : '#d6b69c';
 
   // 8 evenly spaced 3-hour anchor points across the full 24 hours
   const anchorIndices = [0, 3, 6, 9, 12, 15, 18, 21].filter((idx) => idx < slice.length);
@@ -767,32 +767,25 @@ export function renderNext24HoursSplineChart({
             <stop offset="100%" stop-color="${cEnd}"/>
           </linearGradient>
           <linearGradient id="${fillGradId}" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stop-color="${cStart}" stop-opacity="0.44"/>
-            <stop offset="60%" stop-color="${cMid}" stop-opacity="0.14"/>
+            <stop offset="0%" stop-color="${cStart}" stop-opacity="0.22"/>
+            <stop offset="65%" stop-color="${cMid}" stop-opacity="0.06"/>
             <stop offset="100%" stop-color="${cEnd}" stop-opacity="0.0"/>
           </linearGradient>
-          <filter id="n24-glow" x="-5%" y="-25%" width="110%" height="150%">
-            <feGaussianBlur stdDeviation="2.5" result="blur"/>
-            <feMerge>
-              <feMergeNode in="blur"/>
-              <feMergeNode in="SourceGraphic"/>
-            </feMerge>
-          </filter>
         </defs>
 
         ${yTicks
           .map(
             (t) => `
           <line x1="${padL}" y1="${t.y.toFixed(1)}" x2="${W - padR}" y2="${t.y.toFixed(1)}" stroke="rgba(255,255,255,0.09)" stroke-width="1"/>
-          <text x="${padL - 8}" y="${(t.y + 4).toFixed(1)}" text-anchor="end" fill="rgba(210,226,250,0.82)" font-size="11.5" font-weight="700">${t.label}</text>
+          <text x="${padL - 8}" y="${(t.y + 4).toFixed(1)}" text-anchor="end" fill="rgba(225,238,252,0.78)" font-size="11.5" font-weight="600">${t.label}</text>
         `
           )
           .join('')}
 
         <path d="${areaPath}" fill="url(#${fillGradId})"/>
-        <path d="${smoothPath}" fill="none" stroke="url(#${strokeGradId})" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round" filter="url(#n24-glow)"/>
+        <path d="${smoothPath}" fill="none" stroke="url(#${strokeGradId})" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
 
-        <line id="n24-cursor-line" x1="${activePt.x.toFixed(1)}" y1="${padT - 4}" x2="${activePt.x.toFixed(1)}" y2="${(padT + plotH).toFixed(1)}" stroke="rgba(255,255,255,0.48)" stroke-width="1.4" stroke-dasharray="3 3"/>
+        <line id="n24-cursor-line" x1="${activePt.x.toFixed(1)}" y1="${padT - 4}" x2="${activePt.x.toFixed(1)}" y2="${(padT + plotH).toFixed(1)}" stroke="rgba(255,255,255,0.42)" stroke-width="1.2" stroke-dasharray="3 3"/>
 
         ${anchorIndices
           .map((idx) => {
@@ -800,14 +793,14 @@ export function renderNext24HoursSplineChart({
             const valX = idx === 0 ? p.x + 8 : p.x;
             return `
               <g class="n24-anchor-pt" data-h-idx="${idx}" style="cursor:pointer;">
-                <circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="3.6" fill="#ffffff" stroke="${cStart}" stroke-width="1.5"/>
-                <text x="${valX.toFixed(1)}" y="${Math.max(15, p.y - 11).toFixed(1)}" text-anchor="middle" fill="#ffffff" font-size="12.5" font-weight="800">${fmtShort(p.val)}</text>
+                <circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="3.0" fill="#ffffff" stroke="${cStart}" stroke-width="1.3"/>
+                <text x="${valX.toFixed(1)}" y="${Math.max(15, p.y - 10).toFixed(1)}" text-anchor="middle" fill="#ffffff" font-size="12" font-weight="700">${fmtShort(p.val)}</text>
               </g>
             `;
           })
           .join('')}
 
-        <circle id="n24-cursor-dot" cx="${activePt.x.toFixed(1)}" cy="${activePt.y.toFixed(1)}" r="5.5" fill="#ffffff" stroke="${cStart}" stroke-width="2.4"/>
+        <circle id="n24-cursor-dot" cx="${activePt.x.toFixed(1)}" cy="${activePt.y.toFixed(1)}" r="4.6" fill="#ffffff" stroke="${cStart}" stroke-width="2.0"/>
       </svg>
 
       <div class="n24-cols-footer-8" style="padding-left:${footLeftPct.toFixed(2)}%;padding-right:${footRightPct.toFixed(2)}%;">
@@ -954,37 +947,30 @@ export function renderSevenDayDualSplineChart({
       <svg class="d7-dual-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="7-day high and low temperature dual spline chart">
         <defs>
           <linearGradient id="d7-hi-stroke" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stop-color="#ff8c42"/>
-            <stop offset="50%" stop-color="#ff6b35"/>
-            <stop offset="100%" stop-color="#ff9f43"/>
+            <stop offset="0%" stop-color="#eab38c"/>
+            <stop offset="50%" stop-color="#e39c74"/>
+            <stop offset="100%" stop-color="#e8b288"/>
           </linearGradient>
           <linearGradient id="d7-lo-stroke" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stop-color="#38bdf8"/>
-            <stop offset="50%" stop-color="#0ea5e9"/>
-            <stop offset="100%" stop-color="#60a5fa"/>
+            <stop offset="0%" stop-color="#96c7ec"/>
+            <stop offset="50%" stop-color="#7eb8e6"/>
+            <stop offset="100%" stop-color="#9bc4ea"/>
           </linearGradient>
           <linearGradient id="d7-band-fill" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stop-color="#ff7a3d" stop-opacity="0.34"/>
-            <stop offset="100%" stop-color="#0ea5e9" stop-opacity="0.14"/>
+            <stop offset="0%" stop-color="#e39c74" stop-opacity="0.16"/>
+            <stop offset="100%" stop-color="#7eb8e6" stop-opacity="0.06"/>
           </linearGradient>
           <linearGradient id="d7-lo-fill" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stop-color="#0ea5e9" stop-opacity="0.22"/>
-            <stop offset="100%" stop-color="#0ea5e9" stop-opacity="0.0"/>
+            <stop offset="0%" stop-color="#7eb8e6" stop-opacity="0.10"/>
+            <stop offset="100%" stop-color="#7eb8e6" stop-opacity="0.0"/>
           </linearGradient>
-          <filter id="d7-glow" x="-10%" y="-20%" width="120%" height="140%">
-            <feGaussianBlur stdDeviation="2.5" result="blur"/>
-            <feMerge>
-              <feMergeNode in="blur"/>
-              <feMergeNode in="SourceGraphic"/>
-            </feMerge>
-          </filter>
         </defs>
 
         ${yTicks
           .map(
             (t) => `
           <line x1="${padL}" y1="${t.y.toFixed(1)}" x2="${W - padR}" y2="${t.y.toFixed(1)}" stroke="rgba(255,255,255,0.09)" stroke-width="1"/>
-          <text x="${padL - 6}" y="${(t.y + 4).toFixed(1)}" text-anchor="end" fill="rgba(210,226,250,0.82)" font-size="11.5" font-weight="600">${t.label}</text>
+          <text x="${padL - 6}" y="${(t.y + 4).toFixed(1)}" text-anchor="end" fill="rgba(220,234,250,0.78)" font-size="11.5" font-weight="600">${t.label}</text>
         `
           )
           .join('')}
@@ -993,15 +979,15 @@ export function renderSevenDayDualSplineChart({
         ${hiPts
           .map(
             (hp, idx) => `
-          <line x1="${hp.x.toFixed(1)}" y1="${hp.y.toFixed(1)}" x2="${hp.x.toFixed(1)}" y2="${(padT + plotH).toFixed(1)}" stroke="${idx === activeIdx ? 'rgba(255,255,255,0.38)' : 'rgba(255,255,255,0.12)'}" stroke-width="${idx === activeIdx ? '1.5' : '1'}"/>
+          <line x1="${hp.x.toFixed(1)}" y1="${hp.y.toFixed(1)}" x2="${hp.x.toFixed(1)}" y2="${(padT + plotH).toFixed(1)}" stroke="${idx === activeIdx ? 'rgba(255,255,255,0.34)' : 'rgba(255,255,255,0.10)'}" stroke-width="${idx === activeIdx ? '1.3' : '1'}"/>
         `
           )
           .join('')}
 
         <polygon points="${bandPts}" fill="url(#d7-band-fill)"/>
         <path d="${loAreaPath}" fill="url(#d7-lo-fill)"/>
-        <path d="${hiPath}" fill="none" stroke="url(#d7-hi-stroke)" stroke-width="3.4" stroke-linecap="round" filter="url(#d7-glow)"/>
-        <path d="${loPath}" fill="none" stroke="url(#d7-lo-stroke)" stroke-width="3.0" stroke-linecap="round" filter="url(#d7-glow)"/>
+        <path d="${hiPath}" fill="none" stroke="url(#d7-hi-stroke)" stroke-width="2.5" stroke-linecap="round"/>
+        <path d="${loPath}" fill="none" stroke="url(#d7-lo-stroke)" stroke-width="2.3" stroke-linecap="round"/>
 
         ${hiPts
           .map((hp, idx) => {
@@ -1009,10 +995,10 @@ export function renderSevenDayDualSplineChart({
             const isSel = idx === activeIdx;
             return `
               <g data-d7-idx="${idx}" style="cursor:pointer;">
-                <circle cx="${hp.x.toFixed(1)}" cy="${hp.y.toFixed(1)}" r="${isSel ? '4.8' : '3.6'}" fill="#ffffff" stroke="#ff7a3d" stroke-width="1.6"/>
-                <text x="${hp.x.toFixed(1)}" y="${Math.max(15, hp.y - 10).toFixed(1)}" text-anchor="middle" fill="#ffffff" font-size="13.5" font-weight="800">${hp.val}°</text>
-                <circle cx="${lp.x.toFixed(1)}" cy="${lp.y.toFixed(1)}" r="${isSel ? '4.8' : '3.6'}" fill="#ffffff" stroke="#38bdf8" stroke-width="1.6"/>
-                <text x="${lp.x.toFixed(1)}" y="${Math.min(H - 6, lp.y + 18).toFixed(1)}" text-anchor="middle" fill="#9cd8ff" font-size="13" font-weight="700">${lp.val}°</text>
+                <circle cx="${hp.x.toFixed(1)}" cy="${hp.y.toFixed(1)}" r="${isSel ? '4.0' : '3.0'}" fill="#ffffff" stroke="#e39c74" stroke-width="1.4"/>
+                <text x="${hp.x.toFixed(1)}" y="${Math.max(15, hp.y - 9).toFixed(1)}" text-anchor="middle" fill="#ffffff" font-size="12.5" font-weight="700">${hp.val}°</text>
+                <circle cx="${lp.x.toFixed(1)}" cy="${lp.y.toFixed(1)}" r="${isSel ? '4.0' : '3.0'}" fill="#ffffff" stroke="#7eb8e6" stroke-width="1.4"/>
+                <text x="${lp.x.toFixed(1)}" y="${Math.min(H - 6, lp.y + 17).toFixed(1)}" text-anchor="middle" fill="#d0e5f8" font-size="12" font-weight="600">${lp.val}°</text>
               </g>
             `;
           })

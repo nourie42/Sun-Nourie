@@ -14,7 +14,7 @@ function skyFixture(condition='Mostly Cloudy',cloud=94,now=noon){
 }
 test('overcast current conditions use a genuine sun-free scene, regardless of daytime or a stale clear label',async()=>{
  const f=skyFixture(),before=JSON.stringify(f),sky=forecastSky(f,noon);
- assert.equal(sky.state,'cloudy');assert.equal(sky.header,'cloudy');assert.equal(sky.image,'weather-her-bg-cloudy-day-feels-32-59f.webp');
+ assert.equal(sky.state,'cloudy');assert.equal(sky.header,'cloudy');assert.equal(sky.image,'today-sky-rain.webp');assert.equal(sky.overcastCrop,true);
  assert.equal(classifySky('Sunny',94),'cloudy');
  await access(new URL('../public/weather-fusion/'+sky.image,import.meta.url));
  assert.equal(JSON.stringify(f),before);
@@ -30,7 +30,7 @@ test('loading and expired readings do not imply sunshine',()=>{
 });
 test('cloudy nighttime stays dark and never uses the sunny cloud photograph',()=>{
  const night=noon+11*3600000,sky=forecastSky(skyFixture('Overcast',100,night),night);
- assert.equal(sky.state,'night');assert.equal(sky.header,'night-cloudy');assert.equal(sky.image,'weather-her-bg-cloudy-night-feels-32-59f.webp');
+ assert.equal(sky.state,'night');assert.equal(sky.header,'night-cloudy');assert.equal(sky.image,'today-sky-night-v2.webp');
 });
 test('a supported clear daytime report can still select the existing clear scene',()=>{
  assert.equal(forecastSky(skyFixture('Clear',2),noon).image,'today-sky-clear.webp');

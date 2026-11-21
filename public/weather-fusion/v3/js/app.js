@@ -21,7 +21,7 @@ import {
   renderModelCompareChart,
   renderNext24HoursSplineChart,
   renderSevenDayDualSplineChart
-} from './charts.js?v=v3-accuracy-6';
+} from './charts.js?v=v3-accuracy-7';
 import {
   WeatherMapController
 } from './map.js?v=v3-accuracy-5';
@@ -623,13 +623,13 @@ function renderWeatherMeterArcSvg(score) {
     <svg class="meter-arc-svg" viewBox="0 0 112 60" role="img" aria-label="Weather Meter ${score} out of 100">
       <defs>
         <linearGradient id="wm-arc-grad" x1="0%" y1="0%" x2="100%" y2="0%">
-          <stop offset="0%" stop-color="#22c55e"/>
-          <stop offset="55%" stop-color="#eab308"/>
-          <stop offset="100%" stop-color="#f97316"/>
+          <stop offset="0%" stop-color="#78c6a3"/>
+          <stop offset="55%" stop-color="#e4c77b"/>
+          <stop offset="100%" stop-color="#dc8f6c"/>
         </linearGradient>
       </defs>
-      <path d="M ${cx - r} ${cy} A ${r} ${r} 0 0 1 ${cx + r} ${cy}" fill="none" stroke="rgba(255,255,255,0.14)" stroke-width="7" stroke-linecap="round"/>
-      <path d="M ${cx - r} ${cy} A ${r} ${r} 0 0 1 ${cx + r} ${cy}" fill="none" stroke="url(#wm-arc-grad)" stroke-width="7" stroke-linecap="round" stroke-dasharray="${arcLen.toFixed(1)}" stroke-dashoffset="${dashOffset.toFixed(1)}"/>
+      <path d="M ${cx - r} ${cy} A ${r} ${r} 0 0 1 ${cx + r} ${cy}" fill="none" stroke="rgba(255,255,255,0.16)" stroke-width="5.5" stroke-linecap="round"/>
+      <path d="M ${cx - r} ${cy} A ${r} ${r} 0 0 1 ${cx + r} ${cy}" fill="none" stroke="url(#wm-arc-grad)" stroke-width="5.5" stroke-linecap="round" stroke-dasharray="${arcLen.toFixed(1)}" stroke-dashoffset="${dashOffset.toFixed(1)}"/>
       <circle cx="${dotX.toFixed(1)}" cy="${dotY.toFixed(1)}" r="4.5" fill="#ffffff" stroke="#081426" stroke-width="1.5"/>
       <text x="${cx}" y="${cy - 4}" text-anchor="middle" fill="#ffffff" font-size="18" font-weight="800">${score}<tspan font-size="10.5" fill="rgba(200,218,244,0.72)" font-weight="600">/100</tspan></text>
     </svg>
@@ -802,7 +802,7 @@ function renderHeroAndBriefing(f) {
   if (precipEl) precipEl.textContent = `${next24Precip.toFixed(2)}"`;
   if (aqiValEl) {
     aqiValEl.textContent = String(Math.round(aqi));
-    const aqiColor = aqi <= 50 ? '#4ade80' : aqi <= 100 ? '#facc15' : aqi <= 150 ? '#fb923c' : '#f87171';
+    const aqiColor = aqi <= 50 ? '#8fd3b4' : aqi <= 100 ? '#e8cf82' : aqi <= 150 ? '#e8a06e' : '#e58888';
     aqiValEl.style.color = aqiColor;
     if (aqiSubEl) {
       aqiSubEl.textContent = f.airQuality?.label || (aqi <= 50 ? 'Good' : aqi <= 100 ? 'Moderate' : 'Sensitive');
