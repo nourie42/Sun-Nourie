@@ -116,16 +116,22 @@ export class WeatherMapController {
       this.map = L.map(container, {
         center: [latitude, longitude],
         zoom: 8,
+        minZoom: 4,
+        maxZoom: 13,
         zoomControl: true,
-        attributionControl: false
+        attributionControl: false,
+        fadeAnimation: true,
+        zoomAnimation: true
       });
 
       this.map.createPane('weather-base');
       this.map.getPane('weather-base').style.zIndex = 200;
       this.map.createPane('weather-model');
       this.map.getPane('weather-model').style.zIndex = 360;
+      this.map.getPane('weather-model').style.pointerEvents = 'none';
       this.map.createPane('weather-radar');
       this.map.getPane('weather-radar').style.zIndex = 430;
+      this.map.getPane('weather-radar').style.pointerEvents = 'none';
       this.map.createPane('weather-warnings');
       this.map.getPane('weather-warnings').style.zIndex = 500;
 
@@ -133,11 +139,20 @@ export class WeatherMapController {
       this.alertsGroup = L.layerGroup().addTo(this.map);
 
       this.setBasemap(this.activeBasemap);
-      await this.fetchRainViewerFrames();
+      await this.fetchRadarFrames(latitude, longitude);
       this.setLayer(this.activeLayerId);
       this.map.on('moveend zoomend', () => this.renderDynamicFieldCanvas());
+
+      // Keep Leaflet canvas sharp when tabs/sections resize or scroll
+      if (typeof ResizeObserver !== 'undefined') {
+        const ro = new ResizeObserver(() => this.map?.invalidateSize({ pan: false }));
+        ro.observe(container);
+      }
+      setTimeout(() => this.map?.invalidateSize({ pan: false }), 120);
     } else {
       this.map.setView([latitude, longitude], this.map.getZoom(), { animate: true });
+      await this.fetchRadarFrames(latitude, longitude);
+      if (this.activeLayerId === 'radar') this.setLayer('radar');
     }
 
     this.renderLocationAndProximityRings(forecast);
@@ -145,28 +160,45 @@ export class WeatherMapController {
     this.renderDynamicFieldCanvas();
   }
 
-  async fetchRainViewerFrames() {
-    // Use official NOAA / Iowa State Mesonet NEXRAD 5-minute composite reflectivity archive
-    // which supports all zoom levels with zero watermarks or API key gates.
-    const offsets = [
-      { suffix: '-m50m', minsAgo: 50 },
-      { suffix: '-m45m', minsAgo: 45 },
-      { suffix: '-m40m', minsAgo: 40 },
-      { suffix: '-m35m', minsAgo: 35 },
-      { suffix: '-m30m', minsAgo: 30 },
-      { suffix: '-m25m', minsAgo: 25 },
-      { suffix: '-m20m', minsAgo: 20 },
-      { suffix: '-m15m', minsAgo: 15 },
-      { suffix: '-m10m', minsAgo: 10 },
-      { suffix: '-m05m', minsAgo: 5 },
-      { suffix: '', minsAgo: 0 }
-    ];
-    const now = Date.now();
-    this.rainViewerFrames = offsets.map((o) => ({
-      time: now - o.minsAgo * 60000,
-      tileUrl: `https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/nexrad-n0q-900913${o.suffix}/{z}/{x}/{y}.png`,
-      minsAgo: o.minsAgo
-    }));
+  async fetchRadarFrames(lat = 35.78, lon = -78.48) {
+    // Primary: official NOAA MRMS observed reflectivity WMS via our verified /api/weather-fusion/radar endpoint
+    try {
+      const res = await fetch(`/api/weather-fusion/radar?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}`, {
+        cache: 'no-store'
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data.frames) && data.frames.length) {
+          this.radarSource = { type: 'wms', url: data.url, layer: data.layer };
+          this.rainViewerFrames = data.frames.map((iso, idx, arr) => ({
+            time: Date.parse(iso) || Date.now(),
+            isoTime: iso,
+            isLive: idx === arr.length - 1
+          }));
+          return;
+        }
+      }
+    } catch {}
+
+    // Fallback: RainViewer public radar API (clean crisp composite PNG tiles, no blocky mesonet noise)
+    try {
+      const rv = await fetch('https://api.rainviewer.com/public/weather-maps.json');
+      if (rv.ok) {
+        const json = await rv.json();
+        const past = json?.radar?.past || [];
+        if (past.length) {
+          this.radarSource = { type: 'xyz', host: json.host || 'https://tilecache.rainviewer.com' };
+          this.rainViewerFrames = past.slice(-8).map((f, idx, arr) => ({
+            time: f.time * 1000,
+            tileUrl: `${this.radarSource.host}${f.path}/256/{z}/{x}/{y}/2/1_1.png`,
+            isLive: idx === arr.length - 1
+          }));
+          return;
+        }
+      }
+    } catch {}
+
+    this.rainViewerFrames = [];
   }
 
   setBasemap(mode = 'dark') {
@@ -193,6 +225,8 @@ export class WeatherMapController {
       pane: 'weather-base',
       maxZoom: 16,
       maxNativeZoom: 15,
+      updateWhenIdle: true,
+      keepBuffer: 2,
       className
     }).addTo(this.map);
   }
@@ -208,31 +242,23 @@ export class WeatherMapController {
     const hours = this.currentForecast?.hours48 || [];
 
     if (layerId === 'radar') {
-      if (!this.rainViewerFrames.length) {
-        this.fetchRainViewerFrames();
-      }
-      this.frames = this.rainViewerFrames.map((f) => ({
-        label:
-          f.minsAgo === 0
-            ? `${new Date(f.time).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })} (Live NEXRAD)`
-            : `${new Date(f.time).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })} (-${f.minsAgo}m)`,
+      this.frames = (this.rainViewerFrames || []).map((f) => ({
+        label: f.isLive
+          ? `${new Date(f.time).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })} (Live Radar)`
+          : new Date(f.time).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
+        isoTime: f.isoTime,
         tileUrl: f.tileUrl,
         timestamp: f.time
       }));
       this.currentFrameIdx = Math.max(0, this.frames.length - 1);
     } else if (layerId === 'hrrr') {
-      const fHours = ['0000', '0100', '0200', '0300', '0400', '0500', '0600', '0900', '1200', '1500', '1800'];
-      this.frames = fHours.map((fh, idx) => {
-        const hObj = hours[idx] || hours[0];
-        return {
-          label: `HRRR +${parseInt(fh, 10) / 100}h · ${hObj ? hObj.hourLabel : 'Forecast'}`,
-          tileUrl: `https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/hrrr::REFD-F${fh}-0/{z}/{x}/{y}.png`,
-          hourIdx: idx
-        };
-      });
+      this.frames = hours.slice(0, 18).map((h, idx) => ({
+        label: `HRRR +${idx}h · ${h.hourLabel}`,
+        hourIdx: idx,
+        hour: h
+      }));
       this.currentFrameIdx = 0;
     } else {
-      // Model forecast layers (ECMWF rain, NBM rain, Temperature, Wind, Clouds) across 24 forecast steps
       this.frames = hours.slice(0, 24).map((h, idx) => ({
         label: `${h.dateObj.toLocaleDateString('en-US', { weekday: 'short' })} ${h.hourLabel} (+${idx}h)`,
         hourIdx: idx,
@@ -248,17 +274,39 @@ export class WeatherMapController {
     if (!this.map || typeof window.L === 'undefined') return;
     const L = window.L;
     const frame = this.frames[this.currentFrameIdx];
-    if (!frame) return;
 
     this.weatherTileLayers.forEach((l) => this.map.removeLayer(l));
     this.weatherTileLayers = [];
 
-    if (frame.tileUrl) {
+    if (frame?.isoTime && this.radarSource?.type === 'wms') {
+      const wms = L.tileLayer.wms(this.radarSource.url, {
+        pane: 'weather-radar',
+        layers: this.radarSource.layer,
+        format: 'image/png',
+        transparent: true,
+        version: '1.1.1',
+        time: frame.isoTime,
+        opacity: 0.78,
+        updateWhenIdle: true,
+        keepBuffer: 2,
+        className: 'radar-crisp-layer'
+      });
+      wms.on('tileerror', () => {
+        // Silently avoid glitchy broken tile icons
+      });
+      wms.addTo(this.map);
+      this.weatherTileLayers.push(wms);
+    } else if (frame?.tileUrl) {
       const tl = L.tileLayer(frame.tileUrl, {
         pane: 'weather-radar',
         opacity: 0.78,
-        maxZoom: 16
-      }).addTo(this.map);
+        maxZoom: 12,
+        updateWhenIdle: true,
+        keepBuffer: 2,
+        className: 'radar-crisp-layer'
+      });
+      tl.on('tileerror', () => {});
+      tl.addTo(this.map);
       this.weatherTileLayers.push(tl);
     }
 
@@ -268,7 +316,7 @@ export class WeatherMapController {
       this.onFrameChange({
         frameIdx: this.currentFrameIdx,
         totalFrames: this.frames.length,
-        label: frame.label,
+        label: frame?.label || 'Live Radar',
         layer: MAP_LAYERS.find((m) => m.id === this.activeLayerId) || MAP_LAYERS[0]
       });
     }

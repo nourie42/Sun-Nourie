@@ -23,11 +23,11 @@ export const HOURLY_METRICS = [
 ];
 
 export const COMPARE_MODELS = [
-  { id: 'blend', label: 'Weather Nourie blend', color: '#ffffff', width: 4.4, alwaysOn: true },
+  { id: 'blend', label: 'Weather Nourie', color: '#ffffff', glowColor: 'rgba(122, 214, 255, 0.55)', width: 5.5, alwaysOn: true },
   { id: 'nws', label: 'NWS Official', color: '#6bc5ff', width: 2.0 },
   { id: 'hrrr', label: 'HRRR 3km', color: '#ff9f5a', width: 2.0 },
-  { id: 'nbm', label: 'National Blend (NBM)', color: '#5ce0a0', width: 2.0 },
-  { id: 'ecmwf', label: 'ECMWF IFS 0.25°', color: '#b88cff', width: 2.0 },
+  { id: 'nbm', label: 'National Blend', color: '#5ce0a0', width: 2.0 },
+  { id: 'ecmwf', label: 'ECMWF IFS', color: '#b88cff', width: 2.0 },
   { id: 'gefs', label: 'GEFS Ensemble', color: '#ffd166', width: 1.8 },
   { id: 'weathernext', label: 'WeatherNext AI', color: '#ff7eb6', width: 2.0 }
 ];
@@ -410,11 +410,11 @@ export function renderModelCompareChart({
   }
 
   const W = 900;
-  const H = 290;
-  const padL = 44;
-  const padR = 32;
-  const padT = 26;
-  const padB = 42;
+  const H = 310;
+  const padL = 46;
+  const padR = 26;
+  const padT = 32;
+  const padB = 40;
   const plotW = W - padL - padR;
   const plotH = H - padT - padB;
 
@@ -435,7 +435,7 @@ export function renderModelCompareChart({
   } else {
     const span = maxV - minV;
     minV -= span * 0.14;
-    maxV += span * 0.16;
+    maxV += span * 0.18;
     if (['qpf', 'rainChance', 'wind', 'cloudCover', 'uvIndex', 'snow', 'aqi'].includes(variableId)) {
       minV = Math.max(0, minV);
     }
@@ -444,8 +444,14 @@ export function renderModelCompareChart({
   const xForDay = (i) => padL + (i / Math.max(1, days.length - 1)) * plotW;
   const yForVal = (v) => padT + plotH - clamp((v - minV) / (maxV - minV || 1), 0, 1) * plotH;
 
-  // Build model paths
-  const modelPathsSvg = COMPARE_MODELS.map((m) => {
+  // Draw individual models first, and Weather Nourie Blend last so it stays prominent on top
+  const orderedModels = [
+    ...COMPARE_MODELS.filter((m) => m.id !== 'blend'),
+    ...COMPARE_MODELS.filter((m) => m.id === 'blend')
+  ];
+
+  let blendAreaSvg = '';
+  const modelPathsSvg = orderedModels.map((m) => {
     if (!enabledModels.has(m.id) && !m.alwaysOn) return '';
     const pts = [];
     days.forEach((d, idx) => {
@@ -455,27 +461,38 @@ export function renderModelCompareChart({
       }
     });
     if (pts.length < 2) return '';
-    const pathD = buildSmoothSvgPath(pts, 0.18);
+    const pathD = buildSmoothSvgPath(pts, 0.2);
     const isBlend = m.id === 'blend';
+    if (isBlend) {
+      const areaD = `${pathD} L ${pts[pts.length - 1].x.toFixed(1)} ${(padT + plotH).toFixed(1)} L ${pts[0].x.toFixed(1)} ${(padT + plotH).toFixed(1)} Z`;
+      blendAreaSvg = `<path d="${areaD}" fill="url(#cmp-blend-area)"/>`;
+    }
     return `
       <g class="compare-model-series" data-model="${m.id}">
-        <path d="${pathD}" fill="none" stroke="${m.color}" stroke-width="${m.width}" stroke-linecap="round" opacity="${isBlend ? '1' : '0.84'}"/>
+        ${
+          isBlend
+            ? `<path d="${pathD}" fill="none" stroke="rgba(88, 198, 255, 0.42)" stroke-width="11" stroke-linecap="round" filter="url(#cmp-glow)"/>`
+            : ''
+        }
+        <path d="${pathD}" fill="none" stroke="${m.color}" stroke-width="${isBlend ? 5.6 : m.width}" stroke-linecap="round" stroke-linejoin="round" opacity="${isBlend ? '1' : '0.72'}"/>
         ${pts
-          .map(
-            (p) => `
-          <circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="${isBlend ? '4.5' : '3'}" fill="${m.color}" stroke="#0d1b32" stroke-width="1.4"/>
-          ${
-            isBlend
-              ? `<g transform="translate(${p.x.toFixed(1)}, ${(p.y - 11).toFixed(1)})">
-                  <rect x="-18" y="-12" width="36" height="16" rx="6" fill="rgba(9,18,34,0.86)" stroke="rgba(255,255,255,0.28)" stroke-width="0.8"/>
-                  <text text-anchor="middle" y="-1" fill="#ffffff" font-size="10.5" font-weight="700">${
-                    variable.decimals ? p.val.toFixed(variable.decimals) : Math.round(p.val)
-                  }${variable.unit}</text>
-                </g>`
-              : ''
-          }
-        `
-          )
+          .map((p, idx) => {
+            const isSel = p.dayIdx === selectedDayIdx;
+            const showPill = isBlend && (isSel || idx % 2 === 0 || idx === pts.length - 1);
+            return `
+              <circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="${isBlend ? (isSel ? '6.5' : '4.8') : (isSel ? '4.2' : '2.6')}" fill="${m.color}" stroke="${isBlend ? '#0c2340' : '#081426'}" stroke-width="${isBlend ? '2' : '1'}"/>
+              ${
+                showPill
+                  ? `<g transform="translate(${p.x.toFixed(1)}, ${(p.y - 13).toFixed(1)})">
+                      <rect x="-20" y="-13" width="40" height="17" rx="8" fill="${isSel ? 'rgba(14, 165, 233, 0.94)' : 'rgba(9, 20, 40, 0.9)'}" stroke="${isSel ? '#ffffff' : 'rgba(140, 205, 255, 0.42)'}" stroke-width="${isSel ? '1.3' : '0.9'}"/>
+                      <text text-anchor="middle" y="-1" fill="#ffffff" font-size="11.5" font-weight="800">${
+                        variable.decimals ? p.val.toFixed(variable.decimals) : Math.round(p.val)
+                      }${variable.unit}</text>
+                    </g>`
+                  : ''
+              }
+            `;
+          })
           .join('')}
       </g>
     `;
@@ -495,24 +512,36 @@ export function renderModelCompareChart({
   const selX = xForDay(selIdx);
 
   containerEl.innerHTML = `
-    <svg class="compare-models-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
+    <svg class="compare-models-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet">
+      <defs>
+        <linearGradient id="cmp-blend-area" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#58b8ff" stop-opacity="0.22"/>
+          <stop offset="100%" stop-color="#58b8ff" stop-opacity="0.0"/>
+        </linearGradient>
+        <filter id="cmp-glow" x="-10%" y="-25%" width="120%" height="150%">
+          <feGaussianBlur stdDeviation="4" result="b"/>
+          <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+      </defs>
+
       ${yTicks
         .map(
           (t) => `
-        <line x1="${padL}" y1="${t.y.toFixed(1)}" x2="${W - padR}" y2="${t.y.toFixed(1)}" stroke="rgba(255,255,255,0.09)"/>
-        <text x="${padL - 8}" y="${(t.y + 4).toFixed(1)}" text-anchor="end" fill="rgba(205,222,248,0.72)" font-size="11.5">${t.label}</text>
+        <line x1="${padL}" y1="${t.y.toFixed(1)}" x2="${W - padR}" y2="${t.y.toFixed(1)}" stroke="rgba(255,255,255,0.08)"/>
+        <text x="${padL - 8}" y="${(t.y + 4).toFixed(1)}" text-anchor="end" fill="rgba(205,222,248,0.72)" font-size="12.5" font-weight="500">${t.label}</text>
       `
         )
         .join('')}
 
-      <line x1="${selX.toFixed(1)}" y1="${padT}" x2="${selX.toFixed(1)}" y2="${padT + plotH}" stroke="rgba(255,255,255,0.35)" stroke-width="1.5" stroke-dasharray="4 4"/>
+      ${blendAreaSvg}
+      <line x1="${selX.toFixed(1)}" y1="${padT}" x2="${selX.toFixed(1)}" y2="${padT + plotH}" stroke="rgba(122, 198, 255, 0.55)" stroke-width="1.8" stroke-dasharray="4 4"/>
 
       ${modelPathsSvg}
 
       ${days
         .map(
           (d, i) => `
-        <text x="${xForDay(i).toFixed(1)}" y="${H - 14}" text-anchor="middle" fill="${i === selIdx ? '#ffffff' : 'rgba(200,218,245,0.74)'}" font-size="12" font-weight="${i === selIdx ? '700' : '500'}">${d.shortWeekday}</text>
+        <text x="${xForDay(i).toFixed(1)}" y="${H - 12}" text-anchor="middle" fill="${i === selIdx ? '#ffffff' : 'rgba(200,218,245,0.76)'}" font-size="13.5" font-weight="${i === selIdx ? '800' : '600'}">${d.shortWeekday}</text>
       `
         )
         .join('')}

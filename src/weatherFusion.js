@@ -41,6 +41,7 @@ import {createWinterModelService} from './weatherFusionWinterModels.js';
 import {createModelSnowMapService} from './weatherFusionModelSnowMap.js';
 import {retainOfficialFeed,criticalOfficialUrl,validateOfficialPayload} from './weatherFusionOfficialRecovery.js';
 import {COMFORT_SCENE_ASSETS,PET_WALKER_FILES} from '../public/weather-fusion/exposure-scene.js';
+import {PORTRAIT_FILES} from '../public/weather-fusion/weather-portraits.js';
 import {recoverForecastHours,recoverDailyConditions} from './weatherFusionFallback.js';
 import {addConditionConfidence} from './weatherFusionConditionConfidence.js';
 
@@ -839,6 +840,8 @@ export function registerWeatherFusionRoutes(app, options = {}) {
     'pwa-bridge.css','pwa-bridge.js','pwa-192x192.png','pwa-512x512.png','pwa-maskable-512x512.png','apple-touch-icon.png',
     ...COMFORT_SCENE_ASSETS,
     ...PET_WALKER_FILES,
+    ...PORTRAIT_FILES,
+    'weather-portraits.js',
     'pet-walker-art.js',
     'main-hourly-trend.js','main-hourly-trend.css','calendar-day.js','forecast-windows.js','forecast-window-banners.js','forecast-window-banners.css','forecast-status.js','forecast-refresh.js','weather-freshness.js','live-alerts.js','urgent-alerts.css',
     'seven-day.js','seven-day.css','seven-day-art.css',

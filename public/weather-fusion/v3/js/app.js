@@ -9,10 +9,7 @@ import {
   fetchCompleteFusionForecast,
   searchLocations
 } from './fusion-engine.js';
-import {
-  renderExposureArtworkSvg,
-  renderWeatherIconSvg
-} from './icons.js';
+import { renderWeatherIconSvg } from './icons.js';
 import {
   COMPARE_MODELS,
   COMPARE_VARIABLES,
@@ -28,6 +25,8 @@ import {
   MAP_LAYERS,
   WeatherMapController
 } from './map.js';
+import { dogWalkerScene, referenceScene } from '../../exposure-scene.js?v=true-night-art-v6';
+import { selectWeatherPortrait } from '../../weather-portraits.js?v=weather-portraits-v1';
 
 const state = {
   location: PRESET_CITIES[1] || PRESET_CITIES[0],
@@ -113,14 +112,11 @@ function renderAll() {
   renderHeroAndBriefing(f);
   renderNext24QuickCard(f);
   renderSevenDayForecast(f);
-  renderHourlyExplorerSection(f);
   renderOutdoorExposureCards(f);
-  renderModelExplanationSection(f);
-  renderCompareModelsSection(f);
-  renderBestTimesHeatmap(f);
-  renderDewPointFeelMeter(f);
   renderAqiAndGlanceTiles(f);
-  renderScientificFeedsAndAfd(f);
+  renderMainStyleCarWashCard(f);
+  renderBestTimesHeatmap(f);
+  renderCompareModelsSection(f);
 
   if (state.mapController) {
     state.mapController.init(f);
@@ -216,7 +212,8 @@ function renderWindowBanners(f) {
     card.addEventListener('click', () => {
       const b = f.windows.banners[Number(card.dataset.winIdx)];
       if (!b) return;
-      openHourlyListModal(b.title, b.subtitle, b.hours.length ? b.hours : f.hours48.slice(0, 12));
+      state.selectedMetricId = b.type === 'rain' ? 'rainChance' : 'temp';
+      open48hExplorerModal(f);
     });
   });
 }
@@ -368,18 +365,73 @@ function getDewPointVerdict(dpF) {
   return 'Oppressive';
 }
 
+function selectHeroPortraitInfo(cur) {
+  const portrait = selectWeatherPortrait({
+    condition: cur.condition,
+    temperature: cur.tempF,
+    feels: cur.feelsLikeF,
+    isDay: Boolean(cur.isDay),
+    skyCover: cur.cloudCover,
+    rainNow: (cur.precipIn || 0) >= 0.02 || (cur.rainChance || 0) >= 60
+  });
+  if (portrait?.available && portrait.file) {
+    return `/weather-fusion/${portrait.file}?v=weather-portraits-v1`;
+  }
+  return cur.isDay
+    ? '/weather-fusion/weather-her-partly-cloudy-day-feels-32-59f.webp'
+    : '/weather-fusion/weather-her-cloudy-night-feels-32-59f.webp';
+}
+
+function buildWardrobeAdvice(feelsF, cur) {
+  const isRain = (cur.rainChance || 0) >= 50 || (cur.precipIn || 0) >= 0.02;
+  const windy = (cur.windMph || 0) >= 16;
+  if (feelsF < 32) {
+    return {
+      title: 'Heavy Winter Layers',
+      items: ['Insulated coat or parka', 'Warm sweater + long pants', 'Gloves, scarf & warm hat', isRain ? 'Waterproof boots' : 'Closed insulated shoes']
+    };
+  }
+  if (feelsF < 48) {
+    return {
+      title: 'Chilly Weather Layers',
+      items: [isRain ? 'Lined waterproof jacket' : 'Medium jacket or fleece', 'Long-sleeve shirt', 'Jeans or trousers', windy ? 'Wind-blocking outer layer' : 'Closed-toe shoes']
+    };
+  }
+  if (feelsF < 64) {
+    return {
+      title: isRain ? 'Cool & Rain-Ready' : 'Comfortable Jacket Weather',
+      items: [isRain ? 'Light rain shell or umbrella' : 'Light jacket, hoodie, or cardigan', 'T-shirt or breathable base layer', 'Long pants or leggings', 'Everyday sneakers']
+    };
+  }
+  if (feelsF < 78) {
+    return {
+      title: isRain ? 'Mild with Umbrella' : 'Easy Pleasant Layers',
+      items: ['Short sleeves or light shirt', isRain ? 'Compact umbrella handy' : 'Light optional wrap for evening', 'Shorts or light pants', 'Sunglasses for bright spells']
+    };
+  }
+  return {
+    title: 'Warm & Breathable',
+    items: ['Lightweight short sleeves', 'Shorts or breezy fabrics', 'Sunglasses & SPF protection', 'Carry water outdoors']
+  };
+}
+
 function renderHeroAndBriefing(f) {
   const cur = f.current;
   const today = f.days[0];
   const aqi = f.airQuality?.currentAqi ?? 38;
 
-  // Dynamic cinematic photographic backdrop matching current conditions
+  // Dynamic cinematic photographic backdrop + weather-matched outdoor person portrait
   const heroBg = document.getElementById('hero-bg-photo');
   if (heroBg) {
     const nextSrc = selectHeroBackdropPhoto(cur);
     if (heroBg.getAttribute('src') !== nextSrc) {
       heroBg.setAttribute('src', nextSrc);
     }
+  }
+  const personUrl = selectHeroPortraitInfo(cur);
+  const heroPerson = document.getElementById('hero-person-photo');
+  if (heroPerson && heroPerson.getAttribute('src') !== personUrl) {
+    heroPerson.setAttribute('src', personUrl);
   }
 
   const dateEl = document.getElementById('hero-date');
@@ -406,10 +458,15 @@ function renderHeroAndBriefing(f) {
     hiloEl.innerHTML = `High <strong>${fmtTemp(today.highF)}</strong> &nbsp;|&nbsp; Low <strong>${fmtTemp(today.lowF)}</strong>`;
   }
 
-  // Frosted "Weather Take" Banner Copy
+  // Frosted "Weather Take" Banner Copy (consumer plain-English summary)
   const takeBannerCopy = document.getElementById('take-banner-copy');
   if (takeBannerCopy) {
-    takeBannerCopy.textContent = f.briefing.headline || f.briefing.summary || 'Live multi-model consensus active.';
+    const tomorrow = f.days[1] || today;
+    const rainNote =
+      today.rainChance >= 35
+        ? `Rain chance reaches ${today.rainChance}% today.`
+        : `Dry stretch holding today with ${tomorrow.shortWeekday} trending ${tomorrow.highF > today.highF ? 'warmer' : 'comfortable'}.`;
+    takeBannerCopy.textContent = `${cur.condition} · ${rainNote}`;
   }
 
   // 4-Column Quick Stats Glass Strip
@@ -430,7 +487,7 @@ function renderHeroAndBriefing(f) {
     const aqiColor = aqi <= 50 ? '#4ade80' : aqi <= 100 ? '#facc15' : aqi <= 150 ? '#fb923c' : '#f87171';
     aqiValEl.style.color = aqiColor;
     if (aqiSubEl) {
-      aqiSubEl.textContent = f.airQuality?.category || (aqi <= 50 ? 'Good' : aqi <= 100 ? 'Moderate' : 'Sensitive');
+      aqiSubEl.textContent = f.airQuality?.label || (aqi <= 50 ? 'Good' : aqi <= 100 ? 'Moderate' : 'Sensitive');
       aqiSubEl.style.color = aqiColor;
     }
   }
@@ -453,32 +510,15 @@ function renderHeroAndBriefing(f) {
 
   if (trioFeelsLbl) trioFeelsLbl.textContent = feelsVerdict.label;
   if (trioFeelsNote) trioFeelsNote.textContent = feelsVerdict.note;
-  if (trioOutfitEl) trioOutfitEl.innerHTML = renderOutfitGraphicSvg(cur.feelsLikeF ?? cur.tempF, isRainNow);
+  if (trioOutfitEl) {
+    trioOutfitEl.innerHTML = `<img src="${personUrl}" alt="Recommended attire for ${cur.condition}" />`;
+  }
   if (trioDpVal) trioDpVal.textContent = fmtTemp(cur.dewPointF);
   if (trioDpLbl) trioDpLbl.textContent = getDewPointVerdict(cur.dewPointF ?? 50);
   if (trioWindSpd) trioWindSpd.textContent = String(Math.round(cur.windMph ?? 0));
   if (trioWindUnit) trioWindUnit.textContent = `mph ${cur.windCardinal || 'N'}`;
   if (trioWindGust) trioWindGust.textContent = `Gusts ${Math.round(cur.windGustMph ?? cur.windMph ?? 0)} mph`;
   if (trioCompass) trioCompass.innerHTML = renderCompassSvg(cur.windDirDeg ?? 45);
-
-  // Full Nourie Weather Take Section
-  const takeHead = document.getElementById('take-headline');
-  const takeSum = document.getElementById('take-summary');
-  const takeBullets = document.getElementById('take-bullets');
-  const riskPill = document.getElementById('risk-outlook-pill');
-
-  if (takeHead) takeHead.textContent = f.briefing.headline;
-  if (takeSum) takeSum.textContent = f.briefing.summary;
-  if (riskPill && f.briefing.riskOutlook) {
-    riskPill.textContent = `${f.briefing.riskOutlook.agency}: ${f.briefing.riskOutlook.level}`;
-    riskPill.style.color = f.briefing.riskOutlook.color;
-    riskPill.style.borderColor = f.briefing.riskOutlook.color;
-  }
-  if (takeBullets) {
-    takeBullets.innerHTML = f.briefing.bullets
-      .map((b) => `<li><strong>${b.label}:</strong> ${b.text}</li>`)
-      .join('');
-  }
 }
 
 function renderNext24QuickCard(f) {
@@ -658,17 +698,22 @@ function renderOutdoorExposureCards(f) {
   const pave = f.pavement;
   const isRaining = cur.rainChance >= 50 || cur.precipIn >= 0.01;
   const sunWindow = f.windows?.sunHours?.[0];
+  const sceneCtx = { pop: cur.rainChance, rainExpected: isRaining, snowExpected: /snow|flurr/i.test(cur.condition || '') };
+
+  const shadeSvg = referenceScene(0, Boolean(cur.isDay), cur.condition || 'Clear', cur.shadeFeelsF, sceneCtx);
+  const sunSvg = referenceScene(1, Boolean(cur.isDay), cur.condition || 'Clear', isRaining ? cur.rainFeelsF : cur.sunFeelsF, sceneCtx);
+  const petsSvg = dogWalkerScene(Boolean(cur.isDay), cur.condition || 'Clear', cur.feelsLikeF, sceneCtx);
 
   const concretePct = clamp(((pave.concreteTempF - 30) / 120) * 100, 8, 100);
   const asphaltPct = clamp(((pave.asphaltTempF - 30) / 120) * 100, 8, 100);
 
   container.innerHTML = `
-    <!-- Card 1: In the Shade -->
+    <!-- Card 1: In the Shade (Real Illustrated Main-Page Artwork) -->
     <article class="glass exposure-card">
-      <div class="exposure-art-banner">
-        ${renderExposureArtworkSvg('shade', { isDay: cur.isDay })}
+      <div class="exposure-art-banner exposure-real-scene">
+        ${shadeSvg}
         <div class="exposure-art-overlay">
-          <span class="exposure-tag">In the Shade · UTCI / Steadman</span>
+          <span class="exposure-tag">In the Shade</span>
         </div>
       </div>
       <div class="exposure-body">
@@ -677,20 +722,20 @@ function renderOutdoorExposureCards(f) {
           <span class="wfo-pill">Air ${fmtTemp(cur.tempF)}</span>
         </div>
         <div style="font-size:14px;font-weight:700;color:#ffffff;">
-          ${cur.shadeFeelsF < cur.tempF ? `Breeze cools shade by ${cur.tempF - cur.shadeFeelsF}°F` : 'Calm air keeps shade near ambient'}
+          ${cur.shadeFeelsF < cur.tempF ? `Breeze cools shade by ${Math.round(cur.tempF - cur.shadeFeelsF)}°` : 'Calm air in the shade'}
         </div>
         <p style="font-size:12.5px;color:var(--muted);margin:0;">
-          Computed via Weather Nourie's hybrid UTCI → Steadman → NWS Wind Chill curve (${cur.windMph} mph wind, ${cur.humidity}% RH, wet-bulb ${fmtTemp(cur.wetBulbF)}).
+          With ${cur.windMph} mph breeze and ${cur.humidity}% humidity, shaded outdoor air feels ${getFeelsVerdict(cur.shadeFeelsF, isRaining).label.toLowerCase()}.
         </p>
       </div>
     </article>
 
-    <!-- Card 2: In Direct Sun / Active Precip -->
+    <!-- Card 2: In Direct Sun / Rain Chill (Real Illustrated Main-Page Artwork) -->
     <article class="glass exposure-card">
-      <div class="exposure-art-banner">
-        ${renderExposureArtworkSvg('sun', { isRaining, isDay: cur.isDay })}
+      <div class="exposure-art-banner exposure-real-scene">
+        ${sunSvg}
         <div class="exposure-art-overlay">
-          <span class="exposure-tag">${isRaining ? 'Wet Exposure · Rain Chill' : 'In Direct Sun · Solar ERF'}</span>
+          <span class="exposure-tag">${isRaining ? 'In the Rain' : cur.isDay ? 'In Direct Sun' : 'Evening Air'}</span>
         </div>
       </div>
       <div class="exposure-body">
@@ -698,29 +743,33 @@ function renderOutdoorExposureCards(f) {
           <span class="exposure-big-temp" style="color:${isRaining ? '#7ac6ff' : '#ffd470'};">
             ${fmtTemp(isRaining ? cur.rainFeelsF : cur.sunFeelsF)}
           </span>
-          <span class="wfo-pill">${isRaining ? `${cur.rainChance}% Rain Score` : `+${cur.sunDeltaF}°F Solar Delta`}</span>
+          <span class="wfo-pill">${isRaining ? `${cur.rainChance}% Rain` : cur.uvIndex > 0 ? `UV ${cur.uvIndex}` : 'After Dusk'}</span>
         </div>
         <div style="font-size:14px;font-weight:700;color:#ffffff;">
           ${
             isRaining
-              ? 'Evaporative moisture & breeze lower outdoor apparent temp'
-              : `Shortwave flux: ${cur.shortwaveWm2} W/m² · UV Index ${cur.uvIndex}`
+              ? 'Damp breeze makes it feel cooler outside'
+              : cur.sunDeltaF >= 3
+              ? `Sunlight adds +${cur.sunDeltaF}° warmth`
+              : cur.isDay
+              ? 'Clouds soften direct sun warmth'
+              : 'Cooler evening temperatures settling in'
           }
         </div>
         <p style="font-size:12.5px;color:var(--muted);margin:0;">
           ${
             sunWindow
-              ? `Next bright sun window: <strong>${sunWindow.hourLabel}</strong> (${fmtTemp(sunWindow.tempF)}, ${100 - sunWindow.cloudCover}% clear).`
-              : 'Cloud deck limits direct solar radiative gain across upcoming daylight hours.'
+              ? `Next sunny break around <strong>${sunWindow.hourLabel}</strong> (${fmtTemp(sunWindow.tempF)}).`
+              : 'Steadily mild conditions outdoors with no harsh glare.'
           }
         </p>
       </div>
     </article>
 
-    <!-- Card 3: For Pets & 2-Layer Sidewalk Heat -->
+    <!-- Card 3: For Pets & Pavement Safety (Real Poodle Walker Artwork) -->
     <article class="glass exposure-card">
-      <div class="exposure-art-banner">
-        ${renderExposureArtworkSvg('pets', { pawLevel: pave.pawSafety.level })}
+      <div class="exposure-art-banner exposure-real-scene">
+        ${petsSvg}
         <div class="exposure-art-overlay">
           <span class="exposure-tag" style="border-color:${pave.pawSafety.color};color:${pave.pawSafety.color};">
             🐾 For Pets · ${pave.pawSafety.label}
@@ -732,7 +781,7 @@ function renderOutdoorExposureCards(f) {
           <div class="pave-row">
             <div class="pave-row-head">
               <span>Light Concrete Sidewalk</span>
-              <strong>${fmtTemp(pave.concreteTempF, true)} (Peak ${fmtTemp(pave.peakConcreteTodayF)})</strong>
+              <strong>${fmtTemp(pave.concreteTempF)} (Peak ${fmtTemp(pave.peakConcreteTodayF)})</strong>
             </div>
             <div class="pave-progress-bg">
               <div class="pave-progress-fill" style="width:${concretePct}%;background:#7ac6ff;"></div>
@@ -742,7 +791,7 @@ function renderOutdoorExposureCards(f) {
             <div class="pave-row-head">
               <span>Dark Asphalt Street</span>
               <strong style="color:${pave.asphaltTempF >= 135 ? '#ff6b6b' : pave.asphaltTempF >= 120 ? '#ffd166' : '#5ce0a0'};">
-                ${fmtTemp(pave.asphaltTempF, true)} (Peak ${fmtTemp(pave.peakAsphaltTodayF)})
+                ${fmtTemp(pave.asphaltTempF)} (Peak ${fmtTemp(pave.peakAsphaltTodayF)})
               </strong>
             </div>
             <div class="pave-progress-bg">
@@ -751,7 +800,7 @@ function renderOutdoorExposureCards(f) {
           </div>
         </div>
         <p style="font-size:12px;color:var(--muted);margin:4px 0 0;">
-          ${pave.pawSafety.advice} (AAHA paw-burn threshold: <strong>135°F</strong>).
+          ${pave.pawSafety.advice}
         </p>
       </div>
     </article>
@@ -1228,37 +1277,235 @@ function renderAqiAndGlanceTiles(f) {
   if (metricsGrid) {
     const cur = f.current;
     const today = f.days[0];
+    const uvVal = Number(today.maxUvIndex ?? cur.uvIndex ?? 0);
+    const uvPct = clamp((uvVal / 11) * 100, 4, 100);
+    const uvLevel = uvVal >= 8 ? 'Very High' : uvVal >= 6 ? 'High' : uvVal >= 3 ? 'Moderate' : 'Low';
+    const humPct = clamp(cur.humidity ?? 50, 4, 100);
+    const pressInHg = Number(cur.pressureInHg) || 29.92;
+    const pressPct = clamp(((pressInHg - 29.2) / 1.4) * 100, 8, 92);
+    const visMi = Number(cur.visibilityMi) || 10;
+    const visPct = clamp((visMi / 10) * 100, 10, 100);
+    const hrNow = cur.dateObj.getHours() + cur.dateObj.getMinutes() / 60;
+    const sunProgress = clamp(((hrNow - 6.75) / 10.5) * 100, 4, 96);
+
+    const fmtClock12 = (hhmm) => {
+      if (!hhmm || !String(hhmm).includes(':')) return hhmm || '—';
+      const [hRaw, mRaw] = String(hhmm).split(':');
+      const h = parseInt(hRaw, 10);
+      if (!Number.isFinite(h)) return hhmm;
+      const ampm = h >= 12 ? 'PM' : 'AM';
+      const h12 = h % 12 || 12;
+      return `${h12}:${mRaw.slice(0, 2)} ${ampm}`;
+    };
+    const riseStr = fmtClock12(today.sunrise);
+    const setStr = fmtClock12(today.sunset);
+
     const tiles = [
-      { id: 'feels', kicker: '🌡 Feels Like', val: fmtTemp(cur.feelsLikeF), sub: `Shade ${fmtTemp(cur.shadeFeelsF)} · Sun ${fmtTemp(cur.sunFeelsF)}` },
-      { id: 'rainfall', kicker: '💧 Precipitation', val: `${today.totalQpfIn}"`, sub: `24h total · ${cur.precipIn}"/hr now` },
-      { id: 'wind', kicker: '💨 Wind', val: `${cur.windMph} mph`, sub: `${cur.windCardinal} · Gusts ${cur.windGustMph} mph` },
-      { id: 'humidity', kicker: '🌫 Humidity', val: `${cur.humidity}%`, sub: `Dew point ${fmtTemp(cur.dewPointF)}` },
-      { id: 'rainChance', kicker: '☔ Rain Chance', val: `${cur.rainChance}%`, sub: `Today peak ${today.rainChance}% (100-pt)` },
-      { id: 'cloudCover', kicker: '👁 Visibility & Sky', val: `${cur.visibilityMi} mi`, sub: `Cloud cover ${cur.cloudCover}%` },
-      { id: 'pressure', kicker: '⏲ Pressure', val: `${cur.pressureInHg}`, sub: `${cur.pressureHpa} hPa surface` },
-      { id: 'uvIndex', kicker: '☀ Sun & Peak UV', val: `UV ${today.maxUvIndex}`, sub: `Rise ${today.sunrise} · Set ${today.sunset}` }
+      {
+        id: 'uvIndex',
+        label: '☀ UV Index',
+        val: `${uvVal}`,
+        badge: uvLevel,
+        visual: `<div class="apple-uv-bar"><span class="apple-bar-dot" style="left:${uvPct.toFixed(0)}%;"></span></div>`,
+        sub: uvVal >= 6 ? 'Sunscreen & sunglasses advised' : 'Low sunburn risk today'
+      },
+      {
+        id: 'feels',
+        label: '🌡 Feels Like',
+        val: fmtTemp(cur.feelsLikeF),
+        badge: `Air ${fmtTemp(cur.tempF)}`,
+        visual: `<div class="apple-meter-track"><div class="apple-meter-fill" style="width:${clamp(((cur.feelsLikeF - 15) / 85) * 100, 8, 100).toFixed(0)}%;background:linear-gradient(90deg,#38bdf8,#f59e0b);"></div></div>`,
+        sub: `Shade ${fmtTemp(cur.shadeFeelsF)} · Sun ${fmtTemp(cur.sunFeelsF)}`
+      },
+      {
+        id: 'humidity',
+        label: '💧 Humidity',
+        val: `${cur.humidity}%`,
+        badge: getDewPointVerdict(cur.dewPointF),
+        visual: `<div class="apple-meter-track"><div class="apple-meter-fill" style="width:${humPct.toFixed(0)}%;background:linear-gradient(90deg,#38bdf8,#818cf8);"></div></div>`,
+        sub: `Dew point ${fmtTemp(cur.dewPointF)}`
+      },
+      {
+        id: 'wind',
+        label: '💨 Wind',
+        val: `${cur.windMph} mph`,
+        badge: `${cur.windCardinal}`,
+        visual: `<div class="apple-wind-row"><div class="apple-mini-compass">${renderCompassSvg(cur.windDirDeg)}</div><span class="apple-wind-detail">Gusts up to <strong>${cur.windGustMph} mph</strong></span></div>`,
+        sub: cur.windMph >= 15 ? 'Noticeable breeze outdoors' : 'Light & gentle breeze'
+      },
+      {
+        id: 'temp',
+        label: '🌅 Sunset',
+        val: setStr,
+        badge: `Rise ${riseStr}`,
+        visual: `<div class="sun-arc-bar" style="margin:8px 0 4px;"><div class="sun-arc-fill" style="width:${sunProgress.toFixed(0)}%;"></div><span class="sun-arc-dot" style="left:${sunProgress.toFixed(0)}%;"></span></div>`,
+        sub: cur.isDay ? `Daylight until ${setStr}` : `Sunrise at ${riseStr}`
+      },
+      {
+        id: 'rainfall',
+        label: '🌧 Precip',
+        val: `${today.totalQpfIn}"`,
+        badge: `${today.rainChance}% chance`,
+        visual: `<div class="apple-meter-track"><div class="apple-meter-fill" style="width:${clamp(today.rainChance, 6, 100)}%;background:linear-gradient(90deg,#0ea5e9,#3b82f6);"></div></div>`,
+        sub: cur.precipIn > 0 ? `Currently ${cur.precipIn}"/hr` : 'Expected today total'
+      },
+      {
+        id: 'pressure',
+        label: '⏲ Pressure',
+        val: `${cur.pressureInHg}`,
+        badge: 'inHg',
+        visual: `<div class="apple-pressure-bar"><span class="apple-bar-dot" style="left:${pressPct.toFixed(0)}%;"></span></div>`,
+        sub: pressInHg >= 30.05 ? 'High & steady pressure' : pressInHg <= 29.8 ? 'Low pressure system nearby' : 'Steady surface pressure'
+      },
+      {
+        id: 'cloudCover',
+        label: '👁 Visibility',
+        val: `${visMi} mi`,
+        badge: `${cur.cloudCover}% clouds`,
+        visual: `<div class="apple-meter-track"><div class="apple-meter-fill" style="width:${visPct.toFixed(0)}%;background:linear-gradient(90deg,#5eead4,#38bdf8);"></div></div>`,
+        sub: visMi >= 8 ? 'Clear viewing distance' : 'Reduced haze or mist'
+      }
     ];
 
     metricsGrid.innerHTML = tiles
       .map(
         (t) => `
-        <article class="glass metric-tile" data-jump-metric="${t.id}" role="button" tabindex="0">
-          <span class="metric-tile-kicker">${t.kicker}</span>
-          <span class="metric-tile-val">${t.val}</span>
-          <span class="metric-tile-sub">${t.sub}</span>
+        <article class="glass apple-tile" data-jump-metric="${t.id}" role="button" tabindex="0">
+          <div class="apple-tile-top">
+            <span class="apple-tile-lbl">${t.label}</span>
+            <span class="apple-tile-badge">${t.badge}</span>
+          </div>
+          <div class="apple-tile-val">${t.val}</div>
+          ${t.visual}
+          <div class="apple-tile-sub">${t.sub}</div>
         </article>
       `
       )
       .join('');
 
-    metricsGrid.querySelectorAll('.metric-tile').forEach((tile) => {
+    metricsGrid.querySelectorAll('.apple-tile').forEach((tile) => {
       tile.addEventListener('click', () => {
         state.selectedMetricId = tile.dataset.jumpMetric || 'temp';
-        renderHourlyExplorerSection(f);
-        document.getElementById('main-hourly-trend')?.scrollIntoView({ behavior: 'smooth' });
+        open48hExplorerModal(f);
       });
     });
   }
+}
+
+function renderMainStyleCarWashCard(f) {
+  const panel = document.getElementById('car-wash-forecast');
+  if (!panel || !f) return;
+
+  const days5 = f.days.slice(0, 5);
+  const first3Low = days5.slice(0, 3).every((d) => d.rainChance <= 25);
+  const isRainingNow = (f.current.rainChance || 0) >= 50 || (f.current.precipIn || 0) >= 0.02;
+  const canWash = !isRainingNow && first3Low;
+  const verdictClass = canWash ? 'wash' : 'wait';
+  const verdictText = canWash ? 'YES' : 'WAIT!';
+
+  const wetBlocker = days5.slice(0, 3).find((d) => d.rainChance > 25);
+  const reason = isRainingNow
+    ? 'Rain is nearby or happening right now.'
+    : canWash
+    ? 'Three days at or below 25% rain chance are lined up.'
+    : wetBlocker
+    ? `${wetBlocker.shortWeekday} has a ${wetBlocker.rainChance}% rain chance within 3 days.`
+    : 'Rain possible in the next 3 days.';
+
+  const cur = f.current;
+  const today = days5[0] || f.days[0];
+  const lowRainDays = days5.slice(0, 3).filter((d) => d.rainChance <= 25).length;
+
+  // Find next best wash window
+  const washCandidates = days5.filter((d) => d.rainChance <= 25);
+  const bestDay = washCandidates[0] || f.carWash?.bestDay;
+  const bestTitle = canWash
+    ? 'Today · Dry Corridor Open'
+    : bestDay
+    ? `Try ${bestDay.dayName || bestDay.shortWeekday}`
+    : 'Wait for a drier 3-day window';
+
+  const dp = Math.round(cur.dewPointF ?? 50);
+  const dpWord = dp >= 65 ? 'HUMID' : dp >= 52 ? 'COMFY' : 'DRY AIR';
+
+  const cardsHtml = days5
+    .map((d, idx) => {
+      const stretch = f.days.slice(idx, idx + 3);
+      const dayCanWash = stretch.length >= 2 && stretch.every((s) => s.rainChance <= 25);
+      const dayState = dayCanWash ? 'wash' : 'wait';
+      const dayVerdict = dayCanWash ? 'YES' : 'WAIT!';
+      return `
+        <article class="car-wash-day" data-car-wash-state="${dayState}">
+          <strong>${idx === 0 ? 'Today' : d.shortWeekday}</strong>
+          <small>${d.dateLabel}</small>
+          ${renderWeatherIconSvg(d.icon, 42)}
+          <span class="car-wash-temps">${fmtTemp(d.lowF)} <i>|</i> ${fmtTemp(d.highF)}</span>
+          <span class="car-wash-chance">💧 ${d.rainChance}%</span>
+          <b class="car-wash-day-verdict">${dayVerdict}</b>
+        </article>
+      `;
+    })
+    .join('');
+
+  panel.dataset.verdict = verdictClass;
+  panel.innerHTML = `
+    <header class="car-wash-header">
+      <span class="car-wash-logo" aria-hidden="true">💧🚙</span>
+      <span>
+        <h2 id="car-wash-title">Car Wash Forecast</h2>
+        <p>Plan for three days of low rain risk</p>
+      </span>
+      <em>Clean rides.<br>Brighter days.</em>
+    </header>
+    <div class="car-wash-hero">
+      <div class="car-wash-answer">
+        <h3>Can I Wash<br>My Car Today?</h3>
+        <strong class="car-wash-verdict ${verdictClass}" role="status">${canWash ? '✓ ' : ''}${verdictText}</strong>
+        <p>${reason}</p>
+      </div>
+      <div class="car-wash-checks">
+        <span class="car-wash-fact ${today.rainChance <= 25 ? 'good' : ''}">
+          <i aria-hidden="true">💧</i>
+          <span><b>${today.rainChance}%</b><small>Rain chance today</small></span>
+        </span>
+        <span class="car-wash-fact ${lowRainDays === 3 ? 'good' : ''}">
+          <i aria-hidden="true">☀</i>
+          <span><b>${lowRainDays} of 3 days</b><small>Rain chance ≤25%</small></span>
+        </span>
+        <span class="car-wash-fact">
+          <i aria-hidden="true">≋</i>
+          <span><b>${cur.windMph}–${today.maxWindMph} mph</b><small>Wind</small></span>
+        </span>
+        <span class="car-wash-fact">
+          <i aria-hidden="true">♨</i>
+          <span><b>${fmtTemp(today.lowF)}–${fmtTemp(today.highF)}</b><small>Low / high</small></span>
+        </span>
+        <span class="car-wash-fact">
+          <i aria-hidden="true">💦</i>
+          <span><b>${dp}° · ${dpWord}</b><small>Air moisture feel</small></span>
+        </span>
+      </div>
+    </div>
+    <div class="car-wash-photo">
+      <img class="car-wash-art" src="/weather-fusion/car-wash-corvette-hood.webp" alt="Cherry-red Corvette C8 on driveway" loading="lazy" decoding="async" />
+    </div>
+    <div class="car-wash-days-wrap">
+      <h3>Next 5 Days</h3>
+      <div class="car-wash-days">${cardsHtml}</div>
+    </div>
+    <div class="car-wash-window">
+      <span class="car-wash-spark" aria-hidden="true">✦</span>
+      <span>
+        <small>Best Washing Window</small>
+        <strong>${bestTitle}</strong>
+        <em>${reason}</em>
+      </span>
+      <span class="car-wash-tip">☀<small>Avoid hot<br>midday sun</small></span>
+      <span class="car-wash-tip">≋<small>Light wind<br>helps drying</small></span>
+      <span class="car-wash-tip">🚙<small>Enjoy that<br>clean shine</small></span>
+    </div>
+    <div class="car-wash-footer">WEATHER NOURIE · CLEAN RIDES, BRIGHTER DAYS</div>
+  `;
 }
 
 function renderScientificFeedsAndAfd(f) {
@@ -1401,8 +1648,7 @@ function initHeaderControls() {
 
   heroTemp?.addEventListener('click', () => {
     state.selectedMetricId = 'temp';
-    if (state.forecast) renderHourlyExplorerSection(state.forecast);
-    document.getElementById('main-hourly-trend')?.scrollIntoView({ behavior: 'smooth' });
+    if (state.forecast) open48hExplorerModal(state.forecast);
   });
 
   // Mobile Tools Drawer Toggle
@@ -1428,10 +1674,15 @@ function initHeaderControls() {
     searchInput?.focus();
   });
 
-  // Weather Take Banner Click -> Smooth scroll to Full Weather Take
+  // Weather Take Banner Click -> Open Clean Plain-English Weather Take Modal
   const takeBanner = document.getElementById('weather-take-banner');
   takeBanner?.addEventListener('click', () => {
-    document.getElementById('full-weather-take')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if (state.forecast) openWeatherTakeModal(state.forecast);
+  });
+
+  // How It Feels Trio Card -> Open Rich What to Wear & Comfort Modal
+  document.getElementById('how-feels-card-btn')?.addEventListener('click', () => {
+    if (state.forecast) openWardrobeModal(state.forecast);
   });
 
   // Next 24 Hours Quick Spline Metric Pills (Temp | Feels Like | Rain | Wind)
@@ -1448,27 +1699,6 @@ function initHeaderControls() {
   const audioBtn = document.getElementById('sky-audio-btn');
   audioBtn?.addEventListener('click', () => {
     toggleProceduralSkyAudio(audioBtn);
-  });
-
-  // Explanation period pills
-  document.querySelectorAll('[data-period]').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('[data-period]').forEach((b) => b.classList.remove('active'));
-      btn.classList.add('active');
-      state.explanationPeriod = btn.dataset.period;
-      if (state.forecast) renderModelExplanationSection(state.forecast);
-    });
-  });
-
-  // Dew point range pills
-  document.querySelectorAll('[data-dp-range]').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('[data-dp-range]').forEach((b) => b.classList.remove('active'));
-      btn.classList.add('active');
-      state.dewPointRangeHours = Number(btn.dataset.dpRange) || 48;
-      state.selectedDewPointIdx = 0;
-      if (state.forecast) renderDewPointFeelMeter(state.forecast);
-    });
   });
 }
 
@@ -1655,55 +1885,24 @@ function initModalSystem() {
     if (e.target === dialog) dialog.close();
   });
 
-  document.getElementById('open-today-scrubber')?.addEventListener('click', () => {
-    const f = state.forecast;
-    if (!f) return;
-    openHourlyListModal(
-      `Remainder of Today & Tonight · ${f.location.name}`,
-      'Hour-by-hour multi-model blend, UTCI/Steadman feels-like, and 100-point rain scoring.',
-      f.hours48.slice(0, 18)
-    );
-  });
+  // Bind all launcher buttons for clickable modals (keeps home screen zero-clutter!)
+  const closeTools = () => document.getElementById('tools-strip')?.classList.remove('open');
 
-  document.getElementById('open-car-wash-modal')?.addEventListener('click', () => {
-    const f = state.forecast;
-    if (!f) return;
-    const cw = f.carWash;
-    openModal(
-      `🚗 5-Day Car Wash & Outdoor Project Advisor · ${f.location.name}`,
-      `
-        <div style="margin-bottom:14px;padding:12px 16px;border-radius:14px;background:rgba(255,255,255,0.07);">
-          <div style="font-size:12px;color:var(--faint);text-transform:uppercase;font-weight:700;">Best Upcoming Window</div>
-          <div style="font-size:18px;font-weight:800;color:${cw.bestDay.color};margin-top:2px;">
-            ${cw.bestDay.dayName} (${cw.bestDay.dateLabel}) · Score ${cw.bestDay.score}/100 (${cw.bestDay.verdict})
-          </div>
-          <div style="font-size:13px;color:var(--muted);margin-top:2px;">${cw.bestDay.note}</div>
-        </div>
-        <table class="math-table">
-          <thead>
-            <tr><th>Day</th><th>Verdict</th><th>Score</th><th>Rain Risk</th><th>Guidance</th></tr>
-          </thead>
-          <tbody>
-            ${cw.days
-              .map(
-                (d) => `
-              <tr>
-                <td><strong>${d.dayName} · ${d.dateLabel}</strong></td>
-                <td><strong style="color:${d.color};">${d.verdict}</strong></td>
-                <td>${d.score}/100</td>
-                <td>${d.rainChance}%</td>
-                <td>${d.note}</td>
-              </tr>
-            `
-              )
-              .join('')}
-          </tbody>
-        </table>
-      `
-    );
-  });
+  document.getElementById('open-rankings-modal')?.addEventListener('click', () => { closeTools(); if (state.forecast) openModelRankingsModal(state.forecast); });
+  document.getElementById('compare-rankings-cta')?.addEventListener('click', () => { if (state.forecast) openModelRankingsModal(state.forecast); });
+  document.getElementById('more-rankings-btn')?.addEventListener('click', () => { if (state.forecast) openModelRankingsModal(state.forecast); });
+
+  document.getElementById('open-wardrobe-modal')?.addEventListener('click', () => { closeTools(); if (state.forecast) openWardrobeModal(state.forecast); });
+  document.getElementById('more-wardrobe-btn')?.addEventListener('click', () => { if (state.forecast) openWardrobeModal(state.forecast); });
+
+  document.getElementById('open-science-modal')?.addEventListener('click', () => { closeTools(); if (state.forecast) openScienceModal(state.forecast); });
+  document.getElementById('more-science-btn')?.addEventListener('click', () => { if (state.forecast) openScienceModal(state.forecast); });
+
+  document.getElementById('open-48h-explorer-btn')?.addEventListener('click', () => { if (state.forecast) open48hExplorerModal(state.forecast); });
+  document.getElementById('more-hourly-btn')?.addEventListener('click', () => { if (state.forecast) open48hExplorerModal(state.forecast); });
 
   document.getElementById('open-snow-modal')?.addEventListener('click', () => {
+    closeTools();
     const f = state.forecast;
     if (!f) return;
     const total10dSnow = f.days.reduce((s, d) => s + (d.totalSnowIn || 0), 0).toFixed(1);
@@ -1713,18 +1912,10 @@ function initModalSystem() {
         <div style="font-size:22px;font-weight:800;margin-bottom:6px;">
           ${Number(total10dSnow) > 0 ? `${total10dSnow}" Total 10-Day Snow Potential` : 'No Accumulating Snow in the 10-Day Forecast'}
         </div>
-        <p style="font-size:13.5px;color:var(--muted);margin-top:0;">
-          Evaluated across NBM v4.2, ECMWF IFS, GEFS, and surface wet-bulb freezing profiles (${fmtTemp(f.current.wetBulbF, true)} current wet-bulb).
-        </p>
         <table class="math-table">
-          <thead>
-            <tr><th>Day</th><th>High / Low</th><th>Precip Chance</th><th>Snowfall</th><th>Confidence</th></tr>
-          </thead>
+          <thead><tr><th>Day</th><th>High / Low</th><th>Rain Chance</th><th>Snowfall</th><th>Confidence</th></tr></thead>
           <tbody>
-            ${f.days
-              .slice(0, 7)
-              .map(
-                (d) => `
+            ${f.days.slice(0, 7).map((d) => `
               <tr>
                 <td><strong>${d.shortWeekday} · ${d.dateLabel}</strong></td>
                 <td>${fmtTemp(d.highF)} / ${fmtTemp(d.lowF)}</td>
@@ -1732,9 +1923,7 @@ function initModalSystem() {
                 <td><strong>${d.totalSnowIn}"</strong></td>
                 <td style="color:${d.confidence.color};">${d.confidence.level}</td>
               </tr>
-            `
-              )
-              .join('')}
+            `).join('')}
           </tbody>
         </table>
       `
@@ -1742,13 +1931,301 @@ function initModalSystem() {
   });
 
   document.getElementById('open-afd-modal')?.addEventListener('click', () => {
+    closeTools();
     const f = state.forecast;
     if (!f) return;
     openModal(
-      `📡 NWS ${f.afd.wfo} Area Forecast Discussion`,
+      `📡 NWS ${f.afd.wfo} Forecast Discussion`,
       `<pre class="afd-pre" style="max-height:420px;">${f.afd.text}</pre>`
     );
   });
+}
+
+function openWeatherTakeModal(f) {
+  const tomorrow = f.days[1] || f.days[0];
+  openModal(
+    `Weather Take · ${f.location.name}`,
+    `
+      <div class="take-modal-card">
+        <div style="font-size:18px;font-weight:800;color:#ffffff;margin-bottom:6px;">${f.briefing.headline}</div>
+        <p style="font-size:14px;color:var(--muted);line-height:1.55;margin:0 0 12px;">${f.briefing.summary}</p>
+        <div class="take-modal-row">
+          <div>
+            <strong>Tomorrow (${tomorrow.dayName})</strong>
+            <div style="font-size:13px;color:var(--muted);">${fmtTemp(tomorrow.lowF)} to ${fmtTemp(tomorrow.highF)} · ${tomorrow.rainChance}% rain chance</div>
+          </div>
+          <span class="wfo-pill">${tomorrow.confidence.level} confidence</span>
+        </div>
+      </div>
+    `
+  );
+}
+
+function openWardrobeModal(f) {
+  const cur = f.current;
+  const personUrl = selectHeroPortraitInfo(cur);
+  const advice = buildWardrobeAdvice(cur.feelsLikeF ?? cur.tempF, cur);
+  const dpDesc = getDewPointVerdict(cur.dewPointF ?? 50);
+
+  openModal(
+    `What to Wear & How It Feels · ${f.location.name}`,
+    `
+      <div class="wardrobe-modal-hero">
+        <img class="wardrobe-hero-img" src="${personUrl}" alt="Recommended outfit for ${cur.condition}" />
+        <div class="wardrobe-hero-info">
+          <div class="wardrobe-badge">${advice.title}</div>
+          <div style="font-size:28px;font-weight:800;line-height:1.1;margin:6px 0;">Feels Like ${fmtTemp(cur.feelsLikeF)}</div>
+          <div style="font-size:13.5px;color:var(--muted);margin-bottom:10px;">
+            In Shade ${fmtTemp(cur.shadeFeelsF)} · In Sun ${fmtTemp(cur.sunFeelsF)} · Air Moisture: <strong>${dpDesc}</strong> (${fmtTemp(cur.dewPointF)} dew point)
+          </div>
+          <ul class="wardrobe-list">
+            ${advice.items.map((item) => `<li>✓ ${item}</li>`).join('')}
+          </ul>
+        </div>
+      </div>
+    `
+  );
+}
+
+function open48hExplorerModal(f) {
+  openModal(
+    `48-Hour Detailed Timeline · ${f.location.name}`,
+    `
+      <div id="modal-hourly-tabs" class="metric-tabs-bar"></div>
+      <div id="modal-hourly-readout" class="hourly-readout-bar" style="margin-bottom:10px;"></div>
+      <div id="modal-hourly-chart"></div>
+      <div id="modal-hourly-strip" class="hourly-strip-scroll" style="margin-top:12px;"></div>
+    `
+  );
+
+  const tabsWrap = document.getElementById('modal-hourly-tabs');
+  const readoutWrap = document.getElementById('modal-hourly-readout');
+  const chartStage = document.getElementById('modal-hourly-chart');
+  const stripWrap = document.getElementById('modal-hourly-strip');
+
+  const drawModalHourly = () => {
+    const activeMetric = HOURLY_METRICS.find((m) => m.id === state.selectedMetricId) || HOURLY_METRICS[0];
+    if (tabsWrap) {
+      tabsWrap.innerHTML = HOURLY_METRICS.map(
+        (m) => `<button class="metric-tab-btn ${m.id === state.selectedMetricId ? 'active' : ''}" data-m-metric="${m.id}" type="button">${m.label}</button>`
+      ).join('');
+      tabsWrap.querySelectorAll('[data-m-metric]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          state.selectedMetricId = btn.dataset.mMetric;
+          drawModalHourly();
+        });
+      });
+    }
+
+    const h = f.hours48[clamp(state.selectedHourIdx, 0, f.hours48.length - 1)];
+    const val = extractHourMetricValue(h, state.selectedMetricId, state.useCelsius);
+    const fmtV = activeMetric.decimals ? Number(val).toFixed(activeMetric.decimals) : Math.round(val);
+    if (readoutWrap) {
+      readoutWrap.innerHTML = `
+        <div class="hourly-readout-primary">
+          <span class="readout-big-val" style="color:${activeMetric.color};">${fmtV}${activeMetric.unit}</span>
+          <div>
+            <div style="font-size:15px;font-weight:700;color:#ffffff;">${h.dateObj.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} · ${h.hourLabel} (${h.condition})</div>
+            <div class="readout-meta">Temp ${fmtTemp(h.tempF)} · Feels ${fmtTemp(h.feelsLikeF)} · Rain ${h.rainChance}% · Wind ${h.windMph} mph</div>
+          </div>
+        </div>
+      `;
+    }
+    if (stripWrap) {
+      stripWrap.innerHTML = f.hours48.slice(0, 24).map((hr, idx) => `
+        <div class="hour-tile ${idx === state.selectedHourIdx ? 'active' : ''}" data-m-h="${idx}">
+          <span class="hour-tile-time">${hr.hourLabel}</span>
+          <div>${renderWeatherIconSvg(hr.icon, 28)}</div>
+          <span class="hour-tile-temp">${fmtTemp(hr.tempF)}</span>
+          <span class="hour-pop-pill">💧 ${hr.rainChance}%</span>
+        </div>
+      `).join('');
+      stripWrap.querySelectorAll('[data-m-h]').forEach((el) => {
+        el.addEventListener('click', () => {
+          state.selectedHourIdx = Number(el.dataset.mH) || 0;
+          drawModalHourly();
+        });
+      });
+    }
+    renderHourlyExplorerChart({
+      containerEl: chartStage,
+      hours48: f.hours48,
+      metricId: state.selectedMetricId,
+      selectedHourIdx: state.selectedHourIdx,
+      useCelsius: state.useCelsius,
+      onSelectHour: (idx) => {
+        state.selectedHourIdx = idx;
+        drawModalHourly();
+      }
+    });
+  };
+  drawModalHourly();
+}
+
+function openScienceModal(f) {
+  const day = f.days[clamp(state.selectedDayIdx, 0, f.days.length - 1)] || f.days[0];
+  const wettest = day.hours.reduce((b, h) => (h.rainChance > b.rainChance ? h : b), day.hours[0]);
+  const warmest = day.hours.reduce((b, h) => (h.tempF > b.tempF ? h : b), day.hours[0]);
+  const rl = wettest.rainLedger;
+  const bd = rl.breakdown;
+  const tf = warmest.tempFusion;
+  const mt = warmest.modelTemps;
+  const ew = tf.effectiveWeights;
+  const bw = tf.baseWeights;
+
+  const modelRows = [
+    { key: 'nws', name: 'NWS Gridpoint', color: '#6bc5ff' },
+    { key: 'hrrr', name: 'NOAA HRRR 3km', color: '#ff9f5a' },
+    { key: 'nbm', name: 'National Blend (NBM)', color: '#5ce0a0' },
+    { key: 'ecmwf', name: 'ECMWF IFS 0.25°', color: '#b88cff' },
+    { key: 'gefs', name: 'GEFS Ensemble Mean', color: '#ffd166' },
+    { key: 'weathernext', name: 'WeatherNext AI', color: '#ff7eb6' }
+  ];
+
+  openModal(
+    `🔬 Scientific Details & Source Feeds · ${f.location.name}`,
+    `
+      <div class="feeds-pill-cloud" style="margin-bottom:14px;">
+        ${f.feeds.map((fd) => `
+          <span class="feed-badge">
+            <span class="live-dot" style="margin:0;"></span>
+            <strong style="color:#ffffff;">${fd.name}</strong>
+            <span>· ${fd.status}</span>
+          </span>
+        `).join('')}
+      </div>
+
+      <div style="margin-bottom:14px;padding:12px;border-radius:14px;background:rgba(255,255,255,0.05);">
+        <div class="section-kicker" style="margin-bottom:4px;">Blend V2 Weights (${bw.label}) · ${warmest.hourLabel} (${fmtTemp(warmest.tempF, true)})</div>
+        <table class="math-table">
+          <thead><tr><th>Model</th><th>Temp</th><th>Base Wt</th><th>Effective Wt</th></tr></thead>
+          <tbody>
+            ${modelRows.map((m) => `
+              <tr>
+                <td><strong style="color:${m.color};">${m.name}</strong></td>
+                <td>${mt[m.key] !== null ? fmtTemp(mt[m.key]) : '—'}</td>
+                <td>${Math.round((bw[m.key] || 0) * 100)}%</td>
+                <td><strong>${ew[m.key] ? Math.round(ew[m.key] * 100) : 0}%</strong></td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+
+      <div style="margin-bottom:14px;padding:12px;border-radius:14px;background:rgba(255,255,255,0.05);">
+        <div class="section-kicker" style="margin-bottom:4px;">100-Point Rain Ledger · Peak ${wettest.hourLabel} (${rl.totalPts}/100 pts · ${rl.blendedQpfIn}"/hr)</div>
+        <div style="font-size:12.5px;color:var(--muted);">
+          NWS ${bd.nws.pts}/${bd.nws.maxPts} · HRRR ${bd.hrrr.pts}/${bd.hrrr.maxPts} · NBM ${bd.nbm.pts}/${bd.nbm.maxPts} · ECMWF ${bd.ecmwf.pts}/${bd.ecmwf.maxPts} · WeatherNext +${bd.weathernext.pts}
+        </div>
+      </div>
+
+      <details>
+        <summary style="cursor:pointer;font-weight:700;font-size:13.5px;color:var(--blue);">▸ NWS Area Forecast Discussion (${f.afd.wfo})</summary>
+        <pre class="afd-pre" style="margin-top:8px;">${f.afd.text}</pre>
+      </details>
+    `
+  );
+}
+
+async function openModelRankingsModal(f) {
+  let days = 10;
+  let horizon = 24;
+  let rankMode = 'overall';
+
+  openModal(
+    `🏆 Model Accuracy Rankings · ${f.location.name}`,
+    `<div id="modal-rankings-host"><div style="padding:20px;text-align:center;color:var(--muted);">Scoring Weather Nourie against 7 US &amp; global models using real observed weather…</div></div>`
+  );
+
+  const loadAndRender = async () => {
+    const host = document.getElementById('modal-rankings-host');
+    if (!host) return;
+    host.innerHTML = `<div style="padding:20px;text-align:center;color:var(--muted);">Loading verified ${days}-day accuracy scores (${horizon}h lead)…</div>`;
+    try {
+      const url = `/api/weather-fusion/accuracy?latitude=${encodeURIComponent(f.location.latitude)}&longitude=${encodeURIComponent(f.location.longitude)}&days=${days}&horizon=${horizon}`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error('Accuracy service unavailable');
+      const data = await res.json();
+      renderRankingsUi(host, data);
+    } catch {
+      host.innerHTML = `<div style="padding:18px;color:#ff8f8f;">Unable to load model rankings right now. Please try again in a moment.</div>`;
+    }
+  };
+
+  const renderRankingsUi = (host, data) => {
+    const list = [...(data.rankings || [])];
+    if (rankMode === 'temp') list.sort((a, b) => (a.maeF ?? 99) - (b.maeF ?? 99));
+    else if (rankMode === 'rain') list.sort((a, b) => (b.scores?.rain ?? -1) - (a.scores?.rain ?? -1));
+    else if (rankMode === 'wind') list.sort((a, b) => (a.windMaeMph ?? 99) - (b.windMaeMph ?? 99));
+    else list.sort((a, b) => (b.overallScore ?? -1) - (a.overallScore ?? -1));
+
+    const wn = list.find((r) => r.id === 'weather_nourie');
+    const wnPos = wn ? list.indexOf(wn) + 1 : null;
+
+    host.innerHTML = `
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;justify-content:space-between;align-items:center;">
+        <div style="display:flex;gap:4px;flex-wrap:wrap;">
+          ${[
+            ['overall', '🏆 Overall'],
+            ['temp', '🌡 Temp'],
+            ['rain', '🌧 Rain'],
+            ['wind', '💨 Wind']
+          ].map(([id, lbl]) => `<button class="mode-pill ${rankMode === id ? 'active' : ''}" data-r-mode="${id}" type="button">${lbl}</button>`).join('')}
+        </div>
+        <div style="display:flex;gap:4px;">
+          ${[7, 10, 14].map((d) => `<button class="mode-pill ${days === d ? 'active' : ''}" data-r-days="${d}" type="button">${d}d</button>`).join('')}
+          ${[24, 48].map((h) => `<button class="mode-pill ${horizon === h ? 'active' : ''}" data-r-hr="${h}" type="button">${h}h</button>`).join('')}
+        </div>
+      </div>
+
+      ${wn ? `
+        <div style="padding:11px 14px;border-radius:14px;background:rgba(56,189,248,0.14);border:1px solid rgba(56,189,248,0.38);margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;gap:10px;">
+          <div>
+            <div style="font-size:11px;font-weight:800;color:#7dd3fc;text-transform:uppercase;">Weather Nourie Standing (${days}d · ${horizon}h lead)</div>
+            <div style="font-size:17px;font-weight:800;">Rank #${wnPos} of ${list.length} · Score ${(wn.overallScore ?? wn.accuracyScore ?? 0).toFixed(1)}/100</div>
+          </div>
+          <div style="text-align:right;font-size:12px;color:var(--muted);">
+            <div>Temp MAE: <strong>${wn.maeF?.toFixed(2) ?? '—'}°F</strong></div>
+            <div>Rain Hit: <strong>${wn.precipHitPct != null ? Math.round(wn.precipHitPct) + '%' : '—'}</strong></div>
+          </div>
+        </div>
+      ` : ''}
+
+      <div style="display:flex;flex-direction:column;gap:7px;max-height:360px;overflow-y:auto;">
+        ${list.map((r, i) => {
+          const scoreVal = rankMode === 'temp'
+            ? `${r.maeF?.toFixed(2) ?? '—'}°F MAE`
+            : rankMode === 'rain'
+            ? `${r.precipHitPct != null ? Math.round(r.precipHitPct) + '% hit' : '—'}`
+            : rankMode === 'wind'
+            ? `${r.windMaeMph?.toFixed(1) ?? '—'} mph MAE`
+            : `${(r.overallScore ?? r.accuracyScore ?? 0).toFixed(1)} / 100`;
+          const barPct = rankMode === 'temp'
+            ? clamp(r.scores?.temp ?? 65, 10, 100)
+            : rankMode === 'rain'
+            ? clamp(r.scores?.rain ?? 55, 10, 100)
+            : rankMode === 'wind'
+            ? clamp(r.scores?.wind ?? 60, 10, 100)
+            : clamp(r.overallScore ?? r.accuracyScore ?? 60, 10, 100);
+          return `
+            <div style="padding:9px 12px;border-radius:12px;background:${r.id === 'weather_nourie' ? 'rgba(56,189,248,0.12)' : 'rgba(255,255,255,0.05)'};border:1px solid ${r.id === 'weather_nourie' ? 'rgba(122,198,255,0.45)' : 'rgba(255,255,255,0.1)'};">
+              <div style="display:flex;justify-content:space-between;align-items:center;font-size:13.5px;margin-bottom:5px;">
+                <span><strong>#${i + 1} ${r.name}</strong></span>
+                <strong style="color:${r.color || '#7dd3fc'};">${scoreVal}</strong>
+              </div>
+              <div class="pave-progress-bg"><div class="pave-progress-fill" style="width:${barPct}%;background:${r.color || '#38bdf8'};"></div></div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    `;
+
+    host.querySelectorAll('[data-r-mode]').forEach((b) => b.addEventListener('click', () => { rankMode = b.dataset.rMode; renderRankingsUi(host, data); }));
+    host.querySelectorAll('[data-r-days]').forEach((b) => b.addEventListener('click', () => { days = Number(b.dataset.rDays); loadAndRender(); }));
+    host.querySelectorAll('[data-r-hr]').forEach((b) => b.addEventListener('click', () => { horizon = Number(b.dataset.rHr); loadAndRender(); }));
+  };
+
+  loadAndRender();
 }
 
 function openModal(title, htmlContent) {
@@ -1759,39 +2236,6 @@ function openModal(title, htmlContent) {
   titleEl.textContent = title;
   bodyEl.innerHTML = htmlContent;
   dialog.showModal();
-}
-
-function openHourlyListModal(title, subtitle, hoursList) {
-  openModal(
-    title,
-    `
-      <p style="font-size:13px;color:var(--muted);margin-top:0;">${subtitle}</p>
-      <div style="max-height:380px;overflow-y:auto;">
-        <table class="math-table">
-          <thead>
-            <tr><th>Time</th><th>Condition</th><th>Temp</th><th>Feels (Shade/Sun)</th><th>100-Pt Rain</th><th>QPF</th><th>Wind</th></tr>
-          </thead>
-          <tbody>
-            ${hoursList
-              .map(
-                (h) => `
-              <tr>
-                <td><strong>${h.hourLabel}</strong></td>
-                <td>${h.condition}</td>
-                <td><strong>${fmtTemp(h.tempF)}</strong></td>
-                <td>${fmtTemp(h.shadeFeelsF)} / ${fmtTemp(h.sunFeelsF)}</td>
-                <td style="color:#7ac6ff;font-weight:700;">${h.rainChance}%</td>
-                <td>${h.precipIn.toFixed(3)}"</td>
-                <td>${h.windCardinal} ${h.windMph} mph</td>
-              </tr>
-            `
-              )
-              .join('')}
-          </tbody>
-        </table>
-      </div>
-    `
-  );
 }
 
 /**
