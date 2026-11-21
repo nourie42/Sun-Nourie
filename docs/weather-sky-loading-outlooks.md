@@ -4,7 +4,7 @@ The main app and V3 Beta now share their outer glass-card finish and a compact N
 
 The main app's former cloudy photo contained a large sun. Its new selected-location sky mapping uses the existing genuinely overcast scene for cloudy/overcast conditions, including high measured cloud cover with a conflicting dry clear label. Rain, fog, snow, storms and day/night retain weather-specific assets. Loading uses an unknown sky rather than assuming sunshine. The displayed current forecast and weather calculations are unchanged.
 
-Startup begins the saved-location request while modules load and the controller adopts that same request. The sky now consumes the controller's selected-location forecast instead of requesting Knightdale independently. Current weather paints before the remaining lower panels render over subsequent frames. Cached device coordinates load while GPS checks for movement; unchanged coordinates do not start another forecast request. No forecast is persisted as current data, and no source formulas, model blending or API payloads were modified. The sole server change registers the additional static assets.
+Startup begins the saved-location request while modules load and the controller adopts that same request. The sky now consumes the controller's selected-location forecast instead of requesting Knightdale independently. Current weather paints before the remaining lower panels render over subsequent frames. Cached device coordinates load while GPS checks for movement; unchanged coordinates do not start another forecast request. No forecast is persisted as current data, and no source formulas, model blending or API payloads were modified. The initial server change registers the additional static assets; the follow-up below corrects which station sky reports are eligible to override the current condition.
 
 Executed validation on 2026-11-21:
 
@@ -16,3 +16,11 @@ Executed validation on 2026-11-21:
 - Render's recent sampled memory use was approximately 237–311 MiB on the current instance, below its 512 MiB limit. A filtered application-log search returned no out-of-memory/heap/OOM/SIGKILL matches. This does not establish long-term peak usage.
 
 Browser checks ran in Chromium with touch emulation, not on physical Samsung hardware. Captured forecast fixtures and screenshots remain validation artifacts outside the application and are not served as weather data. Beta remains public without a password, with its visible Main app return button; other private applications retain their access controls. The separate Next Gen branch is not part of this change.
+
+## Follow-up from live verification
+
+Live Knightdale data exposed another source of false sunshine: KJNX was 28.6 km away and rejected as a local temperature observation, but a separate sky override still changed the current label to Mostly Sunny. Both sky-selection paths now use the existing 16.1 km / 75-minute source limits and require known good visibility. A nearer cloudy or wet report blocks selection of a farther clear report. Accepted current observations and precipitation remain intact. SCT correctly remains Partly Cloudy. The override changes only current sky wording; it no longer edits hourly or full-day forecast conditions. A valid nearby sky observation can still override cloud-model guidance for the scene.
+
+Seven new station-sky regressions cover distance/age/visibility validation, nearest-station priority, accepted observations, precipitation, actual cloud category, forecast immutability and identical forecast calculations in both NC examples when a rejected distant clear report is present. An older sunrise test expected the scene to retain the previous hour’s nighttime flag; its assertion now checks the existing behavior that live daylight advances at sunrise while published canonical feels-like values stay exact. No production sunrise or thermal calculation was changed.
+
+Follow-up validation: 181 Node checks passed across 16 relevant test files, `npm run check` passed again, and all 11 sky/loading/outlook browser checks passed again.

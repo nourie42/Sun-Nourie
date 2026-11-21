@@ -71,7 +71,7 @@ test('accepted observations retain their station attribution and stale data lose
  assert.match(expired.sourceLabel,/stale/);assert.doesNotMatch(expired.sourceLabel,/model estimate valid|observed 09:00/);
 });
 
-test('canonical modeled Now shares its forecast-hour exposure clock and exact published custom feels',()=>{
+test('canonical modeled Now keeps published custom feels while its scene follows live sunrise',()=>{
  const f=fixture(),now=Date.parse('2026-10-20T11:40:00Z'),hour=iso(Date.parse('2026-10-20T11:00:00Z'));
  f.assembledAt=iso(now);Object.assign(f.current,{time:hour,thermalTime:hour,thermalCondition:'Clear',
   localEstimate:{source:'Selected-location current-hour forecast blend',basis:'canonical-hourly-blend'},
@@ -80,7 +80,9 @@ test('canonical modeled Now shares its forecast-hour exposure clock and exact pu
  const canonical=Number(thermal.rawOutdoors.toFixed(1)),shade=Number(thermal.rawShade.toFixed(1));
  f.current.feelsLike=canonical;f.current.feelsLikeShade=shade;
  const current=currentSample(f,now);
- assert.equal(current.comfort.daylight,false,'the selected hour is before sunrise even though the snapshot is after sunrise');
+ assert.equal(thermal.daylight,false,'the canonical thermal hour remains before sunrise');
+ assert.equal(current.comfort.daylight,true,'the current scene follows the actual viewing time after sunrise');
+ assert.equal(current.isDay,true);
  assert.equal(current.feels,canonical);assert.equal(current.comfort.shade,shade);assert.equal(current.comfort.sun,null);
  assert.equal(currentFeelMeterFacts(f,now).feels,canonical);
  const observation=structuredClone(f);observation.current.type='observation';

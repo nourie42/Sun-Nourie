@@ -1,4 +1,4 @@
-import {forecastSky} from './sky-display.js?v=single-sky-v1';
+import {forecastSky} from './sky-display.js?v=local-observation-v2';
 const header=document.querySelector('.topbar.sky-header');
 let last=globalThis.__weatherNourieForecast||null;
 function apply(){const sky=forecastSky(last);if(header)header.dataset.hdr=sky.header;document.documentElement.dataset.hdr=sky.header;}

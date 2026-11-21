@@ -83,10 +83,10 @@ export function validateCurrentConditions(current,hours=[],modelRows={},now=Date
  else if(!close)reasons.push('the station is more than 10 miles away');
  if(!agrees)reasons.push('the station differs too much from selected-location guidance');
  const reason=`The station was not used because ${reasons.join(' and ')}.`;
- // Observed sky beats forecast wording: if a fresh station within ~25 miles reports its sky cover
- // (and good visibility), use it instead of e.g. "Patchy Fog" in the current-hour forecast.
+ // Sky reports use the same local distance/age limits as direct observations.
+ // A distant airport must not replace selected-location cloud or fog guidance.
  const SKY={SKC:'Clear',CLR:'Clear',FEW:'Mostly Clear',SCT:'Partly Cloudy',BKN:'Mostly Cloudy',OVC:'Cloudy'};
- const skyNear=fresh&&knownDistance&&current.stationDistanceKm<=40&&SKY[current.skyCover]&&(!finite(current.visibility)||current.visibility>=5);
+ const skyNear=fresh&&knownDistance&&close&&SKY[current.skyCover]&&finite(current.visibility)&&current.visibility>=5;
  const forecastWet=/thunder|storm|rain|shower|drizzle|snow|sleet|flurr|ice|freezing/i.test(currentHour?.condition||'');
  const observedSky=skyNear&&!forecastWet?SKY[current.skyCover]:null;
  const observedWeather=fresh&&close&&/thunder|\btstm\b|\bstorm\b|rain|shower|drizzle|snow|sleet|flurr|ice pellets|freezing rain/i.test(current.condition||'')?current.condition:null;

@@ -32,7 +32,7 @@ import {renderForecastWindowBanners,resetForecastWindowBanners,currentForecastWi
 import {createSevenDayCarousel} from './seven-day.js?v=low-rain-display-v1';
 import {forecastSourceHealth} from './forecast-status.js?v=source-health-v1';
 import {forecastRefreshDue} from './forecast-refresh.js?v=coverage-recovery-v2';
-import {forecastSky} from './sky-display.js?v=single-sky-v1';
+import {forecastSky} from './sky-display.js?v=local-observation-v2';
 import {outlookItems,renderOutlookPanel,openOutlookNote} from './outlook-panel.js?v=compact-v1';
 /* Weather Nourie browser client. Forecast values never originate in AI prose. */
 const $ = (id) => document.getElementById(id);

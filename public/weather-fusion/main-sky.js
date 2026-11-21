@@ -1,6 +1,6 @@
 /* Main and experimental skies follow the controller's selected-location data.
  * This module never issues its own forecast request. */
-import {forecastSky} from './sky-display.js?v=single-sky-v1';
+import {forecastSky} from './sky-display.js?v=local-observation-v2';
 let last=globalThis.__weatherNourieForecast||null,generation=0;
 function apply(){
  const token=++generation,sky=forecastSky(last),layers=[document.getElementById('exp-sky-a'),document.getElementById('exp-sky-b')];

@@ -13,7 +13,7 @@ export function classifySky(condition,cloudCover=null){
 export function forecastSky(forecast,now=Date.now()){
  if(!forecast)return {kind:'unknown',state:'unknown',header:'unknown',image:null};
  const display=currentWeatherDisplay(forecast,now),c=forecast.current||{};
- const cloud=currentReadingFreshness(forecast,now).expired?null:c.skyCover;
+ const cloud=currentReadingFreshness(forecast,now).expired||c.observedSky?.applied===true?null:c.skyCover;
  const kind=classifySky(display.condition,cloud);
  if(kind==='unknown')return {kind,state:'unknown',header:'unknown',image:null};
  const elevation=solarElevation(now,forecast.location?.latitude,forecast.location?.longitude);
