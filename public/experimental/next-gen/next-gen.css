@@ -187,3 +187,6 @@ html:has(body.next-gen){background:#102a3b}
 @media(min-width:640px){.ng-hero-photo{mask-image:linear-gradient(90deg,#000 78%,transparent 100%),linear-gradient(180deg,transparent,#000 2%,#000 80%,transparent 100%);mask-composite:intersect}}
 .ng-conditions-strip,.ng-seven-labels{padding-inline:25px 15px}
 .ng-condition{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+/* Keep the compact series key visible in the plot's unused lower margin. */
+#ng-home-chart .ng-chart-legend{position:absolute;bottom:0;right:1px;clip-path:none;width:auto;height:11px;min-height:11px;overflow:visible;font-size:7px;line-height:1;gap:7px;justify-content:flex-end}
+#ng-home-chart .ng-chart-legend i{width:9px}
