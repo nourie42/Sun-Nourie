@@ -7,9 +7,9 @@ function apply(){
  if(!layers[0]||!layers[1])return;
  document.documentElement.classList.add('sky-active');
  if(!sky.image){for(const layer of layers)layer.classList.remove('on');return;}
- if(layers.some(layer=>layer.classList.contains('on')&&layer.dataset.img===sky.image&&layer.classList.contains('sky-overcast')===Boolean(sky.overcastCrop)))return;
+ if(layers.some(layer=>layer.classList.contains('on')&&layer.dataset.img===sky.image&&layer.classList.contains('sky-overcast')===Boolean(sky.overcastCrop)&&layer.classList.contains('sky-partly')===(sky.kind==='partly-cloudy')))return;
  const pre=new Image();pre.decoding='async';
- pre.onload=()=>{if(token!==generation)return;const show=layers.find(layer=>!layer.classList.contains('on'))||layers[0];show.style.backgroundImage=`url("${pre.src}")`;show.dataset.img=sky.image;show.classList.toggle('sky-overcast',Boolean(sky.overcastCrop));show.classList.add('on');for(const layer of layers)if(layer!==show)layer.classList.remove('on');};
+ pre.onload=()=>{if(token!==generation)return;const show=layers.find(layer=>!layer.classList.contains('on'))||layers[0];show.style.backgroundImage=`url("${pre.src}")`;show.dataset.img=sky.image;show.classList.toggle('sky-overcast',Boolean(sky.overcastCrop));show.classList.toggle('sky-clear',sky.kind==='clear');show.classList.toggle('sky-partly',sky.kind==='partly-cloudy');show.classList.add('on');for(const layer of layers)if(layer!==show)layer.classList.remove('on');};
  pre.src='/weather-fusion/'+sky.image;
 }
 document.addEventListener('weather-nourie:forecast',event=>{last=event.detail;apply();});

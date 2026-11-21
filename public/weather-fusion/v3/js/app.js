@@ -9,7 +9,7 @@ import {
   reverseGeocodeLocation,
   searchLocations
 } from './fusion-engine.js?v=v3-accuracy-5';
-import { renderWeatherIconSvg } from './icons.js?v=v3-accuracy-5';
+import { getLunarPhaseFraction, renderWeatherIconSvg } from './icons.js?v=v3-sky-8';
 import {
   COMPARE_MODELS,
   COMPARE_VARIABLES,
@@ -40,6 +40,11 @@ const RISK_COLORS = { Marginal: '#74d36a', Slight: '#f4e14a', Enhanced: '#e67a22
 try {
   localStorage.removeItem(LEGACY_LOC_KEY);
 } catch {}
+
+// Prevent mobile browser bfcache from flashing an outdated page snapshot on return
+window.addEventListener('pageshow', (event) => {
+  if (event.persisted) window.location.reload();
+});
 
 function isValidCoordPair(lat, lon) {
   return (
@@ -329,20 +334,30 @@ function applyBackdropPhotoForSky(f) {
   if (!heroBg || !f?.current) return;
   let photo;
   if (state.skyOverride === 'day') {
-    photo = { src: '/weather-fusion/today-sky-clear.webp', cls: '' };
+    photo = { src: '/weather-fusion/today-sky-clear.webp', cls: 'sky-clear' };
+  } else if (state.skyOverride === 'partly') {
+    photo = { src: '/weather-fusion/today-sky-clouds.webp', cls: 'sky-partly' };
   } else if (state.skyOverride === 'rain') {
     photo = { src: '/weather-fusion/today-sky-rain.webp', cls: '' };
   } else if (state.skyOverride === 'night') {
     photo = { src: '/weather-fusion/today-sky-night-v2.webp', cls: '' };
   } else if (state.skyOverride === 'sunset') {
-    photo = { src: '/weather-fusion/today-sky-clouds.webp', cls: 'sky-sunset' };
+    photo = { src: '/weather-fusion/today-sky-sunset.jpg', cls: 'sky-sunset' };
   } else {
     photo = selectHeroBackdropPhoto(f.current);
   }
+  const targetCls = photo.cls ? `hero-bg-photo ${photo.cls}` : 'hero-bg-photo';
   if (heroBg.getAttribute('src') !== photo.src) {
+    heroBg.onload = () => {
+      heroBg.className = targetCls;
+    };
     heroBg.setAttribute('src', photo.src);
+    if (heroBg.complete && heroBg.naturalWidth > 0) {
+      heroBg.className = targetCls;
+    }
+  } else {
+    heroBg.className = targetCls;
   }
-  heroBg.className = photo.cls ? `hero-bg-photo ${photo.cls}` : 'hero-bg-photo';
 }
 
 function updateSkyAtmosphere(f) {
@@ -543,9 +558,9 @@ function selectHeroBackdropPhoto(cur) {
     return { src: '/weather-fusion/today-sky-rain.webp', cls: 'sky-overcast' };
   }
   if (isPartly) {
-    return { src: '/weather-fusion/today-sky-clouds.webp', cls: '' };
+    return { src: '/weather-fusion/today-sky-clouds.webp', cls: 'sky-partly' };
   }
-  return { src: '/weather-fusion/today-sky-clear.webp', cls: '' };
+  return { src: '/weather-fusion/today-sky-clear.webp', cls: 'sky-clear' };
 }
 
 function computeWeatherMeterScore(cur, today, aqi, canonical = null) {
@@ -1202,11 +1217,15 @@ function renderOutdoorExposureCards(f) {
     !isRaining &&
     cur.isDay &&
     (!cur.hasDirectSun || (cur.cloudCover || 0) >= 70 || /overcast|mostly cloudy|\bcloudy\b|fog/i.test(cur.condition || ''));
+  const titleEl = document.getElementById('exposure-section-title');
+  if (titleEl) {
+    titleEl.textContent = hIdx === 0 ? 'Outside Right Now' : 'Outside Forecast';
+  }
   const noteEl = document.getElementById('exposure-time-note');
   if (noteEl) {
     noteEl.textContent = hIdx === 0
       ? 'Right now'
-      : `Previewing ${formatZonedHourStamp(cur, hIdx, tz)}`;
+      : formatZonedHourStamp(cur, hIdx, tz);
   }
 
   const sunWindow = f.windows?.sunHours?.[0];
@@ -3180,6 +3199,113 @@ function initSkyCanvas() {
     phase: Math.random() * Math.PI * 2
   }));
 
+  // Pre-rendered offscreen lunar disc texture with accurate current moon phase
+  let moonCanvas = null;
+  let moonPhaseKey = '';
+
+  function ensureMoonCanvas(radius) {
+    const now = new Date();
+    const key = `${now.getUTCFullYear()}-${now.getUTCMonth()}-${now.getUTCDate()}-${now.getUTCHours()}-${Math.round(radius)}`;
+    if (moonCanvas && moonPhaseKey === key) return moonCanvas;
+    moonPhaseKey = key;
+
+    const pad = Math.round(radius * 2.2);
+    const size = Math.round((radius + pad) * 2);
+    const off = document.createElement('canvas');
+    off.width = size;
+    off.height = size;
+    const mctx = off.getContext('2d');
+    const cx = size / 2;
+    const cy = size / 2;
+    const phase = getLunarPhaseFraction(now);
+    const illumination = (1 - Math.cos(2 * Math.PI * phase)) / 2;
+    const isWaxing = phase < 0.5;
+
+    // 1. Soft atmospheric lunar halo proportional to illumination
+    const haloGrad = mctx.createRadialGradient(cx, cy, radius * 0.75, cx, cy, radius * 2.8);
+    haloGrad.addColorStop(0, `rgba(220, 234, 255, ${(0.08 + illumination * 0.2).toFixed(3)})`);
+    haloGrad.addColorStop(0.45, `rgba(175, 204, 248, ${(0.03 + illumination * 0.08).toFixed(3)})`);
+    haloGrad.addColorStop(1, 'rgba(175, 204, 248, 0)');
+    mctx.fillStyle = haloGrad;
+    mctx.beginPath();
+    mctx.arc(cx, cy, radius * 2.8, 0, Math.PI * 2);
+    mctx.fill();
+
+    // 2. Subtle dark-side earthshine disc so the full moon outline is gently perceptible
+    mctx.save();
+    mctx.beginPath();
+    mctx.arc(cx, cy, radius, 0, Math.PI * 2);
+    mctx.clip();
+
+    const earthshine = mctx.createRadialGradient(cx - radius * 0.25, cy - radius * 0.25, radius * 0.1, cx, cy, radius);
+    earthshine.addColorStop(0, 'rgba(110, 134, 174, 0.2)');
+    earthshine.addColorStop(1, 'rgba(42, 58, 88, 0.28)');
+    mctx.fillStyle = earthshine;
+    mctx.fillRect(cx - radius, cy - radius, radius * 2, radius * 2);
+
+    // 3. Geometrically accurate illuminated lunar phase region
+    if (illumination > 0.015) {
+      const litOff = document.createElement('canvas');
+      litOff.width = size;
+      litOff.height = size;
+      const lctx = litOff.getContext('2d');
+
+      // Base illuminated lunar surface gradient
+      const surf = lctx.createRadialGradient(cx - radius * 0.28, cy - radius * 0.28, radius * 0.12, cx, cy, radius * 1.05);
+      surf.addColorStop(0, '#fbfcfe');
+      surf.addColorStop(0.58, '#e3e8f0');
+      surf.addColorStop(0.88, '#c5cfde');
+      surf.addColorStop(1, '#a5b2c6');
+      lctx.fillStyle = surf;
+      lctx.beginPath();
+      lctx.arc(cx, cy, radius, 0, Math.PI * 2);
+      lctx.fill();
+
+      // Subtle natural lunar maria (seas/craters)
+      const maria = [
+        [-0.28, -0.22, 0.28, 0.22, 0.16],
+        [0.14, -0.18, 0.24, 0.18, 0.14],
+        [0.24, 0.12, 0.26, 0.22, 0.15],
+        [-0.12, 0.24, 0.22, 0.15, 0.11],
+        [-0.42, 0.1, 0.15, 0.12, 0.1]
+      ];
+      maria.forEach(([ox, oy, rxm, rym, op]) => {
+        lctx.fillStyle = `rgba(98, 110, 132, ${op})`;
+        lctx.beginPath();
+        lctx.ellipse(cx + ox * radius, cy + oy * radius, rxm * radius, rym * radius, 0.35, 0, Math.PI * 2);
+        lctx.fill();
+      });
+
+      // Clip to exact astronomical phase terminator
+      lctx.globalCompositeOperation = 'destination-in';
+      lctx.beginPath();
+      if (illumination >= 0.985) {
+        lctx.arc(cx, cy, radius, 0, Math.PI * 2);
+      } else {
+        const termRx = Math.abs(Math.cos(2 * Math.PI * phase)) * radius;
+        const isGibbous = illumination > 0.5;
+        if (isWaxing) {
+          // Right limb lit
+          lctx.arc(cx, cy, radius, -Math.PI / 2, Math.PI / 2, false);
+          lctx.ellipse(cx, cy, Math.max(0.5, termRx), radius, 0, Math.PI / 2, -Math.PI / 2, !isGibbous);
+        } else {
+          // Left limb lit
+          lctx.arc(cx, cy, radius, Math.PI / 2, -Math.PI / 2, false);
+          lctx.ellipse(cx, cy, Math.max(0.5, termRx), radius, 0, -Math.PI / 2, Math.PI / 2, !isGibbous);
+        }
+      }
+      lctx.closePath();
+      lctx.fillStyle = '#ffffff';
+      lctx.fill();
+
+      mctx.drawImage(litOff, 0, 0);
+    }
+
+    mctx.restore();
+    moonCanvas = off;
+    return moonCanvas;
+  }
+
   function animate(ts) {
     ctx.clearRect(0, 0, W, H);
     const mood = state.skyMood;
@@ -3202,6 +3328,7 @@ function initSkyCanvas() {
         if (p.x < -40) p.x = W + 20;
       });
     } else if (mood === 'night') {
+      // Twinkling stars
       particles.slice(0, 55).forEach((p) => {
         const twinkle = 0.25 + 0.55 * (0.5 + 0.5 * Math.sin(ts * 0.002 + p.phase));
         ctx.fillStyle = `rgba(220, 236, 255, ${twinkle.toFixed(2)})`;
@@ -3209,7 +3336,13 @@ function initSkyCanvas() {
         ctx.arc(p.x, p.y * 0.65, p.radius, 0, Math.PI * 2);
         ctx.fill();
       });
-    } else if (mood !== 'cloudy') {
+      // Realistic current astronomical moon phase in upper-left night sky
+      const moonR = W < 600 ? 25 : 32;
+      const mImg = ensureMoonCanvas(moonR);
+      const mx = W < 600 ? W * 0.23 : W * 0.22;
+      const my = W < 600 ? 224 : 210;
+      ctx.drawImage(mImg, Math.round(mx - mImg.width / 2), Math.round(my - mImg.height / 2));
+    } else if (mood !== 'cloudy' && mood !== 'sunset') {
       // Subtle floating solar light motes (never on overcast/cloudy days)
       particles.slice(0, 35).forEach((p) => {
         ctx.fillStyle = `rgba(255, 232, 175, ${(p.alpha * 0.38).toFixed(2)})`;

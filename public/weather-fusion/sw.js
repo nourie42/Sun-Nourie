@@ -1,13 +1,10 @@
-const CACHE_NAME = 'weather-nourie-render-v3';
+const CACHE_NAME = 'weather-nourie-render-v4';
 const STATIC_SHELL = [
-  '/weather-fusion/',
   '/weather-fusion/manifest.webmanifest',
   '/weather-fusion/pwa-192x192.png',
   '/weather-fusion/pwa-512x512.png',
   '/weather-fusion/pwa-maskable-512x512.png',
   '/weather-fusion/apple-touch-icon.png',
-  '/weather-fusion/pwa-bridge.css?v=1',
-  '/weather-fusion/pwa-bridge.js?v=2',
 ];
 
 self.addEventListener('install', (event) => {
@@ -40,12 +37,17 @@ self.addEventListener('fetch', (event) => {
   // Never intercept or cache live API forecast/alert endpoints.
   if (url.pathname.startsWith('/api/')) return;
 
-  // Network-first so forecasts, scripts, and buttons are always fresh.
-  // Falls back to cache only when offline.
+  // Always bypass HTTP cache for HTML, JS, and CSS so stale cached builds never flash on load.
+  const isFreshAsset =
+    request.mode === 'navigate' ||
+    /\.(html|js|css)$/i.test(url.pathname) ||
+    url.pathname.endsWith('/');
+  const networkReq = isFreshAsset ? new Request(request, { cache: 'no-store' }) : request;
+
   event.respondWith(
-    fetch(request)
+    fetch(networkReq)
       .then((response) => {
-        if (response && response.status === 200 && response.type === 'basic') {
+        if (!isFreshAsset && response && response.status === 200 && response.type === 'basic') {
           const copy = response.clone();
           caches.open(CACHE_NAME).then((cache) => cache.put(request, copy)).catch(() => undefined);
         }
@@ -54,10 +56,6 @@ self.addEventListener('fetch', (event) => {
       .catch(async () => {
         const cached = await caches.match(request);
         if (cached) return cached;
-        if (request.mode === 'navigate') {
-          const fallback = await caches.match('/weather-fusion/');
-          if (fallback) return fallback;
-        }
         return Response.error();
       })
   );

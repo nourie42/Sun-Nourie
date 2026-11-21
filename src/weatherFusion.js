@@ -778,19 +778,23 @@ export function registerWeatherFusionRoutes(app, options = {}) {
     catch (e) { return res.status(e.status || 503).json({ error: e.status === 400 || e.status === 409 ? e.message : 'Weather data is temporarily unavailable. Please retry.' }); }
   };
   app.get(['/weather', '/weather-fusion', '/weather-fusion/', '/weather-fusion/experimental-weather.html', '/weather-fusion/outlooks'], (_req, res) => {
-    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Cache-Control', 'no-store, no-cache, max-age=0, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
     res.sendFile(path.join(PUBLIC_DIR, 'index.html'));
   });
   app.get('/weather-fusion/ai-rankings.html', (_req, res) => {
-    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Cache-Control', 'no-store, no-cache, max-age=0, must-revalidate');
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
     res.sendFile(path.join(PUBLIC_DIR, 'ai-rankings.html'));
   });
   app.get(['/weather-fusion/v3', '/weather-fusion/v3/', '/weather-fusion/v3/index.html', '/weather-fusion/v3/experimental-weather.html'], (_req, res) => {
-    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Cache-Control', 'no-store, no-cache, max-age=0, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
     res.sendFile(path.join(PUBLIC_DIR, 'v3', 'index.html'));
@@ -870,7 +874,7 @@ export function registerWeatherFusionRoutes(app, options = {}) {
     'comfort-reference-scenes-rain.webp','comfort-reference-scenes-umbrella.png','comfort-reference-scenes-umbrella.webp','comfort-reference-scenes-watch.webp',
     'poodle-walk.png','poodle-walk-cold.png','poodle-walk-hot.png','poodle-walk-mild.png',
     'today-sky-clear.webp','today-sky-clouds.webp','today-sky-night-v2.webp','today-sky-night.webp',
-    'today-sky-rain.webp','today-sky-storm.webp',
+    'today-sky-rain.webp','today-sky-storm.webp','today-sky-sunset.jpg',
   ]) app.get(`/weather-fusion/${name}`, (_req, res) => {
     res.setHeader('Cache-Control', 'no-cache');
     res.sendFile(path.join(PUBLIC_DIR, name));

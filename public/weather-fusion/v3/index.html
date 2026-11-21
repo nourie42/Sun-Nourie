@@ -11,13 +11,13 @@
   <link rel="stylesheet" href="/weather-fusion/forecast-window-banners.css?v=current-rain-20261017-v3" />
   <link rel="stylesheet" href="/weather-fusion/weather-glass.css?v=ice-v2" />
   <link rel="stylesheet" href="/weather-fusion/outlook-panel.css?v=compact-v3" />
-  <link rel="stylesheet" href="/weather-fusion/v3/css/styles.css?v=v3-accuracy-7" />
+  <link rel="stylesheet" href="/weather-fusion/v3/css/styles.css?v=v3-sky-8" />
 </head>
 <body data-sky="cloudy">
   <!-- Full-Viewport Fixed Dynamic Living Sky Backdrop (Flows Behind Every Glass Tile) -->
   <div class="atmosphere" aria-hidden="true"></div>
   <div class="live-sky-backdrop" aria-hidden="true">
-    <img id="hero-bg-photo" class="hero-bg-photo sky-overcast" src="/weather-fusion/today-sky-rain.webp" alt="" />
+    <img id="hero-bg-photo" class="hero-bg-photo is-loading" alt="" />
     <div class="live-sky-scrim"></div>
   </div>
   <canvas id="sky-canvas" aria-hidden="true"></canvas>
@@ -66,7 +66,6 @@
         <!-- Compact Action Buttons -->
         <div class="header-actions">
           <button id="mobile-search-toggle" class="icon-btn compact-btn glass-chip-btn" type="button" title="Search city, ZIP, or address" aria-label="Search location">⌕</button>
-          <button id="unit-toggle" class="icon-btn compact-btn glass-chip-btn" type="button" title="Toggle Fahrenheit / Celsius">°F</button>
           <button id="refresh-btn" class="icon-btn compact-btn glass-chip-btn" type="button" title="Refresh forecast" aria-label="Refresh">↻</button>
         </div>
       </div>
@@ -89,11 +88,11 @@
           <select id="sky-mood-select" class="sky-select" aria-label="Sky background theme">
             <option value="auto">Sky: Auto</option>
             <option value="day">Sunny Sky</option>
+            <option value="partly">Partly Sunny</option>
             <option value="rain">Rainy Sky</option>
             <option value="sunset">Sunset</option>
             <option value="night">Night Sky</option>
           </select>
-          <a class="mode-pill" href="/weather-fusion/">← Main app</a>
         </div>
       </div>
     </div>
@@ -283,7 +282,7 @@
     <!-- Outside Right Now (Immediately Below How It Feels & What to Wear) -->
     <section id="skin-exposure">
       <div class="section-inline-head">
-        <h2 class="card-title-clean">Outside Right Now</h2>
+        <h2 id="exposure-section-title" class="card-title-clean">Outside Right Now</h2>
         <span id="exposure-time-note" class="subtle-note">Right now</span>
       </div>
       <div id="exposure-cards-grid" class="exposure-teaser-stack"></div>
@@ -477,6 +476,6 @@
   </footer>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
-  <script type="module" src="/weather-fusion/v3/js/app.js?v=v3-accuracy-7"></script>
+  <script type="module" src="/weather-fusion/v3/js/app.js?v=v3-sky-8"></script>
 </body>
 </html>

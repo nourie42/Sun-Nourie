@@ -537,9 +537,21 @@ body[data-sky="night"] .atmosphere {
   height: 100%;
   object-fit: cover;
   object-position: 50% 45%;
-  filter: saturate(1.08) contrast(1.03) brightness(0.92);
+  filter: saturate(1.06) contrast(1.03) brightness(0.93);
   transform: scale(1.02);
   transition: opacity 0.45s ease, transform 0.55s ease, filter 0.55s ease;
+}
+
+.hero-bg-photo.is-loading {
+  opacity: 0;
+}
+
+.hero-bg-photo.sky-clear {
+  object-position: 64% 44%;
+}
+
+.hero-bg-photo.sky-partly {
+  object-position: 74% 46%;
 }
 
 .hero-bg-photo.sky-overcast {
@@ -550,6 +562,12 @@ body[data-sky="night"] .atmosphere {
 }
 
 @media (max-width: 760px) {
+  .hero-bg-photo.sky-clear {
+    object-position: 66% 42%;
+  }
+  .hero-bg-photo.sky-partly {
+    object-position: 76% 44%;
+  }
   .hero-bg-photo.sky-overcast {
     object-position: 0% 50% !important;
     transform: scale(1.04);
@@ -565,7 +583,8 @@ body[data-sky="night"] .atmosphere {
 }
 
 .hero-bg-photo.sky-sunset {
-  filter: saturate(1.25) hue-rotate(-28deg) brightness(0.84);
+  object-position: 42% 52%;
+  filter: brightness(0.92) contrast(1.04) saturate(1.06);
 }
 
 .topbar {
@@ -687,17 +706,30 @@ body[data-sky="night"] .atmosphere {
 }
 
 .hero-temp {
-  font-size: clamp(68px, 11vw, 96px);
-  font-weight: 300;
-  line-height: 0.92;
-  letter-spacing: -0.045em;
-  color: #ffffff;
+  font-size: clamp(70px, 11.5vw, 98px);
+  font-weight: 200;
+  line-height: 0.9;
+  letter-spacing: -0.04em;
+  background: linear-gradient(180deg, #ffffff 18%, rgba(228, 240, 255, 0.92) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 5px 16px rgba(6, 16, 34, 0.46));
   font-variant-numeric: tabular-nums;
   cursor: pointer;
 }
 
 .hero-weather-icon {
-  filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.35));
+  filter: drop-shadow(0 6px 16px rgba(6, 16, 34, 0.34));
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#exposure-time-note {
+  color: rgba(244, 250, 255, 0.94);
+  font-weight: 600;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.48);
 }
 
 .hero-condition {
