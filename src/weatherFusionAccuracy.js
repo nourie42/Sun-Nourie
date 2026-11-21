@@ -223,6 +223,8 @@ export function scoreModelAgainstTruth(pairs) {
 
 export function createAccuracyService({ fetchImpl = fetch, now = Date.now } = {}) {
   const cache = new Map();
+  const inFlight = new Map();
+  const nwsObsCache = new Map();
   const liveLedger = new Map();
 
   function recordRuntimeForecast(forecast) {
@@ -250,40 +252,45 @@ export function createAccuracyService({ fetchImpl = fetch, now = Date.now } = {}
     }
   }
 
-  async function fetchJson(url) {
+  async function fetchJson(url, { timeoutMs = 8000, retries = 1 } = {}) {
     let lastErr;
-    for (let attempt = 0; attempt < 2; attempt++) {
+    for (let attempt = 0; attempt <= retries; attempt++) {
       try {
         const res = await fetchImpl(url, {
           headers: { Accept: 'application/json', 'User-Agent': 'WeatherNourie/1.0' },
-          signal: AbortSignal.timeout(20000),
+          signal: AbortSignal.timeout(timeoutMs),
         });
         if (!res.ok) throw new Error(`HTTP ${res.status} for ${url}`);
         return await res.json();
       } catch (err) {
         lastErr = err;
-        if (attempt === 0) await new Promise((r) => setTimeout(r, 700));
+        if (attempt < retries) await new Promise((r) => setTimeout(r, 350));
       }
     }
     throw lastErr;
   }
 
   async function loadNwsStationObservations(lat, lon) {
+    const key = `${lat.toFixed(2)}:${lon.toFixed(2)}`;
+    const hit = nwsObsCache.get(key);
+    if (hit && now() - hit.at < CACHE_TTL_MS) return hit.value;
     try {
-      const pts = await fetchJson(`https://api.weather.gov/points/${lat.toFixed(4)},${lon.toFixed(4)}`);
+      const pts = await fetchJson(`https://api.weather.gov/points/${lat.toFixed(4)},${lon.toFixed(4)}`, { timeoutMs: 3500, retries: 0 });
       const stationsUrl = pts?.properties?.observationStations;
       if (!stationsUrl) return { stationId: null, stationName: null, byHour: new Map() };
-      const stList = await fetchJson(stationsUrl);
+      const stList = await fetchJson(stationsUrl, { timeoutMs: 3500, retries: 0 });
       const first = stList?.features?.[0];
       const stationId = first?.properties?.stationIdentifier || null;
       const stationName = first?.properties?.name || stationId;
       if (!stationId) return { stationId: null, stationName: null, byHour: new Map() };
-      const obs = await fetchJson(`https://api.weather.gov/stations/${stationId}/observations?limit=350`);
-      return {
+      const obs = await fetchJson(`https://api.weather.gov/stations/${stationId}/observations?limit=350`, { timeoutMs: 4000, retries: 0 });
+      const value = {
         stationId,
         stationName,
         byHour: bucketNwsObservations(obs?.features),
       };
+      nwsObsCache.set(key, { at: now(), value });
+      return value;
     } catch {
       return { stationId: null, stationName: null, byHour: new Map() };
     }
@@ -293,7 +300,7 @@ export function createAccuracyService({ fetchImpl = fetch, now = Date.now } = {}
     const byHour = new Map();
     try {
       const url = `https://archive-api.open-meteo.com/v1/archive?latitude=${lat.toFixed(4)}&longitude=${lon.toFixed(4)}&start_date=${startDate}&end_date=${endDate}&hourly=temperature_2m,precipitation,wind_speed_10m,cloud_cover,relative_humidity_2m&temperature_unit=fahrenheit&wind_speed_unit=mph&precipitation_unit=inch&timezone=UTC`;
-      const data = await fetchJson(url);
+      const data = await fetchJson(url, { timeoutMs: 6500, retries: 0 });
       const times = data?.hourly?.time || [];
       for (let i = 0; i < times.length; i++) {
         const tempF = data.hourly.temperature_2m?.[i];
@@ -329,7 +336,11 @@ export function createAccuracyService({ fetchImpl = fetch, now = Date.now } = {}
     if (entry && now() - entry.at < CACHE_TTL_MS) {
       return entry.payload;
     }
+    if (inFlight.has(cacheKey)) {
+      return inFlight.get(cacheKey);
+    }
 
+    const work = (async () => {
     const currentMs = now();
     const pastHoursTotal = windowDays * 24;
     const endDate = new Date(currentMs - DAY_MS).toISOString().slice(0, 10);
@@ -591,6 +602,14 @@ export function createAccuracyService({ fetchImpl = fetch, now = Date.now } = {}
       cache.delete(firstKey);
     }
     return payload;
+    })();
+
+    inFlight.set(cacheKey, work);
+    try {
+      return await work;
+    } finally {
+      inFlight.delete(cacheKey);
+    }
   }
 
   return { getAccuracy, recordRuntimeForecast };

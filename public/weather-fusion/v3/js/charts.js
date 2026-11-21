@@ -446,36 +446,41 @@ export function renderModelCompareChart({
       }
     });
     if (pts.length === 0) return '';
-    const pathD = pts.length >= 2 ? buildSmoothSvgPath(pts, 0.18) : '';
+    const pathD = pts.length >= 2 ? buildSmoothSvgPath(pts, 0.22) : '';
     const isBlend = m.id === 'blend';
     return `
       <g class="compare-model-series" data-model="${m.id}">
         ${
           pathD && isBlend
-            ? `<path d="${pathD}" fill="none" stroke="rgba(6, 16, 34, 0.92)" stroke-width="8.5" stroke-linecap="round"/>`
+            ? `<path d="${pathD}" fill="none" stroke="rgba(255, 255, 255, 0.22)" stroke-width="6" stroke-linecap="round"/>`
             : ''
         }
         ${
           pathD
-            ? `<path d="${pathD}" fill="none" stroke="${m.color}" stroke-width="${isBlend ? 4.8 : 2.2}" stroke-dasharray="${m.dash || ''}" stroke-linecap="round" stroke-linejoin="round" opacity="${isBlend ? '1' : '0.92'}"/>`
+            ? `<path d="${pathD}" fill="none" stroke="${m.color}" stroke-width="${isBlend ? 2.8 : 1.5}" stroke-dasharray="${isBlend ? '' : (m.dash ? '4 3' : '')}" stroke-linecap="round" stroke-linejoin="round" opacity="${isBlend ? '1' : '0.82'}"/>`
             : ''
         }
         ${pts
           .map((p, idx) => {
             const isSel = p.dayIdx === selIdx;
-            const showLabel = isBlend && (isSel || visibleDays.length <= 5 || idx % 2 === 0);
-            const pillY = p.y - 16 < 16 ? p.y + 22 : p.y - 16;
-            const pillX = clamp(p.x, padL + 16, W - 26);
+            const showValue = isBlend && (isSel || visibleDays.length <= 5 || idx % 2 === 0);
+            const lblY = p.y - 12 < 14 ? p.y + 18 : p.y - 11;
+            const lblX = clamp(p.x, padL + 12, W - 18);
+            const dotR = isBlend ? (isSel ? '4.2' : '2.8') : (isSel ? '3.0' : '1.8');
             return `
-              <circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="${isBlend ? (isSel ? '6' : '4.5') : (isSel ? '4.2' : '2.8')}" fill="${m.color}" stroke="#081426" stroke-width="${isBlend ? '2' : '1.1'}"/>
+              <circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="${dotR}" fill="${m.color}" stroke="${isSel ? 'rgba(6,16,34,0.8)' : 'none'}" stroke-width="${isSel ? '1.2' : '0'}" opacity="${isBlend || isSel ? '1' : '0.82'}"/>
               ${
-                showLabel
-                  ? `<g transform="translate(${pillX.toFixed(1)}, ${pillY.toFixed(1)})">
-                      <rect x="-22" y="-14" width="44" height="20" rx="8" fill="${isSel ? 'rgba(14, 165, 233, 0.96)' : 'rgba(8, 19, 38, 0.94)'}" stroke="${isSel ? '#ffffff' : 'rgba(255, 255, 255, 0.5)'}" stroke-width="${isSel ? '1.4' : '1'}"/>
-                      <text text-anchor="middle" y="0" fill="#ffffff" font-size="12.5" font-weight="800">${
+                showValue
+                  ? isSel
+                    ? `<g transform="translate(${lblX.toFixed(1)}, ${(lblY - 3).toFixed(1)})">
+                        <rect x="-19" y="-12" width="38" height="17" rx="6" fill="rgba(14, 165, 233, 0.88)" stroke="rgba(255, 255, 255, 0.55)" stroke-width="0.9"/>
+                        <text text-anchor="middle" y="0" fill="#ffffff" font-size="11.5" font-weight="700">${
+                          variable.decimals ? p.val.toFixed(variable.decimals) : Math.round(p.val)
+                        }${variable.unit}</text>
+                      </g>`
+                    : `<text x="${lblX.toFixed(1)}" y="${lblY.toFixed(1)}" text-anchor="middle" fill="#f8fbff" font-size="11.5" font-weight="700" style="paint-order:stroke;stroke:rgba(6,16,34,0.65);stroke-width:2.5px;">${
                         variable.decimals ? p.val.toFixed(variable.decimals) : Math.round(p.val)
-                      }${variable.unit}</text>
-                    </g>`
+                      }${variable.unit}</text>`
                   : ''
               }
             `;
@@ -496,17 +501,17 @@ export function renderModelCompareChart({
   }
 
   containerEl.innerHTML = `
-    <svg class="compare-models-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet">
+    <svg class="compare-models-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" style="cursor:pointer;">
       ${yTicks
         .map(
           (t) => `
-        <line x1="${padL}" y1="${t.y.toFixed(1)}" x2="${W - padR}" y2="${t.y.toFixed(1)}" stroke="rgba(255,255,255,0.12)"/>
-        <text x="${padL - 7}" y="${(t.y + 4.5).toFixed(1)}" text-anchor="end" fill="#dcebff" font-size="12.5" font-weight="700">${t.label}</text>
+        <line x1="${padL}" y1="${t.y.toFixed(1)}" x2="${W - padR}" y2="${t.y.toFixed(1)}" stroke="rgba(255,255,255,0.10)" stroke-width="1"/>
+        <text x="${padL - 8}" y="${(t.y + 4).toFixed(1)}" text-anchor="end" fill="rgba(218,234,252,0.78)" font-size="11.5" font-weight="600">${t.label}</text>
       `
         )
         .join('')}
 
-      <line x1="${selX.toFixed(1)}" y1="${padT}" x2="${selX.toFixed(1)}" y2="${padT + plotH}" stroke="rgba(122, 198, 255, 0.72)" stroke-width="1.8" stroke-dasharray="4 4"/>
+      <line x1="${selX.toFixed(1)}" y1="${padT}" x2="${selX.toFixed(1)}" y2="${padT + plotH}" stroke="rgba(125, 211, 252, 0.55)" stroke-width="1.2" stroke-dasharray="3 3"/>
 
       ${modelPathsSvg}
 
@@ -519,8 +524,8 @@ export function renderModelCompareChart({
           if (labelStep) return '';
           return `
             <g>
-              <text x="${x}" y="${H - 25}" text-anchor="middle" fill="${isSel ? '#ffffff' : '#d2e4fc'}" font-size="13.5" font-weight="${isSel ? '800' : '700'}">${d.shortWeekday}</text>
-              <text x="${x}" y="${H - 8}" text-anchor="middle" fill="${isSel ? '#7dd3fc' : 'rgba(190,214,248,0.82)'}" font-size="11.5" font-weight="600">${d.index === 0 ? d.dateLabel : dateNum}</text>
+              <text x="${x}" y="${H - 25}" text-anchor="middle" fill="${isSel ? '#ffffff' : 'rgba(215,232,252,0.86)'}" font-size="12.5" font-weight="${isSel ? '800' : '600'}">${d.shortWeekday}</text>
+              <text x="${x}" y="${H - 8}" text-anchor="middle" fill="${isSel ? '#7dd3fc' : 'rgba(190,214,248,0.75)'}" font-size="11" font-weight="600">${d.index === 0 ? d.dateLabel : dateNum}</text>
             </g>
           `;
         })

@@ -3526,8 +3526,8 @@ body.awaiting-location .v3-main-stack > :not(#location-needed-card) {
 
 /* Always-visible return navigation, independent of the tools drawer. */
 .main-app-return { display: flex; justify-content: flex-end; padding-block: 0 6px; }
-.main-app-button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 40px; padding: 7px 12px; border: 1px solid rgba(209,234,255,.46); border-radius: 9px; background: rgba(12,35,59,.60); color: #f6fbff; font: 600 12px/1.3 var(--font-sans); text-decoration: none; }
-.main-app-button:hover { background: rgba(32,72,109,.82); }
+.main-app-button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 36px; padding: 6px 13px; border: 1px solid rgba(255,255,255,.28); border-radius: 10px; background: linear-gradient(180deg, rgba(255,255,255,.10) 0%, rgba(255,255,255,0) 45%), rgba(15,25,45,.20); backdrop-filter: blur(18px) saturate(160%); -webkit-backdrop-filter: blur(18px) saturate(160%); box-shadow: inset 0 1px 0 rgba(255,255,255,.28), 0 6px 18px rgba(0,0,0,.18); color: #f6fbff; text-shadow: 0 1px 3px rgba(0,0,0,.55); font: 600 12px/1.25 var(--font-sans); text-decoration: none; }
+.main-app-button:hover { background: linear-gradient(180deg, rgba(255,255,255,.16) 0%, rgba(255,255,255,.02) 45%), rgba(15,25,45,.28); border-color: rgba(255,255,255,.46); }
 .main-app-button:focus-visible { outline: 2px solid #d4eaff; outline-offset: 3px; }
 
 /* Match the main app's glass cards while retaining Beta information and layout. */

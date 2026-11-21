@@ -10,7 +10,7 @@
   <link id="map-style" data-href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
   <script async src="/weather-fusion/forecast-prefetch.js?v=startup-v1"></script>
   <link rel="stylesheet" href="/weather-fusion/weather-glass.css?v=shared-v1">
-  <link rel="stylesheet" href="/weather-fusion/outlook-panel.css?v=compact-v1">
+  <link rel="stylesheet" href="/weather-fusion/outlook-panel.css?v=compact-v2">
   <link rel="stylesheet" href="/weather-fusion/style.css?v=brand-v3">
   <link rel="stylesheet" href="/weather-fusion/forecast-layout.css?v=weather-qa-v67">
   <script type="application/json" id="map-library" data-src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin="" onload="window.dispatchEvent(new Event('weather-map-library-ready'))"></script>
@@ -129,8 +129,8 @@
   <script defer src="/weather-fusion/pwa-bridge.js?v=2"></script>
   <style id="try-beta-style">
     .beta-entry{display:flex;justify-content:flex-end;position:relative;z-index:2;margin:0 0 8px}
-    .try-beta-link{display:inline-flex;align-items:center;justify-content:center;min-height:36px;padding:7px 12px;border:1px solid rgba(209,234,255,.48);border-radius:8px;background:rgba(12,35,59,.72);color:#f6fbff;font-size:12px;line-height:1.3;font-weight:650;text-decoration:none}
-    .try-beta-link:hover{background:rgba(32,72,109,.86)}
+    .try-beta-link{display:inline-flex;align-items:center;justify-content:center;min-height:34px;padding:6px 13px;border:1px solid rgba(255,255,255,.28);border-radius:10px;background:linear-gradient(180deg,rgba(255,255,255,.10) 0%,rgba(255,255,255,0) 45%),rgba(15,25,45,.20);backdrop-filter:blur(18px) saturate(160%);-webkit-backdrop-filter:blur(18px) saturate(160%);box-shadow:inset 0 1px 0 rgba(255,255,255,.28),0 6px 18px rgba(0,0,0,.18);color:#f6fbff;text-shadow:0 1px 3px rgba(0,0,0,.55);font-size:12px;line-height:1.25;font-weight:650;text-decoration:none;transition:background .16s ease,border-color .16s ease}
+    .try-beta-link:hover{background:linear-gradient(180deg,rgba(255,255,255,.16) 0%,rgba(255,255,255,.02) 45%),rgba(15,25,45,.28);border-color:rgba(255,255,255,.46)}
     .try-beta-link:focus-visible{outline:2px solid #d4eaff;outline-offset:3px}
   </style>
 </head>

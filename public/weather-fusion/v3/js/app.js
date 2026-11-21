@@ -21,7 +21,7 @@ import {
   renderModelCompareChart,
   renderNext24HoursSplineChart,
   renderSevenDayDualSplineChart
-} from './charts.js?v=v3-accuracy-5';
+} from './charts.js?v=v3-accuracy-6';
 import {
   WeatherMapController
 } from './map.js?v=v3-accuracy-5';
@@ -104,6 +104,7 @@ const state = {
   compareVariableId: 'highTemp',
   compareHorizonDays: 5,
   enabledCompareModels: new Set(['blend', 'nws', 'hrrr', 'nbm', 'ecmwf', 'gefs', 'weathernext']),
+  accuracyCache: new Map(),
   dewPointRangeHours: 48,
   selectedDewPointIdx: 0,
   aqiExpanded: false,
@@ -274,6 +275,30 @@ async function loadLocationForecast(loc, { forceRefresh = false } = {}) {
         renderTopCompactPills(state.forecast);
       }
     });
+
+  // Warm Model Accuracy Rankings cache in background so opening Rankings is instant
+  setTimeout(() => {
+    if (token !== state.loadToken) return;
+    fetchAccuracyCached(loc.latitude, loc.longitude, 10, 24).catch(() => {});
+  }, 500);
+}
+
+function fetchAccuracyCached(lat, lon, days = 10, horizon = 24) {
+  const key = `${Number(lat).toFixed(2)}:${Number(lon).toFixed(2)}:${days}:${horizon}`;
+  const existing = state.accuracyCache.get(key);
+  if (existing) return existing;
+  const url = `/api/weather-fusion/accuracy?latitude=${encodeURIComponent(lat)}&longitude=${encodeURIComponent(lon)}&days=${days}&horizon=${horizon}`;
+  const req = fetch(url)
+    .then((res) => {
+      if (!res.ok) throw new Error('Accuracy service unavailable');
+      return res.json();
+    })
+    .catch((err) => {
+      state.accuracyCache.delete(key);
+      throw err;
+    });
+  state.accuracyCache.set(key, req);
+  return req;
 }
 
 function renderAll() {
@@ -523,19 +548,42 @@ function selectHeroBackdropPhoto(cur) {
   return { src: '/weather-fusion/today-sky-clear.webp', cls: '' };
 }
 
-function computeWeatherMeterScore(cur, today, aqi) {
+function computeWeatherMeterScore(cur, today, aqi, canonical = null) {
   let score = 96;
   const feels = cur.feelsLikeF ?? cur.tempF ?? 65;
+  const cond = String(cur.condition || '').toLowerCase();
+  const clouds = Number.isFinite(cur.cloudCover) ? cur.cloudCover : 0;
+
   // Optimal outdoor comfort is around 64–75°F
-  if (feels < 64) score -= Math.min(34, (64 - feels) * 1.05);
-  else if (feels > 76) score -= Math.min(38, (feels - 76) * 1.4);
+  if (feels < 64) score -= Math.min(32, (64 - feels) * 1.05);
+  else if (feels > 76) score -= Math.min(36, (feels - 76) * 1.4);
 
   const dp = cur.dewPointF ?? 50;
-  if (dp > 62) score -= Math.min(22, (dp - 62) * 1.3);
-  else if (dp < 28) score -= Math.min(10, (28 - dp) * 0.4);
+  if (dp > 62) score -= Math.min(20, (dp - 62) * 1.25);
+  else if (dp < 28) score -= Math.min(8, (28 - dp) * 0.35);
 
-  const rain = Math.max(cur.rainChance || 0, Math.round((today?.rainChance || 0) * 0.6));
-  if (rain >= 20) score -= Math.min(28, (rain - 15) * 0.35);
+  // Sky / Cloud cover penalty (overcast gray skies cannot be "Ideal Outdoors")
+  const isStorm = /storm|thunder|t-storm|lightning|hail/.test(cond);
+  const isActiveWet = /rain|shower|drizzle|snow|sleet|flurr|ice|wintry|freez/.test(cond) || (cur.precipIn || 0) >= 0.01 || (cur.rainChance || 0) >= 55;
+  const radarNearby = Boolean(
+    canonical?.radar?.nearby ||
+    canonical?.current?.rainAround ||
+    /rain around|within \d+ mi/i.test(String(canonical?.current?.radarSummary || canonical?.current?.conditionSource || ''))
+  );
+  const isOvercast = !isActiveWet && !isStorm && (clouds >= 85 || /overcast|\bcloudy\b|fog|mist|haze/.test(cond));
+  const isMostlyCloudy = !isOvercast && !isActiveWet && !isStorm && (clouds >= 70 || /mostly cloudy/.test(cond));
+  const isPartlyCloudy = !isOvercast && !isMostlyCloudy && !isActiveWet && !isStorm && clouds >= 40;
+
+  if (isOvercast) score -= 18;
+  else if (isMostlyCloudy) score -= 13;
+  else if (isPartlyCloudy) score -= 5;
+
+  // Active rain, nearby radar rain, and daily rain risk
+  const rain = Math.max(cur.rainChance || 0, Math.round((today?.rainChance || 0) * 0.65));
+  if (isStorm) score -= 42;
+  else if (isActiveWet) score -= 28;
+  else if (radarNearby) score -= 18;
+  else if (rain >= 20) score -= Math.min(24, (rain - 15) * 0.36);
 
   const wind = cur.windMph || 0;
   if (wind > 12) score -= Math.min(16, (wind - 12) * 0.85);
@@ -543,13 +591,19 @@ function computeWeatherMeterScore(cur, today, aqi) {
   if (aqi > 100) score -= Math.min(20, (aqi - 100) * 0.2);
   else if (aqi > 50) score -= Math.min(6, (aqi - 50) * 0.1);
 
+  // Hard realism caps so rainy or overcast skies never claim "Ideal Outdoors"
+  if (isStorm) score = Math.min(score, 40);
+  else if (isActiveWet) score = Math.min(score, 58);
+  else if (radarNearby) score = Math.min(score, 66);
+  else if (isOvercast || isMostlyCloudy) score = Math.min(score, 76);
+
   const clamped = Math.round(clamp(score, 12, 99));
   let label = 'Ideal Outdoors';
   if (clamped < 45) label = 'Challenging';
   else if (clamped < 65) label = 'Fair Conditions';
   else if (clamped < 80) label = 'Pleasant';
   else if (clamped < 90) label = 'Mostly Comfortable';
-  return { score: clamped, label };
+  return { score: clamped, label, isStorm, isActiveWet, radarNearby, isOvercast, isMostlyCloudy, clouds };
 }
 
 function renderWeatherMeterArcSvg(score) {
@@ -755,7 +809,7 @@ function renderHeroAndBriefing(f) {
       aqiSubEl.style.color = aqiColor;
     }
   }
-  const meter = computeWeatherMeterScore(cur, today, aqi);
+  const meter = computeWeatherMeterScore(cur, today, aqi, f.canonical);
   if (meterArcEl) meterArcEl.innerHTML = renderWeatherMeterArcSvg(meter.score);
   if (meterSubEl) meterSubEl.textContent = meter.label;
 }
@@ -1615,6 +1669,82 @@ function renderCompareModelsSection(f) {
     });
   }
 
+function openCompareDayModelsModal(dayIdx, f) {
+  const visibleCount = clamp(state.compareHorizonDays, 3, f.days.length);
+  const visibleDays = f.days.slice(0, visibleCount);
+  const drawDayModal = (idx) => {
+    const safeIdx = clamp(idx, 0, visibleDays.length - 1);
+    const d = visibleDays[safeIdx];
+    const variable = COMPARE_VARIABLES.find((v) => v.id === state.compareVariableId) || COMPARE_VARIABLES[0];
+    const fmtCmp = (val) => {
+      if (val === null || val === undefined || Number.isNaN(val)) return '—';
+      return `${variable.decimals ? Number(val).toFixed(variable.decimals) : Math.round(val)}${variable.unit}`;
+    };
+    const wnVal = extractDayModelCompareValue(d, 'blend', state.compareVariableId, state.useCelsius);
+    const rows = COMPARE_MODELS.map((m) => {
+      const val = extractDayModelCompareValue(d, m.id, state.compareVariableId, state.useCelsius);
+      const diff =
+        m.id !== 'blend' && typeof val === 'number' && typeof wnVal === 'number' && !Number.isNaN(val) && !Number.isNaN(wnVal)
+          ? val - wnVal
+          : null;
+      const diffStr =
+        diff === null
+          ? (m.id === 'blend' ? 'Consensus' : '—')
+          : Math.abs(diff) < (variable.decimals ? 0.01 : 0.5)
+          ? 'Matches'
+          : `${diff > 0 ? '+' : ''}${variable.decimals ? diff.toFixed(variable.decimals) : Math.round(diff)}${variable.unit}`;
+      return { m, val, diffStr };
+    }).filter((r) => r.m.id === 'blend' || (typeof r.val === 'number' && !Number.isNaN(r.val)));
+
+    const bodyEl = document.getElementById('modal-body');
+    const titleEl = document.getElementById('modal-title');
+    if (titleEl) titleEl.textContent = `${d.dayName} (${d.dateLabel}) · All Models (${variable.label})`;
+    if (!bodyEl) return;
+
+    bodyEl.innerHTML = `
+      <div class="pill-scroll-row" style="margin-bottom:12px;">
+        ${visibleDays
+          .map(
+            (day, i) =>
+              `<button class="mode-pill ${i === safeIdx ? 'active' : ''}" data-cmp-modal-day="${i}" type="button">${day.shortWeekday} ${day.dateLabel.replace(/^[A-Za-z]+\s+/, '')}</button>`
+          )
+          .join('')}
+      </div>
+      <div style="display:grid;gap:7px;">
+        ${rows
+          .map(
+            ({ m, val, diffStr }) => `
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 13px;border-radius:13px;background:${m.id === 'blend' ? 'rgba(56,189,248,0.16)' : 'rgba(255,255,255,0.06)'};border:1px solid ${m.id === 'blend' ? 'rgba(125,211,252,0.55)' : 'rgba(255,255,255,0.14)'};">
+            <div style="display:flex;align-items:center;gap:9px;min-width:0;">
+              <span style="width:12px;height:3.5px;border-radius:2px;background:${m.color};flex-shrink:0;"></span>
+              <strong style="font-size:14px;color:${m.id === 'blend' ? '#ffffff' : m.color};">${m.id === 'blend' ? 'Weather Nourie' : m.label}</strong>
+            </div>
+            <div style="display:flex;align-items:baseline;gap:10px;flex-shrink:0;">
+              <span style="font-size:12px;color:var(--muted);">${diffStr}</span>
+              <strong style="font-size:16px;color:#ffffff;font-variant-numeric:tabular-nums;">${fmtCmp(val)}</strong>
+            </div>
+          </div>
+        `
+          )
+          .join('')}
+      </div>
+    `;
+
+    bodyEl.querySelectorAll('[data-cmp-modal-day]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const nextIdx = Number(btn.dataset.cmpModalDay) || 0;
+        state.selectedDayIdx = nextIdx;
+        renderSevenDayForecast(f);
+        renderCompareModelsSection(f);
+        drawDayModal(nextIdx);
+      });
+    });
+  };
+
+  openModal('All Models Comparison', '<div></div>');
+  drawDayModal(dayIdx);
+}
+
   renderModelCompareChart({
     containerEl: chartStage,
     days: f.days,
@@ -1627,6 +1757,7 @@ function renderCompareModelsSection(f) {
       state.selectedDayIdx = dIdx;
       renderSevenDayForecast(f);
       renderCompareModelsSection(f);
+      openCompareDayModelsModal(dIdx, f);
     }
   });
 
@@ -1676,9 +1807,11 @@ function renderCompareModelsSection(f) {
 
     breakdownEl.querySelectorAll('[data-cmp-row]').forEach((row) => {
       row.addEventListener('click', () => {
-        state.selectedDayIdx = Number(row.dataset.cmpRow) || 0;
+        const nextIdx = Number(row.dataset.cmpRow) || 0;
+        state.selectedDayIdx = nextIdx;
         renderSevenDayForecast(f);
         renderCompareModelsSection(f);
+        openCompareDayModelsModal(nextIdx, f);
       });
     });
   }
@@ -2600,12 +2733,33 @@ function openWeatherMeterModal(f) {
   const cur = f.current;
   const today = f.days[0];
   const aqi = f.airQuality?.currentAqi ?? 38;
-  const meter = computeWeatherMeterScore(cur, today, aqi);
+  const meter = computeWeatherMeterScore(cur, today, aqi, f.canonical);
   const feels = cur.feelsLikeF ?? cur.tempF ?? 65;
 
   const tempComfort = feels >= 60 && feels <= 78 ? 'Very comfortable' : feels >= 45 && feels < 60 ? 'Crisp / Jacket needed' : feels > 78 ? 'Warm' : 'Chilly';
+  const skyNote = meter.isStorm
+    ? 'Stormy skies'
+    : meter.isActiveWet
+    ? cur.condition || 'Rainy skies'
+    : meter.isOvercast
+    ? `Overcast (${Math.round(meter.clouds)}% clouds)`
+    : meter.isMostlyCloudy
+    ? `Mostly cloudy (${Math.round(meter.clouds)}% clouds)`
+    : meter.clouds >= 40
+    ? `Partly cloudy (${Math.round(meter.clouds)}% clouds)`
+    : 'Clear / Sunny skies';
   const airComfort = (cur.dewPointF ?? 50) <= 60 ? 'Fresh, not sticky' : (cur.dewPointF ?? 50) <= 66 ? 'A little humid' : 'Muggy / Sticky';
-  const rainNote = today.rainChance <= 20 ? 'Mostly dry today' : today.rainChance <= 50 ? 'Chance of a passing shower' : 'Likely wet at times';
+  const rainNote = meter.isStorm
+    ? 'Thunderstorms nearby'
+    : meter.isActiveWet
+    ? 'Active rain / showers'
+    : meter.radarNearby
+    ? 'Rain around nearby'
+    : today.rainChance <= 20
+    ? 'Mostly dry today'
+    : today.rainChance <= 50
+    ? 'Chance of a passing shower'
+    : 'Likely wet at times';
   const windNote = cur.windMph <= 10 ? 'Light breeze' : cur.windMph <= 18 ? 'Breezy outside' : 'Windy';
   const aqiNote = aqi <= 50 ? 'Clean air (Good)' : aqi <= 100 ? 'Acceptable (Moderate)' : 'Hazy / Sensitive';
 
@@ -2616,11 +2770,12 @@ function openWeatherMeterModal(f) {
         <div style="width:155px;margin:0 auto;">${renderWeatherMeterArcSvg(meter.score)}</div>
         <div style="font-size:20px;font-weight:800;color:#ffffff;margin-top:4px;">${meter.score} / 100 · ${meter.label}</div>
         <p style="font-size:13.5px;color:var(--muted);margin:6px auto 0;max-width:440px;line-height:1.5;">
-          The <strong>Weather Meter</strong> gives you one quick 0–100 score showing how nice it feels to be outside right now. Higher scores mean comfortable temperatures, fresh air, low rain risk, and gentle wind.
+          The <strong>Weather Meter</strong> gives you one quick 0–100 score showing how nice it feels to be outside right now. Higher scores mean comfortable temperatures, brighter skies, fresh air, low rain risk, and gentle wind.
         </p>
       </div>
       <div style="display:grid;gap:8px;">
         <div class="take-modal-row"><span>🌡 Temperature Feel (${fmtTemp(feels)})</span><strong>${tempComfort}</strong></div>
+        <div class="take-modal-row"><span>☁ Sky &amp; Clouds</span><strong>${skyNote}</strong></div>
         <div class="take-modal-row"><span>💧 Air Freshness</span><strong>${airComfort}</strong></div>
         <div class="take-modal-row"><span>☔ Rain Risk (${today.rainChance}%)</span><strong>${rainNote}</strong></div>
         <div class="take-modal-row"><span>💨 Wind (${cur.windMph} mph)</span><strong>${windNote}</strong></div>
@@ -2889,12 +3044,12 @@ async function openModelRankingsModal(f) {
   const loadAndRender = async () => {
     const host = document.getElementById('modal-rankings-host');
     if (!host) return;
-    host.innerHTML = `<div style="padding:20px;text-align:center;color:var(--muted);">Loading past ${days}-day accuracy results…</div>`;
+    const cacheKey = `${Number(f.location.latitude).toFixed(2)}:${Number(f.location.longitude).toFixed(2)}:${days}:${horizon}`;
+    if (!state.accuracyCache.has(cacheKey)) {
+      host.innerHTML = `<div style="padding:20px;text-align:center;color:var(--muted);">Loading past ${days}-day accuracy results…</div>`;
+    }
     try {
-      const url = `/api/weather-fusion/accuracy?latitude=${encodeURIComponent(f.location.latitude)}&longitude=${encodeURIComponent(f.location.longitude)}&days=${days}&horizon=${horizon}`;
-      const res = await fetch(url);
-      if (!res.ok) throw new Error('Accuracy service unavailable');
-      const data = await res.json();
+      const data = await fetchAccuracyCached(f.location.latitude, f.location.longitude, days, horizon);
       renderRankingsUi(host, data);
     } catch {
       host.innerHTML = `<div style="padding:18px;color:#ff8f8f;">Unable to load rankings right now. Please try again in a moment.</div>`;
@@ -2908,7 +3063,7 @@ async function openModelRankingsModal(f) {
     else if (rankMode === 'wind') list.sort((a, b) => (a.windMaeMph ?? 99) - (b.windMaeMph ?? 99));
     else list.sort((a, b) => (b.overallScore ?? -1) - (a.overallScore ?? -1));
 
-    const wn = list.find((r) => r.id === 'weather_nourie');
+    const wn = list.find((r) => r.id === 'nourie' || r.id === 'weather_nourie' || r.isNourie);
     const wnPos = wn ? list.indexOf(wn) + 1 : null;
     const modeExplanation =
       rankMode === 'temp'
