@@ -43,7 +43,7 @@ main [hidden]{display:none!important}
 html:not(.gross-open) #dewpoint-gross-meter{display:none!important}
 /* outer tiles: identical glass (also car wash, whose own CSS painted it near-black) */
 html body main .glass,html body main section.glass,html body main .car-wash-forecast,html body main .dewpoint-gross-meter,html body main .experimental-week,html body main .exposure-cards,html body main .weather-change-banner,html body main .forecast-window-banner,html body main .wn-blend-compare,html body main .metric{
-  background:rgba(255,255,255,.07) linear-gradient(180deg,rgba(255,255,255,.06) 0%,rgba(255,255,255,0) 40%)!important;
+  background:var(--weather-tile-fill,rgba(255,255,255,.07) linear-gradient(180deg,rgba(255,255,255,.06),rgba(255,255,255,0) 40%))!important;
   backdrop-filter:blur(18px) saturate(160%)!important;-webkit-backdrop-filter:blur(18px) saturate(160%)!important;
   border:1px solid rgba(255,255,255,.22)!important;border-radius:20px!important;
 }
@@ -67,7 +67,7 @@ html body #wn-compare-chart .wn-chip{font-size:11px!important;line-height:1.4!im
 html body #wn-var-picker button{font-size:12px!important;padding:5px 11px!important;min-height:0!important}
 /* v7: readability over bright day skies — same glass, subtle dark tint + stronger blur/text shadow (all tiles alike) */
 html body:not([data-sky=night]) main :is(.glass,section.glass,.car-wash-forecast,.dewpoint-gross-meter,.experimental-week,.exposure-cards,.weather-change-banner,.forecast-window-banner,.wn-blend-compare,.metric){
-  background:rgba(15,25,45,.18) linear-gradient(180deg,rgba(255,255,255,.06) 0%,rgba(255,255,255,0) 40%)!important;
+  background:var(--weather-tile-fill,rgba(15,25,45,.18) linear-gradient(180deg,rgba(255,255,255,.06),rgba(255,255,255,0) 40%))!important;
   backdrop-filter:blur(24px) saturate(150%)!important;-webkit-backdrop-filter:blur(24px) saturate(150%)!important;
   text-shadow:0 1px 4px rgba(0,0,0,.6),0 0 1px rgba(0,0,0,.5)}
 
@@ -127,7 +127,7 @@ html body .weather-jump-nav>.weather-jump-card:focus-visible{outline:2px solid #
 @media(max-width:800px){html body .weather-jump-nav{grid-template-columns:repeat(4,minmax(0,1fr))!important;max-width:320px}}
 @media(max-width:359px){html body .weather-jump-nav>.weather-jump-card{font-size:11px!important}}
 
-#forecast[data-awaiting-place] > :not(#status,footer) { display:none !important }
+#forecast[data-awaiting-place] > :not(#status,#weather-loading,footer) { display:none !important }
 html body main #weather-change-banner { border-color:rgba(160,199,222,.5)!important; box-shadow:none!important }
 
 html body .weather-jump-nav:has(#open-best-times) {
@@ -140,3 +140,11 @@ html body .weather-jump-nav:has(#open-best-times) {
     max-width:320px;
   }
 }
+
+/* Shared card finish; category borders and layouts remain app-specific. */
+html body.weather-main main :is(.glass,.metric,.forecast-window-banner,.weather-change-banner){border-radius:var(--weather-tile-radius)!important;backdrop-filter:var(--weather-tile-blur)!important;-webkit-backdrop-filter:var(--weather-tile-blur)!important;text-shadow:var(--weather-tile-text-shadow)}
+
+.weather-loading{min-height:340px;padding:28px 0;color:#dce8ef;text-align:center}
+.weather-loading p{font-size:15px;margin-bottom:22px}
+.weather-loading .loading-shimmer{height:110px;border:1px solid #e5f0f32e;border-radius:20px;margin:16px 0}
+#forecast:has(#weather-loading:not([hidden]))>footer{display:none}

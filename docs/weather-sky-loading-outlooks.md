@@ -1,0 +1,18 @@
+# Main sky, startup and shared outlook panel
+
+The main app and V3 Beta now share their outer glass-card finish and a compact Nourie Take panel. The summary opens details; Flood Risk, Storm/Winter Risk, Change Alert, Rain Outlook and Perfect Weather buttons appear only when the existing official-risk and forecast-window calculations qualify them. Every button opens a dialog. Stale snapshots do not advertise current forecast-based alert buttons, and expired risks are excluded. Urgent official warnings remain separately prominent. Phone layouts use two columns; larger displays use up to four.
+
+The main app's former cloudy photo contained a large sun. Its new selected-location sky mapping uses the existing genuinely overcast scene for cloudy/overcast conditions, including high measured cloud cover with a conflicting dry clear label. Rain, fog, snow, storms and day/night retain weather-specific assets. Loading uses an unknown sky rather than assuming sunshine. The displayed current forecast and weather calculations are unchanged.
+
+Startup begins the saved-location request while modules load and the controller adopts that same request. The sky now consumes the controller's selected-location forecast instead of requesting Knightdale independently. Current weather paints before the remaining lower panels render over subsequent frames. Cached device coordinates load while GPS checks for movement; unchanged coordinates do not start another forecast request. No forecast is persisted as current data, and no source formulas, model blending or API payloads were modified. The sole server change registers the additional static assets.
+
+Executed validation on 2026-11-21:
+
+- `npm run check`: passed, including `WEATHER_QA_CONTRACT_OK`.
+- 114 Node checks passed across the new sky/startup and outlook models, selected-day pavement tests, public/private access, weather changes, sky/rain consumers, sky consistency and confidence-window suites.
+- `python scripts/weatherSkyLoadingSmoke.py --before-ref 08f5da3`: 11 checks passed with a captured real forecast, frozen clock, 400 ms forecast delay and 4x mobile CPU slowdown. Covers an unchanged forecast signature, one forecast request, a sun-free overcast scene, every main/Beta outlook dialog, removal of non-applicable buttons, visible unknown-sky loading state, cached GPS behavior, identical main/Beta computed card styles, no overflow from 320 to 1280 pixels and no JavaScript page errors.
+- The controlled first-weather-frame sample improved from 5,714 ms to 3,420 ms; forecast requests fell from two to one. This is one controlled comparison, not a promise about upstream API response times or device performance.
+- `python scripts/weatherV3BetaSmoke.py --fixture-dir /workspace --artifacts /workspace/v3-beta-proof-current`: 22 checks passed for captured Knightdale/Greenville forecasts. Covers Saturday/Sunday/Monday pavement peaks, full available Monday coverage, Celsius, uniform 16px spacing at 360/393/412/768/1280px, warning-stack spacing and the main Try Beta link.
+- Render's recent sampled memory use was approximately 237–311 MiB on the current instance, below its 512 MiB limit. A filtered application-log search returned no out-of-memory/heap/OOM/SIGKILL matches. This does not establish long-term peak usage.
+
+Browser checks ran in Chromium with touch emulation, not on physical Samsung hardware. Captured forecast fixtures and screenshots remain validation artifacts outside the application and are not served as weather data. Beta remains public without a password, with its visible Main app return button; other private applications retain their access controls. The separate Next Gen branch is not part of this change.

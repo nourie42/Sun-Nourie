@@ -80,8 +80,8 @@ async def main(args):
      return {values,overflow:document.documentElement.scrollWidth>innerWidth};
     }''')
     assert not gaps['overflow'],(width,gaps)
-    assert all(abs(g['gap']-12)<.6 for g in gaps['values']),(width,gaps)
-    passed(city+' '+str(width)+'px cards use equal 12px gaps without overflow')
+    assert all(abs(g['gap']-16)<.6 for g in gaps['values']),(width,gaps)
+    passed(city+' '+str(width)+'px cards use equal 16px gaps without overflow')
    passed(city+' populated warning stack keeps the same spacing as all other cards')
    await page.locator('#urgent-alerts-container').evaluate('(el)=>el.replaceChildren()')
    await page.set_viewport_size({'width':393,'height':852});await page.evaluate('scrollTo({top:0,behavior:"instant"})')

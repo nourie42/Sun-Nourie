@@ -23,15 +23,17 @@ import {forecastOutlookDetails} from './outlook-details.js?v=current-rain-202610
 import {isExperimentalWeatherPage,renderCarWashForecast,resetCarWashForecast} from './car-wash.js?v=low-rain-display-v1';
 import {renderModelExplanation,resetModelExplanation} from './model-explanation.js?v=comparison-chart-v3';
 import {updateRainTrend} from './rain-trend.js?v=current-rain-20261017-v3';
-import {renderRiskOutlooks,resetRiskOutlooks} from './risk-outlooks.js?v=risk-outlooks-v5';
+import {renderRiskOutlooks,resetRiskOutlooks,openRiskOutlook} from './risk-outlooks.js?v=risk-outlooks-v5';
 import {renderAirQuality} from './air-quality.js?v=mobile-repair-v1';
 import {hideLowRainChance,displayedRainChance,rainAwareCondition,dailySkyCover} from './rain-display.js?v=low-rain-display-v1';
 import {weatherChangeMessages,WEATHER_CHANGE_TITLE} from './weather-changes.js?v=current-rain-20261017-v3';
 import {renderSnowOutlook,resetSnowOutlook} from './snow-outlook.js?v=snow-readable-v1';
-import {renderForecastWindowBanners,resetForecastWindowBanners} from './forecast-window-banners.js?v=current-rain-20261017-v3';
+import {renderForecastWindowBanners,resetForecastWindowBanners,currentForecastWindowView} from './forecast-window-banners.js?v=compact-outlook-v1';
 import {createSevenDayCarousel} from './seven-day.js?v=low-rain-display-v1';
 import {forecastSourceHealth} from './forecast-status.js?v=source-health-v1';
 import {forecastRefreshDue} from './forecast-refresh.js?v=coverage-recovery-v2';
+import {forecastSky} from './sky-display.js?v=single-sky-v1';
+import {outlookItems,renderOutlookPanel,openOutlookNote} from './outlook-panel.js?v=compact-v1';
 /* Weather Nourie browser client. Forecast values never originate in AI prose. */
 const $ = (id) => document.getElementById(id);
 const experimentalPage = isExperimentalWeatherPage();
@@ -57,6 +59,23 @@ let framePlayer=null;
 let lastRadarFetch = 0, currentBriefing = null, requestController = null;
 let activeDayDetail = null;
 let alertSnapshot=null,alertController=null,alertBusy=false;
+function renderMainOutlook(fresh=false){
+ const host=$('weather-outlook-summary');if(!host||!forecast){if(host)host.hidden=true;return;}
+ const items=outlookItems(forecast,Date.now(),fresh?null:currentForecastWindowView());
+ const take=$('today-uncertainty-text')?.textContent?.trim();
+ const summary=items.find(item=>item.kind==='risk')?.risk.title||take||$('briefing-summary')?.textContent?.trim()||'';
+ renderOutlookPanel(host,{summary,items,onTake:()=>openOutlookNote('Nourie Take',[$('briefing-summary')?.textContent,take,...items.filter(item=>item.kind==='risk').map(item=>item.risk.summary)]),onItem:item=>{
+  if(item.kind==='risk'){
+   if(item.risk.kind==='wssi')openOutlookNote(item.risk.title,[item.risk.summary,item.risk.url]);
+   else void openRiskOutlook(item.risk,forecast);
+  }else if(item.kind==='change')openOutlookNote('Change Alert',item.messages);
+  else document.querySelector(`#forecast-window-banners [data-forecast-window="${item.kind}"]`)?.click();
+ }});
+}
+document.addEventListener('weather-nourie:forecast',()=>queueMicrotask(()=>renderMainOutlook()));
+document.addEventListener('weather-nourie:location-changing',()=>{if($('weather-outlook-summary'))$('weather-outlook-summary').hidden=true;});
+if($('today-uncertainty-text'))new MutationObserver(()=>{if(forecast)renderMainOutlook();}).observe($('today-uncertainty-text'),{childList:true,subtree:true,characterData:true});
+setInterval(()=>{if(forecast&&!document.hidden)renderMainOutlook(true);},60000);
 function configurePageMode() {
   document.documentElement.dataset.weatherPage=experimentalPage?'experimental':'main';
   if(experimentalPage)document.title='Experimental Weather · Weather Nourie';
@@ -85,6 +104,17 @@ function query(extra = {}) {
   return new URLSearchParams({ latitude: place.latitude, longitude: place.longitude, ...extra });
 }
 async function api(path, params = '', signal) {
+  if(path==='forecast'){
+    globalThis.__weatherNourieForecastStarted=true;
+    const warm=globalThis.__weatherNouriePrefetch,q=new URLSearchParams(params),key=`${Number(q.get('latitude'))},${Number(q.get('longitude'))}`;
+    if(warm&&!warm.consumed&&warm.key===key&&Date.now()-warm.startedAt<45000){
+      warm.consumed=true;
+      const abort=()=>warm.controller.abort(signal.reason||new DOMException('Request cancelled','AbortError'));
+      if(signal?.aborted)abort();else signal?.addEventListener('abort',abort,{once:true});
+      try{return await warm.promise;}finally{signal?.removeEventListener('abort',abort);if(globalThis.__weatherNouriePrefetch===warm)globalThis.__weatherNouriePrefetch=null;}
+    }
+    if(warm&&!warm.consumed){warm.controller.abort();globalThis.__weatherNouriePrefetch=null;}
+  }
   return fetchJsonWithDeadline(`/api/weather-fusion/${path}${params ? `?${params}` : ''}`, { signal, timeoutMs:path==='alerts'?15000:path==='briefing'?90000:45000, cache: 'no-store', headers: { Accept: 'application/json' } });
 }
 async function refreshAlerts(){
@@ -122,7 +152,7 @@ function smallIcon(type) {
 }
 // Single shared day/night state (sunrise/sunset). Header, background sky and page visuals all read body[data-sky].
 let lastHeroCondition = '';
-function syncSkyState() { if (!forecast) return; const day = isDaylight(), next = !day ? 'night' : /rain|storm|shower/i.test(lastHeroCondition) ? 'rain' : 'day'; if (document.body.dataset.sky !== next) document.body.dataset.sky = next; }
+function syncSkyState() { const next=forecastSky(forecast).state; if(document.body.dataset.sky!==next)document.body.dataset.sky=next; }
 setInterval(syncSkyState, 60000);
 function isDaylight() {
   // Solar elevation tracks the selected point and the actual time, including
@@ -153,10 +183,17 @@ function currentSourceDisplay(data,now=Date.now()) {
     : `${station} · observed ${validTime}`;
   return {temperatureLabel:estimated?'Estimated current temperature':'Current temperature',sourceLabel};
 }
+let panelGeneration=0;
+function deferPanels(jobs){
+  const token=++panelGeneration,loadGeneration=generation;
+  const run=()=>{if(token!==panelGeneration||loadGeneration!==generation||!forecast)return;const job=jobs.shift();job?.();if(jobs.length)requestAnimationFrame(run);};
+  requestAnimationFrame(()=>requestAnimationFrame(run));
+}
 function render(data) {
   data=withLiveAlerts(data,alertSnapshot);
   data.rainTrend=updateRainTrend(data,Date.now());
   forecast = data;
+  if($('weather-loading'))$('weather-loading').hidden=true;
   if($('forecast'))delete $('forecast').dataset.awaitingPlace;
   const failedPanels = [];
   const draw = (id, label, renderer) => renderWeatherPanel(id, label, renderer, (error) => {
@@ -166,10 +203,10 @@ function render(data) {
   const c = data.current, d = data.days[0], day = isDaylight();
   const hero = currentHero(data, day);
   const heroCondition=conditionForDaylight(hero.condition,day);
-  document.body.dataset.sky = !day ? 'night' : /rain|storm|shower/i.test(hero.condition) ? 'rain' : 'day';
+  document.body.dataset.sky = forecastSky(data).state;
   lastHeroCondition = heroCondition;
   $('city-name').textContent = data.location.name || place?.name || 'Your location';
-  if(place?.source?.startsWith('device'))setDeviceLocationLabel(`Device location · ${data.location.name||'current position'}`);
+  if(place?.source?.startsWith('device'))setDeviceLocationLabel(`${place.source==='device-cache'?'Last device location':'Device location'} · ${data.location.name||'current position'}`);
   $('hero-date').textContent = new Intl.DateTimeFormat('en-US', { timeZone: data.location.timeZone, weekday: 'long', month: 'long', day: 'numeric' }).format(new Date()).toUpperCase();
   const currentDay = dailyDisplay(d, 0, Date.now(), data.location.timeZone,data);
   $('temperature').innerHTML = `${number(hero.temperature)}<span>°</span>`;
@@ -200,15 +237,18 @@ function render(data) {
   draw('risk-outlook-list', 'Outlooks', () => renderRiskOutlooks(data));
   draw('hourly', 'Hourly forecast', () => renderHours(data));
   draw('daily', 'Daily forecast', () => renderDays(data));
-  if(sevenDayCarousel)draw('experimental-week','Seven-day forecast',()=>sevenDayCarousel.render(data));
-  draw('skin-exposure', 'Feels-like outlook', () => renderComfort(data));
-  if(!experimentalPage&&!$('car-wash-forecast').hidden)draw('car-wash-forecast', 'Car Wash Forecast', () => renderCarWashForecast(data));
-  draw('dewpoint-gross-meter', 'Dew Point Feel Meter', () => renderDewpointMeter(data));
-  if(experimentalPage)draw('model-explanation', 'Forecast model explanation', () => renderModelExplanation(data));
-  draw('air-quality-content', 'Air quality', () => renderAirQuality(data));
-  draw('metrics', 'Weather details', () => renderMetrics(data));
-  draw('scientific-stuff', 'Source details', () => renderEvidence(data));
-  draw('day-content', 'Forecast details', () => refreshOpenDay());
+  // Paint current weather and the first forecasts before drawing lower panels.
+  deferPanels([
+    ()=>{if(sevenDayCarousel)draw('experimental-week','Seven-day forecast',()=>sevenDayCarousel.render(forecast));},
+    ()=>draw('skin-exposure','Feels-like outlook',()=>renderComfort(forecast)),
+    ()=>{if(!experimentalPage&&!$('car-wash-forecast').hidden)draw('car-wash-forecast','Car Wash Forecast',()=>renderCarWashForecast(forecast));},
+    ()=>draw('dewpoint-gross-meter','Dew Point Feel Meter',()=>renderDewpointMeter(forecast)),
+    ()=>{if(experimentalPage)draw('model-explanation','Forecast model explanation',()=>renderModelExplanation(forecast));},
+    ()=>draw('air-quality-content','Air quality',()=>renderAirQuality(forecast)),
+    ()=>draw('metrics','Weather details',()=>renderMetrics(forecast)),
+    ()=>draw('scientific-stuff','Source details',()=>renderEvidence(forecast)),
+    ()=>draw('day-content','Forecast details',()=>refreshOpenDay())
+  ]);
   if (currentBriefing?.signature !== data.signature) {
     const outlook=forecastOutlookDetails(data,Date.now());
     draw('briefing-summary', 'Local outlook', () => renderBriefing({ mode: 'nws-summary', signature: data.signature, headline: currentDay.tonight ? 'Your evening outlook' : currentDay.condition, summary: outlook.summary, nearTerm: outlook.nearTerm, extended: outlook.extended,
@@ -349,6 +389,7 @@ async function load({ moveMap = false, refreshModels = false, briefingRetry = 0 
       : `Weather update failed. ${forecast ? `The displayed snapshot was checked at ${clock(forecast.assembledAt)} and may be stale.` : 'Please retry or check weather.gov.'}`;
     if(e.name==='TimeoutError')$('status').textContent=e.message;
     $('status').classList.add('error');
+    if($('weather-loading'))$('weather-loading').hidden=true;
     if(forecast)renderComfort(forecast);
     if (!receivedForecast&&!alertSnapshot) renderBulletins({location:place,alerts:[],feeds:[]});
   } finally { clearTimeout(slowNotice);if (id === generation) { busy = false; $('refresh').classList.remove('loading'); } }
@@ -366,6 +407,7 @@ function savedCity() {
 function chooseLocation(value,{rememberDevice=false}={}) {
   if(!validPlace(value))return;
   if($('forecast'))$('forecast').dataset.awaitingPlace='';
+  if($('weather-loading'))$('weather-loading').hidden=false;
   if($('night-summary'))$('night-summary').hidden=true;
   if (value.source?.startsWith('device')) savePreference(cityKey,'');
   else if(value.id) savePreference(cityKey,JSON.stringify(value));
@@ -386,6 +428,8 @@ function chooseLocation(value,{rememberDevice=false}={}) {
   if ($('day-dialog').open) $('day-dialog').close();
   // Clear the previous location immediately, including its alerts and AI text.
   forecast = null;
+  ++panelGeneration;
+  document.body.dataset.sky='unknown';
   $('city-name').textContent = value.name || 'Your location';
   setDeviceLocationLabel(value.source?.startsWith('device')?'Using device location':`Viewing ${value.name||'searched location'}`);
   $('temperature').innerHTML = '—<span>°</span>';
@@ -657,18 +701,20 @@ $('city-search').addEventListener('keydown', (e) => { if (e.key === 'Escape') { 
 document.addEventListener('click', (e) => { if (!e.target.closest('.search-wrap')) { $('search-results').hidden = true; $('city-search').setAttribute('aria-expanded', 'false'); } });
 let locationRequest=0;
 function startDeviceLocation({explicit=false}={}){
+ const cached=readDeviceLocation();
  if (!explicit) {
    const previous=savedCity();
    if (previous) { chooseLocation(previous); return; }
-   if (!readDeviceLocation()) return;
+   if (!cached) return;
+   // Load the last selected point immediately while GPS checks for movement.
+   chooseLocation(cached);
  }
  const request=++locationRequest;
- const cached=readDeviceLocation();
  const fallback=()=>{
   if(request!==locationRequest)return;
   if(cached){
    setDeviceLocationLabel('Last device location');
-   chooseLocation(cached);
+   if(!place||place.latitude!==cached.latitude||place.longitude!==cached.longitude)chooseLocation(cached);
    return;
   }
   setDeviceLocationLabel('Device location needed');
@@ -676,9 +722,14 @@ function startDeviceLocation({explicit=false}={}){
  };
  if(!navigator.geolocation){fallback();return;}
  setDeviceLocationLabel('Getting device location…');
- $('status').textContent='Getting your device location…';
+ if(explicit||!forecast)$('status').textContent=cached?'Loading the last device location while checking GPS…':'Getting your device location…';
  navigator.geolocation.getCurrentPosition(
-  p=>{if(request===locationRequest)chooseLocation({id:'device',name:'Device location',latitude:Number(p.coords.latitude.toFixed(4)),longitude:Number(p.coords.longitude.toFixed(4)),source:'device'},{rememberDevice:true});},
+  p=>{
+   if(request!==locationRequest)return;
+   const next={id:'device',name:'Device location',latitude:Number(p.coords.latitude.toFixed(4)),longitude:Number(p.coords.longitude.toFixed(4)),source:'device'};
+   if(!explicit&&place?.source?.startsWith('device')&&place.latitude===next.latitude&&place.longitude===next.longitude){place={...place,source:'device'};saveDeviceLocation(next);setDeviceLocationLabel('Device location');return;}
+   chooseLocation(next,{rememberDevice:true});
+  },
   fallback,
   {enableHighAccuracy:true,timeout:12000,maximumAge:120000}
  );

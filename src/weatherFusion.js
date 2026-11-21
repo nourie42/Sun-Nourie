@@ -847,7 +847,7 @@ export function registerWeatherFusionRoutes(app, options = {}) {
     'seven-day.js','seven-day.css','seven-day-art.css',
     'request-deadline.js','weather-changes.js','air-quality.js','alert-banners.js','app.js','bulletin-facts.js','bulletins.js','car-wash.js','car-wash.css','car-wash-background.webp','car-wash-corvette-hood.webp',
     'collapse.js','current-weather.js','gross-toggle.js','rain-timing.js','week-toggle.js','wn-blend.js','best-times.js','best-times.css',
-    'header-sky.css','header-sky.js','page-unify.css',
+    'header-sky.css','header-sky.js','page-unify.css','sky-display.js','forecast-prefetch.js','main-sky.js','main-header-sky.js','weather-glass.css','outlook-panel.js','outlook-panel.css',
     'header-cloudy.jpg','header-cloudy.webp','header-day.jpg','header-day.webp','header-night.jpg','header-night.webp','header-rain.jpg','header-rain.webp','header-snow.jpg','header-snow.webp','logo.svg',
     'comfort-integrated-rain-night.webp','comfort-integrated-snow-play-dawn.webp','comfort-integrated-snow-play.webp',
     'model-explanation.js','model-explanation.css','weathernext-site.html','weathernext-site.css','weathernext-site.js','weathernext-data.js','weathernext-catalog.json',

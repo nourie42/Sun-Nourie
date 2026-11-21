@@ -28,9 +28,8 @@ import {
 import { dogWalkerScene, referenceScene } from '../../exposure-scene.js?v=true-night-art-v6';
 import { danCard, danOverview, danTakeDisplay } from '../../dans-summary.js?v=afd-discussion-section-v1';
 import { activeRiskOutlooks, outlookDetailHTML } from '../../risk-outlooks.js?v=risk-outlooks-v5';
-import { buildForecastWindows } from '../../forecast-windows.js?v=current-rain-20261017-v3';
 import { forecastWindowDetailHTML } from '../../forecast-window-banners.js?v=current-rain-20261017-v3';
-import { weatherChangeMessages, WEATHER_CHANGE_TITLE } from '../../weather-changes.js?v=current-rain-20261017-v3';
+import {outlookItems,renderOutlookPanel,openOutlookNote} from '../../outlook-panel.js?v=compact-v1';
 
 const LEGACY_LOC_KEY = 'weather-nourie-v3-location';
 const SAVED_LOC_KEY = 'weather-nourie-v3-gps-location';
@@ -97,7 +96,6 @@ const state = {
   selectedHourIdx: 0,
   feelsHourIdx: 0,
   expandedExposureIds: new Set(),
-  expandedTopBarIds: new Set(),
   n24MetricId: 'temp',
   selectedMetricId: 'temp',
   selectedDayIdx: 0,
@@ -273,6 +271,7 @@ async function loadLocationForecast(loc, { forceRefresh = false } = {}) {
       if (briefingRes.headline || briefingRes.danTake || briefingRes.summary || briefingRes.danSummary) {
         state.liveBriefing = briefingRes;
         renderHeroAndBriefing(state.forecast);
+        renderTopCompactPills(state.forecast);
       }
     });
 }
@@ -284,8 +283,8 @@ function renderAll() {
   updateSkyAtmosphere(f);
   renderStatusAndAlerts(f);
   renderWeatherHazards(f);
-  renderTopCompactPills(f);
   renderHeroAndBriefing(f);
+  renderTopCompactPills(f);
   renderFeelsTimeAndTrio(f);
   renderNext24QuickCard(f);
   renderSevenDayForecast(f);
@@ -483,112 +482,18 @@ async function openRiskOutlookModal(risk, f) {
 }
 
 function renderTopCompactPills(f) {
-  const container = document.getElementById('top-compact-pills');
-  if (!container) return;
-
-  const changeMsgs = f.canonical
-    ? weatherChangeMessages(f.canonical, Date.now())
-    : (f.briefing?.changeAlerts || []);
-  const canonicalView = f.canonical ? buildForecastWindows(f.canonical, Date.now()) : null;
-  const rainWinCount = canonicalView?.rain?.length ?? f.windows?.rainHours?.length ?? 0;
-  const perfectHrCount = canonicalView?.perfect
-    ? canonicalView.perfect.reduce((s, w) => s + (w.hours?.length || 0), 0)
-    : (f.windows?.perfectHours?.length || 0);
-  const peakRain = Math.max(f.days?.[0]?.rainChance || 0, ...((f.hours48 || []).slice(0, 24).map((h) => h.rainChance || 0)));
-
-  const bars = [];
-
-  if (changeMsgs.length > 0) {
-    bars.push({
-      id: 'change',
-      cls: 'bar-change',
-      icon: '⚡',
-      title: WEATHER_CHANGE_TITLE || 'Weather Change',
-      preview: cleanTakeJargon(changeMsgs[0]),
-      bodyHtml: `<div class="top-bar-detail-stack">${changeMsgs
-        .map((m) => `<p class="top-bar-detail-copy">${cleanTakeJargon(m)}</p>`)
-        .join('')}</div>`
-    });
-  }
-
-  if (rainWinCount > 0 || peakRain >= 35) {
-    const rainBody = canonicalView
-      ? forecastWindowDetailHTML(canonicalView, 'rain', f.location.name, Date.now())
-      : `<p class="top-bar-detail-copy">Rain chances peak near ${peakRain}% over the next 24–48 hours.</p>`;
-    bars.push({
-      id: 'rain',
-      cls: 'bar-rain',
-      icon: '🌧',
-      title: `Rain Outlook · Peak ${peakRain}%`,
-      preview: rainWinCount > 0 ? `${rainWinCount} upcoming rain window${rainWinCount > 1 ? 's' : ''}` : 'Showers possible in the next 48h',
-      bodyHtml: `<div class="top-bar-window-body">${rainBody}</div>`
-    });
-  }
-
-  if (perfectHrCount > 0) {
-    const perfectBody = canonicalView
-      ? forecastWindowDetailHTML(canonicalView, 'perfect', f.location.name, Date.now())
-      : `<p class="top-bar-detail-copy">${perfectHrCount} comfortable golden hours (70–75° feels, low clouds) coming up.</p>`;
-    bars.push({
-      id: 'perfect',
-      cls: 'bar-perfect',
-      icon: '🌤',
-      title: `Perfect Weather · ${perfectHrCount}h`,
-      preview: 'Ideal outdoor temperature & sky window ahead',
-      bodyHtml: `<div class="top-bar-window-body">${perfectBody}<div style="margin-top:10px;"><a class="mode-pill" href="/whats-up" style="display:inline-flex;">Open All Cities Tracker ↗</a></div></div>`
-    });
-  }
-
-  if (state.geoDenied) {
-    bars.push({
-      id: 'gps',
-      cls: 'bar-gps',
-      icon: '⌖',
-      title: 'Enable Current Location',
-      preview: 'Show weather for your exact spot automatically',
-      action: 'gps'
-    });
-  }
-
-  if (!bars.length) {
-    container.innerHTML = '';
-    return;
-  }
-
-  container.innerHTML = bars
-    .map((bar) => {
-      const isOpen = bar.action !== 'gps' && state.expandedTopBarIds.has(bar.id);
-      return `
-        <div class="glass top-outlook-bar ${bar.cls} ${isOpen ? 'is-expanded' : ''}" data-top-bar="${bar.id}">
-          <button type="button" class="top-outlook-btn" data-top-toggle="${bar.id}" aria-expanded="${isOpen}">
-            <span class="top-outlook-left">
-              <span class="top-outlook-ico" aria-hidden="true">${bar.icon}</span>
-              <span class="top-outlook-title">${bar.title}</span>
-              <span class="top-outlook-preview">${bar.preview}</span>
-            </span>
-            <span class="bar-chevron" aria-hidden="true">›</span>
-          </button>
-          ${isOpen ? `<div class="top-outlook-expand">${bar.bodyHtml}</div>` : ''}
-        </div>
-      `;
-    })
-    .join('');
-
-  container.querySelectorAll('[data-top-toggle]').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      const id = btn.dataset.topToggle;
-      if (id === 'gps') {
-        document.getElementById('locate-btn')?.click();
-        return;
-      }
-      if (state.expandedTopBarIds.has(id)) {
-        state.expandedTopBarIds.delete(id);
-      } else {
-        state.expandedTopBarIds.add(id);
-      }
-      renderTopCompactPills(f);
-    });
-  });
+  const host=document.getElementById('weather-outlook-summary');
+  if(!host)return;
+  if(!f.canonical){host.hidden=true;return;}
+  const items=outlookItems(f.canonical);
+  const summary=items.find(item=>item.kind==='risk')?.risk.title||document.getElementById('take-banner-copy')?.textContent||'';
+  renderOutlookPanel(host,{summary,items,onTake:()=>openWeatherTakeModal(f),onItem:item=>{
+    if(item.kind==='risk'){
+      if(item.risk.kind==='wssi')openOutlookNote(item.risk.title,[item.risk.summary,item.risk.url]);
+      else void openRiskOutlookModal(item.risk,f);
+    }else if(item.kind==='change')openModal('Change Alert',item.messages.map(message=>`<p>${cleanTakeJargon(message)}</p>`).join(''));
+    else openModal(item.kind==='rain'?'Rain Outlook':'Perfect Weather',forecastWindowDetailHTML(item.view,item.kind,f.location.name,Date.now()));
+  }});
 }
 
 function selectHeroBackdropPhoto(cur) {
@@ -3167,3 +3072,5 @@ function initSkyCanvas() {
 
   requestAnimationFrame(animate);
 }
+
+setInterval(()=>{if(state.forecast&&!document.hidden)renderTopCompactPills(state.forecast);},60000);

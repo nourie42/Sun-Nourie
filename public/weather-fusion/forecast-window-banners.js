@@ -99,3 +99,5 @@ export function resetForecastWindowBanners() {
   const dialog=document.getElementById('forecast-window-dialog');
   if(dialog?.open)dialog.close();
 }
+
+export function currentForecastWindowView(){return currentView;}

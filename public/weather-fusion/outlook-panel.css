@@ -1,0 +1,21 @@
+main .weather-outlook-panel.glass{padding:14px 16px!important;text-align:left;overflow:hidden}
+.outlook-take{display:grid;grid-template-columns:4px auto minmax(0,1fr) 14px;gap:14px;align-items:center;background:none;border:0;color:#f6fbff;width:100%;padding:0;min-height:48px;text-align:left;font:inherit;cursor:pointer}
+.outlook-take>i{height:33px;border-radius:4px;background:#20dd65;box-shadow:0 0 5px #20dd6544}
+.outlook-take>strong{font-size:19px;white-space:nowrap;padding-right:18px;border-right:1px solid #dceef04d}
+.outlook-take>span{font-size:14px;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;color:#e2edf2}
+.outlook-take>b{font-size:28px;font-weight:400}
+.outlook-items{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border-top:1px solid #dceef04d;margin-top:9px;padding-top:10px;row-gap:12px}
+.outlook-items[data-count="1"]{grid-template-columns:1fr}.outlook-items[data-count="2"]{grid-template-columns:repeat(2,minmax(0,1fr))}.outlook-items[data-count="3"]{grid-template-columns:repeat(3,minmax(0,1fr))}
+.outlook-item{display:flex;align-items:center;gap:9px;min-width:0;min-height:53px;border:0;border-right:1px solid #dceef04d;background:none;color:#f5fbff;text-align:left;padding:0 10px;font:inherit;cursor:pointer}
+.outlook-item:last-child,.outlook-item:nth-child(4n){border-right:0}.outlook-item:first-child{padding-left:0}
+.outlook-icon{width:27px;flex-shrink:0;font-size:25px;line-height:1;color:#20df7c;text-align:center}.outlook-icon svg{display:block;width:25px;height:29px;fill:currentColor}
+.outlook-item-copy{min-width:0}.outlook-item-copy>strong{display:block;font-size:14px;line-height:1.25}.outlook-item-copy>small{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;font-size:12px;line-height:1.35;color:#c9dfeb;margin-top:3px}
+.outlook-item:focus-visible,.outlook-take:focus-visible{outline:2px solid #b9e8f8;outline-offset:3px;border-radius:7px}
+.weather-note-dialog{background:#193a51;color:#f7fbff;border:1px solid #bfdce24d;border-radius:20px;padding:24px;max-width:650px;width:calc(100% - 30px);max-height:88dvh;font:15px/1.6 system-ui}
+.weather-note-dialog::backdrop{background:#061725aa;backdrop-filter:blur(5px)}.weather-note-dialog>button{float:right;border:0;background:none;color:white;font-size:28px;min-width:44px;min-height:44px;cursor:pointer}.weather-note-dialog h2{font-size:22px;margin:6px 40px 14px 0}.weather-note-content p{margin:10px 0}
+.weather-main #weather-change-banner,.weather-main #risk-outlooks,.weather-main #forecast-window-banners{display:none!important}
+body:has(.v3-main-stack) #weather-take-banner,body:has(.v3-main-stack) #weather-hazards-strip,body:has(.v3-main-stack) #top-compact-pills{display:none!important}
+@media(max-width:640px){main .weather-outlook-panel.glass{padding:11px 12px!important}.outlook-take{gap:10px;grid-template-columns:3px auto minmax(0,1fr) 10px}.outlook-take>strong{font-size:16px;padding-right:10px}.outlook-take>span{font-size:12px}.outlook-items,.outlook-items[data-count="3"]{grid-template-columns:repeat(2,minmax(0,1fr))}.outlook-item{padding:0 8px;min-height:55px}.outlook-item:nth-child(2n){border-right:0}.outlook-item:nth-child(2n+1){padding-left:0}.outlook-icon{width:23px;font-size:22px}.outlook-icon svg{width:21px;height:25px}.outlook-item-copy>strong{font-size:13px}.outlook-item-copy>small{font-size:11px!important}}
+
+.weather-outlook-panel .outlook-item-copy>small{font-size:12px!important}
+.weather-main #today-uncertainty{display:none!important}

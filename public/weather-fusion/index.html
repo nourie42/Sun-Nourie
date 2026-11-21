@@ -8,6 +8,9 @@
   <title>Weather Nourie</title>
   <link rel="icon" href="/weather-fusion/logo.svg" type="image/svg+xml">
   <link id="map-style" data-href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+  <script async src="/weather-fusion/forecast-prefetch.js?v=startup-v1"></script>
+  <link rel="stylesheet" href="/weather-fusion/weather-glass.css?v=shared-v1">
+  <link rel="stylesheet" href="/weather-fusion/outlook-panel.css?v=compact-v1">
   <link rel="stylesheet" href="/weather-fusion/style.css?v=brand-v3">
   <link rel="stylesheet" href="/weather-fusion/forecast-layout.css?v=weather-qa-v67">
   <script type="application/json" id="map-library" data-src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin="" onload="window.dispatchEvent(new Event('weather-map-library-ready'))"></script>
@@ -22,8 +25,8 @@
   <link rel="stylesheet" href="/weather-fusion/risk-outlooks.css?v=risk-outlooks-v4">
   <link rel="stylesheet" href="/weather-fusion/weather-polish.css?v=aqi-bg-v2">
   <link rel="stylesheet" href="/weather-fusion/forecast-window-banners.css?v=sun-window-main-v2">
-  <script type="module" src="/weather-fusion/app.js?v=1.2-exp-globe"></script>
-  <script type="module" src="/weather-fusion/experimental-sky.js?v=audit-20261017-v1"></script>
+  <script type="module" src="/weather-fusion/app.js?v=single-sky-fast-v1"></script>
+  <script type="module" src="/weather-fusion/main-sky.js?v=single-sky-v1"></script>
   <script type="module" src="/weather-fusion/experimental-enhance.js?v=exp-acc-v8"></script>
 
 
@@ -106,12 +109,12 @@
     }
   </style>
 
-  <link rel="stylesheet" href="/weather-fusion/header-sky.css?v=photo-rain-header-v1">
-  <link rel="stylesheet" href="/weather-fusion/page-unify.css?v=1.1-controls">
+  <link rel="stylesheet" href="/weather-fusion/header-sky.css?v=single-sky-v1">
+  <link rel="stylesheet" href="/weather-fusion/page-unify.css?v=shared-glass-v1">
   <script type="module" src="/weather-fusion/gross-toggle.js?v=feel-v1"></script>
   <script type="module" src="/weather-fusion/week-toggle.js?v=1"></script>
   <script type="module" src="/weather-fusion/collapse.js?v=3"></script>
-  <script type="module" src="/weather-fusion/header-sky.js?v=3"></script>
+  <script type="module" src="/weather-fusion/main-header-sky.js?v=single-sky-v1"></script>
   <link rel="stylesheet" href="/weather-fusion/main-hourly-trend.css?v=halo-main-collapsed-v2">
   <script type="module" src="/weather-fusion/main-hourly-trend.js?v=halo-main-collapsed-v2"></script>
   <link data-for="open-best-times" data-href="/weather-fusion/best-times.css?v=best-times-v1">
@@ -131,7 +134,7 @@
     .try-beta-link:focus-visible{outline:2px solid #d4eaff;outline-offset:3px}
   </style>
 </head>
-<body data-sky="day">
+<body class="weather-main" data-sky="unknown">
   <a class="skip-link" href="#forecast">Skip to forecast</a>
   <div class="atmosphere" aria-hidden="true"><div class="sky-glow"></div><div class="cloud cloud-one"></div><div class="cloud cloud-two"></div><div class="stars"></div><div id="exp-sky-a" class="exp-sky-layer"></div><div id="exp-sky-b" class="exp-sky-layer"></div><div class="exp-sky-shade"></div></div>
   <div class="shell">
@@ -150,7 +153,7 @@
     <a class="experimental-wn-link" id="deal-intel-link" href="/deal-intelligence/" aria-label="Open Deal Intelligence M&A workspace"><span aria-hidden="true">💼</span> Deal Intel</a>
     <a class="experimental-wn-link" id="ai-rankings-link" href="/weather-fusion/ai-rankings.html" aria-label="Open AI model benchmark rankings" hidden><span aria-hidden="true">🏆</span> AI Rankings</a>
     <a class="experimental-wn-link" id="nourie-enterprises-link" href="/nourie-enterprises/" aria-label="Open password-protected Nourie Enterprises dealer advocacy"><span aria-hidden="true">🏢</span> Nourie Enterprises</a>
-    <header class="topbar sky-header" data-hdr="night"><div class="hdr-layer hdr-stars" aria-hidden="true"></div><div class="hdr-layer hdr-stars b" aria-hidden="true"></div><div class="hdr-layer hdr-sun" aria-hidden="true"></div><div class="hdr-layer hdr-horizon" aria-hidden="true"></div><div class="hdr-layer hdr-clouds" aria-hidden="true"></div><div class="hdr-layer hdr-rain" aria-hidden="true"></div><div class="hdr-layer hdr-snow" aria-hidden="true"></div>
+    <header class="topbar sky-header" data-hdr="unknown"><div class="hdr-layer hdr-stars" aria-hidden="true"></div><div class="hdr-layer hdr-stars b" aria-hidden="true"></div><div class="hdr-layer hdr-sun" aria-hidden="true"></div><div class="hdr-layer hdr-horizon" aria-hidden="true"></div><div class="hdr-layer hdr-clouds" aria-hidden="true"></div><div class="hdr-layer hdr-rain" aria-hidden="true"></div><div class="hdr-layer hdr-snow" aria-hidden="true"></div>
       <a class="brand brand-premium" href="/weather-fusion/experimental-weather.html" aria-label="Open Experimental Weather"><span class="brand-mark"><svg viewBox="0 0 64 64" aria-hidden="true"><defs><radialGradient id="hs-sun" cx=".4" cy=".35"><stop offset="0" stop-color="#fff3b0"/><stop offset="1" stop-color="#f5a623"/></radialGradient><linearGradient id="hs-cl" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff"/><stop offset="1" stop-color="#bcd6f5"/></linearGradient><linearGradient id="hs-w" x1="0" x2="1"><stop offset="0" stop-color="#2f8cff"/><stop offset="1" stop-color="#7fd3ff"/></linearGradient></defs><circle cx="38" cy="22" r="12" fill="url(#hs-sun)"/><path d="M14 34a8 8 0 0 1 8-8 11 11 0 0 1 21 3 6 6 0 0 1 0 12H18a6 6 0 0 1-4-7z" fill="url(#hs-cl)"/><path d="M8 44c6-5 12 5 18 0s12 5 18 0 10 4 14 1" fill="none" stroke="url(#hs-w)" stroke-width="4" stroke-linecap="round"/><path d="M12 52c6-4 11 4 17 0s11 4 17 0" fill="none" stroke="#5fb4ff" stroke-width="3" stroke-linecap="round" opacity=".8"/></svg></span><span class="brand-word"><span class="brand-kicker">WEATHER</span><span class="brand-name">Nourie</span></span></a>
       <nav aria-label="Page tools"><button class="icon-button" id="refresh" title="Refresh weather" aria-label="Refresh weather">↻</button></nav>
     </header>
@@ -183,6 +186,7 @@
     </nav>
     <div class="experimental-page-banner" role="status" hidden>EXPERIMENTAL</div>
     <main id="forecast" data-awaiting-place>
+      <section id="weather-loading" class="weather-loading" hidden aria-label="Loading local weather"><p>Loading your local weather…</p><div class="loading-shimmer" aria-hidden="true"></div><div class="loading-shimmer" aria-hidden="true"></div></section>
       <div id="status" class="status-line" role="status" aria-live="polite">Search for a city or ZIP, or use your location.</div>
       <section id="weather-change-banner" class="weather-change-banner" role="status" hidden></section>
       <section class="hero" aria-labelledby="city-name">
@@ -204,6 +208,7 @@
           <div id="risk-outlook-list" class="risk-outlook-list"></div>
         </section>
         <p id="night-summary" hidden></p>
+      <section id="weather-outlook-summary" class="weather-outlook-panel glass" hidden aria-label="Nourie Take and applicable weather outlooks"></section>
       <section id="forecast-window-banners" class="forecast-window-banners" aria-label="Upcoming weather windows" hidden></section>
         <section class="glass today-panel" aria-label="Today or tonight forecast">
           <div id="today-forecast"><p class="muted">Daily data is loading.</p></div>
