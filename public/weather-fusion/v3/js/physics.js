@@ -337,7 +337,7 @@ export function classifyComfortHour({
  * - Dark Asphalt Street (albedo 0.08, high shortwave absorption)
  * Evaluates against the AAHA 135°F pet paw-burn threshold.
  */
-export function computePavementProfile(hours, currentIdx = 0, lat = 37.7749, lon = -122.4194) {
+export function computePavementProfile(hours, currentIdx = 0, lat = 37.7749, lon = -122.4194, maxHours = 48) {
   if (!Array.isArray(hours) || hours.length === 0) {
     return {
       concreteTempF: 62,
@@ -359,7 +359,9 @@ export function computePavementProfile(hours, currentIdx = 0, lat = 37.7749, lon
 
   const series = [];
 
-  for (let i = 0; i < Math.min(hours.length, 48); i++) {
+  // The default horizon remains unchanged. A selected-day preview may include
+  // its remaining published hours, using the same continuous thermal history.
+  for (let i = 0; i < Math.min(hours.length, maxHours); i++) {
     const h = hours[i];
     const airC = fToC(h.tempF ?? 60);
     const windMs = Math.max(0.6, (h.windMph ?? 6) * 0.44704);
@@ -443,5 +445,32 @@ export function computePavementProfile(hours, currentIdx = 0, lat = 37.7749, lon
     peakAsphaltTodayF,
     peakConcreteTodayF,
     series
+  };
+}
+
+/** Summarize only the selected location's calendar day, never a rolling 24h. */
+export function pavementDayPeak(series, selectedTime, timeZone, now = Date.now()) {
+  const empty = { concreteF: null, asphaltF: null, hours: 0, dayKey: null, dayLabel: '', dateLabel: '', isToday: false };
+  const selected = new Date(selectedTime);
+  if (!Number.isFinite(selected.getTime())) return empty;
+  let dayFormat;
+  try {
+    dayFormat = new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' });
+  } catch { return empty; }
+  const key = time => {
+    const date = new Date(time);
+    return Number.isFinite(date.getTime()) ? dayFormat.format(date) : null;
+  };
+  const dayKey = key(selected);
+  const hours = (series || []).filter(row => key(row.time) === dayKey && (Number.isFinite(row.concreteF) || Number.isFinite(row.asphaltF)));
+  const peak = field => {
+    const values = hours.map(row => row[field]).filter(Number.isFinite);
+    return values.length ? Math.max(...values) : null;
+  };
+  return {
+    concreteF: peak('concreteF'), asphaltF: peak('asphaltF'), hours: hours.length, dayKey,
+    dayLabel: new Intl.DateTimeFormat('en-US', { timeZone, weekday: 'short' }).format(selected),
+    dateLabel: new Intl.DateTimeFormat('en-US', { timeZone, weekday: 'long', month: 'short', day: 'numeric' }).format(selected),
+    isToday: key(now) === dayKey
   };
 }

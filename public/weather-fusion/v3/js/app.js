@@ -2,7 +2,7 @@
  * Weather Nourie · Experimental Fusion V3 Main Application Controller
  */
 
-import { clamp, computePavementProfile } from './physics.js?v=v3-accuracy-5';
+import { clamp, computePavementProfile, pavementDayPeak } from './physics.js?v=v3-pet-day-6';
 import {
   buildUnifiedFusionPayload,
   fetchCompleteFusionForecast,
@@ -1232,8 +1232,12 @@ function renderOutdoorExposureCards(f) {
   const hrs = f.hours48 || [f.current];
   const hIdx = clamp(state.feelsHourIdx || 0, 0, hrs.length - 1);
   const cur = hrs[hIdx] || f.current;
-  const pave = computePavementProfile(hrs, hIdx, f.location.latitude, f.location.longitude);
   const tz = f.timeZone || f.location?.timeZone || 'America/New_York';
+  const allHours = f.hoursAll?.length >= hrs.length ? f.hoursAll : hrs;
+  const dayEnd = allHours.findLastIndex(hour => hour.dayKey === cur.dayKey) + 1;
+  const pave = computePavementProfile(allHours, hIdx, f.location.latitude, f.location.longitude, Math.max(hIdx + 1, dayEnd));
+  const peak = pavementDayPeak(pave.series, cur.time, tz);
+  const peakLabel = peak.isToday ? 'Today peak' : `${peak.dayLabel} peak`;
   const isRaining = cur.rainChance >= 50 || cur.precipIn >= 0.01;
   const isCloudyNoSun =
     !isRaining &&
@@ -1340,7 +1344,7 @@ function renderOutdoorExposureCards(f) {
           <div class="pave-row">
             <div class="pave-row-head">
               <span>Light Concrete Sidewalk</span>
-              <strong>${fmtTemp(pave.concreteTempF)} (Today peak ${fmtTemp(pave.peakConcreteTodayF)})</strong>
+              <strong>${fmtTemp(pave.concreteTempF)} (${peakLabel} ${fmtTemp(peak.concreteF)})</strong>
             </div>
             <div class="pave-progress-bg">
               <div class="pave-progress-fill" style="width:${concretePct}%;background:#7ac6ff;"></div>
@@ -1350,7 +1354,7 @@ function renderOutdoorExposureCards(f) {
             <div class="pave-row-head">
               <span>Dark Asphalt Street</span>
               <strong style="color:${pave.asphaltTempF >= 135 ? '#ff6b6b' : pave.asphaltTempF >= 120 ? '#ffd166' : '#5ce0a0'};">
-                ${fmtTemp(pave.asphaltTempF)} (Today peak ${fmtTemp(pave.peakAsphaltTodayF)})
+                ${fmtTemp(pave.asphaltTempF)} (${peakLabel} ${fmtTemp(peak.asphaltF)})
               </strong>
             </div>
             <div class="pave-progress-bg">
@@ -1358,6 +1362,7 @@ function renderOutdoorExposureCards(f) {
             </div>
           </div>
         </div>
+        <p class="pavement-peak-note">${peak.hours ? `Peak for ${peak.dateLabel} · ${peak.hours} available forecast hours` : 'Peak estimate unavailable for the selected day.'}</p>
         <p style="font-size:12.5px;color:var(--muted);margin:8px 0 0;line-height:1.45;">
           ${pave.pawSafety.advice}
         </p>

@@ -124,6 +124,12 @@
   <link rel="apple-touch-icon" href="/weather-fusion/apple-touch-icon.png">
   <link rel="stylesheet" href="/weather-fusion/pwa-bridge.css?v=1">
   <script defer src="/weather-fusion/pwa-bridge.js?v=2"></script>
+  <style id="try-beta-style">
+    .beta-entry{display:flex;justify-content:flex-end;position:relative;z-index:2;margin:0 0 8px}
+    .try-beta-link{display:inline-flex;align-items:center;justify-content:center;min-height:36px;padding:7px 12px;border:1px solid rgba(209,234,255,.48);border-radius:8px;background:rgba(12,35,59,.72);color:#f6fbff;font-size:12px;line-height:1.3;font-weight:650;text-decoration:none}
+    .try-beta-link:hover{background:rgba(32,72,109,.86)}
+    .try-beta-link:focus-visible{outline:2px solid #d4eaff;outline-offset:3px}
+  </style>
 </head>
 <body data-sky="day">
   <a class="skip-link" href="#forecast">Skip to forecast</a>
@@ -148,6 +154,7 @@
       <a class="brand brand-premium" href="/weather-fusion/experimental-weather.html" aria-label="Open Experimental Weather"><span class="brand-mark"><svg viewBox="0 0 64 64" aria-hidden="true"><defs><radialGradient id="hs-sun" cx=".4" cy=".35"><stop offset="0" stop-color="#fff3b0"/><stop offset="1" stop-color="#f5a623"/></radialGradient><linearGradient id="hs-cl" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff"/><stop offset="1" stop-color="#bcd6f5"/></linearGradient><linearGradient id="hs-w" x1="0" x2="1"><stop offset="0" stop-color="#2f8cff"/><stop offset="1" stop-color="#7fd3ff"/></linearGradient></defs><circle cx="38" cy="22" r="12" fill="url(#hs-sun)"/><path d="M14 34a8 8 0 0 1 8-8 11 11 0 0 1 21 3 6 6 0 0 1 0 12H18a6 6 0 0 1-4-7z" fill="url(#hs-cl)"/><path d="M8 44c6-5 12 5 18 0s12 5 18 0 10 4 14 1" fill="none" stroke="url(#hs-w)" stroke-width="4" stroke-linecap="round"/><path d="M12 52c6-4 11 4 17 0s11 4 17 0" fill="none" stroke="#5fb4ff" stroke-width="3" stroke-linecap="round" opacity=".8"/></svg></span><span class="brand-word"><span class="brand-kicker">WEATHER</span><span class="brand-name">Nourie</span></span></a>
       <nav aria-label="Page tools"><button class="icon-button" id="refresh" title="Refresh weather" aria-label="Refresh weather">↻</button></nav>
     </header>
+    <div class="beta-entry"><a id="try-beta-link" class="try-beta-link" href="/weather-fusion/v3/" aria-label="Try Beta: open Weather Nourie V3">Try Beta</a></div>
     <div class="location-bar">
       <div class="search-wrap"><label for="city-search" class="sr-only">Search a U.S. city or ZIP code, or use your location</label><span aria-hidden="true">⌕</span><input id="city-search" type="search" placeholder="Search city or ZIP" autocomplete="off" aria-controls="search-results" aria-expanded="false"><button id="locate" title="Use my device location" aria-label="Use my location">⌖</button><div id="search-results" class="search-results" hidden></div></div>
       <span id="device-location-label" class="sr-only" aria-live="polite">Choose a location</span>
