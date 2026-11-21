@@ -1,0 +1,22 @@
+{
+  "id": "/experimental/next-gen/",
+  "name": "Weather Nourie — Next Gen",
+  "short_name": "Nourie Next",
+  "description": "A separate experimental Weather Nourie app with a living sky, weather-appropriate clothing and interactive meteorological graphs.",
+  "start_url": "/experimental/next-gen/#today",
+  "scope": "/experimental/next-gen/",
+  "display": "standalone",
+  "orientation": "any",
+  "theme_color": "#17272e",
+  "background_color": "#17272e",
+  "categories": ["weather", "utilities"],
+  "icons": [
+    {"src": "/weather-fusion/pwa-192x192.png", "sizes": "192x192", "type": "image/png", "purpose": "any"},
+    {"src": "/weather-fusion/pwa-512x512.png", "sizes": "512x512", "type": "image/png", "purpose": "any"},
+    {"src": "/weather-fusion/pwa-maskable-512x512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}
+  ],
+  "shortcuts": [
+    {"name": "Hourly forecast", "url": "/experimental/next-gen/#hourly"},
+    {"name": "Weather maps", "url": "/experimental/next-gen/#map"}
+  ]
+}
