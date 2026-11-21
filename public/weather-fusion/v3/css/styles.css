@@ -144,14 +144,13 @@ body[data-sky="night"] .atmosphere {
    Slim Single-Row Sticky Topbar (Translucent Glass Over Dynamic Sky)
    ========================================================================== */
 .topbar {
-  position: sticky;
-  top: 0;
-  z-index: 100;
-  background: rgba(8, 18, 36, 0.26);
-  backdrop-filter: blur(22px) saturate(165%);
-  -webkit-backdrop-filter: blur(22px) saturate(165%);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.18);
-  padding: 9px 0;
+  position: relative;
+  z-index: 40;
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border-bottom: none;
+  padding: 12px 0 6px;
 }
 
 .topbar-row {
@@ -348,9 +347,11 @@ body[data-sky="night"] .atmosphere {
   display: none;
   position: relative;
   z-index: 35;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(7, 16, 32, 0.86);
-  backdrop-filter: blur(20px);
+  border-top: 1px solid rgba(255, 255, 255, 0.18);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.22);
+  background: var(--glass-bg);
+  backdrop-filter: blur(22px) saturate(165%);
+  -webkit-backdrop-filter: blur(22px) saturate(165%);
   padding: 10px 0;
 }
 
@@ -569,11 +570,11 @@ body[data-sky="night"] .atmosphere {
 .topbar {
   position: relative;
   z-index: 40;
-  background: linear-gradient(180deg, rgba(6, 15, 32, 0.36) 0%, rgba(6, 15, 32, 0.08) 100%);
-  backdrop-filter: blur(18px) saturate(160%);
-  -webkit-backdrop-filter: blur(18px) saturate(160%);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.16);
-  padding: 12px 0 8px;
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border-bottom: none;
+  padding: 12px 0 6px;
 }
 
 .topbar-row {
@@ -2823,7 +2824,7 @@ body[data-sky="night"] .atmosphere {
 
 .top-compact-pills {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
   gap: 7px;
 }
 
@@ -2831,50 +2832,99 @@ body[data-sky="night"] .atmosphere {
   display: none;
 }
 
-.top-mini-pill {
-  display: inline-flex;
+.top-outlook-bar {
+  width: 100%;
+  border-radius: 16px;
+  overflow: hidden;
+  border-left-width: 4px;
+}
+
+.top-outlook-bar.bar-change {
+  border-left-color: #facc15;
+}
+
+.top-outlook-bar.bar-rain {
+  border-left-color: #38bdf8;
+}
+
+.top-outlook-bar.bar-perfect {
+  border-left-color: #34d399;
+}
+
+.top-outlook-bar.bar-gps {
+  border-left-color: #60a5fa;
+}
+
+.top-outlook-btn {
+  width: 100%;
+  display: flex;
   align-items: center;
-  gap: 5px;
-  padding: 7px 12px;
-  border-radius: 999px;
-  background: var(--glass-bg);
-  backdrop-filter: blur(20px) saturate(160%);
-  -webkit-backdrop-filter: blur(20px) saturate(160%);
-  border: 1px solid rgba(255, 255, 255, 0.28);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25), 0 6px 18px rgba(0, 0, 0, 0.16);
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.55);
-  color: #f4f9ff;
-  font-family: inherit;
-  font-size: 12px;
-  font-weight: 700;
-  cursor: pointer;
-  white-space: nowrap;
-  transition: transform 0.14s ease, background 0.14s ease, border-color 0.14s ease;
-}
-
-.top-mini-pill:hover {
-  transform: translateY(-1px);
-  background: rgba(22, 44, 80, 0.46);
-}
-
-.top-mini-pill.pill-change {
-  border-color: rgba(255, 215, 70, 0.85);
-  color: #fef3c7;
-}
-
-.top-mini-pill.pill-rain {
-  border-color: rgba(125, 211, 252, 0.72);
-  color: #e0f2fe;
-}
-
-.top-mini-pill.pill-perfect {
-  border-color: rgba(110, 231, 183, 0.72);
-  color: #d1fae5;
-}
-
-.top-mini-pill.pill-gps {
-  border-color: rgba(103, 196, 255, 0.85);
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 14px;
+  background: transparent;
+  border: none;
   color: #ffffff;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.top-outlook-btn:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.top-outlook-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+}
+
+.top-outlook-ico {
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.top-outlook-title {
+  font-size: 13px;
+  font-weight: 800;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.top-outlook-preview {
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.top-outlook-expand {
+  padding: 10px 14px 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.16);
+  font-size: 13px;
+  line-height: 1.5;
+  color: #eaf3ff;
+}
+
+.top-bar-detail-stack {
+  display: grid;
+  gap: 7px;
+}
+
+.top-bar-detail-copy {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.48;
+  color: #eaf3ff;
+}
+
+.top-bar-window-body p {
+  margin: 0 0 6px;
 }
 
 .risk-pill-btn {
@@ -3343,4 +3393,112 @@ body.awaiting-location .hero-visual-split,
 body.awaiting-location #weather-take-banner,
 body.awaiting-location .v3-main-stack > :not(#location-needed-card) {
   display: none !important;
+}
+
+/* Uniform Bar Chevron Across All Clickable & Expandable Bars */
+.bar-chevron {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 21px;
+  font-weight: 500;
+  line-height: 1;
+  color: rgba(226, 240, 255, 0.82);
+  transition: transform 0.2s ease, color 0.16s ease;
+  flex-shrink: 0;
+}
+
+[aria-expanded="true"] .bar-chevron,
+.is-expanded > button .bar-chevron {
+  transform: rotate(90deg);
+  color: #ffffff;
+}
+
+/* 7-Day Selected-Day Full Weather Details Grid */
+.d7-detail-card {
+  margin-top: 12px;
+  padding: 12px 13px;
+  border-radius: 15px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+}
+
+.d7-detail-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+
+.d7-detail-cond {
+  font-size: 13px;
+  color: var(--muted);
+  margin-left: 4px;
+}
+
+.d7-hourly-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(125, 211, 252, 0.36);
+  background: rgba(56, 189, 248, 0.16);
+  color: #e0f2fe;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.d7-hourly-link .bar-chevron {
+  font-size: 16px;
+}
+
+.d7-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.d7-stat-cell {
+  padding: 8px 10px;
+  border-radius: 11px;
+  background: rgba(8, 20, 40, 0.28);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.d7-stat-lbl {
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--faint);
+}
+
+.d7-stat-val {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #ffffff;
+  line-height: 1.25;
+}
+
+.d7-modal-summary {
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  font-size: 14px;
+}
+
+@media (max-width: 560px) {
+  .d7-detail-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
 }

@@ -9,7 +9,7 @@
   <link rel="stylesheet" href="/weather-fusion/car-wash.css?v=center-answer-v43" />
   <link rel="stylesheet" href="/weather-fusion/risk-outlooks.css?v=risk-outlooks-v5" />
   <link rel="stylesheet" href="/weather-fusion/forecast-window-banners.css?v=current-rain-20261017-v3" />
-  <link rel="stylesheet" href="/weather-fusion/v3/css/styles.css?v=v3-accuracy-4" />
+  <link rel="stylesheet" href="/weather-fusion/v3/css/styles.css?v=v3-accuracy-5" />
 </head>
 <body data-sky="cloudy">
   <!-- Full-Viewport Fixed Dynamic Living Sky Backdrop (Flows Behind Every Glass Tile) -->
@@ -29,7 +29,19 @@
         <div class="topbar-left">
           <button id="tools-drawer-btn" class="icon-btn compact-btn glass-chip-btn" type="button" aria-expanded="false" aria-controls="tools-strip" aria-label="Menu & tools">☰</button>
           <a class="brand" href="#top" aria-label="Weather Nourie home">
-            <div class="brand-mark" id="brand-icon-slot"></div>
+            <div class="brand-mark" id="brand-icon-slot">
+              <svg viewBox="0 0 64 64" width="32" height="32" aria-hidden="true">
+                <defs>
+                  <radialGradient id="hs-sun" cx=".4" cy=".35"><stop offset="0" stop-color="#fff3b0"/><stop offset="1" stop-color="#f5a623"/></radialGradient>
+                  <linearGradient id="hs-cl" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff"/><stop offset="1" stop-color="#bcd6f5"/></linearGradient>
+                  <linearGradient id="hs-w" x1="0" x2="1"><stop offset="0" stop-color="#2f8cff"/><stop offset="1" stop-color="#7fd3ff"/></linearGradient>
+                </defs>
+                <circle cx="38" cy="22" r="12" fill="url(#hs-sun)"/>
+                <path d="M14 34a8 8 0 0 1 8-8 11 11 0 0 1 21 3 6 6 0 0 1 0 12H18a6 6 0 0 1-4-7z" fill="url(#hs-cl)"/>
+                <path d="M8 44c6-5 12 5 18 0s12 5 18 0 10 4 14 1" fill="none" stroke="url(#hs-w)" stroke-width="4" stroke-linecap="round"/>
+                <path d="M12 52c6-4 11 4 17 0s11 4 17 0" fill="none" stroke="#5fb4ff" stroke-width="3" stroke-linecap="round" opacity=".8"/>
+              </svg>
+            </div>
             <div class="brand-text">
               <span class="brand-kicker">WEATHER</span>
               <span class="brand-name">Nourie</span>
@@ -103,12 +115,12 @@
         </div>
       </div>
 
-      <!-- Nourie Weather Take Bar (Tappable) -->
+      <!-- Nourie Weather Take Bar -->
       <button id="weather-take-banner" class="glass weather-take-bar" type="button" aria-label="Read Nourie Weather Take">
         <span class="weather-take-accent" aria-hidden="true"></span>
         <span class="weather-take-label">Nourie Take</span>
         <span id="take-banner-copy" class="weather-take-copy">Checking upcoming weather changes for your location…</span>
-        <span class="weather-take-chevron" aria-hidden="true">›</span>
+        <span class="bar-chevron" aria-hidden="true">›</span>
       </button>
     </section>
   </div>
@@ -200,23 +212,24 @@
       </div>
     </section>
 
-    <!-- 7-Day Outlook Dual-Curve High & Low Spline Card -->
+    <!-- 7-Day Outlook Dual-Curve High & Low Spline + Full Selected-Day Details -->
     <section id="daily-panel" class="glass section-panel card-compact">
       <div class="n24-header">
         <h2 class="card-title-clean">7-Day Outlook</h2>
-        <span class="d7-mode-chip">High / Low &amp; Rain</span>
+        <span id="d7-selected-chip" class="d7-mode-chip">Today</span>
       </div>
       <div id="seven-day-dual-stage"></div>
+      <div id="seven-day-selected-detail" class="d7-detail-card"></div>
     </section>
 
     <!-- 3-Column Comfort & Conditions Trio -->
     <section id="comfort-trio-section" class="comfort-trio-grid" aria-label="How It Feels, Dew Point, and Wind">
-      <button id="how-feels-card-btn" class="glass trio-card trio-feels-card trio-clickable" type="button" aria-label="Tap for What to Wear suggestions">
-        <div class="trio-head"><span aria-hidden="true">🌡</span> How It Feels <span class="trio-tap-hint">›</span></div>
+      <button id="how-feels-card-btn" class="glass trio-card trio-feels-card trio-clickable" type="button" aria-label="What to Wear suggestions">
+        <div class="trio-head"><span aria-hidden="true">🌡</span> How It Feels <span class="bar-chevron trio-tap-hint" aria-hidden="true">›</span></div>
         <div class="trio-feels-body">
           <div class="trio-feels-text">
             <div id="trio-feels-label" class="trio-feels-verdict">Comfortable</div>
-            <div id="trio-feels-note" class="trio-sub">Tap for What to Wear</div>
+            <div id="trio-feels-note" class="trio-sub">What to Wear</div>
           </div>
           <div id="trio-outfit-visual" class="trio-cartoon-thumb"></div>
         </div>
@@ -264,7 +277,7 @@
     <section id="skin-exposure">
       <div class="section-inline-head">
         <h2 class="card-title-clean">Outside Right Now</h2>
-        <span id="exposure-time-note" class="subtle-note">Tap Shade, Clouds, or Pets to expand</span>
+        <span id="exposure-time-note" class="subtle-note">Right now</span>
       </div>
       <div id="exposure-cards-grid" class="exposure-teaser-stack"></div>
     </section>
@@ -275,12 +288,12 @@
         <img class="carwash-teaser-thumb" src="/weather-fusion/car-wash-corvette-hood.webp" alt="" />
         <div>
           <div class="carwash-teaser-title">🚗 Car Wash Forecast</div>
-          <div id="carwash-teaser-sub" class="carwash-teaser-sub">Tap to check the best days to wash your car</div>
+          <div id="carwash-teaser-sub" class="carwash-teaser-sub">5-day car wash outlook</div>
         </div>
       </div>
       <div class="carwash-teaser-right">
         <span id="carwash-teaser-pill" class="cw-pill-badge">CHECK</span>
-        <span class="weather-take-chevron">›</span>
+        <span class="bar-chevron" aria-hidden="true">›</span>
       </div>
     </button>
 
@@ -288,7 +301,6 @@
     <section id="your-day" class="your-day-clean">
       <div class="section-inline-head">
         <h2 class="card-title-clean">Conditions &amp; Details</h2>
-        <span class="subtle-note">Tap any card for hourly trend</span>
       </div>
       <div id="metrics-grid" class="apple-tiles-grid"></div>
     </section>
@@ -306,16 +318,16 @@
         <div id="best-times-grid" class="heatmap-grid"></div>
       </div>
       <div id="heatmap-hover-readout" style="margin-top:10px;font-size:12.5px;color:var(--blue);font-weight:600;">
-        Tap any hour box to see how it feels.
+        Select any hour box to see how it feels.
       </div>
     </section>
 
-    <!-- Live Radar & Weather Maps -->
+    <!-- Live Radar -->
     <section id="map-panel" class="glass section-panel card-compact">
       <div class="n24-header">
         <div>
-          <h2 class="card-title-clean">Live Radar &amp; Map</h2>
-          <p id="map-layer-caption" class="section-subtitle" style="margin-top:2px;">Live rain radar around your location.</p>
+          <h2 class="card-title-clean">Live Radar</h2>
+          <p id="map-layer-caption" class="section-subtitle" style="margin-top:2px;">Live precipitation radar near your location.</p>
         </div>
         <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
           <div id="basemap-tabs" class="pill-scroll-row">
@@ -327,7 +339,6 @@
         </div>
       </div>
 
-      <div id="map-layer-tabs" class="metric-tabs-bar"></div>
       <div id="map-stage-wrap" class="map-stage-container">
         <div id="radar-map"></div>
       </div>
@@ -349,12 +360,11 @@
           <span class="compare-toggle-ico" aria-hidden="true">📊</span>
           <div>
             <div class="compare-toggle-title">Compare Weather Forecasts</div>
-            <div id="compare-toggle-sub" class="compare-toggle-sub">See Weather Nourie vs NWS, HRRR, NBM, ECMWF &amp; GEFS · Tap to open</div>
+            <div id="compare-toggle-sub" class="compare-toggle-sub">Weather Nourie vs NWS, HRRR, NBM, ECMWF &amp; GEFS</div>
           </div>
         </div>
         <div class="compare-toggle-right">
-          <span id="compare-toggle-pill" class="compare-open-pill">Open</span>
-          <span id="compare-toggle-chevron" class="compare-toggle-chevron" aria-hidden="true">▾</span>
+          <span class="bar-chevron" aria-hidden="true">›</span>
         </div>
       </button>
 
@@ -389,7 +399,7 @@
             <strong>Past Forecast Accuracy Rankings</strong>
             <small>See which forecast has been most accurate here lately</small>
           </span>
-          <span class="weather-take-chevron">›</span>
+          <span class="bar-chevron" aria-hidden="true">›</span>
         </button>
         <button id="more-carwash-btn" class="more-tile-btn" type="button">
           <span class="more-tile-ico">🚗</span>
@@ -397,7 +407,7 @@
             <strong>5-Day Car Wash Forecast</strong>
             <small>Best wash days &amp; dry streak outlook</small>
           </span>
-          <span class="weather-take-chevron">›</span>
+          <span class="bar-chevron" aria-hidden="true">›</span>
         </button>
         <button id="more-wardrobe-btn" class="more-tile-btn" type="button">
           <span class="more-tile-ico">👕</span>
@@ -405,7 +415,7 @@
             <strong>What to Wear Guide</strong>
             <small>Outfit suggestions for how it feels outside today</small>
           </span>
-          <span class="weather-take-chevron">›</span>
+          <span class="bar-chevron" aria-hidden="true">›</span>
         </button>
         <button id="more-behind-btn" class="more-tile-btn" type="button">
           <span class="more-tile-ico">ℹ</span>
@@ -413,7 +423,7 @@
             <strong>Behind the Forecast</strong>
             <small>See the forecasts &amp; weather office updates powering this page</small>
           </span>
-          <span class="weather-take-chevron">›</span>
+          <span class="bar-chevron" aria-hidden="true">›</span>
         </button>
       </div>
     </section>
@@ -460,6 +470,6 @@
   </footer>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
-  <script type="module" src="/weather-fusion/v3/js/app.js?v=v3-accuracy-4"></script>
+  <script type="module" src="/weather-fusion/v3/js/app.js?v=v3-accuracy-5"></script>
 </body>
 </html>

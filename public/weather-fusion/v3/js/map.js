@@ -20,67 +20,6 @@ export const MAP_LAYERS = [
       { label: 'Heavy', color: '#ff6b4a' },
       { label: 'Intense', color: '#d845ff' }
     ]
-  },
-  {
-    id: 'hrrr',
-    label: 'Short-range rain',
-    caption: 'High-resolution short-range rain radar outlook',
-    legend: [
-      { label: 'Light Showers', color: '#47e5a0' },
-      { label: 'Steady Rain', color: '#ffd166' },
-      { label: 'Heavy Storms', color: '#ff5964' }
-    ]
-  },
-  {
-    id: 'ecmwf',
-    label: 'ECMWF rain',
-    caption: 'European rain outlook for your area',
-    legend: [
-      { label: 'Light', color: '#58c4ff' },
-      { label: 'Moderate', color: '#2b7fff' },
-      { label: 'Heavy', color: '#a855f7' }
-    ]
-  },
-  {
-    id: 'nbm',
-    label: 'US Blend rain',
-    caption: 'US rain forecast for your area',
-    legend: [
-      { label: 'Light', color: '#6ee7b7' },
-      { label: 'Moderate', color: '#3b82f6' },
-      { label: 'Heavy', color: '#ec4899' }
-    ]
-  },
-  {
-    id: 'temperature',
-    label: 'Temperature',
-    caption: 'Current outdoor temperatures across your area',
-    legend: [
-      { label: 'Freezing (<32°)', color: '#3b82f6' },
-      { label: 'Cool (50–65°)', color: '#34d399' },
-      { label: 'Warm (70–85°)', color: '#fbbf24' },
-      { label: 'Hot (90°+)', color: '#ef4444' }
-    ]
-  },
-  {
-    id: 'wind',
-    label: 'Wind',
-    caption: 'Wind direction and breeze speed',
-    legend: [
-      { label: '5–12 mph', color: '#7dd3fc' },
-      { label: '15–25 mph', color: '#fde047' },
-      { label: '30+ mph', color: '#fb7185' }
-    ]
-  },
-  {
-    id: 'clouds',
-    label: 'Clouds',
-    caption: 'Expected cloud cover overhead',
-    legend: [
-      { label: 'Partly Cloudy', color: 'rgba(180,205,245,0.45)' },
-      { label: 'Mostly Cloudy', color: 'rgba(210,226,255,0.72)' },
-      { label: 'Overcast', color: '#ffffff' }
-    ]
   }
 ];
 
@@ -140,8 +79,7 @@ export class WeatherMapController {
 
       this.setBasemap(this.activeBasemap);
       await this.fetchRadarFrames(latitude, longitude);
-      this.setLayer(this.activeLayerId);
-      this.map.on('moveend zoomend', () => this.renderDynamicFieldCanvas());
+      this.setLayer('radar');
 
       // Keep Leaflet canvas sharp when tabs/sections resize or scroll
       if (typeof ResizeObserver !== 'undefined') {
@@ -152,12 +90,11 @@ export class WeatherMapController {
     } else {
       this.map.setView([latitude, longitude], this.map.getZoom(), { animate: true });
       await this.fetchRadarFrames(latitude, longitude);
-      if (this.activeLayerId === 'radar') this.setLayer('radar');
+      this.setLayer('radar');
     }
 
     this.renderLocationAndProximityRings(forecast);
     this.renderAlertPolygons(forecast.alerts || []);
-    this.renderDynamicFieldCanvas();
   }
 
   async fetchRadarFrames(lat = 35.78, lon = -78.48) {
@@ -231,41 +168,23 @@ export class WeatherMapController {
     }).addTo(this.map);
   }
 
-  setLayer(layerId = 'radar') {
+  setLayer() {
     if (!this.map || typeof window.L === 'undefined') return;
-    this.activeLayerId = layerId;
+    this.activeLayerId = 'radar';
     this.stopPlayback();
 
     this.weatherTileLayers.forEach((l) => this.map.removeLayer(l));
     this.weatherTileLayers = [];
 
-    const hours = this.currentForecast?.hours48 || [];
-
-    if (layerId === 'radar') {
-      this.frames = (this.rainViewerFrames || []).map((f) => ({
-        label: f.isLive
-          ? `${new Date(f.time).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })} (Live Radar)`
-          : new Date(f.time).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
-        isoTime: f.isoTime,
-        tileUrl: f.tileUrl,
-        timestamp: f.time
-      }));
-      this.currentFrameIdx = Math.max(0, this.frames.length - 1);
-    } else if (layerId === 'hrrr') {
-      this.frames = hours.slice(0, 18).map((h, idx) => ({
-        label: `HRRR +${idx}h · ${h.hourLabel}`,
-        hourIdx: idx,
-        hour: h
-      }));
-      this.currentFrameIdx = 0;
-    } else {
-      this.frames = hours.slice(0, 24).map((h, idx) => ({
-        label: `${h.dateObj.toLocaleDateString('en-US', { weekday: 'short' })} ${h.hourLabel} (+${idx}h)`,
-        hourIdx: idx,
-        hour: h
-      }));
-      this.currentFrameIdx = 0;
-    }
+    this.frames = (this.rainViewerFrames || []).map((f) => ({
+      label: f.isLive
+        ? `${new Date(f.time).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })} (Live Radar)`
+        : new Date(f.time).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
+      isoTime: f.isoTime,
+      tileUrl: f.tileUrl,
+      timestamp: f.time
+    }));
+    this.currentFrameIdx = Math.max(0, this.frames.length - 1);
 
     this.applyCurrentFrame();
   }
@@ -310,14 +229,12 @@ export class WeatherMapController {
       this.weatherTileLayers.push(tl);
     }
 
-    this.renderDynamicFieldCanvas();
-
     if (typeof this.onFrameChange === 'function') {
       this.onFrameChange({
         frameIdx: this.currentFrameIdx,
         totalFrames: this.frames.length,
         label: frame?.label || 'Live Radar',
-        layer: MAP_LAYERS.find((m) => m.id === this.activeLayerId) || MAP_LAYERS[0]
+        layer: MAP_LAYERS[0]
       });
     }
   }
@@ -418,119 +335,5 @@ export class WeatherMapController {
           .addTo(this.alertsGroup);
       }
     });
-  }
-
-  /**
-   * Renders a GPU canvas meteorological field overlay inside the map container
-   * for Temperature isotherms, Wind streamlines, Clouds, ECMWF/NBM rain plumes
-   * so every single layer tab displays rich animated visual telemetry.
-   */
-  renderDynamicFieldCanvas() {
-    if (!this.map || !this.currentForecast) return;
-    const container = this.map.getContainer();
-    let canvas = container.querySelector('.nourie-field-canvas');
-    if (!canvas) {
-      canvas = document.createElement('canvas');
-      canvas.className = 'nourie-field-canvas';
-      canvas.style.position = 'absolute';
-      canvas.style.inset = '0';
-      canvas.style.pointerEvents = 'none';
-      canvas.style.zIndex = '390';
-      container.appendChild(canvas);
-    }
-
-    const rect = container.getBoundingClientRect();
-    canvas.width = Math.max(1, Math.floor(rect.width));
-    canvas.height = Math.max(1, Math.floor(rect.height));
-    const ctx = canvas.getContext('2d');
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    const frame = this.frames[this.currentFrameIdx] || {};
-    const h = frame.hour || this.currentForecast.current;
-    if (!h) return;
-
-    const centerPt = this.map.latLngToContainerPoint([
-      this.currentForecast.location.latitude,
-      this.currentForecast.location.longitude
-    ]);
-
-    const layerId = this.activeLayerId;
-
-    if (layerId === 'temperature') {
-      const t = h.tempF;
-      const hue = clamp(240 - ((t - 25) / 75) * 230, 8, 240);
-      const grad = ctx.createRadialGradient(
-        centerPt.x,
-        centerPt.y,
-        20,
-        centerPt.x,
-        centerPt.y,
-        Math.max(canvas.width, canvas.height) * 0.72
-      );
-      grad.addColorStop(0, `hsla(${hue}, 88%, 56%, 0.34)`);
-      grad.addColorStop(0.5, `hsla(${(hue + 22) % 360}, 82%, 50%, 0.22)`);
-      grad.addColorStop(1, `hsla(${(hue + 40) % 360}, 75%, 44%, 0.12)`);
-      ctx.fillStyle = grad;
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-    } else if (layerId === 'ecmwf' || layerId === 'nbm') {
-      const qpf = layerId === 'ecmwf'
-        ? (h.rainLedger?.breakdown?.ecmwf?.qpf ?? h.precipIn)
-        : (h.rainLedger?.breakdown?.nbm?.qpf ?? h.precipIn);
-      const pop = h.rainChance;
-      const intensity = clamp(pop / 100 + qpf * 4, 0.12, 0.85);
-      const driftX = (this.currentFrameIdx - 6) * 14;
-      const driftY = Math.sin(this.currentFrameIdx * 0.4) * 18;
-
-      const g1 = ctx.createRadialGradient(
-        centerPt.x + driftX,
-        centerPt.y + driftY,
-        12,
-        centerPt.x + driftX,
-        centerPt.y + driftY,
-        240
-      );
-      const primaryColor = layerId === 'ecmwf' ? '88, 180, 255' : '72, 225, 178';
-      const coreColor = layerId === 'ecmwf' ? '168, 85, 247' : '59, 130, 246';
-      g1.addColorStop(0, `rgba(${coreColor}, ${ (intensity * 0.52).toFixed(2) })`);
-      g1.addColorStop(0.45, `rgba(${primaryColor}, ${ (intensity * 0.34).toFixed(2) })`);
-      g1.addColorStop(1, 'rgba(0, 0, 0, 0)');
-      ctx.fillStyle = g1;
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-    } else if (layerId === 'wind') {
-      const angleRad = ((h.windDirDeg + 180) * Math.PI) / 180;
-      const speed = h.windMph;
-      ctx.strokeStyle = speed >= 20 ? 'rgba(253, 224, 71, 0.52)' : 'rgba(125, 211, 252, 0.45)';
-      ctx.lineWidth = 1.8;
-      const step = 54;
-      const offset = (this.currentFrameIdx * 11) % step;
-      for (let x = -40; x < canvas.width + 40; x += step) {
-        for (let y = -40; y < canvas.height + 40; y += step) {
-          const sx = x + Math.cos(angleRad) * offset;
-          const sy = y + Math.sin(angleRad) * offset;
-          const len = clamp(14 + speed * 0.9, 16, 38);
-          const ex = sx + Math.cos(angleRad) * len;
-          const ey = sy + Math.sin(angleRad) * len;
-          ctx.beginPath();
-          ctx.moveTo(sx, sy);
-          ctx.lineTo(ex, ey);
-          ctx.stroke();
-        }
-      }
-    } else if (layerId === 'clouds') {
-      const alpha = clamp((h.cloudCover || 40) / 160, 0.08, 0.52);
-      const gCloud = ctx.createRadialGradient(
-        centerPt.x,
-        centerPt.y,
-        30,
-        centerPt.x,
-        centerPt.y,
-        Math.max(canvas.width, canvas.height) * 0.7
-      );
-      gCloud.addColorStop(0, `rgba(225, 236, 255, ${alpha.toFixed(2)})`);
-      gCloud.addColorStop(0.6, `rgba(180, 204, 242, ${(alpha * 0.7).toFixed(2)})`);
-      gCloud.addColorStop(1, 'rgba(140, 170, 220, 0.05)');
-      ctx.fillStyle = gCloud;
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-    }
   }
 }
