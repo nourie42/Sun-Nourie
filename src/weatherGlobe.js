@@ -41,9 +41,9 @@ export function createGlobeService({fetchImpl=globalThis.fetch,now=Date.now,pars
  async function winds(){return memo('wind:'+Math.floor(now()/HOUR),HOUR,async()=>{
   for(const key of cache.keys())if(key.startsWith('wind:'))cache.delete(key);
   const lat=[],lon=[],g=GLOBE_GRID;for(let y=0;y<g.ny;y++)for(let x=0;x<g.nx;x++){lat.push(g.lat0+y*g.dy);lon.push(g.lon0+x*g.dx);}
-  const hour=new Date(Math.floor(now()/HOUR)*HOUR).toISOString().slice(0,16);
+  const requestedAt=now(),hour=new Date(Math.floor(requestedAt/HOUR)*HOUR).toISOString().slice(0,16);
   const q=new URLSearchParams({latitude:lat.join(','),longitude:lon.join(','),hourly:'wind_speed_10m,wind_direction_10m',wind_speed_unit:'ms',models:'gfs_seamless',start_hour:hour,end_hour:hour,timezone:'GMT',timeformat:'unixtime'});
-  const wind=normalizeGlobeWind(await request('https://api.open-meteo.com/v1/forecast?'+q),now());if(wind.status!=='ready')throw Object.assign(Error('No current wind field'),{code:'WIND_DATA_INVALID'});return wind;
+  const wind=normalizeGlobeWind(await request('https://api.open-meteo.com/v1/forecast?'+q),requestedAt);if(wind.status!=='ready')throw Object.assign(Error('No current wind field'),{code:'WIND_DATA_INVALID'});return wind;
  });}
  async function clouds(){return memo('cloud-info',10*MINUTE,async()=>{
   const data=await request('https://realearth.ssec.wisc.edu/api/times?products=globalir');

@@ -20,7 +20,7 @@ Data and limitations:
 Executed validation on 2026-11-21 after integrating main `96dba938b317513ba89812a8b9cf547fe1cc9476`:
 
 - `npm run check`: passed, including `WEATHER_QA_CONTRACT_OK`.
-- 87 Node checks passed across globe geography/data/caching, public/private access, selected-day pavement, observed sky, current facts, source repair and outlook suites.
+- 88 Node checks passed across globe geography/data/caching, public/private access, selected-day pavement, observed sky, current facts, source repair and outlook suites.
 - `scripts/weatherV3PeopleGlobeSmoke.py`: 17 checks passed. Captured real forecast, satellite, radar and GFS responses; frozen clock; mobile Chromium with WebGL and touch. Checks centered hero/no overflow at 320–1280px, main branding, glass controls, all three cartoon scenes, night previews, pet details, geographic marker, real-field wind particles, expansion, movement, layer/zoom/drag/recenter controls, reduced-motion behavior, browser Back, correct radar query names, unavailable feeds and no JavaScript page errors.
 - `scripts/weatherV3BetaSmoke.py`: 22 checks passed for captured Knightdale and Greenville forecasts, including Saturday/Sunday/Monday surface peaks, Celsius via the menu, equal 16px spacing, warning stacks and the main Try Beta link.
 - A direct request to the real globe sources returned all 200 valid wind cells, advertised MRMS frames and timestamped satellite imagery; the satellite/radar PNG responses were validated and rendered in the browser proof.
@@ -28,3 +28,5 @@ Executed validation on 2026-11-21 after integrating main `96dba938b317513ba89812
 These browser checks emulate mobile Chromium; they were not run on a physical Samsung device. Captured weather fixtures and screenshots are validation artifacts outside the served application.
 
 Production verification initially encountered an unavailable wind response while satellite and radar were ready; subsequent metadata returned all 200 valid GFS wind cells. Safe source reason codes distinguish unavailable HTTP/data failures. The browser recovery check verifies that a failed wind layer recovers through Refresh layers without reloading the forecast.
+
+Live anonymous Chromium verification passed for both Knightdale and Greenville: centered canonical current weather, three illustrated scenes, exact globe markers, real GFS wind particles plus observed radar and satellite timestamps, correct local-radar coordinates, Monday pet peaks and Main app return. A request-time guard keeps a valid wind response if a network request crosses the UTC hour; its regression passed.
