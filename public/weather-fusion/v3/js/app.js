@@ -2,7 +2,7 @@
  * Weather Nourie · Experimental Fusion V3 Main Application Controller
  */
 
-import { clamp } from './physics.js';
+import { clamp, computePavementProfile } from './physics.js';
 import {
   PRESET_CITIES,
   buildUnifiedFusionPayload,
@@ -15,6 +15,7 @@ import {
   COMPARE_MODELS,
   COMPARE_VARIABLES,
   HOURLY_METRICS,
+  extractDayModelCompareValue,
   extractHourMetricValue,
   renderDewPointFeelChart,
   renderHourlyExplorerChart,
@@ -27,15 +28,40 @@ import {
   WeatherMapController
 } from './map.js';
 import { dogWalkerScene, referenceScene } from '../../exposure-scene.js?v=true-night-art-v6';
+import { danCard, danOverview, danTakeDisplay } from '../../dans-summary.js?v=afd-discussion-section-v1';
+import { activeRiskOutlooks, outlookDetailHTML, riskOutlookButtonHTML } from '../../risk-outlooks.js?v=risk-outlooks-v5';
+import { buildForecastWindows } from '../../forecast-windows.js?v=current-rain-20261017-v3';
+import { forecastWindowBannerHTML, forecastWindowDetailHTML } from '../../forecast-window-banners.js?v=current-rain-20261017-v3';
+import { weatherChangeMessages, WEATHER_CHANGE_TITLE } from '../../weather-changes.js?v=current-rain-20261017-v3';
+import { forecastOutlookDetails } from '../../outlook-details.js?v=current-rain-20261017-v3';
 
 const SAVED_LOC_KEY = 'weather-nourie-v3-location';
+const DEVICE_LOC_KEY = 'weather-fusion-device-place';
+const RISK_COLORS = { Marginal: '#74d36a', Slight: '#f4e14a', Enhanced: '#e67a22', Moderate: '#e03b3b', High: '#d34cff' };
+
 function loadSavedLocation() {
   try {
+    const params = new URLSearchParams(window.location.search);
+    const rawLat = params.get('latitude') ?? params.get('lat');
+    const rawLon = params.get('longitude') ?? params.get('lon');
+    const qLat = rawLat !== null && rawLat !== '' ? Number(rawLat) : NaN;
+    const qLon = rawLon !== null && rawLon !== '' ? Number(rawLon) : NaN;
+    const qName = params.get('name');
+    if (Number.isFinite(qLat) && Number.isFinite(qLon) && qLat >= -90 && qLat <= 90 && qLon >= -180 && qLon <= 180) {
+      return { id: 'query', name: qName || 'Selected Location', latitude: qLat, longitude: qLon, explicitChoice: true };
+    }
     const raw = localStorage.getItem(SAVED_LOC_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (parsed && Number.isFinite(parsed.latitude) && Number.isFinite(parsed.longitude)) {
+      if (parsed && Number.isFinite(parsed.latitude) && Number.isFinite(parsed.longitude) && (parsed.latitude !== 0 || parsed.longitude !== 0)) {
         return parsed;
+      }
+    }
+    const devRaw = localStorage.getItem(DEVICE_LOC_KEY);
+    if (devRaw) {
+      const dev = JSON.parse(devRaw);
+      if (dev && Number.isFinite(dev.latitude) && Number.isFinite(dev.longitude) && (dev.latitude !== 0 || dev.longitude !== 0)) {
+        return { ...dev, id: 'gps', name: dev.name === 'Device location' ? 'Current Location' : dev.name };
       }
     }
   } catch {}
@@ -47,10 +73,13 @@ const state = {
   forecast: null,
   liveAlerts: null,
   liveBriefing: null,
+  loadToken: 0,
   useCelsius: false,
   skyOverride: 'auto',
   activeViewMode: 'experimental',
   selectedHourIdx: 0,
+  feelsHourIdx: 0,
+  expandedExposureIds: new Set(),
   n24MetricId: 'temp',
   selectedMetricId: 'temp',
   selectedDayIdx: 0,
@@ -74,6 +103,37 @@ export function fmtTemp(tempF, includeUnit = false) {
   return `${v}°${includeUnit ? (state.useCelsius ? 'C' : 'F') : ''}`;
 }
 
+function requestAutoDeviceLocation() {
+  if (!navigator.geolocation || state.location?.explicitChoice) return;
+  navigator.geolocation.getCurrentPosition(
+    async (pos) => {
+      const lat = pos.coords.latitude;
+      const lon = pos.coords.longitude;
+      try {
+        localStorage.setItem(DEVICE_LOC_KEY, JSON.stringify({ id: 'device', name: 'Device location', latitude: lat, longitude: lon, source: 'device' }));
+      } catch {}
+      const movedFar =
+        !Number.isFinite(state.location?.latitude) ||
+        Math.abs(lat - state.location.latitude) > 0.015 ||
+        Math.abs(lon - state.location.longitude) > 0.015;
+      if (movedFar || state.location?.id !== 'gps') {
+        const resolvedName = await reverseGeocodeLocation(lat, lon);
+        loadLocationForecast({
+          id: 'gps',
+          name: resolvedName || 'Current Location',
+          latitude: lat,
+          longitude: lon,
+          wfo: 'NWS'
+        });
+      }
+    },
+    () => {
+      // Keep current/saved fallback if user declined location access
+    },
+    { enableHighAccuracy: false, timeout: 9000, maximumAge: 300000 }
+  );
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   initBrandIcon();
   initSkyCanvas();
@@ -93,8 +153,11 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   renderAll();
 
-  // 2. Live multi-model hydration from Open-Meteo + NOAA/NWS + CAMS Air Quality
+  // 2. Canonical backend + multi-model hydration
   loadLocationForecast(state.location);
+
+  // 3. Automatically detect user's actual local location when permitted
+  requestAutoDeviceLocation();
 });
 
 function initBrandIcon() {
@@ -105,6 +168,7 @@ function initBrandIcon() {
 }
 
 async function loadLocationForecast(loc) {
+  const token = ++state.loadToken;
   state.location = loc;
   try {
     localStorage.setItem(SAVED_LOC_KEY, JSON.stringify(loc));
@@ -113,29 +177,40 @@ async function loadLocationForecast(loc) {
   state.liveBriefing = null;
   updatePresetChipSelection();
 
-  const [liveForecast, alertsRes, briefingRes] = await Promise.all([
+  const [liveForecast, alertsRes] = await Promise.all([
     fetchCompleteFusionForecast(loc),
     fetch(`/api/weather-fusion/alerts?latitude=${encodeURIComponent(loc.latitude)}&longitude=${encodeURIComponent(loc.longitude)}`)
       .then((r) => (r.ok ? r.json() : null))
-      .catch(() => null),
-    fetch(`/api/weather-fusion/briefing?latitude=${encodeURIComponent(loc.latitude)}&longitude=${encodeURIComponent(loc.longitude)}`)
-      .then((r) => (r.ok ? r.json() : null))
       .catch(() => null)
   ]);
+  if (token !== state.loadToken) return;
 
   if (alertsRes && Array.isArray(alertsRes.alerts)) {
     state.liveAlerts = alertsRes.alerts;
     if (alertsRes.alerts.length) liveForecast.alerts = alertsRes.alerts;
   }
-  if (briefingRes && (briefingRes.headline || briefingRes.danTake || briefingRes.summary)) {
-    state.liveBriefing = briefingRes;
-  }
 
   state.forecast = liveForecast;
+  state.location = liveForecast.location;
   state.selectedHourIdx = 0;
+  state.feelsHourIdx = 0;
   state.selectedDayIdx = 0;
   state.selectedDewPointIdx = 0;
   renderAll();
+
+  // Async layman's-terms NWS Forecast Discussion briefing (never blocks initial accurate paint)
+  const sig = liveForecast.canonical?.signature;
+  const briefingUrl = `/api/weather-fusion/briefing?latitude=${encodeURIComponent(loc.latitude)}&longitude=${encodeURIComponent(loc.longitude)}${sig ? `&signature=${encodeURIComponent(sig)}` : ''}`;
+  fetch(briefingUrl, { cache: 'no-store' })
+    .then((r) => (r.ok ? r.json() : null))
+    .catch(() => null)
+    .then((briefingRes) => {
+      if (token !== state.loadToken || !briefingRes) return;
+      if (briefingRes.headline || briefingRes.danTake || briefingRes.summary || briefingRes.danSummary) {
+        state.liveBriefing = briefingRes;
+        renderHeroAndBriefing(state.forecast);
+      }
+    });
 }
 
 function renderAll() {
@@ -144,8 +219,10 @@ function renderAll() {
 
   updateSkyAtmosphere(f);
   renderStatusAndAlerts(f);
+  renderWeatherHazards(f);
   renderWindowBanners(f);
   renderHeroAndBriefing(f);
+  renderFeelsTimeAndTrio(f);
   renderNext24QuickCard(f);
   renderSevenDayForecast(f);
   renderOutdoorExposureCards(f);
@@ -223,35 +300,190 @@ function renderStatusAndAlerts(f) {
   });
 }
 
+function renderWeatherHazards(f) {
+  const strip = document.getElementById('weather-hazards-strip');
+  const canonical = f.canonical || f;
+  const risks = activeRiskOutlooks(canonical, Date.now());
+
+  if (strip) {
+    if (!risks.length) {
+      strip.hidden = true;
+      strip.innerHTML = '';
+    } else {
+      strip.hidden = false;
+      strip.innerHTML = risks.map((r, idx) => riskOutlookButtonHTML(r, idx)).join('');
+      strip.querySelectorAll('[data-risk-kind]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const r = risks[Number(btn.dataset.riskIndex)];
+          if (r) openRiskOutlookModal(r, f);
+        });
+      });
+    }
+  }
+
+  const takeBadges = document.getElementById('take-hazards-badges');
+  if (takeBadges) {
+    if (!risks.length) {
+      takeBadges.hidden = true;
+      takeBadges.innerHTML = '';
+    } else {
+      takeBadges.hidden = false;
+      takeBadges.innerHTML = risks
+        .map(
+          (r, idx) => `
+          <button type="button" class="take-hazard-chip ${/Moderate|Enhanced|High/i.test(r.level) ? 'severe' : ''}" data-take-risk-idx="${idx}">
+            <span>⚠ ${r.title || `${r.level} risk`}</span>
+            <span aria-hidden="true">›</span>
+          </button>
+        `
+        )
+        .join('');
+      takeBadges.querySelectorAll('[data-take-risk-idx]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const r = risks[Number(btn.dataset.takeRiskIdx)];
+          if (r) openRiskOutlookModal(r, f);
+        });
+      });
+    }
+  }
+}
+
+async function openRiskOutlookModal(risk, f) {
+  if (!risk) return;
+  if (risk.kind === 'wssi' && risk.url) {
+    window.open(risk.url, '_blank', 'noopener');
+    return;
+  }
+  openModal(
+    risk.title || `${risk.level} Weather Outlook`,
+    `<div style="padding:14px 4px;color:var(--muted);">Loading official local outlook map &amp; summary for ${f.location.name}…</div>`
+  );
+  try {
+    const q = new URLSearchParams({
+      kind: risk.kind,
+      latitude: String(f.location.latitude),
+      longitude: String(f.location.longitude),
+      place: f.location.name
+    });
+    if (f.location.wfo || f.location.office) q.set('office', f.location.wfo || f.location.office);
+    const res = await fetch(`/api/weather-fusion/outlook?${q}`, { cache: 'no-store', headers: { Accept: 'application/json' } });
+    const detail = await res.json();
+    if (!res.ok) throw new Error(detail?.error || 'Outlook unavailable.');
+
+    const bodyEl = document.getElementById('modal-body');
+    if (bodyEl) {
+      bodyEl.innerHTML = outlookDetailHTML(risk, detail);
+      const mapHost = document.getElementById('outlook-map');
+      if (mapHost && Array.isArray(detail.features) && detail.features.length && detail.location && window.L) {
+        const center = [detail.location.latitude, detail.location.longitude];
+        const oMap = window.L.map(mapHost, { zoomControl: true, scrollWheelZoom: false, attributionControl: false }).setView(center, 7);
+        window.L.tileLayer('https://basemap.nationalmap.gov/arcgis/rest/services/USGSTopo/MapServer/tile/{z}/{y}/{x}', {
+          maxZoom: 10,
+          className: 'outlook-basemap'
+        }).addTo(oMap);
+        window.L.geoJSON(
+          {
+            type: 'FeatureCollection',
+            features: detail.features.map((row) => ({ type: 'Feature', properties: { level: row.level }, geometry: row.geometry }))
+          },
+          {
+            style: (feat) => ({
+              color: '#102033',
+              weight: 1,
+              fillColor: RISK_COLORS[feat.properties?.level] || '#74d36a',
+              fillOpacity: 0.45
+            })
+          }
+        ).addTo(oMap);
+        window.L.circleMarker(center, { radius: 7, color: '#fff', weight: 2, fillColor: '#4cc3ff', fillOpacity: 1 }).addTo(oMap);
+        requestAnimationFrame(() => oMap.invalidateSize());
+      }
+    }
+  } catch (err) {
+    const bodyEl = document.getElementById('modal-body');
+    if (bodyEl) {
+      bodyEl.innerHTML = `<p style="color:#fecaca;">${err.message || 'Unable to load outlook details right now.'}</p><a class="bulletin-dialog-source" href="${risk.url || 'https://www.weather.gov/'}" target="_blank" rel="noopener noreferrer">Open official outlook ↗</a>`;
+    }
+  }
+}
+
 function renderWindowBanners(f) {
   const container = document.getElementById('forecast-window-banners');
-  if (!container) return;
+  const trackerBar = document.getElementById('perfect-tracker-bar');
 
-  container.innerHTML = (f.windows?.banners || [])
-    .map(
-      (b, idx) => `
-      <div class="glass window-banner-card" data-type="${b.type}" data-win-idx="${idx}">
-        <div style="display:flex;align-items:center;gap:12px;">
-          <div>${renderWeatherIconSvg(b.type === 'rain' ? 'rain' : 'clear-day', 34)}</div>
-          <div>
-            <div style="font-size:14.5px;font-weight:800;color:#ffffff;">${b.title}</div>
-            <div style="font-size:12.5px;color:var(--muted);">${b.subtitle}</div>
-          </div>
+  if (f.canonical) {
+    const view = buildForecastWindows(f.canonical, Date.now());
+    const kinds = ['perfect', 'rain'].filter((k) => view[k]?.length);
+    kinds.sort((a, b) => view[a][0].start - view[b][0].start);
+
+    if (container) {
+      container.innerHTML = kinds.map((k) => forecastWindowBannerHTML(view, k, Date.now())).join('');
+      container.hidden = !kinds.length;
+      container.querySelectorAll('[data-forecast-window]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const kind = btn.dataset.forecastWindow;
+          openModal(
+            kind === 'perfect' ? `Perfect Weather Tracker · ${f.location.name}` : `Rain & Storm Outlook · ${f.location.name}`,
+            forecastWindowDetailHTML(view, kind, f.location.name, Date.now())
+          );
+        });
+      });
+    }
+
+    if (trackerBar) {
+      const perfectWinCount = view.perfect?.length || 0;
+      const perfectHrCount = (view.perfect || []).reduce((s, w) => s + (w.hours?.length || 0), 0);
+      trackerBar.innerHTML = `
+        <div class="perfect-tracker-copy">
+          <strong>🌤 Perfect Weather Tracker</strong>
+          <span>${
+            perfectHrCount > 0
+              ? `${perfectHrCount} golden outdoor ${perfectHrCount === 1 ? 'hour' : 'hours'} across ${perfectWinCount} ${perfectWinCount === 1 ? 'window' : 'windows'} in next 5 days (70–75° feels, low clouds & dew point)`
+              : 'No 70–75° sunny golden windows in next 5 days · Tap to view comfortable windows & tracker'
+          }</span>
         </div>
-        <span class="wfo-pill" style="white-space:nowrap;">${b.badge} ▸</span>
-      </div>
-    `
-    )
-    .join('');
+        <div class="perfect-tracker-actions">
+          <button id="open-perfect-tracker-modal" class="mode-pill" type="button">5-Day Windows ›</button>
+          <a class="mode-pill" href="/whats-up">All Cities Tracker ↗</a>
+        </div>
+      `;
+      document.getElementById('open-perfect-tracker-modal')?.addEventListener('click', () => {
+        openModal(
+          `Perfect Weather Tracker · ${f.location.name}`,
+          forecastWindowDetailHTML(view, 'perfect', f.location.name, Date.now())
+        );
+      });
+    }
+    return;
+  }
 
-  container.querySelectorAll('.window-banner-card').forEach((card) => {
-    card.addEventListener('click', () => {
-      const b = f.windows.banners[Number(card.dataset.winIdx)];
-      if (!b) return;
-      state.selectedMetricId = b.type === 'rain' ? 'rainChance' : 'temp';
-      open48hExplorerModal(f);
+  if (container) {
+    container.innerHTML = (f.windows?.banners || [])
+      .map(
+        (b, idx) => `
+        <div class="glass window-banner-card" data-type="${b.type}" data-win-idx="${idx}">
+          <div style="display:flex;align-items:center;gap:12px;">
+            <div>${renderWeatherIconSvg(b.type === 'rain' ? 'rain' : 'clear-day', 34)}</div>
+            <div>
+              <div style="font-size:14.5px;font-weight:800;color:#ffffff;">${b.title}</div>
+              <div style="font-size:12.5px;color:var(--muted);">${b.subtitle}</div>
+            </div>
+          </div>
+          <span class="wfo-pill" style="white-space:nowrap;">${b.badge} ▸</span>
+        </div>
+      `
+      )
+      .join('');
+
+    container.querySelectorAll('.window-banner-card').forEach((card) => {
+      card.addEventListener('click', () => {
+        const b = f.windows.banners[Number(card.dataset.winIdx)];
+        if (!b) return;
+        state.selectedMetricId = b.type === 'rain' ? 'rainChance' : 'temp';
+        open48hExplorerModal(f);
+      });
     });
-  });
+  }
 }
 
 function selectHeroBackdropPhoto(cur) {
@@ -401,11 +633,22 @@ function getDewPointVerdict(dpF) {
   return 'Oppressive';
 }
 
+function formatZonedHourStamp(h, idx, timeZone) {
+  if (!h) return 'Now';
+  if (idx === 0) return 'Now';
+  try {
+    const dayStr = new Intl.DateTimeFormat('en-US', { timeZone, weekday: 'short' }).format(h.dateObj);
+    return `${dayStr} · ${h.hourLabel}`;
+  } catch {
+    return h.hourLabel;
+  }
+}
+
 function renderHeroAndBriefing(f) {
   const cur = f.current;
   const today = f.days[0];
   const aqi = f.airQuality?.currentAqi ?? 38;
-  const isRainNow = (cur.rainChance || 0) >= 55 || (cur.precipIn || 0) >= 0.02;
+  const tz = f.timeZone || f.location?.timeZone || 'America/New_York';
 
   // Dynamic clean photographic sky backdrop matching current conditions (no lady portrait!)
   const heroBg = document.getElementById('hero-bg-photo');
@@ -416,14 +659,16 @@ function renderHeroAndBriefing(f) {
     }
   }
 
-  // Render Large Weather Change Alert Banner when triggered
+  // Render Large Weather Change Alert Banner (canonical main-site messages when available)
   const changeBanner = document.getElementById('weather-change-banner');
   if (changeBanner) {
-    const msgs = f.briefing?.changeAlerts || [];
+    const msgs = f.canonical
+      ? weatherChangeMessages(f.canonical, Date.now())
+      : (f.briefing?.changeAlerts || []);
     if (msgs.length) {
       changeBanner.hidden = false;
       changeBanner.innerHTML = `
-        <div class="wc-kicker">LARGE WEATHER CHANGE ALERT</div>
+        <div class="wc-kicker">${WEATHER_CHANGE_TITLE.toUpperCase()}</div>
         <div class="wc-body">${msgs.join(' ')}</div>
       `;
     } else {
@@ -441,11 +686,12 @@ function renderHeroAndBriefing(f) {
   const hiloEl = document.getElementById('hero-hilo');
 
   if (dateEl) {
-    dateEl.textContent = cur.dateObj.toLocaleDateString('en-US', {
+    dateEl.textContent = new Intl.DateTimeFormat('en-US', {
+      timeZone: tz,
       weekday: 'short',
       month: 'short',
       day: 'numeric'
-    });
+    }).format(cur.dateObj);
   }
   if (cityEl) cityEl.textContent = f.location.name;
   if (sceneEl) sceneEl.innerHTML = renderWeatherIconSvg(cur.icon, 68);
@@ -456,32 +702,98 @@ function renderHeroAndBriefing(f) {
     hiloEl.innerHTML = `High <strong>${fmtTemp(today.highF)}</strong> &nbsp;|&nbsp; Low <strong>${fmtTemp(today.lowF)}</strong>`;
   }
 
-  // Frosted "Nourie Take" Hero Bar Copy
+  // Main-site Nourie Weather Take (Layman's Terms AFD + Official Hazard Alerts)
+  const canonical = f.canonical;
+  const b = state.liveBriefing || canonical;
+  const activeRisks = canonical ? activeRiskOutlooks(canonical, Date.now()) : [];
+  const card = canonical ? danCard(b, canonical, Date.now()) : null;
+  const overview = canonical ? danOverview(b, canonical, Date.now()) : null;
+  const takeDisplay = canonical ? danTakeDisplay(b, canonical, Date.now()) : '';
+  const localDetails = canonical ? forecastOutlookDetails(canonical, Date.now()) : null;
+
+  const cleanWindowProse = (txt) =>
+    String(txt || '').replace(/\bBest window:\s*12 AM to 12 AM\.?/gi, 'Wet weather possible off and on through the day.');
+
+  const isUnavailableNote = /discussion is unavailable right now/i.test(overview?.text || '');
+  const takeLeadText =
+    card?.text ||
+    b?.headline ||
+    f.briefing.headline;
+  const takeDetailText = cleanWindowProse(
+    localDetails?.summary ||
+    b?.summary ||
+    f.briefing.summary
+  );
+  let rawLayman =
+    takeDisplay && !/unavailable right now/i.test(takeDisplay)
+      ? takeDisplay
+      : !isUnavailableNote && overview?.text
+      ? overview.text
+      : '';
+  // Avoid repeating card.text inside the layman discussion box when it is already the card headline
+  if (card?.text && rawLayman.includes(card.text)) {
+    rawLayman = rawLayman.replace(card.text, '').trim();
+  }
+  const laymanText =
+    rawLayman || (!isUnavailableNote && overview?.text ? overview.text : '');
+
   const takeBannerCopy = document.getElementById('take-banner-copy');
-  const b = state.liveBriefing;
-  const takeLeadText = b?.danTake || b?.headline || f.briefing.headline;
-  const takeDetailText = b?.summary || f.briefing.summary;
   if (takeBannerCopy) {
-    takeBannerCopy.textContent = takeLeadText;
+    takeBannerCopy.textContent = card?.text || (laymanText ? laymanText.split('\n')[0] : takeLeadText);
   }
 
-  // Full Nourie Weather Take Card right on the page (for all ages, plain language!)
   const takeHead = document.getElementById('take-headline');
   const takeSum = document.getElementById('take-summary');
+  const takeLayman = document.getElementById('take-layman-discussion');
   const takeBullets = document.getElementById('take-bullets');
   const riskPill = document.getElementById('risk-outlook-pill');
+
   if (takeHead) takeHead.textContent = takeLeadText;
   if (takeSum) takeSum.textContent = takeDetailText;
-  if (riskPill && f.briefing.riskOutlook) {
-    riskPill.textContent = `${f.briefing.riskOutlook.agency}: ${f.briefing.riskOutlook.level}`;
-    riskPill.style.color = f.briefing.riskOutlook.color;
-    riskPill.style.borderColor = f.briefing.riskOutlook.color;
+  if (takeLayman) {
+    if (laymanText) {
+      takeLayman.hidden = false;
+      takeLayman.textContent = `Plain-English Weather Office Notes:\n${laymanText}`;
+    } else {
+      takeLayman.hidden = true;
+      takeLayman.textContent = '';
+    }
   }
+
+  if (riskPill) {
+    if (activeRisks.length > 0) {
+      const top = activeRisks[0];
+      const kindWord = top.kind === 'wpc' ? 'Flooding' : top.kind === 'spc' ? 'Severe Storms' : 'Winter';
+      const c = RISK_COLORS[top.level] || '#f4e14a';
+      riskPill.textContent = `⚠ ${top.level} Risk of ${kindWord} ›`;
+      riskPill.style.color = c;
+      riskPill.style.borderColor = c;
+      riskPill.onclick = () => openRiskOutlookModal(top, f);
+    } else if (f.briefing.riskOutlook) {
+      riskPill.textContent = `${f.briefing.riskOutlook.agency}: ${f.briefing.riskOutlook.level}`;
+      riskPill.style.color = f.briefing.riskOutlook.color;
+      riskPill.style.borderColor = f.briefing.riskOutlook.color;
+      riskPill.onclick = () => openWeatherTakeModal(f);
+    }
+  }
+
   if (takeBullets) {
-    const bulletItems = f.briefing.bullets || [];
-    takeBullets.innerHTML = bulletItems
-      .map((item) => `<li><strong>${item.label}:</strong> ${item.text}</li>`)
-      .join('');
+    if (localDetails?.nearTerm) {
+      const lines = cleanWindowProse(localDetails.nearTerm).split('\n').filter(Boolean);
+      takeBullets.innerHTML = lines
+        .map((ln) => {
+          const colon = ln.indexOf(':');
+          return colon > 0
+            ? `<li><strong>${ln.slice(0, colon)}:</strong> ${ln.slice(colon + 1).trim()}</li>`
+            : `<li>${ln}</li>`;
+        })
+        .join('');
+    } else {
+      const bulletItems = f.briefing.bullets || [];
+      takeBullets.innerHTML = bulletItems
+        .map((item) => `<li><strong>${item.label}:</strong> ${item.text}</li>`)
+        .join('');
+    }
   }
 
   // 4-Column Quick Stats Glass Strip
@@ -509,9 +821,70 @@ function renderHeroAndBriefing(f) {
   const meter = computeWeatherMeterScore(cur, today, aqi);
   if (meterArcEl) meterArcEl.innerHTML = renderWeatherMeterArcSvg(meter.score);
   if (meterSubEl) meterSubEl.textContent = meter.label;
+}
 
-  // 3-Column Bottom Comfort Trio (How It Feels with Cartoon Scene | Dew Point | Wind)
-  const feelsVerdict = getFeelsVerdict(cur.feelsLikeF ?? cur.tempF, isRainNow);
+function getFeelsTimePresets(f) {
+  const hrs = f.hours48 || [];
+  const todayKey = hrs[0]?.dayKey;
+  const tomAmIdx = hrs.findIndex((h) => h.dayKey !== todayKey && h.hourOfDay === 9);
+  const tomPmIdx = hrs.findIndex((h) => h.dayKey !== todayKey && h.hourOfDay === 15);
+  return [
+    { label: 'Now', idx: 0 },
+    { label: '+3h', idx: Math.min(3, hrs.length - 1) },
+    { label: '+6h', idx: Math.min(6, hrs.length - 1) },
+    { label: '+12h', idx: Math.min(12, hrs.length - 1) },
+    ...(tomAmIdx > 0 ? [{ label: 'Tom AM', idx: tomAmIdx }] : []),
+    ...(tomPmIdx > 0 ? [{ label: 'Tom PM', idx: tomPmIdx }] : [])
+  ];
+}
+
+function renderFeelsTimeAndTrio(f) {
+  const hrs = f.hours48 || [f.current];
+  const idx = clamp(state.feelsHourIdx || 0, 0, hrs.length - 1);
+  state.feelsHourIdx = idx;
+  const h = hrs[idx] || f.current;
+  const tz = f.timeZone || f.location?.timeZone || 'America/New_York';
+  const isRain = (h.rainChance || 0) >= 55 || (h.precipIn || 0) >= 0.02;
+
+  const stampText = formatZonedHourStamp(h, idx, tz);
+  const timeLbl = document.getElementById('feels-selected-time-label');
+  const tempPill = document.getElementById('feels-selected-temp-pill');
+  const slider = document.getElementById('feels-hour-slider');
+  const quickPills = document.getElementById('feels-quick-pills');
+
+  if (timeLbl) {
+    timeLbl.textContent = idx === 0
+      ? 'Showing right now · drag slider or tap a time below'
+      : `Previewing ${stampText} (${h.condition}) · updates outfit & cartoon cards`;
+  }
+  if (tempPill) tempPill.textContent = `${idx === 0 ? 'Now' : h.hourLabel} · Feels ${fmtTemp(h.feelsLikeF)}`;
+  if (slider) {
+    slider.max = String(Math.max(0, hrs.length - 1));
+    slider.value = String(idx);
+    slider.oninput = () => {
+      state.feelsHourIdx = Number(slider.value) || 0;
+      renderFeelsTimeAndTrio(f);
+      renderOutdoorExposureCards(f);
+    };
+  }
+  if (quickPills) {
+    const presets = getFeelsTimePresets(f);
+    quickPills.innerHTML = presets
+      .map(
+        (p) => `<button class="mode-pill ${p.idx === idx ? 'active' : ''}" data-feels-idx="${p.idx}" type="button">${p.label}</button>`
+      )
+      .join('');
+    quickPills.querySelectorAll('[data-feels-idx]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        state.feelsHourIdx = Number(btn.dataset.feelsIdx) || 0;
+        renderFeelsTimeAndTrio(f);
+        renderOutdoorExposureCards(f);
+      });
+    });
+  }
+
+  // Update 3-Column Bottom Comfort Trio for selected hour
+  const feelsVerdict = getFeelsVerdict(h.feelsLikeF ?? h.tempF, isRain);
   const trioFeelsLbl = document.getElementById('trio-feels-label');
   const trioFeelsNote = document.getElementById('trio-feels-note');
   const trioOutfitEl = document.getElementById('trio-outfit-visual');
@@ -522,18 +895,19 @@ function renderHeroAndBriefing(f) {
   const trioWindGust = document.getElementById('trio-wind-gust');
   const trioCompass = document.getElementById('trio-wind-compass');
 
+  const advice = buildWardrobeAdvice(h.feelsLikeF ?? h.tempF, h);
   if (trioFeelsLbl) trioFeelsLbl.textContent = feelsVerdict.label;
-  if (trioFeelsNote) trioFeelsNote.textContent = feelsVerdict.note;
+  if (trioFeelsNote) trioFeelsNote.textContent = `${advice.items[0]} · Tap ›`;
   if (trioOutfitEl) {
-    const sceneCtx = { pop: cur.rainChance, rainExpected: isRainNow, snowExpected: /snow|flurr/i.test(cur.condition || '') };
-    trioOutfitEl.innerHTML = referenceScene(1, Boolean(cur.isDay), cur.condition || 'Clear', cur.feelsLikeF ?? cur.tempF, sceneCtx);
+    const sceneCtx = { pop: h.rainChance, rainExpected: isRain, snowExpected: /snow|flurr/i.test(h.condition || '') };
+    trioOutfitEl.innerHTML = referenceScene(1, Boolean(h.isDay), h.condition || 'Clear', h.feelsLikeF ?? h.tempF, sceneCtx);
   }
-  if (trioDpVal) trioDpVal.textContent = fmtTemp(cur.dewPointF);
-  if (trioDpLbl) trioDpLbl.textContent = getDewPointVerdict(cur.dewPointF ?? 50);
-  if (trioWindSpd) trioWindSpd.textContent = String(Math.round(cur.windMph ?? 0));
-  if (trioWindUnit) trioWindUnit.textContent = `mph ${cur.windCardinal || 'N'}`;
-  if (trioWindGust) trioWindGust.textContent = `Gusts ${Math.round(cur.windGustMph ?? cur.windMph ?? 0)} mph`;
-  if (trioCompass) trioCompass.innerHTML = renderCompassSvg(cur.windDirDeg ?? 45);
+  if (trioDpVal) trioDpVal.textContent = fmtTemp(h.dewPointF);
+  if (trioDpLbl) trioDpLbl.textContent = getDewPointVerdict(h.dewPointF ?? 50);
+  if (trioWindSpd) trioWindSpd.textContent = String(Math.round(h.windMph ?? 0));
+  if (trioWindUnit) trioWindUnit.textContent = `mph ${h.windCardinal || 'N'}`;
+  if (trioWindGust) trioWindGust.textContent = `Gusts ${Math.round(h.windGustMph ?? h.windMph ?? 0)} mph`;
+  if (trioCompass) trioCompass.innerHTML = renderCompassSvg(h.windDirDeg ?? 45);
 }
 
 function renderNext24QuickCard(f) {
@@ -709,8 +1083,18 @@ function renderOutdoorExposureCards(f) {
   const container = document.getElementById('exposure-cards-grid');
   if (!container) return;
 
-  const cur = f.current;
-  const pave = f.pavement;
+  const hrs = f.hours48 || [f.current];
+  const hIdx = clamp(state.feelsHourIdx || 0, 0, hrs.length - 1);
+  const cur = hrs[hIdx] || f.current;
+  const pave = computePavementProfile(hrs, hIdx, f.location.latitude, f.location.longitude);
+  const tz = f.timeZone || f.location?.timeZone || 'America/New_York';
+  const noteEl = document.getElementById('exposure-time-note');
+  if (noteEl) {
+    noteEl.textContent = hIdx === 0
+      ? 'Right now · Tap Shade, Sun, or Pets to expand'
+      : `Previewing ${formatZonedHourStamp(cur, hIdx, tz)} · Tap tile to expand`;
+  }
+
   const isRaining = cur.rainChance >= 50 || cur.precipIn >= 0.01;
   const sunWindow = f.windows?.sunHours?.[0];
   const sceneCtx = { pop: cur.rainChance, rainExpected: isRaining, snowExpected: /snow|flurr/i.test(cur.condition || '') };
@@ -722,45 +1106,50 @@ function renderOutdoorExposureCards(f) {
   const concretePct = clamp(((pave.concreteTempF - 30) / 120) * 100, 8, 100);
   const asphaltPct = clamp(((pave.asphaltTempF - 30) / 120) * 100, 8, 100);
 
-  container.innerHTML = `
-    <!-- Card 1: In the Shade (Real Illustrated Main-Page Artwork) -->
-    <article class="glass exposure-card">
-      <div class="exposure-art-banner exposure-real-scene">
-        ${shadeSvg}
-        <div class="exposure-art-overlay">
-          <span class="exposure-tag">In the Shade</span>
-        </div>
-      </div>
-      <div class="exposure-body">
-        <div style="display:flex;align-items:baseline;justify-content:space-between;">
+  const items = [
+    {
+      id: 'shade',
+      title: 'In the Shade',
+      shortLine: cur.shadeFeelsF < cur.tempF
+        ? `Breeze cools shade by ${Math.round(cur.tempF - cur.shadeFeelsF)}° · Tap to expand`
+        : 'Calm shaded outdoor air · Tap to expand',
+      badgeVal: fmtTemp(cur.shadeFeelsF),
+      badgeColor: '#ffffff',
+      svg: shadeSvg,
+      detailsHtml: `
+        <div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:6px;">
           <span class="exposure-big-temp">${fmtTemp(cur.shadeFeelsF)}</span>
           <span class="wfo-pill">Air ${fmtTemp(cur.tempF)}</span>
         </div>
-        <div style="font-size:14px;font-weight:700;color:#ffffff;">
+        <div style="font-size:14.5px;font-weight:700;color:#ffffff;margin-bottom:4px;">
           ${cur.shadeFeelsF < cur.tempF ? `Breeze cools shade by ${Math.round(cur.tempF - cur.shadeFeelsF)}°` : 'Calm air in the shade'}
         </div>
-        <p style="font-size:12.5px;color:var(--muted);margin:0;">
+        <p style="font-size:13px;color:var(--muted);margin:0;line-height:1.45;">
           With ${cur.windMph} mph breeze and ${cur.humidity}% humidity, shaded outdoor air feels ${getFeelsVerdict(cur.shadeFeelsF, isRaining).label.toLowerCase()}.
         </p>
-      </div>
-    </article>
-
-    <!-- Card 2: In Direct Sun / Rain Chill (Real Illustrated Main-Page Artwork) -->
-    <article class="glass exposure-card">
-      <div class="exposure-art-banner exposure-real-scene">
-        ${sunSvg}
-        <div class="exposure-art-overlay">
-          <span class="exposure-tag">${isRaining ? 'In the Rain' : cur.isDay ? 'In Direct Sun' : 'Evening Air'}</span>
-        </div>
-      </div>
-      <div class="exposure-body">
-        <div style="display:flex;align-items:baseline;justify-content:space-between;">
+      `
+    },
+    {
+      id: 'sun',
+      title: isRaining ? 'In the Rain' : cur.isDay ? 'In Direct Sun' : 'Evening Air',
+      shortLine: isRaining
+        ? `${cur.rainChance}% rain risk · Damp outdoor chill`
+        : cur.sunDeltaF >= 3
+        ? `Sunlight adds +${cur.sunDeltaF}° warmth · Tap to expand`
+        : cur.isDay
+        ? 'Cloud cover softens sun glare · Tap to expand'
+        : 'No direct sunlight outdoors · Tap to expand',
+      badgeVal: fmtTemp(isRaining ? cur.rainFeelsF : cur.sunFeelsF),
+      badgeColor: isRaining ? '#7ac6ff' : '#ffd470',
+      svg: sunSvg,
+      detailsHtml: `
+        <div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:6px;">
           <span class="exposure-big-temp" style="color:${isRaining ? '#7ac6ff' : '#ffd470'};">
             ${fmtTemp(isRaining ? cur.rainFeelsF : cur.sunFeelsF)}
           </span>
           <span class="wfo-pill">${isRaining ? `${cur.rainChance}% Rain` : cur.uvIndex > 0 ? `UV ${cur.uvIndex}` : 'After Dusk'}</span>
         </div>
-        <div style="font-size:14px;font-weight:700;color:#ffffff;">
+        <div style="font-size:14.5px;font-weight:700;color:#ffffff;margin-bottom:4px;">
           ${
             isRaining
               ? 'Damp breeze makes it feel cooler outside'
@@ -771,32 +1160,32 @@ function renderOutdoorExposureCards(f) {
               : 'Cooler evening temperatures settling in'
           }
         </div>
-        <p style="font-size:12.5px;color:var(--muted);margin:0;">
+        <p style="font-size:13px;color:var(--muted);margin:0;line-height:1.45;">
           ${
             sunWindow
-              ? `Next sunny break around <strong>${sunWindow.hourLabel}</strong> (${fmtTemp(sunWindow.tempF)}).`
-              : 'Steadily mild conditions outdoors with no harsh glare.'
+              ? `Next bright sunny break around <strong>${sunWindow.hourLabel}</strong> (${fmtTemp(sunWindow.tempF)}).`
+              : 'No harsh glare expected for outdoor plans.'
           }
         </p>
-      </div>
-    </article>
-
-    <!-- Card 3: For Pets & Pavement Safety (Real Poodle Walker Artwork) -->
-    <article class="glass exposure-card">
-      <div class="exposure-art-banner exposure-real-scene">
-        ${petsSvg}
-        <div class="exposure-art-overlay">
-          <span class="exposure-tag" style="border-color:${pave.pawSafety.color};color:${pave.pawSafety.color};">
-            🐾 For Pets · ${pave.pawSafety.label}
-          </span>
+      `
+    },
+    {
+      id: 'pets',
+      title: '🐾 For Pets',
+      shortLine: `${pave.pawSafety.label} · Sidewalk ${fmtTemp(pave.concreteTempF)} · Street ${fmtTemp(pave.asphaltTempF)}`,
+      badgeVal: pave.asphaltTempF >= 135 ? 'HOT!' : pave.asphaltTempF >= 120 ? 'WARM' : 'SAFE',
+      badgeColor: pave.pawSafety.color,
+      svg: petsSvg,
+      detailsHtml: `
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;">
+          <strong style="font-size:15px;color:${pave.pawSafety.color};">🐾 Paw Safety: ${pave.pawSafety.label}</strong>
+          <span class="wfo-pill">Air ${fmtTemp(cur.tempF)}</span>
         </div>
-      </div>
-      <div class="exposure-body">
         <div class="pavement-compare-bars">
           <div class="pave-row">
             <div class="pave-row-head">
               <span>Light Concrete Sidewalk</span>
-              <strong>${fmtTemp(pave.concreteTempF)} (Peak ${fmtTemp(pave.peakConcreteTodayF)})</strong>
+              <strong>${fmtTemp(pave.concreteTempF)} (Today peak ${fmtTemp(pave.peakConcreteTodayF)})</strong>
             </div>
             <div class="pave-progress-bg">
               <div class="pave-progress-fill" style="width:${concretePct}%;background:#7ac6ff;"></div>
@@ -806,7 +1195,7 @@ function renderOutdoorExposureCards(f) {
             <div class="pave-row-head">
               <span>Dark Asphalt Street</span>
               <strong style="color:${pave.asphaltTempF >= 135 ? '#ff6b6b' : pave.asphaltTempF >= 120 ? '#ffd166' : '#5ce0a0'};">
-                ${fmtTemp(pave.asphaltTempF)} (Peak ${fmtTemp(pave.peakAsphaltTodayF)})
+                ${fmtTemp(pave.asphaltTempF)} (Today peak ${fmtTemp(pave.peakAsphaltTodayF)})
               </strong>
             </div>
             <div class="pave-progress-bg">
@@ -814,12 +1203,55 @@ function renderOutdoorExposureCards(f) {
             </div>
           </div>
         </div>
-        <p style="font-size:12px;color:var(--muted);margin:4px 0 0;">
+        <p style="font-size:12.5px;color:var(--muted);margin:8px 0 0;line-height:1.45;">
           ${pave.pawSafety.advice}
         </p>
-      </div>
-    </article>
-  `;
+      `
+    }
+  ];
+
+  container.innerHTML = items
+    .map((item) => {
+      const isOpen = state.expandedExposureIds.has(item.id);
+      return `
+        <article class="glass exposure-teaser-card ${isOpen ? 'expanded' : ''}" data-exp-id="${item.id}">
+          <button type="button" class="exposure-teaser-btn" data-exp-toggle="${item.id}" aria-expanded="${isOpen}">
+            <div class="exposure-teaser-left">
+              <div class="exposure-teaser-thumb">${item.svg}</div>
+              <div style="min-width:0;">
+                <div class="exposure-teaser-title">${item.title}</div>
+                <div class="exposure-teaser-sub">${item.shortLine}</div>
+              </div>
+            </div>
+            <div class="exposure-teaser-right">
+              <span class="exposure-teaser-temp" style="color:${item.badgeColor};">${item.badgeVal}</span>
+              <span class="weather-take-chevron" aria-hidden="true">${isOpen ? '▴' : '▾'}</span>
+            </div>
+          </button>
+          ${
+            isOpen
+              ? `<div class="exposure-expanded-body">
+                  <div class="exposure-expanded-scene">${item.svg}</div>
+                  <div>${item.detailsHtml}</div>
+                </div>`
+              : ''
+          }
+        </article>
+      `;
+    })
+    .join('');
+
+  container.querySelectorAll('[data-exp-toggle]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const id = btn.dataset.expToggle;
+      if (state.expandedExposureIds.has(id)) {
+        state.expandedExposureIds.delete(id);
+      } else {
+        state.expandedExposureIds.add(id);
+      }
+      renderOutdoorExposureCards(f);
+    });
+  });
 }
 
 function renderModelExplanationSection(f) {
@@ -1108,19 +1540,57 @@ function renderCompareModelsSection(f) {
 
   if (breakdownEl) {
     const visibleCount = clamp(state.compareHorizonDays, 3, f.days.length);
-    const d = f.days[clamp(state.selectedDayIdx, 0, visibleCount - 1)] || f.days[0];
+    const visibleDays = f.days.slice(0, visibleCount);
+    const variable = COMPARE_VARIABLES.find((v) => v.id === state.compareVariableId) || COMPARE_VARIABLES[0];
+    const fmtCmp = (val) => {
+      if (val === null || val === undefined || Number.isNaN(val)) return '—';
+      return `${variable.decimals ? Number(val).toFixed(variable.decimals) : Math.round(val)}${variable.unit}`;
+    };
+    const activeModels = COMPARE_MODELS.filter((m) => state.enabledCompareModels.has(m.id) || m.alwaysOn);
+    const selDayIdx = clamp(state.selectedDayIdx, 0, visibleDays.length - 1);
+
     breakdownEl.innerHTML = `
-      <div style="display:flex;flex-wrap:wrap;gap:7px;align-items:center;font-size:12.5px;">
-        <span class="wfo-pill"><strong>${d.dayName} (${d.dateLabel})</strong></span>
-        <span class="telemetry-chip" style="border-color:#ffffff;">Weather Nourie: <strong>${fmtTemp(d.highF)} / ${fmtTemp(d.lowF)}</strong></span>
-        <span class="telemetry-chip" style="border-color:#38bdf8;">NWS: <strong>${fmtTemp(d.modelHighs.nws)}</strong></span>
-        <span class="telemetry-chip" style="border-color:#ff9248;">HRRR: <strong>${d.modelHighs.hrrr !== null ? fmtTemp(d.modelHighs.hrrr) : '2d only'}</strong></span>
-        <span class="telemetry-chip" style="border-color:#34d399;">NBM: <strong>${fmtTemp(d.modelHighs.nbm)}</strong></span>
-        <span class="telemetry-chip" style="border-color:#c084fc;">ECMWF: <strong>${fmtTemp(d.modelHighs.ecmwf)}</strong></span>
-        <span class="telemetry-chip" style="border-color:#facc15;">GEFS: <strong>${fmtTemp(d.modelHighs.gefs)}</strong></span>
-        <span class="telemetry-chip" style="border-color:#f472b6;">WeatherNext: <strong>${fmtTemp(d.modelHighs.weathernext)}</strong></span>
+      <div class="compare-table-wrap">
+        <table class="compare-days-table" aria-label="Day by day forecast comparison table">
+          <thead>
+            <tr>
+              <th>Day</th>
+              ${activeModels
+                .map(
+                  (m) =>
+                    `<th class="${m.id === 'blend' ? 'col-wn' : ''}" style="color:${m.color};">${m.id === 'blend' ? 'Weather Nourie' : m.label}</th>`
+                )
+                .join('')}
+            </tr>
+          </thead>
+          <tbody>
+            ${visibleDays
+              .map(
+                (d, idx) => `
+              <tr class="${idx === selDayIdx ? 'active-day-row' : ''}" data-cmp-row="${idx}" style="cursor:pointer;">
+                <td>${d.shortWeekday} <span style="font-size:11px;color:var(--muted);font-weight:500;">${d.dateLabel}</span></td>
+                ${activeModels
+                  .map((m) => {
+                    const val = extractDayModelCompareValue(d, m.id, state.compareVariableId, state.useCelsius);
+                    return `<td class="${m.id === 'blend' ? 'col-wn' : ''}">${fmtCmp(val)}</td>`;
+                  })
+                  .join('')}
+              </tr>
+            `
+              )
+              .join('')}
+          </tbody>
+        </table>
       </div>
     `;
+
+    breakdownEl.querySelectorAll('[data-cmp-row]').forEach((row) => {
+      row.addEventListener('click', () => {
+        state.selectedDayIdx = Number(row.dataset.cmpRow) || 0;
+        renderSevenDayForecast(f);
+        renderCompareModelsSection(f);
+      });
+    });
   }
 }
 
@@ -1135,10 +1605,10 @@ function renderBestTimesHeatmap(f) {
 
   const headerRow = `
     <div class="heatmap-row" style="margin-bottom:2px;">
-      <div class="heatmap-day-label" style="font-size:11px;color:var(--faint);">Hour</div>
+      <div class="heatmap-day-label" style="font-size:10px;color:var(--faint);">Hour</div>
       ${Array.from({ length: 24 }, (_, h) => {
         const lbl = h === 0 ? '12a' : h === 6 ? '6a' : h === 12 ? '12p' : h === 18 ? '6p' : '';
-        return `<div style="font-size:10px;color:var(--faint);text-align:center;">${lbl}</div>`;
+        return `<div style="font-size:9.5px;color:var(--faint);text-align:center;">${lbl}</div>`;
       }).join('')}
     </div>
   `;
@@ -1146,7 +1616,7 @@ function renderBestTimesHeatmap(f) {
   const dayRows = days7
     .map((d) => {
       const hourMap = new Map();
-      d.hours.forEach((h) => hourMap.set(h.dateObj.getHours(), h));
+      d.hours.forEach((h) => hourMap.set(h.hourOfDay ?? h.dateObj.getHours(), h));
 
       const cells = Array.from({ length: 24 }, (_, hr) => {
         const h = hourMap.get(hr) || d.hours[0];
@@ -1172,7 +1642,7 @@ function renderBestTimesHeatmap(f) {
 
       return `
         <div class="heatmap-row">
-          <div class="heatmap-day-label">${d.shortWeekday} <span style="font-size:10.5px;color:var(--faint);font-weight:500;">${d.dateLabel.split(' ')[1]}</span></div>
+          <div class="heatmap-day-label">${d.shortWeekday}</div>
           ${cells}
         </div>
       `;
@@ -1607,7 +2077,8 @@ function initHeaderControls() {
           const picked = results[Number(item.dataset.resIdx)];
           dropdown.hidden = true;
           searchInput.value = '';
-          if (picked) loadLocationForecast(picked);
+          document.getElementById('search-cluster')?.classList.remove('open');
+          if (picked) loadLocationForecast({ ...picked, explicitChoice: true });
         });
       });
     }, 180);
@@ -1632,7 +2103,8 @@ function initHeaderControls() {
         item.addEventListener('click', () => {
           const picked = results[Number(item.dataset.resIdx)];
           dropdown.hidden = true;
-          if (picked) loadLocationForecast(picked);
+          document.getElementById('search-cluster')?.classList.remove('open');
+          if (picked) loadLocationForecast({ ...picked, explicitChoice: true });
         });
       });
     }
@@ -1652,7 +2124,11 @@ function initHeaderControls() {
       async (pos) => {
         const lat = pos.coords.latitude;
         const lon = pos.coords.longitude;
+        try {
+          localStorage.setItem(DEVICE_LOC_KEY, JSON.stringify({ id: 'device', name: 'Device location', latitude: lat, longitude: lon, source: 'device' }));
+        } catch {}
         const resolvedName = await reverseGeocodeLocation(lat, lon);
+        document.getElementById('search-cluster')?.classList.remove('open');
         loadLocationForecast({
           id: 'gps',
           name: resolvedName,
@@ -1788,7 +2264,7 @@ function initPresetCityChips() {
   wrap.querySelectorAll('.city-chip').forEach((chip) => {
     chip.addEventListener('click', () => {
       const found = PRESET_CITIES.find((c) => c.id === chip.dataset.cityId);
-      if (found) loadLocationForecast(found);
+      if (found) loadLocationForecast({ ...found, explicitChoice: true });
     });
   });
 }
@@ -2073,14 +2549,46 @@ function openWeatherMeterModal(f) {
 }
 
 function openWeatherTakeModal(f) {
-  const b = state.liveBriefing;
+  const canonical = f.canonical;
+  const b = state.liveBriefing || canonical;
+  const risks = canonical ? activeRiskOutlooks(canonical, Date.now()) : [];
+  const card = canonical ? danCard(b, canonical, Date.now()) : null;
+  const overview = canonical ? danOverview(b, canonical, Date.now()) : null;
+  const takeDisplay = canonical ? danTakeDisplay(b, canonical, Date.now()) : '';
+  const localDetails = canonical ? forecastOutlookDetails(canonical, Date.now()) : null;
   const tomorrow = f.days[1] || f.days[0];
+  const laymanCopy =
+    takeDisplay && !/unavailable right now/i.test(takeDisplay)
+      ? takeDisplay
+      : !/unavailable right now/i.test(overview?.text || '')
+      ? overview.text
+      : f.briefing.summary;
+
   openModal(
     `Nourie Weather Take · ${f.location.name}`,
     `
+      ${
+        risks.length
+          ? `<div style="display:grid;gap:7px;margin-bottom:12px;">
+              ${risks
+                .map(
+                  (r, i) => `<button type="button" class="take-hazard-chip ${/Moderate|Enhanced|High/i.test(r.level) ? 'severe' : ''}" data-modal-risk-idx="${i}">
+                    <span>⚠ ${r.title || `${r.level} risk`}</span><span>View Map ›</span>
+                  </button>`
+                )
+                .join('')}
+            </div>`
+          : ''
+      }
       <div class="take-modal-card">
-        <div style="font-size:18px;font-weight:800;color:#ffffff;margin-bottom:6px;">${b?.danTake || b?.headline || f.briefing.headline}</div>
-        <p style="font-size:14px;color:var(--muted);line-height:1.55;margin:0 0 12px;">${b?.summary || f.briefing.summary}</p>
+        <div style="font-size:18px;font-weight:800;color:#ffffff;margin-bottom:6px;">${card?.text || b?.headline || f.briefing.headline}</div>
+        <p style="font-size:14px;color:var(--muted);line-height:1.55;margin:0 0 10px;">${localDetails?.summary || b?.summary || f.briefing.summary}</p>
+        <div class="take-layman-box" style="margin-bottom:12px;">Plain-English Weather Office Discussion:\n${laymanCopy}</div>
+        ${
+          localDetails?.extended
+            ? `<div style="font-size:12.5px;color:var(--muted);line-height:1.5;white-space:pre-line;margin-bottom:10px;"><strong>Week Ahead:</strong>\n${localDetails.extended}</div>`
+            : ''
+        }
         <div class="take-modal-row">
           <div>
             <strong>Tomorrow (${tomorrow.dayName})</strong>
@@ -2091,34 +2599,85 @@ function openWeatherTakeModal(f) {
       </div>
     `
   );
+
+  document.querySelectorAll('[data-modal-risk-idx]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const r = risks[Number(btn.dataset.modalRiskIdx)];
+      if (r) openRiskOutlookModal(r, f);
+    });
+  });
 }
 
 function openWardrobeModal(f) {
-  const cur = f.current;
-  const isRaining = (cur.rainChance || 0) >= 50 || (cur.precipIn || 0) >= 0.02;
-  const sceneCtx = { pop: cur.rainChance, rainExpected: isRaining, snowExpected: /snow|flurr/i.test(cur.condition || '') };
-  const cartoonHtml = referenceScene(1, Boolean(cur.isDay), cur.condition || 'Clear', cur.feelsLikeF ?? cur.tempF, sceneCtx);
-  const advice = buildWardrobeAdvice(cur.feelsLikeF ?? cur.tempF, cur);
-  const dpDesc = getDewPointVerdict(cur.dewPointF ?? 50);
+  const hrs = f.hours48 || [f.current];
+  const tz = f.timeZone || f.location?.timeZone || 'America/New_York';
 
-  openModal(
-    `What to Wear · ${f.location.name}`,
-    `
+  const drawWardrobeContent = () => {
+    const idx = clamp(state.feelsHourIdx || 0, 0, hrs.length - 1);
+    const cur = hrs[idx] || f.current;
+    const isRaining = (cur.rainChance || 0) >= 50 || (cur.precipIn || 0) >= 0.02;
+    const sceneCtx = { pop: cur.rainChance, rainExpected: isRaining, snowExpected: /snow|flurr/i.test(cur.condition || '') };
+    const cartoonHtml = referenceScene(1, Boolean(cur.isDay), cur.condition || 'Clear', cur.feelsLikeF ?? cur.tempF, sceneCtx);
+    const advice = buildWardrobeAdvice(cur.feelsLikeF ?? cur.tempF, cur);
+    const dpDesc = getDewPointVerdict(cur.dewPointF ?? 50);
+    const presets = getFeelsTimePresets(f);
+
+    const bodyEl = document.getElementById('modal-body');
+    if (!bodyEl) return;
+    bodyEl.innerHTML = `
+      <div style="margin-bottom:14px;padding:11px 13px;border-radius:14px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.12);">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px;">
+          <strong style="font-size:13px;color:#7dd3fc;">Select Time to Check What to Wear</strong>
+          <span class="wfo-pill">${formatZonedHourStamp(cur, idx, tz)} · ${cur.condition}</span>
+        </div>
+        <div class="pill-scroll-row" style="margin-bottom:8px;">
+          ${presets
+            .map(
+              (p) => `<button class="mode-pill ${p.idx === idx ? 'active' : ''}" data-mw-idx="${p.idx}" type="button">${p.label}</button>`
+            )
+            .join('')}
+        </div>
+        <div class="feels-slider-row">
+          <span class="feels-slider-edge">Now</span>
+          <input id="modal-feels-slider" class="modal-feels-slider" type="range" min="0" max="${Math.max(0, hrs.length - 1)}" value="${idx}" aria-label="Change time for What to Wear" />
+          <span class="feels-slider-edge">+47h</span>
+        </div>
+      </div>
+
       <div class="wardrobe-modal-hero">
         <div class="wardrobe-cartoon-box">${cartoonHtml}</div>
         <div class="wardrobe-hero-info">
           <div class="wardrobe-badge">${advice.title}</div>
           <div style="font-size:28px;font-weight:800;line-height:1.1;margin:6px 0;">Feels Like ${fmtTemp(cur.feelsLikeF)}</div>
           <div style="font-size:13.5px;color:var(--muted);margin-bottom:10px;">
-            In Shade ${fmtTemp(cur.shadeFeelsF)} · In Sun ${fmtTemp(cur.sunFeelsF)} · Air feels <strong>${dpDesc.toLowerCase()}</strong>
+            Air ${fmtTemp(cur.tempF)} · Shade ${fmtTemp(cur.shadeFeelsF)} · Sun ${fmtTemp(cur.sunFeelsF)} · Wind ${cur.windMph} mph · Rain ${cur.rainChance}% · Air feels <strong>${dpDesc.toLowerCase()}</strong>
           </div>
           <ul class="wardrobe-list">
             ${advice.items.map((item) => `<li>✓ ${item}</li>`).join('')}
           </ul>
         </div>
       </div>
-    `
-  );
+    `;
+
+    bodyEl.querySelectorAll('[data-mw-idx]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        state.feelsHourIdx = Number(btn.dataset.mwIdx) || 0;
+        drawWardrobeContent();
+        renderFeelsTimeAndTrio(f);
+        renderOutdoorExposureCards(f);
+      });
+    });
+    const mSlider = document.getElementById('modal-feels-slider');
+    mSlider?.addEventListener('input', () => {
+      state.feelsHourIdx = Number(mSlider.value) || 0;
+      drawWardrobeContent();
+      renderFeelsTimeAndTrio(f);
+      renderOutdoorExposureCards(f);
+    });
+  };
+
+  openModal(`What to Wear · ${f.location.name}`, '<div></div>');
+  drawWardrobeContent();
 }
 
 function open48hExplorerModal(f) {

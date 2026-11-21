@@ -866,7 +866,59 @@ body[data-sky="night"] .atmosphere {
   width: 100%;
 }
 
-.n24-svg,
+.n24-scroll-wrap {
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(122, 198, 255, 0.35) transparent;
+}
+
+.n24-scroll-track {
+  display: flex;
+  flex-direction: column;
+}
+
+.n24-svg {
+  width: 100%;
+  height: auto;
+  display: block;
+  overflow: visible;
+}
+
+.n24-nav-hint {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.n24-scroll-arrow {
+  width: 30px;
+  height: 26px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(10, 24, 48, 0.72);
+  color: #ffffff;
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.n24-scroll-arrow:hover {
+  border-color: var(--blue);
+  background: rgba(24, 52, 92, 0.88);
+}
+
+.n24-scroll-label {
+  font-size: 11px;
+  color: var(--muted);
+  text-align: center;
+}
+
 .d7-dual-svg {
   width: 100%;
   height: auto;
@@ -2124,35 +2176,40 @@ body[data-sky="night"] .atmosphere {
   text-transform: uppercase;
 }
 
-/* 7x24 Heatmap */
+/* 7x24 Heatmap — fits 100% inside mobile & desktop card width without scrolling */
 .heatmap-scroll {
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
+  overflow: hidden;
+  width: 100%;
 }
 
 .heatmap-grid {
-  min-width: 600px;
+  min-width: 0;
   width: 100%;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 3px;
 }
 
 .heatmap-row {
   display: grid;
-  grid-template-columns: 64px repeat(24, 1fr);
+  grid-template-columns: 42px repeat(24, minmax(0, 1fr));
   align-items: center;
-  gap: 3px;
+  gap: 2px;
+  width: 100%;
 }
 
 .heatmap-day-label {
-  font-size: 12px;
+  font-size: 10.5px;
   font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .heatmap-cell {
-  height: 24px;
-  border-radius: 4px;
+  height: 22px;
+  min-width: 0;
+  border-radius: 3px;
   position: relative;
   cursor: pointer;
   border: 1px solid rgba(255, 255, 255, 0.12);
@@ -2163,8 +2220,8 @@ body[data-sky="night"] .atmosphere {
   position: absolute;
   inset: 0;
   margin: auto;
-  width: 5px;
-  height: 5px;
+  width: 4px;
+  height: 4px;
   border-radius: 50%;
   background: #ffffff;
 }
@@ -2625,5 +2682,350 @@ body[data-sky="night"] .atmosphere {
   }
   .readout-big-val {
     font-size: 28px;
+  }
+}
+
+/* ==========================================================================
+   V3 Overhaul: Hazards, Perfect Tracker, Feels Time Bar, Expandable Cartoons, Compare Table
+   ========================================================================== */
+.hazards-strip-grid {
+  display: grid;
+  gap: 8px;
+}
+
+.hazards-strip-grid[hidden] {
+  display: none;
+}
+
+.hazards-strip-grid .risk-outlook-item {
+  margin: 0;
+  cursor: pointer;
+}
+
+.risk-pill-btn {
+  cursor: pointer;
+  font-family: inherit;
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+
+.risk-pill-btn:hover {
+  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.take-hazards-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-bottom: 9px;
+}
+
+.take-hazards-row[hidden] {
+  display: none;
+}
+
+.take-hazard-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 11px;
+  border-radius: 999px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  background: rgba(250, 204, 21, 0.16);
+  border: 1px solid rgba(250, 204, 21, 0.55);
+  color: #fef08a;
+}
+
+.take-hazard-chip.severe {
+  background: rgba(248, 113, 113, 0.18);
+  border-color: rgba(248, 113, 113, 0.62);
+  color: #fecaca;
+}
+
+.take-layman-box {
+  margin: 4px 0 10px;
+  padding: 10px 13px;
+  border-radius: 13px;
+  background: rgba(8, 22, 46, 0.56);
+  border-left: 3px solid #4ade80;
+  font-size: 13px;
+  line-height: 1.52;
+  color: #e6f0ff;
+  white-space: pre-line;
+}
+
+.take-layman-box[hidden] {
+  display: none;
+}
+
+.window-banners-grid {
+  display: grid;
+  gap: 8px;
+}
+
+.window-banners-grid .forecast-window-banner {
+  margin: 0;
+}
+
+.perfect-tracker-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: 16px;
+  background: linear-gradient(120deg, rgba(16, 46, 82, 0.72), rgba(20, 32, 68, 0.68));
+  border: 1px solid rgba(122, 198, 255, 0.32);
+}
+
+.perfect-tracker-copy strong {
+  display: block;
+  font-size: 13.5px;
+  font-weight: 800;
+  color: #ffffff;
+}
+
+.perfect-tracker-copy span {
+  display: block;
+  font-size: 11.5px;
+  color: var(--muted);
+  margin-top: 1px;
+}
+
+.perfect-tracker-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+/* Interactive How It Feels / What to Wear Time Bar */
+.feels-time-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+#feels-quick-pills {
+  flex-wrap: wrap;
+  overflow-x: visible;
+  gap: 5px;
+}
+
+#feels-quick-pills .mode-pill {
+  padding: 5px 10px;
+  font-size: 12px;
+}
+
+.feels-slider-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.feels-slider-edge {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+#feels-hour-slider,
+.modal-feels-slider {
+  flex: 1;
+  accent-color: #38bdf8;
+  cursor: pointer;
+}
+
+/* Compact Car-Wash-Style Clickable Cartoon Exposure Tiles */
+.exposure-teaser-stack {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.exposure-teaser-card {
+  border-radius: 18px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background: rgba(8, 22, 44, 0.78);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+}
+
+.exposure-teaser-card.expanded {
+  grid-column: 1 / -1;
+  border-color: rgba(122, 198, 255, 0.55);
+}
+
+.exposure-teaser-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 13px;
+  background: transparent;
+  border: none;
+  color: var(--text);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.exposure-teaser-btn:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.exposure-teaser-left {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  flex: 1;
+  min-width: 0;
+}
+
+.exposure-teaser-thumb {
+  width: 58px;
+  height: 58px;
+  border-radius: 13px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  background: #0a1830;
+  flex-shrink: 0;
+}
+
+.exposure-teaser-thumb svg.reference-scene {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.exposure-teaser-title {
+  font-size: 14px;
+  font-weight: 800;
+  color: #ffffff;
+  white-space: nowrap;
+}
+
+.exposure-teaser-sub {
+  font-size: 11.5px;
+  color: var(--muted);
+  margin-top: 2px;
+  line-height: 1.3;
+}
+
+.exposure-teaser-right {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.exposure-teaser-temp {
+  font-size: 19px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.exposure-expanded-body {
+  border-top: 1px solid rgba(255, 255, 255, 0.14);
+  padding: 14px;
+  display: grid;
+  grid-template-columns: 190px 1fr;
+  gap: 14px;
+  align-items: center;
+}
+
+.exposure-expanded-scene {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  border-radius: 16px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: #0a1830;
+}
+
+.exposure-expanded-scene svg.reference-scene {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* Compare Models Readable Day-by-Day Table */
+.compare-table-wrap {
+  width: 100%;
+  overflow-x: auto;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(6, 16, 34, 0.52);
+}
+
+.compare-days-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.compare-days-table th,
+.compare-days-table td {
+  padding: 8px 7px;
+  text-align: center;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  white-space: nowrap;
+}
+
+.compare-days-table th:first-child,
+.compare-days-table td:first-child {
+  text-align: left;
+  padding-left: 11px;
+  font-weight: 700;
+}
+
+.compare-days-table thead th {
+  font-size: 11px;
+  color: var(--muted);
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.compare-days-table .col-wn {
+  background: rgba(56, 189, 248, 0.12);
+  color: #ffffff;
+  font-weight: 900;
+  font-size: 14px;
+}
+
+.compare-days-table tr.active-day-row {
+  background: rgba(56, 189, 248, 0.16);
+}
+
+@media (max-width: 820px) {
+  .exposure-teaser-stack {
+    grid-template-columns: 1fr;
+  }
+  .exposure-expanded-body {
+    grid-template-columns: 140px 1fr;
+  }
+}
+
+@media (max-width: 520px) {
+  .exposure-expanded-body {
+    grid-template-columns: 1fr;
+  }
+  .exposure-expanded-scene {
+    max-width: 210px;
+    margin: 0 auto;
+  }
+  .perfect-tracker-bar {
+    flex-direction: column;
+    align-items: flex-start;
   }
 }

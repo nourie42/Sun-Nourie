@@ -7,7 +7,9 @@
   <title>Weather Nourie · V3</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
   <link rel="stylesheet" href="/weather-fusion/car-wash.css?v=center-answer-v43" />
-  <link rel="stylesheet" href="/weather-fusion/v3/css/styles.css?v=v3-allages-4" />
+  <link rel="stylesheet" href="/weather-fusion/risk-outlooks.css?v=risk-outlooks-v5" />
+  <link rel="stylesheet" href="/weather-fusion/forecast-window-banners.css?v=current-rain-20261017-v3" />
+  <link rel="stylesheet" href="/weather-fusion/v3/css/styles.css?v=v3-accuracy-2" />
 </head>
 <body data-sky="day">
   <!-- Living Sky Atmosphere & Subtle Particle Canvas -->
@@ -119,8 +121,12 @@
     <!-- Large Weather Change Alert Banner (Matches Main Page) -->
     <div id="weather-change-banner" class="weather-change-card" hidden></div>
 
-    <!-- Upcoming Rain / Sun / Storm Outlook Alert Badges (Clickable Pills Like Main Page) -->
+    <!-- Official Weather Hazards (Flooding Rain / Severe Storms / Winter Risks from Main Site) -->
+    <div id="weather-hazards-strip" class="hazards-strip-grid" hidden></div>
+
+    <!-- Upcoming Rain / Perfect Weather Tracker Banners (Main Site Sync) -->
     <div id="forecast-window-banners" class="window-banners-grid"></div>
+    <div id="perfect-tracker-bar" class="perfect-tracker-bar"></div>
 
     <!-- 4-Column Quick Stats Glass Strip (Rain | Precip | AQI Clickable | Weather Meter Clickable) -->
     <section id="quick-stats-strip" class="glass quick-stats-strip" aria-label="Quick Weather Summary">
@@ -191,6 +197,23 @@
       <div id="seven-day-dual-stage"></div>
     </section>
 
+    <!-- Interactive Time Selector for How It Feels, What to Wear & Outdoor Cartoon Cards -->
+    <section id="feels-time-section" class="glass section-panel card-compact" aria-label="Choose time to preview how it feels and what to wear">
+      <div class="feels-time-head">
+        <div>
+          <h2 class="card-title-clean" style="font-size:16.5px;">👕 How It Feels &amp; What to Wear</h2>
+          <div id="feels-selected-time-label" class="section-subtitle" style="margin-top:2px;">Showing right now</div>
+        </div>
+        <span id="feels-selected-temp-pill" class="wfo-pill">Now · --°</span>
+      </div>
+      <div id="feels-quick-pills" class="pill-scroll-row" style="margin:8px 0 6px;"></div>
+      <div class="feels-slider-row">
+        <span class="feels-slider-edge">Now</span>
+        <input id="feels-hour-slider" type="range" min="0" max="47" value="0" aria-label="Preview how it feels at another hour" />
+        <span class="feels-slider-edge">+47h</span>
+      </div>
+    </section>
+
     <!-- 3-Column Comfort & Conditions Trio -->
     <section id="comfort-trio-section" class="comfort-trio-grid" aria-label="How It Feels, Dew Point, and Wind">
       <button id="how-feels-card-btn" class="glass trio-card trio-feels-card trio-clickable" type="button" aria-label="Tap for What to Wear suggestions">
@@ -225,14 +248,16 @@
       </article>
     </section>
 
-    <!-- Nourie Weather Take Full Plain-English Card -->
+    <!-- Nourie Weather Take Full Plain-English Card (Translates NWS Forecast Discussion into Layman's Terms + Hazards) -->
     <section id="nourie-weather-take" class="glass section-panel card-compact">
       <div class="card-kicker-row" style="margin-bottom:6px;">
         <span class="take-badge-title"><span class="take-green-dot"></span> Nourie Weather Take</span>
-        <span id="risk-outlook-pill" class="wfo-pill">Quiet Weather</span>
+        <button id="risk-outlook-pill" class="wfo-pill risk-pill-btn" type="button">Checking Outlooks…</button>
       </div>
+      <div id="take-hazards-badges" class="take-hazards-row" hidden></div>
       <h2 id="take-headline" class="card-title-clean" style="font-size:17px;margin-bottom:5px;">Checking local forecast…</h2>
-      <p id="take-summary" class="section-subtitle" style="font-size:13.5px;line-height:1.5;margin-bottom:10px;"></p>
+      <p id="take-summary" class="section-subtitle" style="font-size:13.5px;line-height:1.5;margin-bottom:8px;"></p>
+      <div id="take-layman-discussion" class="take-layman-box" hidden></div>
       <ul id="take-bullets" class="take-plain-list"></ul>
     </section>
 
@@ -251,13 +276,13 @@
       </div>
     </button>
 
-    <!-- Outside Right Now (Uncropped 1:1 Main-Page Cartoon Illustrations: Shade, Sun, For Pets) -->
+    <!-- Outside Right Now (Compact Car-Wash-Style Clickable Cartoon Tiles That Expand on Click) -->
     <section id="skin-exposure">
       <div class="section-inline-head">
         <h2 class="card-title-clean">Outside Right Now</h2>
-        <span class="subtle-note">How it feels in shade, sun &amp; for pets</span>
+        <span id="exposure-time-note" class="subtle-note">Tap Shade, Sun, or Pets to expand</span>
       </div>
-      <div id="exposure-cards-grid" class="exposure-grid"></div>
+      <div id="exposure-cards-grid" class="exposure-teaser-stack"></div>
     </section>
 
     <!-- Conditions & Details (8 Interactive Apple/Samsung Tiles) -->
@@ -423,6 +448,6 @@
   </footer>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
-  <script type="module" src="/weather-fusion/v3/js/app.js?v=v3-allages-4"></script>
+  <script type="module" src="/weather-fusion/v3/js/app.js?v=v3-accuracy-2"></script>
 </body>
 </html>

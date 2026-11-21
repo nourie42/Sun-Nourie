@@ -498,15 +498,23 @@ async function fetchNwsIntelligence(lat, lon) {
 }
 
 /**
- * Generates a realistic, deterministic multi-model forecast dataset immediately
- * (and also transforms live Open-Meteo + NWS payloads into the unified Weather Nourie Fusion schema).
+ * Fetches live Weather Nourie canonical backend forecast + multi-model comparison series
+ * so V3 matches the main page's exact temperatures, rain chances, hazards, and discussions.
  */
 export async function fetchCompleteFusionForecast(locationInput, { forceRefresh = false } = {}) {
-  const loc = locationInput || PRESET_CITIES[0];
-  const lat = Number(loc.latitude ?? 37.7749);
-  const lon = Number(loc.longitude ?? -122.4194);
+  const loc = locationInput || PRESET_CITIES[1] || PRESET_CITIES[0];
+  const lat = Number(loc.latitude ?? 35.7877);
+  const lon = Number(loc.longitude ?? -78.4806);
 
-  // Fetch Open-Meteo Multi-Model + Air Quality + NWS in parallel
+  // Fetch canonical main-site backend forecast first (exact NDFD/HRRR/NBM/ECMWF/GEFS/WeatherNext blend + WPC/SPC hazards + NWS AFD)
+  const canonicalPromise = fetch(
+    `/api/weather-fusion/forecast?latitude=${encodeURIComponent(lat)}&longitude=${encodeURIComponent(lon)}${forceRefresh ? `&_t=${Date.now()}` : ''}`,
+    { cache: 'no-store', headers: { Accept: 'application/json' } }
+  )
+    .then((r) => (r.ok ? r.json() : null))
+    .catch(() => null);
+
+  // Fetch supplementary 10-day hourly variables & explicit multi-model series using UTC unixtime
   const hourlyVars = [
     'temperature_2m',
     'relative_humidity_2m',
@@ -528,166 +536,334 @@ export async function fetchCompleteFusionForecast(locationInput, { forceRefresh 
     'is_day'
   ].join(',');
 
-  const openMeteoBaseUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&hourly=${hourlyVars}&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,uv_index_max,precipitation_sum,snowfall_sum,precipitation_probability_max,wind_speed_10m_max,wind_gusts_10m_max&temperature_unit=fahrenheit&wind_speed_unit=mph&precipitation_unit=inch&timezone=auto&forecast_days=10`;
+  const openMeteoBaseUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&hourly=${hourlyVars}&daily=weather_code,temperature_2m_max,temperature_2m_min,sunrise,sunset,uv_index_max,precipitation_sum,snowfall_sum,precipitation_probability_max,wind_speed_10m_max,wind_gusts_10m_max&temperature_unit=fahrenheit&wind_speed_unit=mph&precipitation_unit=inch&timezone=auto&timeformat=unixtime&forecast_days=10`;
+  const multiModelUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&hourly=temperature_2m,precipitation,wind_speed_10m,dew_point_2m,cloud_cover&models=best_match,ecmwf_ifs025,gfs_seamless,icon_seamless&temperature_unit=fahrenheit&wind_speed_unit=mph&precipitation_unit=inch&timezone=auto&timeformat=unixtime&forecast_days=10`;
+  const aqiUrl = `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat}&longitude=${lon}&current=us_aqi,pm10,pm2_5,carbon_monoxide,nitrogen_dioxide,sulphur_dioxide,ozone&hourly=us_aqi,pm2_5,pm10,ozone,nitrogen_dioxide&timezone=auto&timeformat=unixtime&forecast_days=5`;
 
-  // Also fetch explicit ECMWF & GFS/HRRR model comparison series from Open-Meteo
-  const multiModelUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&hourly=temperature_2m,precipitation,wind_speed_10m,dew_point_2m,cloud_cover&models=best_match,ecmwf_ifs025,gfs_seamless,icon_seamless&temperature_unit=fahrenheit&wind_speed_unit=mph&precipitation_unit=inch&timezone=auto&forecast_days=10`;
-
-  const aqiUrl = `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat}&longitude=${lon}&current=us_aqi,pm10,pm2_5,carbon_monoxide,nitrogen_dioxide,sulphur_dioxide,ozone&hourly=us_aqi,pm2_5,pm10,ozone,nitrogen_dioxide&timezone=auto&forecast_days=5`;
-
+  let canonicalData = null;
   let baseData = null;
   let multiModelData = null;
   let aqiData = null;
-  let nwsData = { wfo: loc.wfo || 'MTR', alerts: [], afdText: null, nwsHourlyMap: new Map(), available: false };
+  let nwsData = { wfo: loc.wfo || 'RAH', alerts: [], afdText: null, nwsHourlyMap: new Map(), available: false };
 
   try {
-    const [baseRes, mmRes, aqiRes, nws] = await Promise.all([
+    const [canonRes, baseRes, mmRes, aqiRes] = await Promise.all([
+      canonicalPromise,
       fetch(openMeteoBaseUrl).then((r) => (r.ok ? r.json() : null)).catch(() => null),
       fetch(multiModelUrl).then((r) => (r.ok ? r.json() : null)).catch(() => null),
-      fetch(aqiUrl).then((r) => (r.ok ? r.json() : null)).catch(() => null),
-      fetchNwsIntelligence(lat, lon)
+      fetch(aqiUrl).then((r) => (r.ok ? r.json() : null)).catch(() => null)
     ]);
+    canonicalData = canonRes;
     baseData = baseRes;
     multiModelData = mmRes;
     aqiData = aqiRes;
-    if (nws) nwsData = nws;
+
+    // Only hit direct NWS browser endpoints if the main backend forecast is unavailable (e.g. non-US city or offline dev)
+    if (!canonicalData) {
+      const nws = await fetchNwsIntelligence(lat, lon);
+      if (nws) nwsData = nws;
+    } else {
+      nwsData = {
+        wfo: canonicalData.location?.office || loc.wfo || 'NWS',
+        alerts: canonicalData.alerts || [],
+        afdText: canonicalData.discussion?.text || null,
+        afdIssuedAt: canonicalData.discussion?.issuanceTime || null,
+        nwsHourlyMap: new Map(),
+        available: true
+      };
+    }
   } catch {
     // Will synthesize seamlessly below if offline
   }
 
-  return buildUnifiedFusionPayload(loc, baseData, multiModelData, aqiData, nwsData);
+  return buildUnifiedFusionPayload(loc, baseData, multiModelData, aqiData, nwsData, canonicalData);
+}
+
+function toZonedDayKey(dt, timeZone) {
+  try {
+    return new Intl.DateTimeFormat('en-CA', {
+      timeZone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    }).format(dt);
+  } catch {
+    return dt.toISOString().slice(0, 10);
+  }
+}
+
+function toZonedHour(dt, timeZone) {
+  try {
+    const val = Number(
+      new Intl.DateTimeFormat('en-US', {
+        timeZone,
+        hour: 'numeric',
+        hourCycle: 'h23'
+      }).format(dt)
+    );
+    return Number.isFinite(val) ? val % 24 : dt.getHours();
+  } catch {
+    return dt.getHours();
+  }
+}
+
+function parseWindSpeedValue(windStr) {
+  if (typeof windStr === 'number' && Number.isFinite(windStr)) return windStr;
+  if (typeof windStr !== 'string') return null;
+  const nums = windStr.match(/\d+(?:\.\d+)?/g);
+  return nums && nums.length ? Number(nums[nums.length - 1]) : null;
+}
+
+function cardinalToDeg(cardinal) {
+  const dirs = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
+  const idx = dirs.indexOf(String(cardinal || '').toUpperCase().trim());
+  return idx >= 0 ? idx * 22.5 : null;
 }
 
 /**
- * Constructs the full Weather Nourie Experimental Fusion data structure
- * from live API responses (or high-precision synthetic data when offline).
+ * Constructs the full Weather Nourie Fusion data structure
+ * prioritizing canonical backend data from /api/weather-fusion/forecast.
  */
-export function buildUnifiedFusionPayload(loc, baseData, multiModelData, aqiData, nwsData) {
-  const lat = Number(loc.latitude ?? 37.7749);
-  const lon = Number(loc.longitude ?? -122.4194);
+export function buildUnifiedFusionPayload(loc, baseData, multiModelData, aqiData, nwsData, canonicalData = null) {
+  const lat = Number(loc.latitude ?? canonicalData?.location?.latitude ?? 35.7877);
+  const lon = Number(loc.longitude ?? canonicalData?.location?.longitude ?? -78.4806);
   const now = new Date();
-  const isLiveApi = Boolean(baseData?.hourly?.time?.length);
+  const timeZone = canonicalData?.location?.timeZone || baseData?.timezone || loc.timezone || 'America/New_York';
+  const resolvedLocName =
+    (loc.id === 'gps' || !loc.name || loc.name === 'Current Location' || loc.source?.startsWith('device')) && canonicalData?.location?.name
+      ? canonicalData.location.name
+      : (loc.name || canonicalData?.location?.name || 'Current Location');
 
-  const times = baseData?.hourly?.time || generateHourlyIsoStrings(now, 240);
-  // Find index corresponding to current hour
-  const currentIsoPrefix = new Date(now.getTime() - now.getTimezoneOffset() * 60000)
-    .toISOString()
-    .slice(0, 13);
-  let startIdx = times.findIndex((t) => t.slice(0, 13) >= currentIsoPrefix);
-  if (startIdx < 0) startIdx = 0;
+  const isLiveApi = Boolean(canonicalData?.hours?.length || baseData?.hourly?.time?.length);
 
-  const totalHoursToProcess = Math.min(240, times.length - startIdx);
+  // Lookup maps from canonical backend payload
+  const canonHours = new Map();
+  (canonicalData?.hours || []).forEach((h) => {
+    const ep = Date.parse(h.time);
+    if (Number.isFinite(ep)) canonHours.set(Math.floor(ep / 3600000) * 3600000, h);
+  });
+  const canonRain = new Map();
+  (canonicalData?.rainTimeline || []).forEach((r) => {
+    const ep = Date.parse(r.time);
+    if (Number.isFinite(ep)) canonRain.set(Math.floor(ep / 3600000) * 3600000, r);
+  });
+  const canonSeries = {};
+  for (const [k, arr] of Object.entries(canonicalData?.metricForecasts?.series || {})) {
+    const m = new Map();
+    if (Array.isArray(arr)) {
+      arr.forEach((pt) => {
+        const ep = Date.parse(pt.time);
+        if (Number.isFinite(ep)) m.set(Math.floor(ep / 3600000) * 3600000, pt);
+      });
+    }
+    canonSeries[k] = m;
+  }
+
+  // Also index Open-Meteo baseData & multiModelData by hour epoch for 100% alignment
+  const baseIdxByEpoch = new Map();
+  (baseData?.hourly?.time || []).forEach((t, idx) => {
+    const ep = typeof t === 'number' ? t * 1000 : Date.parse(t);
+    if (Number.isFinite(ep)) baseIdxByEpoch.set(Math.floor(ep / 3600000) * 3600000, idx);
+  });
+  const mmIdxByEpoch = new Map();
+  (multiModelData?.hourly?.time || []).forEach((t, idx) => {
+    const ep = typeof t === 'number' ? t * 1000 : Date.parse(t);
+    if (Number.isFinite(ep)) mmIdxByEpoch.set(Math.floor(ep / 3600000) * 3600000, idx);
+  });
+
+  const currentHourEpoch = Math.floor(now.getTime() / 3600000) * 3600000;
+  const startEpoch = canonHours.size
+    ? Math.min(currentHourEpoch, ...canonHours.keys())
+    : currentHourEpoch;
+
   const hours = [];
-
-  // Deterministic seed bias per city if offline
   const seedBaseTemp = lat < 30 ? 78 : lat > 45 ? 51 : lat > 39 && lon < -100 ? 44 : 58;
 
-  for (let i = 0; i < totalHoursToProcess; i++) {
-    const idx = startIdx + i;
-    const isoTime = times[idx];
-    const dt = new Date(isoTime);
-    const hourOfDay = dt.getHours();
-    const isDay = baseData?.hourly?.is_day?.[idx] !== undefined
-      ? Boolean(baseData.hourly.is_day[idx])
-      : hourOfDay >= 6 && hourOfDay <= 18;
+  for (let i = 0; i < 240; i++) {
+    const hourEpoch = startEpoch + i * 3600000;
+    const dt = new Date(hourEpoch);
+    const isoTime = dt.toISOString();
+    const hourOfDay = toZonedHour(dt, timeZone);
+    const bIdx = baseIdxByEpoch.get(hourEpoch);
+    const mmIdx = mmIdxByEpoch.get(hourEpoch);
+    const ch = canonHours.get(hourEpoch);
+    const cr = canonRain.get(hourEpoch);
+    const csTemp = canonSeries.temperature?.get(hourEpoch);
+    const csFeels = canonSeries.feels?.get(hourEpoch);
+    const csShade = canonSeries.feelsShade?.get(hourEpoch);
+    const csSun = canonSeries.feelsSun?.get(hourEpoch);
+    const csDp = canonSeries.dewpoint?.get(hourEpoch);
+    const csWind = canonSeries.wind?.get(hourEpoch);
+    const csGust = canonSeries.gust?.get(hourEpoch);
+    const csHum = canonSeries.humidity?.get(hourEpoch);
+    const csPop = canonSeries.pop?.get(hourEpoch);
+    const csQpf = canonSeries.precipitation?.get(hourEpoch);
+    const csVis = canonSeries.visibility?.get(hourEpoch);
+    const csPres = canonSeries.pressure?.get(hourEpoch);
+    const csCloud = canonSeries.cloud?.get(hourEpoch);
 
-    // Extract base hourly metrics
+    const isDay =
+      typeof ch?.isDay === 'boolean'
+        ? ch.isDay
+        : typeof csFeels?.daylight === 'boolean'
+        ? csFeels.daylight
+        : bIdx !== undefined && baseData?.hourly?.is_day?.[bIdx] !== undefined
+        ? Boolean(baseData.hourly.is_day[bIdx])
+        : hourOfDay >= 6 && hourOfDay <= 18;
+
     const diurnalWave = Math.sin(((hourOfDay - 9) / 24) * 2 * Math.PI) * 7.5;
     const synopticWave = Math.sin((i / 36) * Math.PI) * 4.2;
-    const rawBaseTemp = baseData?.hourly?.temperature_2m?.[idx] ?? (seedBaseTemp + diurnalWave + synopticWave);
-    const rh = Math.round(baseData?.hourly?.relative_humidity_2m?.[idx] ?? clamp(68 - diurnalWave * 1.8, 28, 96));
-    const dewPointF = Math.round(baseData?.hourly?.dew_point_2m?.[idx] ?? calcDewPointF(rawBaseTemp, rh));
-    const windMph = Math.round(baseData?.hourly?.wind_speed_10m?.[idx] ?? clamp(7 + Math.sin(i * 0.3) * 5, 2, 24));
-    const windGustMph = Math.round(baseData?.hourly?.wind_gusts_10m?.[idx] ?? Math.round(windMph * 1.45 + 3));
-    const windDirDeg = Math.round(baseData?.hourly?.wind_direction_10m?.[idx] ?? ((240 + i * 7) % 360));
-    const cloudCover = Math.round(baseData?.hourly?.cloud_cover?.[idx] ?? clamp(45 + Math.cos(i * 0.22) * 40, 5, 100));
-    const pressureHpa = Number((baseData?.hourly?.surface_pressure?.[idx] ?? (1016.4 + Math.sin(i * 0.15) * 6)).toFixed(1));
-    const pressureInHg = Number((pressureHpa * 0.02953).toFixed(2));
+    const rawBaseTemp =
+      csTemp?.value ??
+      ch?.temperature ??
+      (bIdx !== undefined ? baseData?.hourly?.temperature_2m?.[bIdx] : undefined) ??
+      (seedBaseTemp + diurnalWave + synopticWave);
+
+    const rh = Math.round(
+      csHum?.value ??
+      ch?.humidity ??
+      (bIdx !== undefined ? baseData?.hourly?.relative_humidity_2m?.[bIdx] : undefined) ??
+      clamp(68 - diurnalWave * 1.8, 28, 96)
+    );
+    const dewPointF = Math.round(
+      csDp?.value ??
+      ch?.dewpoint ??
+      (bIdx !== undefined ? baseData?.hourly?.dew_point_2m?.[bIdx] : undefined) ??
+      calcDewPointF(rawBaseTemp, rh)
+    );
+    const windMph = Math.round(
+      csWind?.value ??
+      ch?.windMph ??
+      parseWindSpeedValue(ch?.wind) ??
+      (bIdx !== undefined ? baseData?.hourly?.wind_speed_10m?.[bIdx] : undefined) ??
+      clamp(7 + Math.sin(i * 0.3) * 5, 2, 24)
+    );
+    const windGustMph = Math.round(
+      csGust?.value ??
+      ch?.gust ??
+      (bIdx !== undefined ? baseData?.hourly?.wind_gusts_10m?.[bIdx] : undefined) ??
+      Math.round(windMph * 1.45 + 3)
+    );
+    const windDirDeg = Math.round(
+      ch?.windDirectionDegrees ??
+      cardinalToDeg(ch?.windDirection) ??
+      (bIdx !== undefined ? baseData?.hourly?.wind_direction_10m?.[bIdx] : undefined) ??
+      ((240 + i * 7) % 360)
+    );
+    const cloudCover = Math.round(
+      csCloud?.value ??
+      ch?.skyCover ??
+      csFeels?.inputs?.skyCover ??
+      (bIdx !== undefined ? baseData?.hourly?.cloud_cover?.[bIdx] : undefined) ??
+      clamp(45 + Math.cos(i * 0.22) * 40, 5, 100)
+    );
+    const pressureInHgRaw =
+      csPres?.value ??
+      (bIdx !== undefined && baseData?.hourly?.surface_pressure?.[bIdx] != null
+        ? baseData.hourly.surface_pressure[bIdx] * 0.02953
+        : undefined) ??
+      Number(((1016.4 + Math.sin(i * 0.15) * 6) * 0.02953).toFixed(2));
+    const pressureInHg = Number(Number(pressureInHgRaw).toFixed(2));
+    const pressureHpa = Number((pressureInHg / 0.02953).toFixed(1));
     const visibilityMi = Number(
-      clamp((baseData?.hourly?.visibility?.[idx] ?? 16093) / 1609.34, 0.5, 10).toFixed(1)
+      clamp(
+        csVis?.value ??
+        (bIdx !== undefined && baseData?.hourly?.visibility?.[bIdx] != null
+          ? baseData.hourly.visibility[bIdx] / 1609.34
+          : 10),
+        0.5,
+        10
+      ).toFixed(1)
     );
     const uvIndex = isDay
       ? Number(
           (
-            baseData?.hourly?.uv_index?.[idx] ??
+            (bIdx !== undefined ? baseData?.hourly?.uv_index?.[bIdx] : undefined) ??
             Math.max(0, Math.sin(((hourOfDay - 6) / 12) * Math.PI) * (1 - cloudCover * 0.0065) * 6.5)
           ).toFixed(1)
         )
       : 0;
-    const solarWm2 = baseData?.hourly?.shortwave_radiation?.[idx] ?? null;
-    const wmoCode = baseData?.hourly?.weather_code?.[idx] ?? (cloudCover > 75 ? 3 : cloudCover > 35 ? 2 : 0);
+    const solarWm2 =
+      csFeels?.inputs?.solarRadiation ??
+      (bIdx !== undefined ? baseData?.hourly?.shortwave_radiation?.[bIdx] : null) ??
+      null;
+    const wmoCode =
+      (bIdx !== undefined ? baseData?.hourly?.weather_code?.[bIdx] : undefined) ??
+      (cloudCover > 75 ? 3 : cloudCover > 35 ? 2 : 0);
 
-    // Individual Model Temperatures for Blend V2
-    const nwsHourMatch = nwsData?.nwsHourlyMap?.get(isoTime.slice(0, 13));
-    const nbmTemp = multiModelData?.hourly?.temperature_2m_gfs_seamless?.[idx] ??
-      multiModelData?.hourly?.temperature_2m_best_match?.[idx] ??
-      rawBaseTemp;
-    const ecmwfTemp = multiModelData?.hourly?.temperature_2m_ecmwf_ifs025?.[idx] ??
-      (rawBaseTemp + Math.sin(i * 0.19 + 1.1) * 2.1);
-    const gefsTemp = multiModelData?.hourly?.temperature_2m_icon_seamless?.[idx] ??
-      (rawBaseTemp - Math.cos(i * 0.14) * 1.7);
-    const nwsTemp = nwsHourMatch?.tempF ?? (nbmTemp * 0.65 + ecmwfTemp * 0.35 + Math.sin(i * 0.25) * 0.9);
-    const hrrrTemp = i < 48
-      ? (rawBaseTemp + Math.cos(i * 0.31) * 1.4)
-      : null;
-    const wnTemp = (ecmwfTemp * 0.55 + nbmTemp * 0.45 + Math.sin(i * 0.12) * 0.8);
+    // Individual Model Temperatures: prefer canonical backend comparisonSources, then Open-Meteo multi-model
+    const canonCompMap = new Map();
+    (ch?.temperatureBlend?.comparisonSources || csTemp?.comparisonSources || ch?.temperatureBlend?.sources || csTemp?.sources || []).forEach((s) => {
+      if (s?.id && typeof s.value === 'number') canonCompMap.set(s.id, s.value);
+    });
+
+    const mmNbm = mmIdx !== undefined ? (multiModelData?.hourly?.temperature_2m_gfs_seamless?.[mmIdx] ?? multiModelData?.hourly?.temperature_2m_best_match?.[mmIdx]) : undefined;
+    const mmEcmwf = mmIdx !== undefined ? multiModelData?.hourly?.temperature_2m_ecmwf_ifs025?.[mmIdx] : undefined;
+    const mmGefs = mmIdx !== undefined ? multiModelData?.hourly?.temperature_2m_icon_seamless?.[mmIdx] : undefined;
+
+    const nbmTemp = canonCompMap.get('nbm') ?? mmNbm ?? rawBaseTemp;
+    const ecmwfTemp = canonCompMap.get('ecmwf') ?? mmEcmwf ?? (rawBaseTemp + Math.sin(i * 0.19 + 1.1) * 2.1);
+    const gefsTemp = canonCompMap.get('gefs') ?? mmGefs ?? (rawBaseTemp - Math.cos(i * 0.14) * 1.7);
+    const nwsTemp = canonCompMap.get('nws') ?? ch?.officialTemperature ?? nwsData?.nwsHourlyMap?.get(isoTime.slice(0, 13))?.tempF ?? (nbmTemp * 0.65 + ecmwfTemp * 0.35 + Math.sin(i * 0.25) * 0.9);
+    const hrrrTemp = canonCompMap.get('hrrr') ?? (i < 48 ? (bIdx !== undefined && baseData?.hourly?.temperature_2m?.[bIdx] != null ? baseData.hourly.temperature_2m[bIdx] : rawBaseTemp + Math.cos(i * 0.31) * 1.4) : null);
+    const wnTemp = canonCompMap.get('wn') ?? canonCompMap.get('weathernext3') ?? (ecmwfTemp * 0.55 + nbmTemp * 0.45 + Math.sin(i * 0.12) * 0.8);
 
     const modelTemps = {
-      nws: Number(nwsTemp.toFixed(1)),
-      hrrr: hrrrTemp !== null ? Number(hrrrTemp.toFixed(1)) : null,
-      nbm: Number(nbmTemp.toFixed(1)),
-      ecmwf: Number(ecmwfTemp.toFixed(1)),
-      gefs: Number(gefsTemp.toFixed(1)),
-      weathernext: Number(wnTemp.toFixed(1))
+      nws: Number(Number(nwsTemp).toFixed(1)),
+      hrrr: hrrrTemp !== null && hrrrTemp !== undefined ? Number(Number(hrrrTemp).toFixed(1)) : null,
+      nbm: Number(Number(nbmTemp).toFixed(1)),
+      ecmwf: Number(Number(ecmwfTemp).toFixed(1)),
+      gefs: Number(Number(gefsTemp).toFixed(1)),
+      weathernext: Number(Number(wnTemp).toFixed(1))
     };
 
     const tempFusion = blendTemperatureHour(modelTemps, i);
+    const canonicalTempF = ch?.temperature ?? csTemp?.value;
+    if (typeof canonicalTempF === 'number' && Number.isFinite(canonicalTempF)) {
+      tempFusion.blendedF = Math.round(canonicalTempF);
+      tempFusion.rawBlendedF = Number(canonicalTempF.toFixed(2));
+    }
 
-    // Individual Model QPF & PoP for 100-Point Rain Chance Scoring Ledger
-    const basePop = baseData?.hourly?.precipitation_probability?.[idx] ?? (cloudCover > 82 ? 65 : cloudCover > 65 ? 25 : 5);
-    const baseQpf = baseData?.hourly?.precipitation?.[idx] ?? (basePop >= 60 ? 0.045 : basePop >= 35 ? 0.008 : 0);
-    const nwsPop = clamp(nwsHourMatch?.pop ?? basePop, 0, 100);
+    // Rain Chance & QPF: use exact canonical rainLikelihood & precipitation when available
+    const basePop = (bIdx !== undefined ? baseData?.hourly?.precipitation_probability?.[bIdx] : undefined) ?? (cloudCover > 82 ? 65 : cloudCover > 65 ? 25 : 5);
+    const baseQpf = (bIdx !== undefined ? baseData?.hourly?.precipitation?.[bIdx] : undefined) ?? (basePop >= 60 ? 0.045 : basePop >= 35 ? 0.008 : 0);
+    const canonRl = cr?.rainLikelihood || ch?.rainLikelihood;
+    const canonAmt = cr?.precipitationBlend?.sourceValues || ch?.precipitationBlend?.sourceValues || {};
+    const nwsPop = clamp(ch?.officialPop ?? cr?.officialPop ?? basePop, 0, 100);
 
-    const nbmQpf = Math.max(0, multiModelData?.hourly?.precipitation_gfs_seamless?.[idx] ?? baseQpf);
-    const ecmwfQpf = Math.max(
-      0,
-      multiModelData?.hourly?.precipitation_ecmwf_ifs025?.[idx] ??
-        (baseQpf > 0 ? baseQpf * (0.85 + 0.3 * Math.sin(i * 0.4)) : basePop > 50 ? 0.014 : 0)
-    );
-    const gefsQpf = Math.max(
-      0,
-      multiModelData?.hourly?.precipitation_icon_seamless?.[idx] ??
-        (baseQpf * 0.9)
-    );
-    const hrrrQpf = i < 48
-      ? Math.max(0, baseQpf * (0.9 + 0.35 * Math.cos(i * 0.5)))
-      : 0;
-    const wnQpf = Math.max(0, (ecmwfQpf * 0.6 + nbmQpf * 0.4));
+    const nbmQpf = Math.max(0, canonAmt.nbm ?? (mmIdx !== undefined ? multiModelData?.hourly?.precipitation_gfs_seamless?.[mmIdx] : undefined) ?? baseQpf);
+    const ecmwfQpf = Math.max(0, canonAmt.ecmwf ?? (mmIdx !== undefined ? multiModelData?.hourly?.precipitation_ecmwf_ifs025?.[mmIdx] : undefined) ?? (baseQpf > 0 ? baseQpf * (0.85 + 0.3 * Math.sin(i * 0.4)) : basePop > 50 ? 0.014 : 0));
+    const gefsQpf = Math.max(0, canonAmt.gefs ?? (mmIdx !== undefined ? multiModelData?.hourly?.precipitation_icon_seamless?.[mmIdx] : undefined) ?? (baseQpf * 0.9));
+    const hrrrQpf = i < 48 ? Math.max(0, canonAmt.hrrr ?? baseQpf * (0.9 + 0.35 * Math.cos(i * 0.5))) : 0;
+    const wnQpf = Math.max(0, canonAmt.wn ?? canonAmt.weathernext3 ?? (ecmwfQpf * 0.6 + nbmQpf * 0.4));
 
-    const rainLedger = scoreRainChance100Pt({
-      nwsPop,
-      hrrrQpf,
-      nbmQpf,
-      ecmwfQpf,
-      gefsQpf,
-      wnQpf,
-      leadHours: i
-    });
+    const rainLedger = scoreRainChance100Pt({ nwsPop, hrrrQpf, nbmQpf, ecmwfQpf, gefsQpf, wnQpf, leadHours: i });
+    if (typeof canonRl?.value === 'number' && Number.isFinite(canonRl.value)) {
+      rainLedger.totalPts = Math.round(canonRl.value);
+    } else if (typeof csPop?.value === 'number' && Number.isFinite(csPop.value)) {
+      rainLedger.totalPts = Math.round(csPop.value);
+    } else if (typeof ch?.pop === 'number' && Number.isFinite(ch.pop)) {
+      rainLedger.totalPts = Math.round(ch.pop);
+    }
+    const canonPrecipVal = cr?.precipitation ?? ch?.precipitation ?? csQpf?.value;
+    if (typeof canonPrecipVal === 'number' && Number.isFinite(canonPrecipVal)) {
+      rainLedger.blendedQpfIn = Number(canonPrecipVal.toFixed(3));
+    }
 
     const snowfallIn = Number(
       (
-        baseData?.hourly?.snowfall?.[idx] ??
+        (bIdx !== undefined ? baseData?.hourly?.snowfall?.[bIdx] : undefined) ??
         (tempFusion.blendedF <= 33 && rainLedger.blendedQpfIn > 0 ? rainLedger.blendedQpfIn * 8.5 : 0)
       ).toFixed(2)
     );
 
     const aqiHour = Math.round(
-      aqiData?.hourly?.us_aqi?.[idx] ??
-      aqiData?.current?.us_aqi ??
+      canonicalData?.airQuality?.hours?.find((a) => Math.abs(Date.parse(a.time) - hourEpoch) < 1800000)?.aqi ??
+      canonicalData?.airQuality?.aqi ??
+      (i === 0 ? aqiData?.current?.us_aqi : undefined) ??
       clamp(34 + Math.sin(i * 0.2) * 11, 18, 68)
     );
 
-    // Hybrid UTCI / Steadman / Wind Chill Thermal Comfort
     const comfort = computeThermalComfort({
       tempF: tempFusion.blendedF,
       rh,
@@ -701,25 +877,33 @@ export function buildUnifiedFusionPayload(loc, baseData, multiModelData, aqiData
       time: dt
     });
 
-    const cond = describeWeatherCondition(wmoCode, rainLedger.totalPts, tempFusion.blendedF, isDay, windMph);
+    const feelsLikeF = Number.isFinite(csFeels?.value) ? Math.round(csFeels.value) : Number.isFinite(ch?.feelsLike) ? Math.round(ch.feelsLike) : comfort.activeFeelsF;
+    const shadeFeelsF = Number.isFinite(csFeels?.shadeValue) ? Math.round(csFeels.shadeValue) : Number.isFinite(csShade?.value) ? Math.round(csShade.value) : Number.isFinite(ch?.feelsLikeShade) ? Math.round(ch.feelsLikeShade) : comfort.shadeFeelsF;
+    const sunFeelsF = Number.isFinite(csFeels?.sunValue) ? Math.round(csFeels.sunValue) : Number.isFinite(csSun?.value) ? Math.round(csSun.value) : Number.isFinite(ch?.feelsLikeSun) ? Math.round(ch.feelsLikeSun) : comfort.sunFeelsF;
 
-    // WeatherNext AI P10-P90 ensemble spread around blended temperature
+    const condFallback = describeWeatherCondition(wmoCode, rainLedger.totalPts, tempFusion.blendedF, isDay, windMph);
+    const condLabel = ch?.condition || cr?.condition || condFallback.label;
+    const condIcon = deriveIconFromLabel(condLabel, isDay, rainLedger.totalPts, tempFusion.blendedF) || condFallback.icon;
+    const condSky = deriveSkyFromLabel(condLabel, isDay, rainLedger.totalPts) || condFallback.sky;
+
     const spreadHalf = Math.max(1.2, tempFusion.spreadF * 0.65 + i * 0.025);
 
     hours.push({
       index: i,
       time: isoTime,
       dateObj: dt,
-      hourLabel: formatHourLabel(dt, i === 0),
-      dayKey: isoTime.slice(0, 10),
+      timeZone,
+      hourOfDay,
+      hourLabel: formatHourLabel(dt, i === 0, timeZone),
+      dayKey: toZonedDayKey(dt, timeZone),
       isDay,
       tempF: tempFusion.blendedF,
       rawBlendedF: tempFusion.rawBlendedF,
-      feelsLikeF: comfort.activeFeelsF,
-      shadeFeelsF: comfort.shadeFeelsF,
-      sunFeelsF: comfort.sunFeelsF,
+      feelsLikeF,
+      shadeFeelsF,
+      sunFeelsF,
       rainFeelsF: comfort.rainFeelsF,
-      sunDeltaF: comfort.sunDeltaF,
+      sunDeltaF: Math.round(sunFeelsF - shadeFeelsF),
       shortwaveWm2: comfort.shortwaveWm2,
       wetBulbF: comfort.wetBulbF,
       comfortCategory: comfort.category,
@@ -733,7 +917,7 @@ export function buildUnifiedFusionPayload(loc, baseData, multiModelData, aqiData
       windMph,
       windGustMph,
       windDirDeg,
-      windCardinal: degToCardinal(windDirDeg),
+      windCardinal: ch?.windDirection || degToCardinal(windDirDeg),
       cloudCover,
       pressureHpa,
       pressureInHg,
@@ -741,9 +925,9 @@ export function buildUnifiedFusionPayload(loc, baseData, multiModelData, aqiData
       uvIndex,
       aqi: aqiHour,
       wmoCode,
-      condition: cond.label,
-      icon: cond.icon,
-      skyMood: cond.sky,
+      condition: condLabel,
+      icon: condIcon,
+      skyMood: condSky,
       modelTemps,
       tempFusion,
       ensemble: {
@@ -756,6 +940,32 @@ export function buildUnifiedFusionPayload(loc, baseData, multiModelData, aqiData
     });
   }
 
+  // Sync current hour (hours[0]) with exact canonicalData.current readings/observations
+  if (canonicalData?.current && hours[0]) {
+    const cc = canonicalData.current;
+    if (typeof cc.temperature === 'number' && Number.isFinite(cc.temperature)) hours[0].tempF = Math.round(cc.temperature);
+    if (typeof cc.feelsLike === 'number' && Number.isFinite(cc.feelsLike)) hours[0].feelsLikeF = Math.round(cc.feelsLike);
+    else if (typeof cc.apparent === 'number' && Number.isFinite(cc.apparent)) hours[0].feelsLikeF = Math.round(cc.apparent);
+    if (typeof cc.feelsLikeShade === 'number' && Number.isFinite(cc.feelsLikeShade)) hours[0].shadeFeelsF = Math.round(cc.feelsLikeShade);
+    if (typeof cc.feelsLikeSun === 'number' && Number.isFinite(cc.feelsLikeSun)) hours[0].sunFeelsF = Math.round(cc.feelsLikeSun);
+    hours[0].sunDeltaF = Math.round((hours[0].sunFeelsF ?? hours[0].feelsLikeF) - (hours[0].shadeFeelsF ?? hours[0].feelsLikeF));
+    if (typeof cc.dewpoint === 'number' && Number.isFinite(cc.dewpoint)) hours[0].dewPointF = Math.round(cc.dewpoint);
+    if (typeof cc.humidity === 'number' && Number.isFinite(cc.humidity)) hours[0].humidity = Math.round(cc.humidity);
+    if (typeof cc.wind === 'number' && Number.isFinite(cc.wind)) hours[0].windMph = Math.round(cc.wind);
+    if (typeof cc.gust === 'number' && Number.isFinite(cc.gust)) hours[0].windGustMph = Math.round(cc.gust);
+    if (typeof cc.windDirection === 'number' && Number.isFinite(cc.windDirection)) {
+      hours[0].windDirDeg = Math.round(cc.windDirection);
+      hours[0].windCardinal = degToCardinal(hours[0].windDirDeg);
+    }
+    if (typeof cc.pressure === 'number' && Number.isFinite(cc.pressure)) hours[0].pressureInHg = Number(cc.pressure.toFixed(2));
+    if (typeof cc.visibility === 'number' && Number.isFinite(cc.visibility)) hours[0].visibilityMi = Number(cc.visibility.toFixed(1));
+    if (cc.condition) {
+      hours[0].condition = cc.condition;
+      hours[0].icon = deriveIconFromLabel(cc.condition, hours[0].isDay, hours[0].rainChance, hours[0].tempF) || hours[0].icon;
+      hours[0].skyMood = deriveSkyFromLabel(cc.condition, hours[0].isDay, hours[0].rainChance) || hours[0].skyMood;
+    }
+  }
+
   // Compute 2-layer Pavement Heat Balance across the first 48 hours
   const pavement = computePavementProfile(hours.slice(0, 48), 0, lat, lon);
   pavement.series.forEach((p, idx) => {
@@ -766,32 +976,37 @@ export function buildUnifiedFusionPayload(loc, baseData, multiModelData, aqiData
   });
 
   // Group hours into 10 Daily Summaries with Per-Model Comparisons & Confidence Meters
-  const days = buildDailySummaries(hours, baseData?.daily);
+  const days = buildDailySummaries(hours, baseData?.daily, canonicalData, timeZone);
 
   // Compute Forecast Window Banners (Rain windows, Sunny windows, Perfect outdoor windows)
   const windows = detectForecastWindows(hours.slice(0, 48));
 
   // Compute Air Quality Detail Card
-  const airQuality = buildAirQualityProfile(aqiData, hours);
+  const airQuality = buildAirQualityProfile(aqiData, hours, canonicalData?.airQuality);
 
   // Compute Car Wash & Outdoor Project 5-Day Outlook
   const carWash = buildCarWashOutlook(days.slice(0, 5), hours.slice(0, 120));
 
   // Build "Nourie Weather Take" Narrative Briefing & Bulletins
-  const briefing = buildNourieWeatherTake(loc, hours, days, windows, pavement, nwsData);
+  const briefing = buildNourieWeatherTake(loc, hours, days, windows, pavement, nwsData, canonicalData);
 
   // Build Active Feed Health & Run Timestamps
-  const feeds = buildFeedHealthRegistry(now, isLiveApi, nwsData);
+  const feeds = buildFeedHealthRegistry(now, isLiveApi, nwsData, canonicalData);
 
   return {
     version: 'weather-nourie-fusion-v3',
-    fetchedAt: now.toISOString(),
+    fetchedAt: canonicalData?.assembledAt || now.toISOString(),
     isLiveApi,
+    canonical: canonicalData || null,
+    timeZone,
     location: {
       ...loc,
+      name: resolvedLocName,
       latitude: lat,
       longitude: lon,
-      wfo: nwsData.wfo || loc.wfo || 'NWS'
+      timeZone,
+      office: wfoFromCanonical(canonicalData, nwsData, loc),
+      wfo: wfoFromCanonical(canonicalData, nwsData, loc)
     },
     current: hours[0],
     hours48: hours.slice(0, 48),
@@ -802,40 +1017,96 @@ export function buildUnifiedFusionPayload(loc, baseData, multiModelData, aqiData
     airQuality,
     carWash,
     briefing,
-    alerts: nwsData.alerts || [],
+    riskOutlooks: canonicalData?.riskOutlooks || [],
+    alerts: canonicalData?.alerts?.length ? canonicalData.alerts : (nwsData.alerts || []),
+    discussion: canonicalData?.discussion || null,
     afd: {
-      wfo: nwsData.wfo || loc.wfo || 'MTR',
-      issuedAt: nwsData.afdIssuedAt || now.toISOString(),
+      wfo: wfoFromCanonical(canonicalData, nwsData, loc),
+      issuedAt: canonicalData?.discussion?.issuanceTime || nwsData.afdIssuedAt || now.toISOString(),
       text:
+        canonicalData?.discussion?.text ||
         nwsData.afdText ||
-        generateSyntheticAfd(loc, hours[0], days)
+        generateSyntheticAfd({ ...loc, name: resolvedLocName }, hours[0], days)
     },
     feeds
   };
 }
 
-function buildDailySummaries(hours, dailyApi) {
+function wfoFromCanonical(canonicalData, nwsData, loc) {
+  return canonicalData?.location?.office || nwsData?.wfo || loc?.wfo || 'NWS';
+}
+
+function deriveIconFromLabel(condition, isDay, rainChance = 0, tempF = 60) {
+  const c = String(condition || '').toLowerCase();
+  if (/thunder|t-storm|lightning|storm/.test(c)) return 'storm';
+  if (/snow|sleet|flurr|blizzard|ice|wintry/.test(c) || (rainChance >= 55 && tempF <= 33)) return 'snow';
+  if (/heavy rain|steady rain|showers likely|rain likely/.test(c) || (/rain|shower/.test(c) && rainChance >= 55)) return 'rain';
+  if (/drizzle|chance.*rain|slight chance.*rain|sprinkle|scattered shower/.test(c) || rainChance >= 35) return 'drizzle';
+  if (/fog|mist|haze|smoke/.test(c)) return 'fog';
+  if (/overcast|mostly cloudy|cloudy/.test(c)) return 'cloudy';
+  if (/partly sunny|partly cloudy|mostly sunny|few clouds|scattered clouds/.test(c)) return isDay ? 'partly-day' : 'partly-night';
+  if (/sunny|clear|fair/.test(c)) return isDay ? 'clear-day' : 'clear-night';
+  return null;
+}
+
+function deriveSkyFromLabel(condition, isDay, rainChance = 0) {
+  const c = String(condition || '').toLowerCase();
+  if (/thunder|t-storm|lightning|storm/.test(c)) return 'storm';
+  if (/rain|shower|drizzle|snow|sleet|flurr/.test(c) || rainChance >= 60) return 'rain';
+  return isDay ? 'day' : 'night';
+}
+
+function formatZonedHHMM(rawVal, timeZone, fallback = '06:48') {
+  if (!rawVal) return fallback;
+  let ms = NaN;
+  if (typeof rawVal === 'number' && Number.isFinite(rawVal)) {
+    ms = rawVal < 1e11 ? rawVal * 1000 : rawVal;
+  } else if (typeof rawVal === 'string') {
+    if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(rawVal)) return rawVal.slice(11, 16);
+    ms = Date.parse(rawVal);
+  }
+  if (!Number.isFinite(ms)) return fallback;
+  try {
+    return new Intl.DateTimeFormat('en-GB', {
+      timeZone,
+      hour: '2-digit',
+      minute: '2-digit',
+      hourCycle: 'h23'
+    }).format(new Date(ms));
+  } catch {
+    return fallback;
+  }
+}
+
+function buildDailySummaries(hours, dailyApi, canonicalData = null, timeZone = 'America/New_York') {
   const byDay = new Map();
   hours.forEach((h) => {
     if (!byDay.has(h.dayKey)) byDay.set(h.dayKey, []);
     byDay.get(h.dayKey).push(h);
   });
 
+  const canonDaysByDate = new Map((canonicalData?.days || []).map((d) => [d.date, d]));
+  const solarByDate = new Map((canonicalData?.metricForecasts?.solar || []).map((s) => [s.date, s]));
+
   const days = [];
   let dIdx = 0;
 
   for (const [dayKey, dayHours] of byDay.entries()) {
     if (days.length >= 10) break;
+    const cd = canonDaysByDate.get(dayKey);
     const temps = dayHours.map((h) => h.tempF);
-    const highF = Math.max(...temps);
-    const lowF = Math.min(...temps);
+    const highF = typeof cd?.high === 'number' && Number.isFinite(cd.high) ? Math.round(cd.high) : Math.max(...temps);
+    const lowF = typeof cd?.low === 'number' && Number.isFinite(cd.low) ? Math.round(cd.low) : Math.min(...temps);
     const peakHour = dayHours.reduce((best, h) => (h.tempF > best.tempF ? h : best), dayHours[0]);
     const wettestHour = dayHours.reduce((best, h) => (h.rainChance > best.rainChance ? h : best), dayHours[0]);
 
-    const rainChance = Math.max(...dayHours.map((h) => h.rainChance));
-    const totalQpfIn = Number(
-      dayHours.reduce((sum, h) => sum + (h.precipIn || 0), 0).toFixed(2)
-    );
+    const canonPop = cd?.rainLikelihood?.value ?? cd?.pop;
+    const rainChance = typeof canonPop === 'number' && Number.isFinite(canonPop)
+      ? Math.round(canonPop)
+      : Math.max(...dayHours.map((h) => h.rainChance));
+    const totalQpfIn = typeof cd?.qpf === 'number' && Number.isFinite(cd.qpf)
+      ? Number(cd.qpf.toFixed(2))
+      : Number(dayHours.reduce((sum, h) => sum + (h.precipIn || 0), 0).toFixed(2));
     const totalSnowIn = Number(
       dayHours.reduce((sum, h) => sum + (h.snowfallIn || 0), 0).toFixed(1)
     );
@@ -852,7 +1123,7 @@ function buildDailySummaries(hours, dailyApi) {
     const maxUvIndex = Number(Math.max(...dayHours.map((h) => h.uvIndex)).toFixed(1));
     const maxAqi = Math.max(...dayHours.map((h) => h.aqi));
 
-    // Per-model Daily High & Total Precip comparison
+    // Per-model Daily High & Total Precip comparison (prefer canonical guidance when available)
     const modelKeys = ['nws', 'hrrr', 'nbm', 'ecmwf', 'gefs', 'weathernext'];
     const modelHighs = {};
     const modelLows = {};
@@ -867,30 +1138,39 @@ function buildDailySummaries(hours, dailyApi) {
       modelLows[mk] = mTemps.length >= 4 ? Math.round(Math.min(...mTemps)) : null;
 
       if (mk === 'nws') {
-        modelRainChance[mk] = Math.max(...dayHours.map((h) => h.rainLedger.breakdown.nws.pop || 0));
-        modelQpf[mk] = totalQpfIn;
+        if (typeof cd?.official?.high === 'number') modelHighs.nws = Math.round(cd.official.high);
+        if (typeof cd?.official?.low === 'number') modelLows.nws = Math.round(cd.official.low);
+        modelRainChance.nws = cd?.officialPop ?? Math.max(...dayHours.map((h) => h.rainLedger.breakdown.nws.pop || 0));
+        modelQpf.nws = cd?.qpfBlend?.sourceValues?.nws != null ? Number(cd.qpfBlend.sourceValues.nws.toFixed(2)) : totalQpfIn;
       } else {
-        const qSum = dayHours.reduce(
-          (acc, h) => acc + (h.rainLedger.breakdown[mk]?.qpf || 0),
-          0
-        );
-        modelQpf[mk] = (mk === 'hrrr' && dIdx > 2) ? null : Number(qSum.toFixed(2));
-        modelRainChance[mk] = (mk === 'hrrr' && dIdx > 2)
+        const gKey = mk === 'weathernext' ? (cd?.guidance?.wn ? 'wn' : 'weathernext3') : mk;
+        const g = cd?.guidance?.[gKey];
+        if (g) {
+          if (typeof g.high === 'number') modelHighs[mk] = Math.round(g.high);
+          if (typeof g.low === 'number') modelLows[mk] = Math.round(g.low);
+        }
+        const qSum = g && typeof g.qpf === 'number'
+          ? g.qpf
+          : dayHours.reduce((acc, h) => acc + (h.rainLedger.breakdown[mk]?.qpf || 0), 0);
+        modelQpf[mk] = (mk === 'hrrr' && dIdx > 2 && g?.qpf == null) ? null : Number(qSum.toFixed(2));
+        modelRainChance[mk] = (mk === 'hrrr' && dIdx > 2 && g?.qpf == null)
           ? null
           : clamp(Math.round(qSum * 340 + (rainChance * 0.45)), 0, 100);
       }
     });
 
-    // Confidence score from cross-model temperature spread & rain consensus
+    // Confidence score from cross-model temperature spread & canonical rating
     const validHighs = Object.values(modelHighs).filter((v) => typeof v === 'number');
-    const highSpread = validHighs.length > 1 ? Math.max(...validHighs) - Math.min(...validHighs) : 2;
+    const highSpread = cd?.confidence?.temperatureSpread ?? (validHighs.length > 1 ? Math.max(...validHighs) - Math.min(...validHighs) : 2);
     const avgHourSpread =
       dayHours.reduce((s, h) => s + (h.tempFusion.spreadF || 2), 0) / dayHours.length;
-    const rawConfScore = clamp(
-      Math.round(96 - highSpread * 4.8 - avgHourSpread * 2.5 - dIdx * 2.2),
-      35,
-      98
-    );
+    const rawConfScore = cd?.confidence?.key === 'high'
+      ? 86
+      : cd?.confidence?.key === 'moderate'
+      ? 68
+      : cd?.confidence?.key === 'low'
+      ? 45
+      : clamp(Math.round(96 - highSpread * 4.8 - avgHourSpread * 2.5 - dIdx * 2.2), 35, 98);
 
     const confidence =
       rawConfScore >= 76
@@ -899,22 +1179,24 @@ function buildDailySummaries(hours, dailyApi) {
         ? { level: 'Moderate', score: rawConfScore, color: '#ffd166', spreadF: Number(highSpread.toFixed(1)) }
         : { level: 'Low', score: rawConfScore, color: '#ff7b7b', spreadF: Number(highSpread.toFixed(1)) };
 
-    const dt = new Date(`${dayKey}T12:00:00`);
+    const dt = new Date(`${dayKey}T12:00:00Z`);
     const dayName =
       dIdx === 0
         ? 'Today'
         : dIdx === 1
         ? 'Tomorrow'
-        : dt.toLocaleDateString('en-US', { weekday: 'short' });
+        : new Intl.DateTimeFormat('en-US', { timeZone: 'UTC', weekday: 'short' }).format(dt);
     const shortWeekday =
       dIdx === 0
         ? 'Today'
-        : dt.toLocaleDateString('en-US', { weekday: 'short' });
-    const dateLabel = dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        : new Intl.DateTimeFormat('en-US', { timeZone: 'UTC', weekday: 'short' }).format(dt);
+    const dateLabel = new Intl.DateTimeFormat('en-US', { timeZone: 'UTC', month: 'short', day: 'numeric' }).format(dt);
 
-    const middayHour = dayHours.find((h) => h.dateObj.getHours() === 13) || dayHours[Math.floor(dayHours.length / 2)];
-    const displayCond =
-      rainChance >= 55 ? wettestHour : middayHour;
+    const middayHour = dayHours.find((h) => h.hourOfDay === 13) || dayHours[Math.floor(dayHours.length / 2)];
+    const displayCond = rainChance >= 55 ? wettestHour : middayHour;
+    const canonCondLabel = cd?.condition || displayCond.condition;
+    const canonCondIcon = deriveIconFromLabel(canonCondLabel, true, rainChance, highF) || displayCond.icon;
+    const solar = solarByDate.get(dayKey);
 
     days.push({
       index: dIdx,
@@ -938,10 +1220,10 @@ function buildDailySummaries(hours, dailyApi) {
       avgCloudCover,
       maxUvIndex,
       maxAqi,
-      condition: displayCond.condition,
-      icon: displayCond.icon,
-      sunrise: dailyApi?.sunrise?.[dIdx]?.slice(11, 16) || '06:48',
-      sunset: dailyApi?.sunset?.[dIdx]?.slice(11, 16) || '17:12',
+      condition: canonCondLabel,
+      icon: canonCondIcon,
+      sunrise: formatZonedHHMM(solar?.sunrise ?? dailyApi?.sunrise?.[dIdx], timeZone, '06:48'),
+      sunset: formatZonedHHMM(solar?.sunset ?? dailyApi?.sunset?.[dIdx], timeZone, '17:12'),
       confidence,
       modelHighs,
       modelLows,
@@ -1015,9 +1297,9 @@ function detectForecastWindows(hours48) {
   };
 }
 
-function buildAirQualityProfile(aqiData, hours) {
-  const currentAqi = hours[0]?.aqi ?? 36;
-  const peak24h = Math.max(...hours.slice(0, 24).map((h) => h.aqi));
+function buildAirQualityProfile(aqiData, hours, canonicalAqi = null) {
+  const currentAqi = canonicalAqi?.aqi ?? hours[0]?.aqi ?? 36;
+  const peak24h = canonicalAqi?.next24HourPeak ?? Math.max(...hours.slice(0, 24).map((h) => h.aqi));
 
   let category = { label: 'Good', color: '#5ce0a0', bg: 'linear-gradient(135deg, rgba(24, 92, 68, 0.52), rgba(16, 45, 58, 0.65))', advice: 'Air quality is clean and ideal for outdoor activity.' };
   if (currentAqi > 150) {
@@ -1028,22 +1310,26 @@ function buildAirQualityProfile(aqiData, hours) {
     category = { label: 'Moderate', color: '#ffd166', bg: 'linear-gradient(135deg, rgba(112, 92, 26, 0.52), rgba(24, 38, 56, 0.68))', advice: 'Air quality is acceptable; unusually sensitive individuals should monitor symptoms.' };
   }
 
+  const pm25Val = canonicalAqi?.pm25 ?? aqiData?.current?.pm2_5 ?? 7.4;
+  const pm10Val = canonicalAqi?.pm10 ?? aqiData?.current?.pm10 ?? 14.2;
+  const o3Val = canonicalAqi?.ozone ?? aqiData?.current?.ozone ?? 54.0;
+  const no2Val = canonicalAqi?.nitrogenDioxide ?? aqiData?.current?.nitrogen_dioxide ?? 9.8;
+
   return {
     currentAqi,
     peak24h,
     ...category,
     pollutants: [
-      { id: 'pm25', name: 'PM2.5 Fine Particles', value: Number((aqiData?.current?.pm2_5 ?? 7.4).toFixed(1)), unit: 'µg/m³', max: 35 },
-      { id: 'pm10', name: 'PM10 Coarse Dust', value: Number((aqiData?.current?.pm10 ?? 14.2).toFixed(1)), unit: 'µg/m³', max: 150 },
-      { id: 'o3', name: 'Ozone (O₃)', value: Number((aqiData?.current?.ozone ?? 54.0).toFixed(1)), unit: 'µg/m³', max: 140 },
-      { id: 'no2', name: 'Nitrogen Dioxide (NO₂)', value: Number((aqiData?.current?.nitrogen_dioxide ?? 9.8).toFixed(1)), unit: 'µg/m³', max: 100 }
+      { id: 'pm25', name: 'PM2.5 Fine Particles', value: Number(Number(pm25Val).toFixed(1)), unit: 'µg/m³', max: 35 },
+      { id: 'pm10', name: 'PM10 Coarse Dust', value: Number(Number(pm10Val).toFixed(1)), unit: 'µg/m³', max: 150 },
+      { id: 'o3', name: 'Ozone (O₃)', value: Number(Number(o3Val).toFixed(1)), unit: 'µg/m³', max: 140 },
+      { id: 'no2', name: 'Nitrogen Dioxide (NO₂)', value: Number(Number(no2Val).toFixed(1)), unit: 'µg/m³', max: 100 }
     ]
   };
 }
 
 function buildCarWashOutlook(days5, hours120) {
   const dayScores = days5.map((d, idx) => {
-    // Check if rain occurs on this day or the following 24h
     const nextDayRain = days5[idx + 1]?.rainChance ?? 0;
     const penaltyRain = d.rainChance * 0.7 + nextDayRain * 0.45;
     const score = clamp(Math.round(98 - penaltyRain - (d.maxWindMph > 18 ? 12 : 0)), 12, 98);
@@ -1073,10 +1359,16 @@ function buildCarWashOutlook(days5, hours120) {
   };
 }
 
-function buildNourieWeatherTake(loc, hours, days, windows, pavement, nwsData) {
+function buildNourieWeatherTake(loc, hours, days, windows, pavement, nwsData, canonicalData = null) {
   const cur = hours[0];
   const today = days[0];
   const tomorrow = days[1] || today;
+
+  // Check active official WPC/SPC/WSSI risk outlooks from canonical backend FIRST
+  const nowMs = Date.now();
+  const activeRisks = (canonicalData?.riskOutlooks || [])
+    .filter((r) => r && r.id && (!r.expires || Date.parse(r.expires) > nowMs))
+    .sort((a, b) => (b.rank || 0) - (a.rank || 0));
 
   // Compute plain-English large weather change alerts matching the main page rules
   const changeAlerts = [];
@@ -1131,6 +1423,64 @@ function buildNourieWeatherTake(loc, hours, days, windows, pavement, nwsData) {
       ? `Direct sun makes it feel warmer (+${cur.sunDeltaF}° in sun vs shade).`
       : `Feels-like temperatures stay close to ${cur.feelsLikeF}° whether in sun or shade.`;
 
+  let riskOutlook;
+  const activeAlerts = canonicalData?.alerts?.length ? canonicalData.alerts : (nwsData.alerts || []);
+  if (activeRisks.length > 0) {
+    const top = activeRisks[0];
+    const kindLabel = top.kind === 'wpc'
+      ? 'Flooding'
+      : top.kind === 'spc'
+      ? 'Severe Storms'
+      : 'Winter Weather';
+    const agencyLabel = top.kind === 'wpc'
+      ? 'Flood Risk'
+      : top.kind === 'spc'
+      ? 'Storm Risk'
+      : 'Winter Risk';
+    const riskColor =
+      top.level === 'High'
+        ? '#d34cff'
+        : top.level === 'Moderate'
+        ? '#ff6b6b'
+        : top.level === 'Enhanced'
+        ? '#ff9f43'
+        : top.level === 'Slight'
+        ? '#f4e14a'
+        : '#facc15';
+    riskOutlook = {
+      level: `${top.level} Risk of ${kindLabel}`,
+      agency: agencyLabel,
+      title: top.summary || top.title,
+      color: riskColor,
+      riskObj: top,
+      items: activeRisks
+    };
+  } else if (activeAlerts.length > 0) {
+    riskOutlook = {
+      level: activeAlerts[0].event || activeAlerts[0].severity || 'Active Weather Alert',
+      agency: 'Official Alert',
+      title: activeAlerts[0].headline || activeAlerts[0].event,
+      color: '#ff7b7b',
+      items: []
+    };
+  } else if (today.rainChance >= 65 && today.totalQpfIn >= 0.4) {
+    riskOutlook = {
+      level: 'Wet Weather Watch',
+      agency: 'Rain Outlook',
+      title: 'Heavier rain showers could bring wet roads and puddles at times',
+      color: '#ffd166',
+      items: []
+    };
+  } else {
+    riskOutlook = {
+      level: 'Quiet Weather',
+      agency: 'Storm & Flood Outlook',
+      title: 'No flood or severe storm outlooks are active here right now.',
+      color: '#5ce0a0',
+      items: []
+    };
+  }
+
   return {
     headline: `${cur.condition} at ${cur.tempF}° · High ${today.highF}° / Low ${today.lowF}°`,
     summary: `${rainNote} ${consensusNote} ${thermalNote}`,
@@ -1149,44 +1499,25 @@ function buildNourieWeatherTake(loc, hours, days, windows, pavement, nwsData) {
         text: `Sidewalks are around ${pavement.concreteTempF}° and streets ${pavement.asphaltTempF}° — ${pavement.pawSafety.label.toLowerCase()} for dog walks.`
       }
     ],
-    riskOutlook:
-      today.rainChance >= 70 && today.totalQpfIn >= 0.5
-        ? {
-            level: 'Wet Weather Watch',
-            agency: 'Rain Outlook',
-            title: 'Heavier rain showers could bring wet roads and puddles at times',
-            color: '#ffd166'
-          }
-        : nwsData.alerts?.length > 0
-        ? {
-            level: nwsData.alerts[0].severity || 'Active Weather Alert',
-            agency: `Weather Alert`,
-            title: nwsData.alerts[0].headline || nwsData.alerts[0].event,
-            color: '#ff7b7b'
-          }
-        : {
-            level: 'Quiet Weather',
-            agency: 'Storm & Flood Outlook',
-            title: 'No severe storm or flooding hazards expected over the next 3 days.',
-            color: '#5ce0a0'
-          }
+    riskOutlook
   };
 }
 
-function buildFeedHealthRegistry(now, isLiveApi, nwsData) {
+function buildFeedHealthRegistry(now, isLiveApi, nwsData, canonicalData = null) {
   const runTime = new Date(now.getTime() - 45 * 60000).toLocaleTimeString('en-US', {
     hour: 'numeric',
     minute: '2-digit'
   });
+  const wfo = wfoFromCanonical(canonicalData, nwsData, {});
   return [
-    { id: 'nws', name: 'NOAA / NWS Gridpoint', status: nwsData.available ? 'Available' : 'Synthesized', run: `Updated ${runTime}`, active: true },
+    { id: 'nws', name: 'NOAA / NWS Gridpoint', status: nwsData.available || canonicalData ? 'Available' : 'Synthesized', run: `Updated ${runTime}`, active: true },
     { id: 'hrrr', name: 'NOAA HRRR 3km CONUS', status: 'Contributing', run: `Run ${runTime} (0–48h)`, active: true },
     { id: 'nbm', name: 'National Blend (NBM v4.2)', status: 'Contributing', run: `Run ${runTime} (Days 1–10)`, active: true },
     { id: 'ecmwf', name: 'ECMWF IFS 0.25° Open Data', status: 'Contributing', run: `00Z / 12Z Cycle`, active: true },
     { id: 'gefs', name: 'GEFS / ICON Global Ensemble', status: 'Contributing', run: `30-Member Mean`, active: true },
     { id: 'weathernext', name: 'Google WeatherNext AI Ensemble', status: 'Contributing', run: `P10–P90 Probabilistic`, active: true },
     { id: 'aqi', name: 'Open-Meteo / CAMS Air Quality', status: 'Available', run: `Real-time US EPA AQI`, active: true },
-    { id: 'afd', name: `NWS ${nwsData.wfo || 'Local'} Forecast Discussion`, status: nwsData.afdText ? 'Live AFD' : 'Briefing Active', run: `WFO ${nwsData.wfo || 'MTR'}`, active: true }
+    { id: 'afd', name: `NWS ${wfo} Forecast Discussion`, status: canonicalData?.discussion?.text || nwsData.afdText ? 'Live AFD' : 'Briefing Active', run: `WFO ${wfo}`, active: true }
   ];
 }
 
@@ -1207,17 +1538,24 @@ function generateHourlyIsoStrings(startDate, count) {
   const list = [];
   for (let i = 0; i < count; i++) {
     const d = new Date(base.getTime() + i * 3600000);
-    const localIso = new Date(d.getTime() - d.getTimezoneOffset() * 60000)
-      .toISOString()
-      .slice(0, 16);
-    list.push(localIso);
+    list.push(d.toISOString());
   }
   return list;
 }
 
-export function formatHourLabel(dt, isNow = false) {
+export function formatHourLabel(dt, isNow = false, timeZone = undefined) {
   if (isNow) return 'Now';
-  return dt.toLocaleTimeString('en-US', { hour: 'numeric', hour12: true }).replace(' ', '');
+  try {
+    return new Intl.DateTimeFormat('en-US', {
+      ...(timeZone ? { timeZone } : {}),
+      hour: 'numeric',
+      hour12: true
+    })
+      .format(dt)
+      .replace(' ', '');
+  } catch {
+    return dt.toLocaleTimeString('en-US', { hour: 'numeric', hour12: true }).replace(' ', '');
+  }
 }
 
 export function degToCardinal(deg) {
