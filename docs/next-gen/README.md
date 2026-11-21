@@ -4,6 +4,8 @@ A separate, implemented Android-oriented weather interface on `feature/weather-n
 
 ## Open the app
 
+- [Open the deployed Next Gen preview](https://weather-nourie-next-gen.onrender.com/experimental/next-gen/).
+- [Preview Experimental page with its Next Gen entry](https://weather-nourie-next-gen.onrender.com/weather-fusion/experimental-weather.html).
 - Next Gen route: `/experimental/next-gen/`.
 - Entry point: the existing `/weather-fusion/experimental-weather.html` page **on the preview deployment** contains “Weather Nourie Next Gen”.
 - The production and existing Prerelease/Aurora services are not changed. Publishing an entry link on the production hostname requires a later, explicitly approved production change.
@@ -85,13 +87,13 @@ Shade, Sun, Night and Pets remain accessible. Irrelevant or missing exposure val
 - `npm ci --ignore-scripts --no-audit --no-fund`: succeeded.
 - `npm run check`: passed, including the existing weather QA contract.
 - `node --test test/weatherNextGen.test.js`: **14 passed, 0 failed**. Includes both-city numeric parity and forecast immutability, missing sources, monotone-curve extrema, source-range math, night/overcast/snow portraits, unavailable exposures, retained controller IDs/routes and PWA separation.
-- `python scripts/weatherNextGenBrowserSmoke.py`: **50 passed**, with captured real Knightdale and Greenville forecasts and a frozen clock in headless Chromium. See [executed browser proof](browser-proof.json).
-- The walkthrough exercised touch drag, keyboard graph selection, rain axes, variable/horizon switches, daily details, Back, full-screen charts, model toggles/range, Car Wash, Best Times, Feel Meter, AQI, alerts, science, original exposure/hourly panels, legacy daily comparison, winter outlook, map mounting/layers, all exposure modes, search, GPS selection, refresh, real forecast day/night selection, original pages, PWA scope and offline navigation.
+- `python scripts/weatherNextGenBrowserSmoke.py`: **54 passed**, with captured real Knightdale and Greenville forecasts and a frozen clock in headless Chromium. See [executed browser proof](browser-proof.json).
+- The walkthrough exercised touch drag, keyboard graph selection, rain axes, variable/horizon switches, daily details, Back/Forward reconstruction, full-screen charts, model toggles/range, Car Wash, Best Times, Feel Meter, AQI, alerts, science, original exposure/hourly panels, legacy daily comparison, winter outlook, map mounting/layers, all exposure modes, search, GPS selection, refresh, real forecast day/night selection, original pages, PWA scope and offline navigation.
 - No horizontal overflow at 360, 393, 412, 768 and 1280 CSS pixels.
-- No JavaScript page errors in that walkthrough.
+- No JavaScript page errors in that walkthrough. Closed optional tools stop redrawing; source-age and solar-state changes cannot leave a stale current person or temperature on screen.
 - A real local preview-proxy request returned HTTP 200 with the live engine’s 48 hours, 10 forecast days, existing signature and AI-enabled status. This is distinct from fixture testing.
 
-The browser checks use controlled no-radar guidance and a test basemap tile to validate missing-map handling without claiming that an observed NOAA radar image was verified. Live preview checks are recorded separately after deployment. No tests claim to have run on physical Samsung hardware.
+The browser checks use controlled no-radar guidance and a test basemap tile to validate missing-map handling without claiming that an observed NOAA radar image was verified. The [separate live preview verification](live-preview-verification.json) records real API checks for Knightdale and Greenville, real model charts, the actual map and verified radar timestamp, with no broken visible images or JavaScript page errors. Initial preview memory use was about 91 MiB; this is an initial sample, not a long-duration load test. No tests claim to have run on physical Samsung hardware.
 
 ## Reproduce locally
 
@@ -107,6 +109,7 @@ Capture the public API responses as `knightdale-live.json` and `greenville-live.
 ```sh
 node --test test/weatherNextGen.test.js
 python scripts/weatherNextGenBrowserSmoke.py --base http://127.0.0.1:3100 --fixture-dir /path/to/captures --artifacts /tmp/next-gen-proof
+python scripts/weatherNextGenLiveSmoke.py --base https://weather-nourie-next-gen.onrender.com --artifacts /tmp/next-gen-live-proof
 ```
 
 ## Preview deployment
@@ -119,6 +122,8 @@ python scripts/weatherNextGenBrowserSmoke.py --base http://127.0.0.1:3100 --fixt
 - Separate Render web service in the existing Ohio workspace/region; smallest free compute plan. No production service settings are changed.
 
 ## Remaining limits
+
+- At the initial live verification, the optional upstream NAM winter feed was unavailable for both saved locations. The existing source-status view reports this; other available forecasts remain displayed.
 
 - This is a web/PWA implementation; physical Samsung gestures and the OS installation/splash flow still need a real-device acceptance pass.
 - API availability, optional weather feeds and third-party map availability remain those of the existing services; missing data is displayed honestly.

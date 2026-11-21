@@ -70,6 +70,10 @@
       "passed": true
     },
     {
+      "name": "Forward reconstructs the original selected day detail",
+      "passed": true
+    },
+    {
       "name": "model comparison discovers available current model traces",
       "passed": true,
       "detail": [
@@ -96,6 +100,10 @@
       "passed": true
     },
     {
+      "name": "Forward reconstructs the full-screen graph with its current data",
+      "passed": true
+    },
+    {
       "name": "AI benchmarks, original Experimental and other original apps remain linked",
       "passed": true,
       "detail": [
@@ -106,6 +114,30 @@
         {
           "label": "Existing Experimental page\u2197",
           "href": "http://127.0.0.1:3100/weather-fusion/experimental-weather.html"
+        },
+        {
+          "label": "Atmos \u00b7 living sky & forecast lab\u2197",
+          "href": "https://sun-nourie-live.onrender.com/weather-fusion/atmos.html"
+        },
+        {
+          "label": "Side-by-side forecast comparison\u2197",
+          "href": "https://sun-nourie-live.onrender.com/weather-fusion/compare/"
+        },
+        {
+          "label": "WeatherNext data explorer\u2197",
+          "href": "https://sun-nourie-live.onrender.com/weather-fusion/weathernext-site.html"
+        },
+        {
+          "label": "Fusion V3 experimental\u2197",
+          "href": "https://sun-nourie-live.onrender.com/weather-fusion/v3/experimental-weather.html"
+        },
+        {
+          "label": "Model accuracy\u2197",
+          "href": "https://sun-nourie-live.onrender.com/weather-fusion/experimental-weather.html#experimental-accuracy-section"
+        },
+        {
+          "label": "What\u2019s Up \u00b7 weather outlook\u2197",
+          "href": "https://sun-nourie-live.onrender.com/whats-up/"
         },
         {
           "label": "AI Chat\u2197",
@@ -167,6 +199,10 @@
     },
     {
       "name": "car-wash retains its working original detail renderer",
+      "passed": true
+    },
+    {
+      "name": "Forward reconstructs retained tools instead of opening an empty sheet",
       "passed": true
     },
     {
@@ -276,6 +312,10 @@
     },
     {
       "name": "existing Experimental page retains its navigation and contains the working Next Gen link",
+      "passed": true
+    },
+    {
+      "name": "resumed or time-shifted stale readings cannot leave a misleading current person or temperature",
       "passed": true
     },
     {

@@ -1,0 +1,101 @@
+{
+  "base": "https://weather-nourie-next-gen.onrender.com",
+  "mode": "real live API, no forecast fixtures or frozen clocks",
+  "checks": [
+    {
+      "name": "knightdale real mobile forecast and portrait",
+      "passed": true,
+      "loadSeconds": 4.77,
+      "state": {
+        "city": "Knightdale, NC",
+        "signature": "b73c4f7c5ef5b440eb25613e",
+        "assembledAt": "2026-11-21T10:04:10.824Z",
+        "current": 47,
+        "feels": 42.1,
+        "hero": "47",
+        "days": 7,
+        "hours": 48,
+        "photo": "https://weather-nourie-next-gen.onrender.com/weather-fusion/weather-her-cloudy-night-feels-32-59f.webp",
+        "light": "night",
+        "overflow": false,
+        "feedIssues": [
+          {
+            "id": "winter-nam",
+            "status": "unavailable"
+          }
+        ],
+        "brokenVisibleImages": []
+      }
+    },
+    {
+      "name": "knightdale real model comparison",
+      "passed": true,
+      "models": [
+        "Nourie",
+        "NWS",
+        "NBM",
+        "ECMWF",
+        "HRRR",
+        "WeatherNext",
+        "WeatherNext 3",
+        "GEFS"
+      ]
+    },
+    {
+      "name": "real map and radar control mounting",
+      "passed": true,
+      "layers": 7,
+      "status": "",
+      "radarStamp": "4:59 AM"
+    },
+    {
+      "name": "greenville real mobile forecast and portrait",
+      "passed": true,
+      "loadSeconds": 5.53,
+      "state": {
+        "city": "Greenville, NC",
+        "signature": "d02e2e36422f5e4b268a601c",
+        "assembledAt": "2026-11-21T10:04:25.143Z",
+        "current": 48.2,
+        "feels": 45,
+        "hero": "48",
+        "days": 7,
+        "hours": 48,
+        "photo": "https://weather-nourie-next-gen.onrender.com/weather-fusion/weather-her-cloudy-night-feels-32-59f.webp",
+        "light": "night",
+        "overflow": false,
+        "feedIssues": [
+          {
+            "id": "winter-nam",
+            "status": "unavailable"
+          }
+        ],
+        "brokenVisibleImages": []
+      }
+    },
+    {
+      "name": "greenville real model comparison",
+      "passed": true,
+      "models": [
+        "Nourie",
+        "NWS",
+        "NBM",
+        "ECMWF",
+        "HRRR",
+        "WeatherNext",
+        "WeatherNext 3",
+        "GEFS"
+      ]
+    }
+  ],
+  "errors": [],
+  "status": "passed",
+  "verifiedCommit": "8419542642804458f677e0c9db75a167e69a9921",
+  "verificationScope": "Initial deployed app, using real upstream API responses and the real map. Later UI lifecycle improvements are covered by the separate 54-check browser report.",
+  "initialPreviewMemory": {
+    "MiB": 91.1,
+    "timestamp": "2026-11-21T10:06:00Z",
+    "service": "Weather-Nourie-Next-Gen",
+    "longDurationTest": false
+  }
+}

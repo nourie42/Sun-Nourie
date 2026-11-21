@@ -10,7 +10,7 @@ const PRESETS=[{name:'Knightdale, NC',latitude:35.787,longitude:-78.4806},{name:
 const VIEWS=['today','hourly','week','map','compare','more'];
 const TOOLS=[['best-times','Best Times','Find your best hours outside'],['car-wash','Car Wash','Plan a longer-lasting wash'],['meter','Feel Meter','Dew point & comfort outlook'],['snow','Snow & ice','Amounts, timing & winter maps'],['air-quality','Air quality','Pollutants & the AQI forecast'],['alerts','Alerts & outlooks','Official notices for this location'],['skin-exposure','How It Feels science','Shade, sun, clothing & paws'],['science','Science & sources','All calculations and source status'],['hourly-panel','Full hourly forecast','The original 48-hour detail view'],['compare','All model comparisons','Daily rain, snow, UV, AQI & more']];
 const CHART_VARIABLES=['temperature','feels','rain','wind','humidity','dewpoint'];
-let model=null,selectedId='now',view='today',variable='temperature',compareVariable='temperature',horizon=48,feelMode='sun',feelTouched=false,activeModels=new Set(),modelChoiceTouched=false,fullKind=null,restoring=false,legacyRestore=null,portraitGeneration=0,visiblePortrait=null,deferredInstall=null,originalReady=false;
+let model=null,selectedId='now',view='today',variable='temperature',compareVariable='temperature',horizon=48,feelMode='sun',feelTouched=false,activeModels=new Set(),modelChoiceTouched=false,fullKind=null,restoring=false,legacyRestore=null,activeLegacyKey=null,activeDayDate=null,activeMetricKey=null,portraitGeneration=0,visiblePortrait=null,deferredInstall=null,originalReady=false;
 const charts={home:new MeteorChart($('ng-home-chart')),hourly:new MeteorChart($('ng-hourly-chart')),weekHome:new MeteorChart($('ng-home-week')),week:new MeteorChart($('ng-week-chart')),compare:new MeteorChart($('ng-compare-chart')),full:new MeteorChart($('ng-fullscreen-chart'))};
 const motionQuery=matchMedia('(prefers-reduced-motion: reduce)'),connection=navigator.connection;
 let userReduced=false;try{userReduced=localStorage.getItem('ng-reduced-motion')==='true';}catch{}
@@ -20,7 +20,7 @@ const sky=createSky($('ng-sky'),{reducedMotion:reduced()});
 function syncMotion(){document.body.classList.toggle('ng-reduce-motion',reduced());$('ng-motion').checked=userReduced;sky.reducedMotion=reduced();if(document.hidden)sky.stop();else sky.start();}
 function resizeSky(){sky.resize();}
 window.addEventListener('resize',resizeSky,{passive:true});motionQuery.addEventListener('change',syncMotion);connection?.addEventListener?.('change',syncMotion);
-document.addEventListener('visibilitychange',()=>{syncMotion();if(!document.hidden&&model&&selectedId==='now')renderPerson();});
+document.addEventListener('visibilitychange',()=>{syncMotion();if(!document.hidden&&model&&selectedId==='now')onForecast(model.forecast);});
 navigator.getBattery?.().then(battery=>{const changed=()=>{lowBattery=!battery.charging&&battery.level<=.2;syncMotion();};changed();battery.addEventListener('levelchange',changed);battery.addEventListener('chargingchange',changed);}).catch(()=>{});
 $('ng-motion').addEventListener('change',()=>{userReduced=$('ng-motion').checked;try{localStorage.setItem('ng-reduced-motion',String(userReduced));}catch{}syncMotion();});
 resizeSky();syncMotion();
@@ -163,7 +163,9 @@ function onForecast(data){
 document.addEventListener('weather-nourie:forecast',event=>onForecast(event.detail));
 
 function routeTo(next,{push=true,scroll=true}={}){
-  if(!VIEWS.includes(next))next='today';view=next;
+  if(!VIEWS.includes(next))next='today';
+  if(view==='map'&&next!=='map'&&$('radar-play')?.getAttribute('aria-label')==='Pause radar animation')$('radar-play').click();
+  view=next;
   document.querySelectorAll('.ng-screen').forEach(screen=>screen.hidden=screen.dataset.view!==next);
   document.querySelectorAll('.ng-bottom-nav button').forEach(button=>{if(button.dataset.viewLink===next)button.setAttribute('aria-current','page');else button.removeAttribute('aria-current');});
   $('ng-more').setAttribute('aria-pressed',String(next==='more'));
@@ -174,7 +176,7 @@ function routeTo(next,{push=true,scroll=true}={}){
 function openDialog(dialog){if(!dialog.open)dialog.showModal();}
 function closeDialog(dialog){if(dialog.open)dialog.close();}
 function watchDialog(dialog){
-  new MutationObserver(()=>{if(dialog.open&&!restoring&&history.state?.ngDialog!==dialog.id)history.pushState({ngView:view,ngDialog:dialog.id},'','#'+view+'/'+dialog.id);}).observe(dialog,{attributes:true,attributeFilter:['open']});
+  new MutationObserver(()=>{if(dialog.open&&!restoring&&history.state?.ngDialog!==dialog.id)history.pushState({ngView:view,ngDialog:dialog.id,ngLegacyKey:activeLegacyKey,ngChartKind:fullKind,ngDayDate:activeDayDate,ngMetricKey:activeMetricKey},'','#'+view+'/'+dialog.id);}).observe(dialog,{attributes:true,attributeFilter:['open']});
   dialog.addEventListener('close',()=>{
     if(dialog.open)return;
     if(dialog.id==='ng-detail-dialog'&&legacyRestore){legacyRestore();legacyRestore=null;}
@@ -186,12 +188,21 @@ function watchDialog(dialog){
 window.addEventListener('popstate',event=>{
   restoring=true;const state=event.state||{};
   document.querySelectorAll('dialog[open]').forEach(dialog=>{if(dialog.id!==state.ngDialog)dialog.close();});
-  routeTo(state.ngView||location.hash.slice(1).split('/')[0]||'today',{push:false});
-  const target=state.ngDialog&&$(state.ngDialog);if(target&&!target.open)target.showModal();
+  routeTo(state.ngView||location.hash.slice(1).split('/')[0]||'today',{push:false,scroll:false});
+  const target=state.ngDialog&&$(state.ngDialog);
+  if(target&&!target.open){
+    if(target.id==='ng-detail-dialog'&&state.ngLegacyKey)void openLegacy(state.ngLegacyKey);
+    else if(target.id==='ng-chart-dialog'&&state.ngChartKind)openChart(state.ngChartKind);
+    else if(target.id==='day-dialog'&&state.ngDayDate){const index=model?.days.findIndex(day=>day.date===state.ngDayDate);if(index>=0)openDay(index);}
+    else if(target.id==='metric-dialog'&&state.ngMetricKey)document.querySelector(`#metrics [data-metric="${state.ngMetricKey}"]`)?.click();
+    else if(target.id==='forecast-window-dialog'&&state.ngLegacyKey==='snow')void openLegacy('snow');
+    else target.showModal();
+  }
   restoring=false;
 });
 async function openLegacy(key){
   if(!originalReady||!model)return;
+  activeLegacyKey=key;
   if(key==='snow'){$('open-snow').click();return;}
   if(key==='skin-exposure'){
     const button=[...document.querySelectorAll('#hourly [data-comfort-time]')].find(b=>b.dataset.comfortTime===selectedId);button?.click();
@@ -208,10 +219,13 @@ async function openLegacy(key){
   $('ng-detail-title').textContent=item[1];$('ng-detail-content').replaceChildren(panel);
   const extras=[];
   if(key==='alerts'&&$('risk-outlooks')){const p=$('risk-outlooks'),mark=document.createComment('outlooks return');p.before(mark);$('ng-detail-content').append(p);extras.push([p,mark]);}
-  legacyRestore=()=>{placeholder.replaceWith(panel);for(const[p,mark]of extras)mark.replaceWith(p);};
+  legacyRestore=()=>{
+    placeholder.replaceWith(panel);for(const[p,mark]of extras)mark.replaceWith(p);
+    if(['best-times','car-wash','compare'].includes(key)){panel.hidden=true;if(item[2])$(item[2])?.setAttribute('aria-expanded','false');}
+  };
   openDialog($('ng-detail-dialog'));requestAnimationFrame(()=>window.dispatchEvent(new Event('resize')));
 }
-function openDay(index){if(!originalReady||!model)return;const day=[...document.querySelectorAll('#daily [data-day]')].find(b=>Number(b.dataset.day)===index);day?.click();}
+function openDay(index){if(!originalReady||!model)return;activeDayDate=model.days[index]?.date;const day=[...document.querySelectorAll('#daily [data-day]')].find(b=>Number(b.dataset.day)===index);day?.click();}
 function showCondition(key){
   if(['wind','humidity','dewpoint'].includes(key)){variable=key;routeTo('hourly');renderCharts();return;}
   if(key==='air-quality'||key==='snow'){void openLegacy(key);return;}
@@ -234,6 +248,7 @@ function originalLinks(){
   $('ng-original-links').innerHTML=unique.map(link=>`<a href="${esc(link.href==='/weather-fusion/experimental-weather.html'?link.href:new URL(link.href,ORIGIN).href)}">${esc(link.label)}<span aria-hidden="true">↗</span></a>`).join('');
 }
 document.addEventListener('click',event=>{
+  const metric=event.target.closest('#metrics [data-metric]');if(metric)activeMetricKey=metric.dataset.metric;
   const link=event.target.closest('[data-view-link]');if(link){event.preventDefault();routeTo(link.dataset.viewLink);return;}
   if(event.target.closest('[data-open-location]')){openDialog($('ng-location-dialog'));return;}
   const close=event.target.closest('[data-close-dialog]');if(close){closeDialog(close.closest('dialog'));return;}
@@ -282,6 +297,11 @@ async function boot(){
     $('ng-search').setAttribute('aria-expanded',String(buttons.length>0));
   }).observe($('search-results'),{childList:true,subtree:true});
   await import(document.body.dataset.controller);originalReady=true;
+  // Reuse the original controller's solar clock. Sunrise/sunset and resuming
+  // an old tab must refresh the current scene even before another API reply.
+  new MutationObserver(()=>{
+    if(model&&selectedId==='now'&&Math.abs(Date.now()-model.now)>1000)onForecast(model.forecast);
+  }).observe(document.body,{attributes:true,attributeFilter:['data-sky']});
   if(window.__weatherNourieForecast)onForecast(window.__weatherNourieForecast);
   const params=new URLSearchParams(location.search);let place=null;
   if(params.has('latitude')&&params.has('longitude'))place={latitude:Number(params.get('latitude')),longitude:Number(params.get('longitude')),name:params.get('name')||'Selected location'};

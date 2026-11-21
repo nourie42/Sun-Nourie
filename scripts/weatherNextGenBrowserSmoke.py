@@ -19,7 +19,7 @@ async def main(args):
     async with async_playwright() as p:
         browser=await p.chromium.launch(executable_path='/usr/bin/chromium',headless=True,args=['--no-sandbox','--disable-dev-shm-usage'],proxy=proxy)
         context=await browser.new_context(viewport={'width':393,'height':852},is_mobile=True,has_touch=True,device_scale_factor=1,reduced_motion='reduce',permissions=['geolocation'],geolocation={'latitude':35.787,'longitude':-78.4806})
-        await context.add_init_script(f'''const NativeDate=Date;globalThis.Date=class extends NativeDate{{constructor(...args){{super(...(args.length?args:[{epoch}]))}}static now(){{return {epoch}}}}};''')
+        await context.add_init_script(f'''const NativeDate=Date;globalThis.Date=class extends NativeDate{{constructor(...args){{super(...(args.length?args:[globalThis.__ngTestNow??{epoch}]))}}static now(){{return globalThis.__ngTestNow??{epoch}}}}};''')
         api_count={'forecast':0}
         async def fixture(route):
             url=urlparse(route.request.url);query=parse_qs(url.query)
@@ -95,6 +95,9 @@ async def main(args):
             passed('tapping a day opens the original detailed forecast')
             await page.go_back();await page.wait_for_function('!document.querySelector("dialog[open]")')
             passed('Android-style Back closes the daily detail dialog')
+            await page.go_forward();await page.locator('#day-dialog').wait_for(state='visible');assert len(await page.locator('#day-content').inner_text())>30
+            passed('Forward reconstructs the original selected day detail')
+            await page.go_back();await page.wait_for_function('!document.querySelector("dialog[open]")')
             await go('compare')
             ids=await page.locator('#ng-model-toggles button').evaluate_all('(buttons)=>buttons.map(b=>b.dataset.model)')
             assert all(key in ids for key in ['nourie','nws','hrrr','ecmwf','nbm'])
@@ -109,6 +112,9 @@ async def main(args):
             assert await page.locator('#ng-fullscreen-chart svg').count()==1
             await page.go_back();await page.wait_for_function('!document.querySelector("#ng-chart-dialog[open]")')
             passed('full-screen graph expands and Back restores the comparison screen')
+            await page.go_forward();await page.locator('#ng-chart-dialog').wait_for(state='visible');assert await page.locator('#ng-fullscreen-chart svg').count()==1
+            passed('Forward reconstructs the full-screen graph with its current data')
+            await page.go_back();await page.wait_for_function('!document.querySelector("dialog[open]")')
             await go('more')
             links=await page.locator('#ng-original-links a').evaluate_all('(links)=>links.map(a=>({label:a.textContent,href:a.href}))')
             for path in ['/ai-council/','/weather-fusion/ai-rankings.html','/deal-intelligence/','/weather-fusion/v3/']:
@@ -125,6 +131,12 @@ async def main(args):
                     await page.locator('#wn-compare-chart svg').wait_for(state='visible');passed('legacy daily comparison renders its actual model graph')
                 assert await page.locator('#ng-detail-content').evaluate('(el)=>el.scrollWidth<=el.clientWidth+2'),tool+' detail overflow'
                 await close_modal();passed(tool+' retains its working original detail renderer')
+                if tool in ['best-times','car-wash','compare']:
+                    panel={'best-times':'best-times','car-wash':'car-wash-forecast','compare':'wn-compare-section'}[tool]
+                    assert await page.locator('#'+panel).evaluate('(el)=>el.hidden'),tool+' did not pause after close'
+                if tool=='car-wash':
+                    await page.go_forward();await page.locator('#ng-detail-dialog').wait_for(state='visible');assert len(await page.locator('#ng-detail-content').inner_text())>30
+                    passed('Forward reconstructs retained tools instead of opening an empty sheet');await close_modal()
             await page.locator('#ng-tools [data-legacy="snow"]').click();await page.locator('#forecast-window-dialog').wait_for(state='visible');assert len(await page.locator('#forecast-window-content').inner_text())>20;await close_modal()
             passed('snow and ice retain the original winter outlook dialog')
             await go('map');await page.wait_for_timeout(1800)
@@ -178,6 +190,11 @@ async def main(args):
             assert await original_page.locator('#experimental-bots-link').count()==1
             passed('existing Experimental page retains its navigation and contains the working Next Gen link')
             await original_page.close()
+            await page.evaluate('''()=>{window.__ngTestNow=Date.now()+3*3600000;document.body.dataset.sky=document.body.dataset.sky==='night'?'day':'night';}''')
+            await page.wait_for_function('document.querySelector("#ng-person").hidden===true')
+            assert await page.locator('#ng-temperature').inner_text()=='—'
+            passed('resumed or time-shifted stale readings cannot leave a misleading current person or temperature')
+            await page.evaluate('''()=>{delete window.__ngTestNow;document.dispatchEvent(new CustomEvent('weather-nourie:forecast',{detail:window.__weatherNourieForecast}));}''')
             # Distinct service worker scope and honest offline navigation.
             await page.wait_for_function('navigator.serviceWorker.controller!==null',timeout=20000)
             registrations=await page.evaluate('navigator.serviceWorker.getRegistrations().then(rs=>rs.map(r=>r.scope))')
