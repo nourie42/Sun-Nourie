@@ -31,7 +31,7 @@ export function createGlobeService({fetchImpl=globalThis.fetch,now=Date.now,pars
  async function request(url,kind='json'){
   if(String(url).startsWith('https://api.open-meteo.com/')&&now()<providerRetryAt)throw Object.assign(Error('Wind provider retry window'),{retryMs:providerRetryAt-now()});
   const r=await fetchImpl(url,{signal:AbortSignal.timeout(12000),headers:{Accept:kind==='image'?'image/png':kind==='text'?'application/xml':'application/json'},redirect:'error'});
-  if(!r.ok){const error=Error('Globe source unavailable');if(r.status===429){const after=r.headers.get('retry-after'),seconds=Number(after);error.retryMs=after?(Number.isFinite(seconds)?seconds*1000:Math.max(0,Date.parse(after)-now())):5*MINUTE;}if(r.status===429&&String(url).startsWith('https://api.open-meteo.com/'))providerRetryAt=now()+Math.max(MINUTE,error.retryMs||0);throw error;}
+  if(!r.ok){const error=Object.assign(Error('Globe source unavailable'),{code:'HTTP_'+r.status});if(r.status===429){const after=r.headers.get('retry-after'),seconds=Number(after);error.retryMs=after?(Number.isFinite(seconds)?seconds*1000:Math.max(0,Date.parse(after)-now())):5*MINUTE;}if(r.status===429&&String(url).startsWith('https://api.open-meteo.com/'))providerRetryAt=now()+Math.max(MINUTE,error.retryMs||0);throw error;}
   if(kind==='image'){
    if(!r.headers.get('content-type')?.includes('image/png'))throw Error('Invalid globe image type');
    const buffer=Buffer.from(await r.arrayBuffer());if(buffer.length>6*1024*1024||buffer.length<8||!buffer.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10])))throw Error('Invalid globe image');return buffer;
@@ -43,7 +43,7 @@ export function createGlobeService({fetchImpl=globalThis.fetch,now=Date.now,pars
   const lat=[],lon=[],g=GLOBE_GRID;for(let y=0;y<g.ny;y++)for(let x=0;x<g.nx;x++){lat.push(g.lat0+y*g.dy);lon.push(g.lon0+x*g.dx);}
   const hour=new Date(Math.floor(now()/HOUR)*HOUR).toISOString().slice(0,16);
   const q=new URLSearchParams({latitude:lat.join(','),longitude:lon.join(','),hourly:'wind_speed_10m,wind_direction_10m',wind_speed_unit:'ms',models:'gfs_seamless',start_hour:hour,end_hour:hour,timezone:'GMT',timeformat:'unixtime'});
-  const wind=normalizeGlobeWind(await request('https://api.open-meteo.com/v1/forecast?'+q),now());if(wind.status!=='ready')throw Error('No current wind field');return wind;
+  const wind=normalizeGlobeWind(await request('https://api.open-meteo.com/v1/forecast?'+q),now());if(wind.status!=='ready')throw Object.assign(Error('No current wind field'),{code:'WIND_DATA_INVALID'});return wind;
  });}
  async function clouds(){return memo('cloud-info',10*MINUTE,async()=>{
   const data=await request('https://realearth.ssec.wisc.edu/api/times?products=globalir');
@@ -58,7 +58,7 @@ export function createGlobeService({fetchImpl=globalThis.fetch,now=Date.now,pars
  });}
  async function metadata(){
   const values=await Promise.allSettled([winds(),clouds(),radar()]);
-  return Object.fromEntries(values.map((r,i)=>[['wind','clouds','radar'][i],r.status==='fulfilled'?r.value:{status:'unavailable',source:['NOAA GFS via Open-Meteo','SSEC satellite infrared','NOAA MRMS radar'][i]}]));
+  return Object.fromEntries(values.map((r,i)=>[['wind','clouds','radar'][i],r.status==='fulfilled'?r.value:{status:'unavailable',source:['NOAA GFS via Open-Meteo','SSEC satellite infrared','NOAA MRMS radar'][i],reason:String(r.reason?.code||r.reason?.name||'SOURCE_UNAVAILABLE').slice(0,64)}]));
  }
  async function image(kind,time){
   const stamp=Date.parse(time);if(!finite(stamp))throw Object.assign(Error('Invalid image time'),{status:400});
