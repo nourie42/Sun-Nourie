@@ -169,15 +169,18 @@ test('configured server password overrides the emergency hash and invalidates ol
   assert.equal((await configured.request('/weather-fusion/', {headers: {Cookie: cookie}})).status, 401);
 });
 
-test('only the main weather page, its assets and read-only APIs are public', async t => {
+test('the main weather page, V3 Beta assets and required read-only APIs are public', async t => {
   const {request} = await fixture(t, {publicMain: true});
-  for (const route of ['/weather-fusion/', '/weather-fusion/index.html', '/weather-fusion/app.js', '/weather-fusion/header-night.webp', '/api/weather-fusion/forecast?location=knightdale', '/api/weather-fusion/winter-map?file=ppp_co_24hr_expected_sn_in_2026101409f027.kmz']) {
-    assert.equal((await request(route)).status, 200, route);
+  for (const route of ['/weather-fusion/', '/weather-fusion/index.html', '/weather-fusion/app.js', '/weather-fusion/header-night.webp', '/api/weather-fusion/forecast?location=knightdale', '/api/weather-fusion/winter-map?file=ppp_co_24hr_expected_sn_in_2026101409f027.kmz', '/weather-fusion/v3', '/weather-fusion/v3/', '/weather-fusion/v3/index.html', '/weather-fusion/v3/js/app.js?v=v3-pet-day-6', '/weather-fusion/v3/js/physics.js', '/weather-fusion/v3/js/fusion-engine.js', '/weather-fusion/v3/js/charts.js', '/weather-fusion/v3/js/icons.js', '/weather-fusion/v3/js/map.js', '/weather-fusion/v3/css/styles.css?v=v3-main-return-7', '/api/weather-fusion/accuracy?latitude=35.787&longitude=-78.48']) {
+    for (const method of ['GET', 'HEAD']) assert.equal((await request(route, {method})).status, 200, `${method} ${route}`);
   }
-  for (const route of ['/weather-fusion/experimental-weather.html', '/weather-fusion/glance.html', '/weather-fusion/compare', '/weathernext/', '/whats-up/', '/deal-intelligence/', '/api/weather-fusion/compare/google', '/api/whats-up/tracker', '/api/deal-intelligence/x', '/weather-fusion/sub/app.js']) {
+  for (const route of ['/weather-fusion/experimental-weather.html', '/weather-fusion/glance.html', '/weather-fusion/compare', '/weathernext/', '/whats-up/', '/deal-intelligence/', '/api/weather-fusion/compare/google', '/api/whats-up/tracker', '/api/deal-intelligence/x', '/weather-fusion/sub/app.js', '/weather-fusion/v3-admin/', '/weather-fusion/v3/admin', '/weather-fusion/v3/js/private.json', '/weather-fusion/v3/css/private.html', '/weather-fusion/v3/../compare/']) {
     assert.equal((await request(route)).status, 401, route);
   }
   assert.equal((await request('/api/weather-fusion/forecast', {method: 'POST'})).status, 401);
+  for (const route of ['/weather-fusion/v3/', '/weather-fusion/v3/js/app.js', '/api/weather-fusion/accuracy']) {
+    for (const method of ['POST', 'PUT', 'DELETE', 'OPTIONS']) assert.equal((await request(route, {method})).status, 401, `${method} ${route}`);
+  }
   assert.equal(isPublicWeatherPath('/WEATHER-FUSION/', 'GET'), true);
   assert.equal(isPublicWeatherPath('/weather-fusion/', 'DELETE'), false);
 });

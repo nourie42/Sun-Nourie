@@ -38,7 +38,7 @@ test('landing page, AI Council pages, assets and APIs require server-side authen
 
 test('weather page, weather dependencies and health remain public without any cookie', async t => {
   const {request} = await fixture(t);
-  for (const route of ['/weather-fusion/', '/weather-fusion', '/weather-fusion/index.html', '/weather-fusion/app.js', '/weather-fusion/nav-week.webp', '/api/weather-fusion/forecast', '/api/weather-fusion/search', '/api/weather-fusion/winter-map', '/health']) {
+  for (const route of ['/weather-fusion/', '/weather-fusion', '/weather-fusion/index.html', '/weather-fusion/app.js', '/weather-fusion/nav-week.webp', '/weather-fusion/v3/', '/weather-fusion/v3/index.html', '/weather-fusion/v3/js/app.js', '/weather-fusion/v3/css/styles.css', '/api/weather-fusion/forecast', '/api/weather-fusion/search', '/api/weather-fusion/winter-map', '/api/weather-fusion/accuracy', '/health']) {
     for (const method of ['GET', 'HEAD']) assert.equal((await request(route, {method})).status, 200, `${method} ${route}`);
   }
   assert.equal((await request('/weather-fusion/compare')).status, 401, 'existing private weather tools retain their gate');
