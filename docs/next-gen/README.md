@@ -20,7 +20,7 @@ The adapter reuses `currentSample`, `forecastSample`, `buildTimeline`, `dailyFor
 
 ## Screens
 
-- **Today:** weather-selected realistic portrait in the outdoor scene; current or selected-hour temperature and feels-like; daily range; expandable Nourie Take; rain/precipitation/AQI/Feel Meter row; interactive 24-hour and seven-day plots; compact exposure modes and conditions.
+- **Today:** weather-selected realistic person on the left of a continuous outdoor scene, branding over the sky and readings on the right; current or selected-hour temperature and feels-like; daily range; overlapping, expandable Weather Take; compact rain/precipitation/AQI/Feel Meter row; orange/cyan interactive 24-hour and seven-day plots; compact How It Feels, Dew Point and Wind panels; complete exposure modes and conditions below.
 - **Hourly:** 24/48-hour temperature, feels-like, rain, wind, humidity and dew-point plots, exact hourly readings and a compact hour list.
 - **7-Day:** high/low curves and their actual range, weather icons, rain likelihood, existing confidence labels and original daily detail dialogs.
 - **Map:** existing radar, map selection, basemaps, playback and six model-layer controls.
@@ -28,6 +28,12 @@ The adapter reuses `currentSample`, `forecastSample`, `buildTimeline`, `dailyFor
 - **More:** original weather tools, all original applications, motion preference and separate app installation.
 
 Graphs use the project’s native SVG approach. Monotone Hermite curves pass through every published point, preserve peaks and break at missing readings or time gaps. Rain chance and hourly rain amount have separately labeled axes. Touch, sliders, keyboard controls, exact-value readouts and full-screen expansion share the same data. The optional source band is the min/max of at least two available independent model values at the same timestamp; it excludes the Nourie blend and is explicitly not a confidence interval. No forecast is extrapolated to fill a missing horizon.
+
+## Visual composition
+
+The mobile layout follows the supplied visual reference: an outdoor scene behind the header, person on the left, large readings on the right, overlapping Weather Take, one short four-metric row, and translucent meteorological graph panels. Orange/coral temperature and high curves pair with cyan feels-like/low curves. Published samples remain exact; only rendering and axis spacing change. The full seven-day chart and compact-condition headings fit above the bottom navigation at the tested 393 × 852 viewport. The large readout, slider and legend remain in detailed graph views; compact home graphs reveal exact-value tooltips on touch/focus. Day captions and plotted daily values align in the same seven columns.
+
+The compact How It Feels panel scrolls to the complete Shade/Sun/Night/Pets controls. The existing dew-point Feel Meter remains a dew-point assessment; the reference image’s example 82/100 is not invented as a new forecast value.
 
 ## Dynamic scene and clothing
 
@@ -87,8 +93,8 @@ Shade, Sun, Night and Pets remain accessible. Irrelevant or missing exposure val
 - `npm ci --ignore-scripts --no-audit --no-fund`: succeeded.
 - `npm run check`: passed, including the existing weather QA contract.
 - `node --test test/weatherNextGen.test.js`: **14 passed, 0 failed**. Includes both-city numeric parity and forecast immutability, missing sources, monotone-curve extrema, source-range math, night/overcast/snow portraits, unavailable exposures, retained controller IDs/routes and PWA separation.
-- `python scripts/weatherNextGenBrowserSmoke.py`: **54 passed**, with captured real Knightdale and Greenville forecasts and a frozen clock in headless Chromium. See [executed browser proof](browser-proof.json).
-- The walkthrough exercised touch drag, keyboard graph selection, rain axes, variable/horizon switches, daily details, Back/Forward reconstruction, full-screen charts, model toggles/range, Car Wash, Best Times, Feel Meter, AQI, alerts, science, original exposure/hourly panels, legacy daily comparison, winter outlook, map mounting/layers, all exposure modes, search, GPS selection, refresh, real forecast day/night selection, original pages, PWA scope and offline navigation.
+- `python scripts/weatherNextGenBrowserSmoke.py`: **59 passed**, with captured real Knightdale and Greenville forecasts and a frozen clock in headless Chromium. See [executed browser proof](browser-proof.json).
+- The walkthrough checks the reference composition and first-screen forecast density, compact touch tooltips and rain axes, the compact comfort entry, and touch drag, keyboard graph selection, rain axes, variable/horizon switches, daily details, Back/Forward reconstruction, full-screen charts, model toggles/range, Car Wash, Best Times, Feel Meter, AQI, alerts, science, original exposure/hourly panels, legacy daily comparison, winter outlook, map mounting/layers, all exposure modes, search, GPS selection, refresh, real forecast day/night selection, original pages, PWA scope and offline navigation.
 - No horizontal overflow at 360, 393, 412, 768 and 1280 CSS pixels.
 - No JavaScript page errors in that walkthrough. Closed optional tools stop redrawing; source-age and solar-state changes cannot leave a stale current person or temperature on screen.
 - A real local preview-proxy request returned HTTP 200 with the live engine’s 48 hours, 10 forecast days, existing signature and AI-enabled status. This is distinct from fixture testing.

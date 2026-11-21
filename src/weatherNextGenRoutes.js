@@ -20,13 +20,13 @@ export function nextGenDocument(original,shell){
   html=html.replace(/<script\b[^>]*\ssrc="([^"]+)"[^>]*>[\s\S]*?<\/script>/g,(tag,src)=>/\/(best-times|gross-toggle|week-toggle|collapse)\.js\b/.test(src)?tag:'');
   html=html.replace(/<link\b[^>]*(?:manifest|pwa-bridge\.css|apple-touch-icon)[^>]*>/g,'');
   html=html.replace(/<meta\b[^>]*name="theme-color"[^>]*>/g,'');
-  html=html.replace('</head>',`<meta name="theme-color" content="#17272e"><meta name="apple-mobile-web-app-capable" content="yes"><link rel="manifest" href="${NEXT_GEN_ROUTE}/manifest.webmanifest"><link rel="stylesheet" href="${NEXT_GEN_ROUTE}/next-gen.css?v=1"></head>`);
+  html=html.replace('</head>',`<meta name="theme-color" content="#123c50"><meta name="apple-mobile-web-app-capable" content="yes"><link rel="manifest" href="${NEXT_GEN_ROUTE}/manifest.webmanifest"><link rel="stylesheet" href="${NEXT_GEN_ROUTE}/next-gen.css?v=2"></head>`);
   html=html.replace(/<body\b[^>]*>/,`<body class="next-gen" data-controller="${controller[1]}">${shell}<div id="ng-legacy" hidden aria-hidden="true">`);
   // Make the existing experimental model-map controls available to this shell.
   html=html.replace(/(<button class="selected" data-layer="radar"[^>]*>[\s\S]*?<\/button>)/,'$1'+[['hrrr','HRRR'],['ecmwf','ECMWF rain'],['nbm','NBM rain'],['temperature','Temperature'],['wind','Wind'],['clouds','Clouds']].map(([id,label])=>`<button type="button" data-layer="${id}" aria-pressed="false">${label}</button>`).join(''));
   const dialogs=[];
   html=html.replace(/<dialog\b[\s\S]*?<\/dialog>/g,tag=>{dialogs.push(tag);return '';});
-  return html.replace('</body>',`</div><div class="ng-legacy-dialogs">${dialogs.join('')}</div><script type="module" src="${NEXT_GEN_ROUTE}/app.js?v=1"></script></body>`);
+  return html.replace('</body>',`</div><div class="ng-legacy-dialogs">${dialogs.join('')}</div><script type="module" src="${NEXT_GEN_ROUTE}/app.js?v=2"></script></body>`);
 }
 
 export function registerWeatherNextGenRoutes(app){

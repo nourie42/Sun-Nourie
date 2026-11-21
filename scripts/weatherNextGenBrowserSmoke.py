@@ -67,7 +67,33 @@ async def main(args):
             assert snapshot['temperature']==snapshot['hour']
             assert str(round(snapshot['high'])) in snapshot['range'] and str(round(snapshot['low'])) in snapshot['range']
             passed('hero, hourly graph and daily ranges use the same published readings',snapshot)
+            layout=await page.evaluate('''()=>{const r=s=>{const b=document.querySelector(s).getBoundingClientRect();return {x:b.x,y:b.y,bottom:b.bottom,height:b.height}};return {hero:r('.ng-hero'),readings:r('.ng-current'),take:r('#ng-take'),quick:r('.ng-quick'),week:r('#ng-screen-today .ng-week-card'),nav:r('.ng-bottom-nav'),glance:r('.ng-glance-row'),width:innerWidth}}''')
+            assert layout['hero']['y']==0 and layout['readings']['x']>layout['width']*.42
+            assert layout['take']['y']<layout['hero']['bottom'] and layout['quick']['height']<80
+            passed('reference composition keeps the scene behind the header, readings on the right, overlapping Take and compact metrics',layout)
+            assert layout['week']['bottom']<layout['nav']['y'] and layout['glance']['y']<layout['nav']['y']
+            passed('the full seven-day graph and compact condition panel headings fit above mobile navigation')
             await screenshot('next-gen-mobile-night')
+            compact=page.locator('#ng-home-chart svg');box=await compact.bounding_box();home_cdp=await context.new_cdp_session(page)
+            await home_cdp.send('Input.dispatchTouchEvent',{'type':'touchStart','touchPoints':[{'x':box['x']+box['width']*.3,'y':box['y']+box['height']*.5}]})
+            await home_cdp.send('Input.dispatchTouchEvent',{'type':'touchMove','touchPoints':[{'x':box['x']+box['width']*.7,'y':box['y']+box['height']*.5}]})
+            await home_cdp.send('Input.dispatchTouchEvent',{'type':'touchEnd','touchPoints':[]})
+            assert int(await page.locator('#ng-home-chart input').input_value())>0
+            assert await page.locator('#ng-home-chart .ng-chart-readout').is_visible()
+            picked=await page.evaluate('window.__weatherNourieNextGen.model.timeline[Number(document.querySelector("#ng-home-chart input").value)].temperature')
+            shown=float((await page.locator('#ng-home-chart .ng-chart-readout strong').first.inner_text()).replace('°',''))
+            assert shown==picked
+            passed('compact home graph supports touch selection with an exact-value tooltip')
+            await page.locator('#ng-back-now').click()
+            await page.locator('#ng-home-tabs [data-variable="rain"]').click()
+            labels=await page.locator('#ng-home-chart svg').text_content();assert '%' in labels and 'Hourly in' in labels
+            await page.locator('#ng-home-tabs [data-variable="temperature"]').click()
+            passed('compact rain graph retains separately labeled percent and inch axes')
+            await page.locator('[data-scroll-feels]').click()
+            assert await page.locator('#ng-comfort').evaluate('(el)=>el.getBoundingClientRect().top>=0&&el.getBoundingClientRect().top<innerHeight-100')
+            assert await page.locator('[data-feel]').count()==4
+            await page.evaluate('scrollTo({top:0,behavior:"instant"})')
+            passed('compact How It Feels panel opens the retained four exposure modes')
             await page.locator('#ng-take summary').click();assert await page.locator('#ng-take-detail').is_visible();await page.locator('#ng-take summary').click()
             passed('Nourie Take expands and collapses')
             # Real pointer/touch drag through the chart.

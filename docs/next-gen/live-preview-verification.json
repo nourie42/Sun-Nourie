@@ -91,7 +91,7 @@
   "errors": [],
   "status": "passed",
   "verifiedCommit": "8419542642804458f677e0c9db75a167e69a9921",
-  "verificationScope": "Initial deployed app, using real upstream API responses and the real map. Later UI lifecycle improvements are covered by the separate 54-check browser report.",
+  "verificationScope": "Initial deployed app, using real upstream API responses and the real map. Later UI lifecycle improvements are covered by the separate 59-check browser report.",
   "initialPreviewMemory": {
     "MiB": 91.1,
     "timestamp": "2026-11-21T10:06:00Z",

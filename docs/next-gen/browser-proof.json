@@ -30,6 +30,71 @@
       }
     },
     {
+      "name": "reference composition keeps the scene behind the header, readings on the right, overlapping Take and compact metrics",
+      "passed": true,
+      "detail": {
+        "hero": {
+          "x": 0,
+          "y": 0,
+          "bottom": 280,
+          "height": 280
+        },
+        "readings": {
+          "x": 174.578125,
+          "y": 65,
+          "bottom": 216,
+          "height": 151
+        },
+        "take": {
+          "x": 12,
+          "y": 206,
+          "bottom": 262,
+          "height": 56
+        },
+        "quick": {
+          "x": 12,
+          "y": 272,
+          "bottom": 337.4375,
+          "height": 65.4375
+        },
+        "week": {
+          "x": 12,
+          "y": 531.9375,
+          "bottom": 736.515625,
+          "height": 204.578125
+        },
+        "nav": {
+          "x": 0,
+          "y": 787,
+          "bottom": 852,
+          "height": 65
+        },
+        "glance": {
+          "x": 12,
+          "y": 746.515625,
+          "bottom": 834.515625,
+          "height": 88
+        },
+        "width": 393
+      }
+    },
+    {
+      "name": "the full seven-day graph and compact condition panel headings fit above mobile navigation",
+      "passed": true
+    },
+    {
+      "name": "compact home graph supports touch selection with an exact-value tooltip",
+      "passed": true
+    },
+    {
+      "name": "compact rain graph retains separately labeled percent and inch axes",
+      "passed": true
+    },
+    {
+      "name": "compact How It Feels panel opens the retained four exposure modes",
+      "passed": true
+    },
+    {
       "name": "Nourie Take expands and collapses",
       "passed": true
     },
@@ -128,8 +193,8 @@
           "href": "https://sun-nourie-live.onrender.com/weather-fusion/weathernext-site.html"
         },
         {
-          "label": "Fusion V3 experimental\u2197",
-          "href": "https://sun-nourie-live.onrender.com/weather-fusion/v3/experimental-weather.html"
+          "label": "Fusion V3\u2197",
+          "href": "https://sun-nourie-live.onrender.com/weather-fusion/v3/"
         },
         {
           "label": "Model accuracy\u2197",
@@ -174,10 +239,6 @@
         {
           "label": "Ultimate\u2197",
           "href": "https://sun-nourie-live.onrender.com/weather-fusion/ultimate.html"
-        },
-        {
-          "label": "Fusion V3\u2197",
-          "href": "https://sun-nourie-live.onrender.com/weather-fusion/v3/"
         },
         {
           "label": "Prerelease\u2197",

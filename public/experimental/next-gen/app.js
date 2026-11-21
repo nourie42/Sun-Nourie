@@ -35,9 +35,9 @@ function allSolar(){return model?.forecast.metricForecasts?.solar||[model?.forec
 function renderCharts(){
   updateTabs();if(!model)return;
   const common={kind:'hourly',variable,zone:model.zone,solar:allSolar(),onSelect:selectRow};
-  charts.home.set({...common,rows:hourlyRows(model,24)});charts.hourly.set({...common,rows:hourlyRows(model,horizon)});
+  charts.home.set({...common,rows:hourlyRows(model,24),compact:true});charts.hourly.set({...common,rows:hourlyRows(model,horizon)});
   const week={kind:'week',rows:weeklyRows(model),zone:model.zone,onSelect:null,onCommit:row=>openDay(row.index)};
-  charts.weekHome.set(week);charts.week.set(week);
+  charts.weekHome.set({...week,compact:true});charts.week.set(week);
   renderCompare();if(fullKind)renderFull();
 }
 function renderCompare(){
@@ -70,6 +70,7 @@ function renderPerson(){
   $('ng-date').textContent=sample.now?formatTime(model.now,model.zone,{weekday:'long',month:'long',day:'numeric'}).toUpperCase():formatTime(Date.parse(sample.time),model.zone,{weekday:'long',hour:'numeric',minute:'2-digit'}).toUpperCase()+' · FORECAST';
   $('ng-temperature').textContent=valueText(sample.temperature);
   $('ng-condition').textContent=sample.condition||'Sky conditions unavailable';
+  $('ng-hero-condition-icon').innerHTML=weatherIcon(sample.condition,sample.isDay,64).replace('><g','><defs><linearGradient id="ng-hero-cloud" x2="0" y2="1"><stop stop-color="#fff"/><stop offset="1" stop-color="#a7bfd4"/></linearGradient></defs><g');
   $('ng-feels').textContent=`Feels like ${valueText(sample.feels,'°')}`;
   const date=formatTime(sample.now?model.now:Date.parse(sample.time),model.zone,{year:'numeric',month:'2-digit',day:'2-digit'});
   const day=model.days.find(d=>formatTime(Date.parse(d.date+'T12:00:00Z'),model.zone,{year:'numeric',month:'2-digit',day:'2-digit'})===date)||model.days[0];
@@ -80,15 +81,15 @@ function renderPerson(){
   sky.setLocation(model.forecast.location.latitude,model.forecast.location.longitude);
   if(portrait.scene)sky.setState({time:step.time,scene:portrait.scene});
   const img=$('ng-person'),token=++portraitGeneration;
-  if(!portrait.available){img.hidden=true;visiblePortrait=null;$('ng-landscape').style.backgroundImage='none';return;}
+  if(!portrait.available){img.hidden=true;visiblePortrait=null;$('ng-landscape').style.backgroundImage='none';document.querySelector('.ng-hero').style.backgroundImage='none';return;}
   if(visiblePortrait===portrait.file)return;
-  img.hidden=true;$('ng-landscape').style.backgroundImage='none';visiblePortrait=null;
+  img.hidden=true;$('ng-landscape').style.backgroundImage='none';document.querySelector('.ng-hero').style.backgroundImage='none';visiblePortrait=null;
   const picture=new Image(),background=new Image();picture.decoding='async';background.decoding='async';
   const load=(node,file)=>new Promise((resolve,reject)=>{node.onload=resolve;node.onerror=reject;node.src='/weather-fusion/'+file;});
   Promise.all([load(picture,portrait.file),load(background,portrait.background)]).then(()=>{
     if(token!==portraitGeneration)return;
     img.src=picture.src;img.alt=`Weather-appropriate clothing: ${portrait.clothing}. ${portrait.condition}, ${portrait.light}.`;img.hidden=false;
-    $('ng-landscape').style.backgroundImage=`url("${background.src}")`;visiblePortrait=portrait.file;
+    $('ng-landscape').style.backgroundImage=`url("${background.src}")`;document.querySelector('.ng-hero').style.backgroundImage=`url("${background.src}")`;visiblePortrait=portrait.file;
   }).catch(()=>{if(token===portraitGeneration){img.hidden=true;visiblePortrait=null;}});
 }
 function renderComfort(){
@@ -98,6 +99,10 @@ function renderComfort(){
   $('ng-comfort-value').textContent=valueText(result.value,'°');$('ng-comfort-label').textContent=result.label;
   $('ng-comfort-clothes').textContent=result.clothing||'';$('ng-comfort-note').textContent=result.note||'';
   document.querySelectorAll('[data-feel]').forEach(button=>button.setAttribute('aria-pressed',String(button.dataset.feel===feelMode)));
+  $('ng-glance-comfort').textContent=finite(sample.feels)?valueText(sample.feels,'°')+' feels like':'Estimate unavailable';
+  $('ng-glance-clothing').textContent=result.clothing||'Clothing guidance unavailable';
+  const mini=$('ng-glance-person');mini.hidden=!result.portrait.available;
+  if(result.portrait.available)mini.src='/weather-fusion/'+result.portrait.file;
   if(feelMode==='pets')$('ng-comfort-art').innerHTML=dogWalkerScene(sample.isDay,sample.condition,sample.feels,{...result.portrait.context,pop:sample.pop,rainExpected:sample.rainExpected,rainAround:sample.rainAround,radarThreat:sample.radarThreat});
   else if(result.portrait.available)$('ng-comfort-art').innerHTML=`<img src="/weather-fusion/${result.portrait.file}" width="1200" height="675" alt="${esc(result.portrait.clothing)}" loading="lazy" decoding="async">`;
   else $('ng-comfort-art').innerHTML='<span class="ng-chart-empty">Weather scene unavailable</span>';
@@ -119,12 +124,16 @@ function renderLists(){
   if(!model)return;
   $('ng-hourly-list').innerHTML=hourlyRows(model,48).map(row=>`<button type="button" class="ng-hour-row" data-hour="${esc(row.id)}" aria-pressed="${row.id===selectedId}"><span>${row.isNow?'Now':formatTime(row.time,model.zone).replace(' ','')}<small>${formatTime(row.time,model.zone,{weekday:'short'})}</small></span>${weatherIcon(row.condition,row.isDay,27)}<span><strong>${valueText(row.temperature,'°')}</strong><small>Temp</small></span><span>${valueText(row.feels,'°')}<small>Feels</small></span><span>${valueText(row.rain,'%')}<small>${valueText(row.precipitation,' in',3)}</small></span><span>${valueText(row.wind)}<small>mph</small></span></button>`).join('');
   $('ng-week-list').innerHTML=model.days.map(day=>{const c=confidenceOf(day);return `<button type="button" class="ng-week-row" data-day-next="${day.index}"><span>${esc(day.label)}<small>${esc(day.dateLabel)}</small></span>${weatherIcon(day.condition,day.isDay,27)}<span class="ng-week-temperatures"><b>${valueText(day.high,'°')}</b><em>${valueText(day.low,'°')}</em><small>${esc(day.shortCondition)}</small></span><span>${valueText(day.pop,'%')}<small>${valueText(day.amount,' in',2)}</small></span><span class="ng-confidence" data-confidence="${c.key}">${esc(c.label)}</span></button>`;}).join('');
-  const slots=hourlyRows(model,24),indices=[0,.2,.4,.6,.8,1].map(r=>Math.round((slots.length-1)*r));
+  const slots=hourlyRows(model,24),indices=[0,1/6,2/6,3/6,4/6,5/6,1].map(r=>Math.round((slots.length-1)*r));
   $('ng-home-conditions').innerHTML=[...new Set(indices)].filter(i=>slots[i]).map(i=>{const r=slots[i];return `<button type="button" data-hour="${esc(r.id)}" aria-label="${esc(r.label+' '+r.condition)}"><span>${esc(r.isNow?'Now':formatTime(r.time,model.zone).replace(' ',''))}</span>${weatherIcon(r.condition,r.isDay,25)}<small>${valueText(r.rain,'%')}</small></button>`;}).join('');
 }
 function renderConditions(){
   if(!model)return;
   const c=model.current.inputs||{},sun=model.forecast.solar||{},wind=c.wind;
+  $('ng-glance-dewpoint').textContent=valueText(c.dewpoint,'°');
+  $('ng-glance-dewpoint-note').textContent=meterReading(model).level?.label?.split('—')[0].trim()||'Moisture & comfort';
+  $('ng-glance-wind').textContent=valueText(wind)+' mph';
+  $('ng-glance-wind-note').textContent=finite(c.gust)?'Gusts '+valueText(c.gust,' mph'):'Gusts unavailable';
   const fields=[['wind','Wind',valueText(wind,' mph'),finite(c.gust)?'Gusts '+valueText(c.gust,' mph'):'Gusts unavailable'],['humidity','Humidity',valueText(c.humidity,'%'),'Relative humidity'],['dewpoint','Dew point',valueText(c.dewpoint,'°'),'Moisture in the air'],['visibility','Visibility',valueText(c.visibility,' mi',1),'Current visibility'],['pressure','Pressure',valueText(finite(c.pressurePa)?c.pressurePa/100:finite(c.pressure)?c.pressure*33.86389:null,' mb'),'Trend in details'],['solar','Sunset',formatTime(Date.parse(sun.sunset),model.zone,{hour:'numeric',minute:'2-digit'}),'Sunrise '+formatTime(Date.parse(sun.sunrise),model.zone,{hour:'numeric',minute:'2-digit'})],['uv','Peak UV',valueText(model.forecast.days[0]?.uvMax),'Today’s forecast maximum'],['air-quality','Air quality',valueText(model.airQuality?.aqi),model.airQualityBand.label],['snow','Snow & ice',model.forecast.snow?.possible?'Possible':'Outlook','Amounts & winter maps']];
   $('ng-condition-grid').innerHTML=fields.map(([key,label,value,note])=>`<button type="button" class="ng-condition-tile" data-condition="${key}" aria-label="${esc(label+' '+value+'. Open details')}"><span>${label}</span><strong>${esc(value)}</strong><small>${esc(note)}</small></button>`).join('');
 }
@@ -242,12 +251,13 @@ $('ng-use-location').addEventListener('click',()=>{closeDialog($('ng-location-di
 $('ng-presets').innerHTML=PRESETS.map((place,i)=>`<button type="button" data-preset="${i}">${place.name}</button>`).join('');
 $('ng-tools').innerHTML=TOOLS.map(([key,label,note])=>`<button type="button" data-legacy="${key}"><strong>${label} <span aria-hidden="true">↗</span></strong><small>${note}</small></button>`).join('');
 function originalLinks(){
-  const links=[{href:'/weather-fusion/',label:'Original Weather Nourie'},{href:'/weather-fusion/experimental-weather.html',label:'Existing Experimental page'},{href:'/weather-fusion/atmos.html',label:'Atmos · living sky & forecast lab'},{href:'/weather-fusion/compare/',label:'Side-by-side forecast comparison'},{href:'/weather-fusion/weathernext-site.html',label:'WeatherNext data explorer'},{href:'/weather-fusion/v3/experimental-weather.html',label:'Fusion V3 experimental'},{href:'/weather-fusion/experimental-weather.html#experimental-accuracy-section',label:'Model accuracy'},{href:'/whats-up/',label:'What’s Up · weather outlook'}];
+  const links=[{href:'/weather-fusion/',label:'Original Weather Nourie'},{href:'/weather-fusion/experimental-weather.html',label:'Existing Experimental page'},{href:'/weather-fusion/atmos.html',label:'Atmos · living sky & forecast lab'},{href:'/weather-fusion/compare/',label:'Side-by-side forecast comparison'},{href:'/weather-fusion/weathernext-site.html',label:'WeatherNext data explorer'},{href:'/weather-fusion/v3/',label:'Fusion V3'},{href:'/weather-fusion/experimental-weather.html#experimental-accuracy-section',label:'Model accuracy'},{href:'/whats-up/',label:'What’s Up · weather outlook'}];
   for(const a of document.querySelectorAll('#ng-legacy a[class^="experimental-"]'))if(a.getAttribute('href')&&!a.getAttribute('href').startsWith('#'))links.push({href:a.getAttribute('href'),label:a.textContent.trim().replace(/^[^a-z0-9]+/i,'')});
   const unique=[...new Map(links.map(link=>[link.href,link])).values()];
   $('ng-original-links').innerHTML=unique.map(link=>`<a href="${esc(link.href==='/weather-fusion/experimental-weather.html'?link.href:new URL(link.href,ORIGIN).href)}">${esc(link.label)}<span aria-hidden="true">↗</span></a>`).join('');
 }
 document.addEventListener('click',event=>{
+  if(event.target.closest('[data-scroll-feels]')){$('ng-comfort').scrollIntoView({behavior:reduced()?'instant':'smooth',block:'start'});return;}
   const metric=event.target.closest('#metrics [data-metric]');if(metric)activeMetricKey=metric.dataset.metric;
   const link=event.target.closest('[data-view-link]');if(link){event.preventDefault();routeTo(link.dataset.viewLink);return;}
   if(event.target.closest('[data-open-location]')){openDialog($('ng-location-dialog'));return;}
