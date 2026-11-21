@@ -1,0 +1,406 @@
+{
+  "mode": "captured forecasts, frozen clock, headless Chromium; no physical Android device",
+  "base": "http://127.0.0.1:3100",
+  "clock": 1795254404971,
+  "checks": [
+    {
+      "name": "mobile startup, existing controller, portrait and forecast loaded",
+      "passed": true
+    },
+    {
+      "name": "393px Android layout has no horizontal overflow",
+      "passed": true
+    },
+    {
+      "name": "all seven days are visible in both graph views",
+      "passed": true
+    },
+    {
+      "name": "hero, hourly graph and daily ranges use the same published readings",
+      "passed": true,
+      "detail": {
+        "hero": 47,
+        "temperature": 47,
+        "feels": 42.4,
+        "hour": 47,
+        "high": 65,
+        "low": 47,
+        "range": "High 65\u00b0 \u00b7 Low 47\u00b0",
+        "source": "244d2aa57c8fb6bf8196e9c2"
+      }
+    },
+    {
+      "name": "reference composition keeps the scene behind the header, readings on the right, overlapping Take and compact metrics",
+      "passed": true,
+      "detail": {
+        "hero": {
+          "x": 0,
+          "y": 0,
+          "bottom": 280,
+          "height": 280
+        },
+        "readings": {
+          "x": 174.578125,
+          "y": 65,
+          "bottom": 216,
+          "height": 151
+        },
+        "take": {
+          "x": 12,
+          "y": 206,
+          "bottom": 262,
+          "height": 56
+        },
+        "quick": {
+          "x": 12,
+          "y": 272,
+          "bottom": 337.4375,
+          "height": 65.4375
+        },
+        "week": {
+          "x": 12,
+          "y": 531.9375,
+          "bottom": 736.515625,
+          "height": 204.578125
+        },
+        "nav": {
+          "x": 0,
+          "y": 787,
+          "bottom": 852,
+          "height": 65
+        },
+        "glance": {
+          "x": 12,
+          "y": 746.515625,
+          "bottom": 834.515625,
+          "height": 88
+        },
+        "width": 393
+      }
+    },
+    {
+      "name": "the full seven-day graph and compact condition panel headings fit above mobile navigation",
+      "passed": true
+    },
+    {
+      "name": "compact home graph supports touch selection with an exact-value tooltip",
+      "passed": true
+    },
+    {
+      "name": "compact rain graph retains separately labeled percent and inch axes",
+      "passed": true
+    },
+    {
+      "name": "compact How It Feels panel opens the retained four exposure modes",
+      "passed": true
+    },
+    {
+      "name": "Nourie Take expands and collapses",
+      "passed": true
+    },
+    {
+      "name": "touch drag selects an exact forecast hour",
+      "passed": true
+    },
+    {
+      "name": "graph keyboard controls move one exact hourly sample",
+      "passed": true
+    },
+    {
+      "name": "wind graph renders its actual series and labels",
+      "passed": true
+    },
+    {
+      "name": "rain graph renders its actual series and labels",
+      "passed": true
+    },
+    {
+      "name": "humidity graph renders its actual series and labels",
+      "passed": true
+    },
+    {
+      "name": "dewpoint graph renders its actual series and labels",
+      "passed": true
+    },
+    {
+      "name": "hourly horizon switches between 24 and 48 hours",
+      "passed": true
+    },
+    {
+      "name": "tapping a day opens the original detailed forecast",
+      "passed": true
+    },
+    {
+      "name": "Android-style Back closes the daily detail dialog",
+      "passed": true
+    },
+    {
+      "name": "Forward reconstructs the original selected day detail",
+      "passed": true
+    },
+    {
+      "name": "model comparison discovers available current model traces",
+      "passed": true,
+      "detail": [
+        "nourie",
+        "nws",
+        "nbm",
+        "ecmwf",
+        "hrrr",
+        "wn",
+        "weathernext3",
+        "gefs"
+      ]
+    },
+    {
+      "name": "model traces can be hidden and shown without changing values",
+      "passed": true
+    },
+    {
+      "name": "optional source range uses the actual min/max guidance, with an explicit non-probability label",
+      "passed": true
+    },
+    {
+      "name": "full-screen graph expands and Back restores the comparison screen",
+      "passed": true
+    },
+    {
+      "name": "Forward reconstructs the full-screen graph with its current data",
+      "passed": true
+    },
+    {
+      "name": "AI benchmarks, original Experimental and other original apps remain linked",
+      "passed": true,
+      "detail": [
+        {
+          "label": "Back to regular weather\u2197",
+          "href": "https://sun-nourie-live.onrender.com/weather-fusion/"
+        },
+        {
+          "label": "Existing Experimental page\u2197",
+          "href": "http://127.0.0.1:3100/weather-fusion/experimental-weather.html"
+        },
+        {
+          "label": "Atmos \u00b7 living sky & forecast lab\u2197",
+          "href": "https://sun-nourie-live.onrender.com/weather-fusion/atmos.html"
+        },
+        {
+          "label": "Side-by-side forecast comparison\u2197",
+          "href": "https://sun-nourie-live.onrender.com/weather-fusion/compare/"
+        },
+        {
+          "label": "WeatherNext data explorer\u2197",
+          "href": "https://sun-nourie-live.onrender.com/weather-fusion/weathernext-site.html"
+        },
+        {
+          "label": "Fusion V3\u2197",
+          "href": "https://sun-nourie-live.onrender.com/weather-fusion/v3/"
+        },
+        {
+          "label": "Model accuracy\u2197",
+          "href": "https://sun-nourie-live.onrender.com/weather-fusion/experimental-weather.html#experimental-accuracy-section"
+        },
+        {
+          "label": "What\u2019s Up \u00b7 weather outlook\u2197",
+          "href": "https://sun-nourie-live.onrender.com/whats-up/"
+        },
+        {
+          "label": "AI Chat\u2197",
+          "href": "https://sun-nourie-live.onrender.com/ai-council/"
+        },
+        {
+          "label": "Deal tracker\u2197",
+          "href": "https://sun-nourie-live.onrender.com/deal-lens/"
+        },
+        {
+          "label": "Google WeatherNext\u2197",
+          "href": "https://sun-nourie-live.onrender.com/weathernext/"
+        },
+        {
+          "label": "Glance\u2197",
+          "href": "https://sun-nourie-live.onrender.com/weather-fusion/glance.html"
+        },
+        {
+          "label": "Blend\u2197",
+          "href": "https://sun-nourie-live.onrender.com/weather-fusion/blend.html"
+        },
+        {
+          "label": "Today\u2197",
+          "href": "https://sun-nourie-live.onrender.com/weather-fusion/today.html"
+        },
+        {
+          "label": "Halo\u2197",
+          "href": "https://sun-nourie-live.onrender.com/weather-fusion/halo.html"
+        },
+        {
+          "label": "WN AI\u2197",
+          "href": "https://sun-nourie-live.onrender.com/weather-fusion/wn.html"
+        },
+        {
+          "label": "Ultimate\u2197",
+          "href": "https://sun-nourie-live.onrender.com/weather-fusion/ultimate.html"
+        },
+        {
+          "label": "Prerelease\u2197",
+          "href": "https://sun-nourie-prerelease.onrender.com/weather-fusion/"
+        },
+        {
+          "label": "Deal Intel\u2197",
+          "href": "https://sun-nourie-live.onrender.com/deal-intelligence/"
+        },
+        {
+          "label": "AI Rankings\u2197",
+          "href": "https://sun-nourie-live.onrender.com/weather-fusion/ai-rankings.html"
+        },
+        {
+          "label": "Nourie Enterprises\u2197",
+          "href": "https://sun-nourie-live.onrender.com/nourie-enterprises/"
+        }
+      ]
+    },
+    {
+      "name": "car-wash retains its working original detail renderer",
+      "passed": true
+    },
+    {
+      "name": "Forward reconstructs retained tools instead of opening an empty sheet",
+      "passed": true
+    },
+    {
+      "name": "Best Times renders the actual shared hourly comfort heat map",
+      "passed": true
+    },
+    {
+      "name": "best-times retains its working original detail renderer",
+      "passed": true
+    },
+    {
+      "name": "meter retains its working original detail renderer",
+      "passed": true
+    },
+    {
+      "name": "air-quality retains its working original detail renderer",
+      "passed": true
+    },
+    {
+      "name": "alerts retains its working original detail renderer",
+      "passed": true
+    },
+    {
+      "name": "science retains its working original detail renderer",
+      "passed": true
+    },
+    {
+      "name": "skin-exposure retains its working original detail renderer",
+      "passed": true
+    },
+    {
+      "name": "hourly-panel retains its working original detail renderer",
+      "passed": true
+    },
+    {
+      "name": "legacy daily comparison renders its actual model graph",
+      "passed": true
+    },
+    {
+      "name": "compare retains its working original detail renderer",
+      "passed": true
+    },
+    {
+      "name": "snow and ice retain the original winter outlook dialog",
+      "passed": true
+    },
+    {
+      "name": "Map preserves radar and all six existing model-layer controls",
+      "passed": true
+    },
+    {
+      "name": "shade exposure mode uses the existing estimate or an honest unavailable state",
+      "passed": true
+    },
+    {
+      "name": "sun exposure mode uses the existing estimate or an honest unavailable state",
+      "passed": true
+    },
+    {
+      "name": "night exposure mode uses the existing estimate or an honest unavailable state",
+      "passed": true
+    },
+    {
+      "name": "pets exposure mode uses the existing estimate or an honest unavailable state",
+      "passed": true
+    },
+    {
+      "name": "reduced-motion preference stops animated weather",
+      "passed": true
+    },
+    {
+      "name": "city/ZIP search reuses the existing controller and changes locations",
+      "passed": true
+    },
+    {
+      "name": "device location action returns the forecast to the device coordinates",
+      "passed": true
+    },
+    {
+      "name": "refresh issues a fresh request through the existing weather controller",
+      "passed": true
+    },
+    {
+      "name": "daylight forecast selection changes the portrait and dynamic sky from night to day",
+      "passed": true
+    },
+    {
+      "name": "360px layout has no horizontal overflow",
+      "passed": true
+    },
+    {
+      "name": "412px layout has no horizontal overflow",
+      "passed": true
+    },
+    {
+      "name": "768px layout has no horizontal overflow",
+      "passed": true
+    },
+    {
+      "name": "1280px layout has no horizontal overflow",
+      "passed": true
+    },
+    {
+      "name": "original main page still renders the identical forecast snapshot",
+      "passed": true,
+      "detail": "244d2aa57c8fb6bf8196e9c2"
+    },
+    {
+      "name": "existing Experimental page retains its navigation and contains the working Next Gen link",
+      "passed": true
+    },
+    {
+      "name": "resumed or time-shifted stale readings cannot leave a misleading current person or temperature",
+      "passed": true
+    },
+    {
+      "name": "separate PWA manifest and service-worker scope are registered",
+      "passed": true,
+      "detail": [
+        "http://127.0.0.1:3100/experimental/next-gen/",
+        "http://127.0.0.1:3100/weather-fusion/"
+      ]
+    },
+    {
+      "name": "offline navigation gives an honest connection screen and never fabricates a fresh forecast",
+      "passed": true
+    },
+    {
+      "name": "no JavaScript page errors during the tested flows",
+      "passed": true
+    }
+  ],
+  "errors": [],
+  "screenshots": [
+    "next-gen-mobile-night.png",
+    "next-gen-mobile-day.png",
+    "next-gen-desktop.png"
+  ],
+  "status": "passed"
+}

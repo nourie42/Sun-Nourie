@@ -16,6 +16,7 @@ import { registerSiteResearchReportEnhancements } from "./src/siteResearchReport
 import { registerFuelAtlasRoutes } from "./src/fuelAtlasRoutes.js";
 import { registerFuelAtlasLocationCompanyBridge } from "./src/fuelAtlasLocationCompanyBridge.js";
 import { registerWeatherFusionRoutes } from "./src/weatherFusion.js";
+import { registerWeatherNextGenRoutes } from "./src/weatherNextGenRoutes.js";
 import { registerWeatherComparisonRoutes } from "./src/weatherComparison.js";
 import { registerPrivatePageAccess, privatePageCookieSecret } from "./src/privatePageAccess.js";
 import { registerWeatherSiteAccess, weatherSiteCookieSecret } from "./src/weatherSiteAccess.js";
@@ -93,6 +94,7 @@ registerSiteEnhancementRoutes(app, {
 });
 registerFuelAtlasLocationCompanyBridge(app);
 registerFuelAtlasRoutes(app, { googleApiKey: process.env.GOOGLE_API_KEY || "" });
+registerWeatherNextGenRoutes(app);
 registerWeatherComparisonRoutes(app);
 const weatherFusion = registerWeatherFusionRoutes(app);
 registerWhatsUpRoutes(app, { getForecast: (query) => weatherFusion.getForecast(query) });
