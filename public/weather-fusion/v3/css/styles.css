@@ -3508,6 +3508,8 @@ body.awaiting-location .v3-main-stack > :not(#location-needed-card) {
 .hero-cinematic-shell { padding-bottom: 0; }
 .v3-main-stack { gap: var(--tile-gap); padding-top: var(--tile-gap); }
 .v3-main-stack > * { margin-block: 0; }
+#urgent-alerts-container { display: grid; gap: var(--tile-gap); }
+#urgent-alerts-container > .urgent-alert-banner { margin-block: 0; }
 #urgent-alerts-container:empty { display: none; }
 .hazards-strip-grid,
 .top-compact-pills,

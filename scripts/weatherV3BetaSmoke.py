@@ -66,12 +66,14 @@ async def main(args):
    await page.locator('#unit-toggle').click();passed(city+' selected-day peaks retain Celsius conversion')
    await page.locator('[data-exp-id=pets]').screenshot(path=str(args.artifacts/(city+'-monday-pets.png')))
    await page.locator('[data-exp-toggle=pets]').click();await set_hour(0)
+   # Controlled warning markup exercises the otherwise-empty alert stack.
+   await page.locator('#urgent-alerts-container').evaluate("(el)=>{el.replaceChildren(...['Test warning one','Test warning two'].map(text=>{const card=document.createElement('div');card.className='urgent-alert-banner';card.textContent=text;return card}))}")
    for width,height in [(360,800),(393,852),(412,915),(768,1024),(1280,900)]:
     await page.set_viewport_size({'width':width,'height':height});await page.wait_for_timeout(100)
     gaps=await page.evaluate('''()=>{
      const rects=s=>[...document.querySelector(s).children].filter(e=>getComputedStyle(e).display!=='none'&&e.getBoundingClientRect().height>0).map(e=>{const r=e.getBoundingClientRect();return {id:e.id||e.className,x:r.x,y:r.y,right:r.right,bottom:r.bottom}});
      const values=[];
-     for(const s of ['.v3-main-stack','.exposure-teaser-stack','.top-compact-pills','.comfort-trio-grid','.apple-tiles-grid']){
+     for(const s of ['.v3-main-stack','#urgent-alerts-container','.exposure-teaser-stack','.top-compact-pills','.comfort-trio-grid','.apple-tiles-grid']){
       const rows=[];for(const r of rects(s)){let row=rows.find(row=>Math.abs(row[0].y-r.y)<1);if(!row){row=[];rows.push(row)}row.push(r)}
       for(let i=0;i<rows.length;i++){const row=rows[i].sort((a,b)=>a.x-b.x);for(let j=1;j<row.length;j++)values.push({pair:s+' horizontal',gap:row[j].x-row[j-1].right});if(i)values.push({pair:s+' vertical',gap:row[0].y-Math.max(...rows[i-1].map(r=>r.bottom))});}
      }
@@ -80,6 +82,8 @@ async def main(args):
     assert not gaps['overflow'],(width,gaps)
     assert all(abs(g['gap']-12)<.6 for g in gaps['values']),(width,gaps)
     passed(city+' '+str(width)+'px cards use equal 12px gaps without overflow')
+   passed(city+' populated warning stack keeps the same spacing as all other cards')
+   await page.locator('#urgent-alerts-container').evaluate('(el)=>el.replaceChildren()')
    await page.set_viewport_size({'width':393,'height':852});await page.evaluate('scrollTo({top:0,behavior:"instant"})')
    await page.screenshot(path=str(args.artifacts/(city+'-v3-top.png')))
   await page.goto(args.base+'/weather-fusion/',wait_until='domcontentloaded')
