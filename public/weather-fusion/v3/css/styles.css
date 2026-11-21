@@ -3,21 +3,21 @@
    ========================================================================== */
 
 :root {
-  --bg-deep: #071324;
-  --bg-mid: #0d1d36;
-  --text: #f5f9ff;
-  --muted: #b8c9e4;
-  --faint: #8499bb;
-  --blue: #58b8ff;
+  --bg-deep: #0b182c;
+  --bg-mid: #10223e;
+  --text: #f7fbff;
+  --muted: #d2e1f7;
+  --faint: #a7bcda;
+  --blue: #67c4ff;
   --mint: #34d399;
   --gold: #ffd470;
   --coral: #ff7b7b;
   --violet: #b98eff;
-  --glass-bg: linear-gradient(180deg, rgba(28, 52, 86, 0.52) 0%, rgba(12, 26, 48, 0.72) 100%);
-  --glass-border: rgba(180, 214, 255, 0.18);
-  --glass-border-strong: rgba(200, 228, 255, 0.34);
-  --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.16);
-  --glass-shadow: 0 14px 36px rgba(2, 8, 22, 0.42);
+  --glass-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.11) 0%, rgba(255, 255, 255, 0.01) 42%), rgba(12, 24, 44, 0.28);
+  --glass-border: rgba(255, 255, 255, 0.25);
+  --glass-border-strong: rgba(255, 255, 255, 0.45);
+  --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.30);
+  --glass-shadow: 0 10px 28px rgba(0, 0, 0, 0.20);
   --radius-lg: 20px;
   --radius-md: 14px;
   --shell-max: 1080px;
@@ -47,17 +47,36 @@ body {
   padding-bottom: calc(82px + env(safe-area-inset-bottom, 0px));
 }
 
-/* Dynamic Sky Atmosphere & Particle Canvas */
+/* Dynamic Sky Atmosphere & Full-Viewport Living Sky Photo */
 .atmosphere {
   position: fixed;
   inset: 0;
-  z-index: -2;
+  z-index: -3;
   pointer-events: none;
   transition: background 0.8s ease;
   background:
     radial-gradient(900px 560px at 14% 8%, rgba(82, 162, 255, 0.28), transparent 62%),
     radial-gradient(800px 560px at 86% 12%, rgba(145, 98, 255, 0.22), transparent 64%),
     linear-gradient(180deg, #13284e 0%, #0b1831 54%, #050c1b 100%);
+}
+
+.live-sky-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.live-sky-scrim {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    rgba(6, 15, 30, 0.24) 0%,
+    rgba(8, 18, 36, 0.13) 38%,
+    rgba(6, 15, 30, 0.32) 100%
+  );
 }
 
 body[data-sky="day"] .atmosphere {
@@ -113,24 +132,25 @@ body[data-sky="night"] .atmosphere {
 
 .glass {
   background: var(--glass-bg);
-  backdrop-filter: blur(22px) saturate(175%);
-  -webkit-backdrop-filter: blur(22px) saturate(175%);
+  backdrop-filter: blur(22px) saturate(165%);
+  -webkit-backdrop-filter: blur(22px) saturate(165%);
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-lg);
   box-shadow: var(--glass-highlight), var(--glass-shadow);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.52);
 }
 
 /* ==========================================================================
-   Slim Single-Row Sticky Topbar (58px tall — clean on mobile & desktop)
+   Slim Single-Row Sticky Topbar (Translucent Glass Over Dynamic Sky)
    ========================================================================== */
 .topbar {
   position: sticky;
   top: 0;
   z-index: 100;
-  background: rgba(7, 15, 32, 0.82);
-  backdrop-filter: blur(24px) saturate(180%);
-  -webkit-backdrop-filter: blur(24px) saturate(180%);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(8, 18, 36, 0.26);
+  backdrop-filter: blur(22px) saturate(165%);
+  -webkit-backdrop-filter: blur(22px) saturate(165%);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.18);
   padding: 9px 0;
 }
 
@@ -505,52 +525,54 @@ body[data-sky="night"] .atmosphere {
 .hero-cinematic-shell {
   position: relative;
   width: 100%;
-  overflow: hidden;
+  overflow: visible;
   padding-bottom: 14px;
-}
-
-.hero-backdrop-layer {
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-  overflow: hidden;
+  background: transparent;
 }
 
 .hero-bg-photo {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  object-position: 30% 25%;
-  filter: saturate(1.1) contrast(1.04) brightness(0.88);
+  object-position: 50% 45%;
+  filter: saturate(1.08) contrast(1.03) brightness(0.92);
   transform: scale(1.02);
+  transition: opacity 0.45s ease, transform 0.55s ease, filter 0.55s ease;
 }
 
 .hero-bg-photo.sky-overcast {
-  object-position: 0% 18% !important;
-  transform: scale(1.75);
-  transform-origin: 0% 18%;
-  filter: brightness(0.95) saturate(0.82);
+  object-position: 0% 10% !important;
+  transform: scale(2.25);
+  transform-origin: 0% 10%;
+  filter: brightness(0.96) saturate(0.84);
+}
+
+@media (max-width: 760px) {
+  .hero-bg-photo.sky-overcast {
+    object-position: 0% 50% !important;
+    transform: scale(1.04);
+    transform-origin: 0% 50%;
+    filter: brightness(0.96) saturate(0.86);
+  }
 }
 
 .hero-bg-photo.sky-storm {
-  object-position: 78% 20% !important;
-  filter: brightness(0.75) contrast(1.08);
+  object-position: 80% 30% !important;
+  filter: brightness(0.76) contrast(1.08);
   transform: scale(1.1);
 }
 
-.hero-bg-scrim {
-  position: absolute;
-  inset: 0;
-  background:
-    linear-gradient(180deg, rgba(6, 15, 30, 0.44) 0%, rgba(7, 17, 34, 0.14) 26%, rgba(7, 18, 36, 0.46) 72%, #071324 100%),
-    linear-gradient(90deg, rgba(6, 15, 30, 0.08) 0%, rgba(6, 15, 30, 0.18) 52%, rgba(6, 16, 34, 0.62) 100%);
+.hero-bg-photo.sky-sunset {
+  filter: saturate(1.25) hue-rotate(-28deg) brightness(0.84);
 }
 
 .topbar {
   position: relative;
   z-index: 40;
-  background: linear-gradient(180deg, rgba(5, 13, 26, 0.58) 0%, rgba(5, 13, 26, 0) 100%);
+  background: linear-gradient(180deg, rgba(6, 15, 32, 0.36) 0%, rgba(6, 15, 32, 0.08) 100%);
+  backdrop-filter: blur(18px) saturate(160%);
+  -webkit-backdrop-filter: blur(18px) saturate(160%);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.16);
   padding: 12px 0 8px;
 }
 
@@ -596,39 +618,44 @@ body[data-sky="night"] .atmosphere {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  background: rgba(8, 19, 38, 0.42);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.12) 0%, rgba(255, 255, 255, 0.02) 48%), rgba(12, 24, 44, 0.28);
+  backdrop-filter: blur(18px) saturate(160%);
+  -webkit-backdrop-filter: blur(18px) saturate(160%);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28), 0 6px 18px rgba(0, 0, 0, 0.18);
   border-radius: 999px;
   padding: 5px 13px;
   color: #ffffff;
   font-family: inherit;
-  font-size: 16px;
+  font-size: 15.5px;
   font-weight: 700;
   letter-spacing: -0.01em;
   cursor: pointer;
-  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
-  transition: background 0.16s ease;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.55);
+  transition: background 0.16s ease, border-color 0.16s ease;
 }
 
 .hero-city-trigger:hover {
-  background: rgba(14, 30, 58, 0.68);
+  background: rgba(18, 36, 66, 0.44);
+  border-color: rgba(255, 255, 255, 0.45);
 }
 
-.city-chevron {
-  font-size: 13px;
-  opacity: 0.85;
+.city-pin-ico {
+  font-size: 13.5px;
+  line-height: 1;
 }
 
 .hero-date-pill {
   font-size: 12px;
   font-weight: 700;
-  color: rgba(235, 245, 255, 0.9);
-  background: rgba(8, 19, 38, 0.42);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.16);
+  color: rgba(240, 248, 255, 0.96);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.12) 0%, rgba(255, 255, 255, 0.02) 48%), rgba(12, 24, 44, 0.28);
+  backdrop-filter: blur(16px) saturate(160%);
+  -webkit-backdrop-filter: blur(16px) saturate(160%);
+  border: 1px solid rgba(255, 255, 255, 0.25);
   border-radius: 999px;
   padding: 4px 11px;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.55);
 }
 
 .hero-visual-split {
@@ -698,9 +725,9 @@ body[data-sky="night"] .atmosphere {
   align-items: center;
   gap: 12px;
   padding: 13px 16px;
-  border-radius: 16px;
-  background: linear-gradient(180deg, rgba(16, 34, 62, 0.72) 0%, rgba(9, 20, 40, 0.82) 100%);
-  border: 1px solid rgba(190, 222, 255, 0.24);
+  border-radius: 18px;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
   color: var(--text);
   font-family: inherit;
   text-align: left;
@@ -905,10 +932,10 @@ body[data-sky="night"] .atmosphere {
   padding: 6px 10px;
   margin-bottom: 4px;
   border-radius: 11px;
-  background: rgba(8, 20, 42, 0.56);
-  border: 1px solid rgba(122, 198, 255, 0.22);
+  background: rgba(10, 22, 42, 0.30);
+  border: 1px solid rgba(255, 255, 255, 0.18);
   font-size: 12px;
-  color: #e2eeff;
+  color: #edf5ff;
 }
 
 .n24-scrub-tip {
@@ -1214,13 +1241,17 @@ body[data-sky="night"] .atmosphere {
   justify-content: space-between;
   gap: 12px;
   padding: 12px 15px;
-  border-radius: 18px;
+  border-radius: 20px;
   color: var(--text);
   font-family: inherit;
   text-align: left;
   cursor: pointer;
-  background: linear-gradient(135deg, rgba(8, 36, 58, 0.85), rgba(6, 22, 42, 0.9)) !important;
-  border-color: rgba(56, 201, 255, 0.45) !important;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.11) 0%, rgba(255, 255, 255, 0.01) 42%), rgba(10, 32, 54, 0.30) !important;
+  backdrop-filter: blur(22px) saturate(165%);
+  -webkit-backdrop-filter: blur(22px) saturate(165%);
+  border: 1px solid rgba(88, 214, 255, 0.46) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.30), 0 10px 28px rgba(0, 0, 0, 0.20);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.55);
   transition: transform 0.15s ease, border-color 0.15s ease;
 }
 
@@ -1509,9 +1540,9 @@ body[data-sky="night"] .atmosphere {
   align-items: center;
   gap: 12px;
   padding: 13px 14px;
-  border-radius: 15px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: rgba(8, 20, 40, 0.55);
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.08);
   color: var(--text);
   font-family: inherit;
   text-align: left;
@@ -1520,8 +1551,8 @@ body[data-sky="night"] .atmosphere {
 }
 
 .more-tile-btn:hover {
-  background: rgba(16, 36, 68, 0.72);
-  border-color: rgba(122, 198, 255, 0.45);
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.42);
 }
 
 .more-tile-ico {
@@ -1623,15 +1654,15 @@ body[data-sky="night"] .atmosphere {
   z-index: 120;
   display: grid;
   grid-template-columns: repeat(5, 1fr);
-  background: rgba(8, 18, 36, 0.9);
-  backdrop-filter: blur(22px) saturate(180%);
-  -webkit-backdrop-filter: blur(22px) saturate(180%);
-  border-top: 1px solid rgba(180, 214, 255, 0.2);
-  border-left: 1px solid rgba(180, 214, 255, 0.12);
-  border-right: 1px solid rgba(180, 214, 255, 0.12);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.10) 0%, rgba(255, 255, 255, 0.02) 45%), rgba(10, 22, 42, 0.56);
+  backdrop-filter: blur(24px) saturate(175%);
+  -webkit-backdrop-filter: blur(24px) saturate(175%);
+  border-top: 1px solid rgba(255, 255, 255, 0.24);
+  border-left: 1px solid rgba(255, 255, 255, 0.16);
+  border-right: 1px solid rgba(255, 255, 255, 0.16);
   border-radius: 18px 18px 0 0;
   padding: 6px 6px calc(8px + env(safe-area-inset-bottom, 0px));
-  box-shadow: 0 -10px 30px rgba(2, 8, 22, 0.55);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.24), 0 -8px 26px rgba(2, 8, 22, 0.36);
 }
 
 .bnav-item {
@@ -2741,10 +2772,14 @@ body[data-sky="night"] .atmosphere {
   justify-content: space-between;
   gap: 10px;
   width: 100%;
-  padding: 9px 13px;
-  border-radius: 13px;
-  background: rgba(15, 30, 56, 0.78);
-  border: 1px solid rgba(255, 255, 255, 0.16);
+  padding: 10px 14px;
+  border-radius: 16px;
+  background: var(--glass-bg);
+  backdrop-filter: blur(22px) saturate(165%);
+  -webkit-backdrop-filter: blur(22px) saturate(165%);
+  border: 1px solid rgba(255, 255, 255, 0.26);
+  box-shadow: var(--glass-highlight), 0 8px 22px rgba(0, 0, 0, 0.18);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.55);
   color: #ffffff;
   font-family: inherit;
   font-size: 13px;
@@ -2755,13 +2790,13 @@ body[data-sky="night"] .atmosphere {
 }
 
 .hazard-slim-btn:hover {
-  background: rgba(24, 46, 82, 0.88);
+  background: rgba(24, 46, 82, 0.44);
   transform: translateY(-1px);
 }
 
 .hazard-slim-btn.severe {
-  background: rgba(74, 22, 34, 0.72);
-  border-color: rgba(248, 113, 113, 0.45);
+  background: rgba(96, 22, 36, 0.36);
+  border-color: rgba(248, 113, 113, 0.62);
 }
 
 .hazard-slim-left {
@@ -2802,9 +2837,13 @@ body[data-sky="night"] .atmosphere {
   gap: 5px;
   padding: 7px 12px;
   border-radius: 999px;
-  background: rgba(12, 26, 50, 0.72);
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  color: #f0f6ff;
+  background: var(--glass-bg);
+  backdrop-filter: blur(20px) saturate(160%);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25), 0 6px 18px rgba(0, 0, 0, 0.16);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.55);
+  color: #f4f9ff;
   font-family: inherit;
   font-size: 12px;
   font-weight: 700;
@@ -2815,30 +2854,26 @@ body[data-sky="night"] .atmosphere {
 
 .top-mini-pill:hover {
   transform: translateY(-1px);
-  background: rgba(22, 44, 80, 0.88);
+  background: rgba(22, 44, 80, 0.46);
 }
 
 .top-mini-pill.pill-change {
-  border-color: rgba(251, 191, 36, 0.55);
-  background: rgba(245, 158, 11, 0.18);
-  color: #fde68a;
+  border-color: rgba(255, 215, 70, 0.85);
+  color: #fef3c7;
 }
 
 .top-mini-pill.pill-rain {
-  border-color: rgba(56, 189, 248, 0.45);
-  background: rgba(14, 165, 233, 0.16);
-  color: #bae6fd;
+  border-color: rgba(125, 211, 252, 0.72);
+  color: #e0f2fe;
 }
 
 .top-mini-pill.pill-perfect {
-  border-color: rgba(92, 224, 160, 0.48);
-  background: rgba(52, 211, 153, 0.15);
-  color: #bbf7d0;
+  border-color: rgba(110, 231, 183, 0.72);
+  color: #d1fae5;
 }
 
 .top-mini-pill.pill-gps {
-  border-color: rgba(56, 189, 248, 0.65);
-  background: rgba(33, 150, 243, 0.24);
+  border-color: rgba(103, 196, 255, 0.85);
   color: #ffffff;
 }
 
@@ -2989,12 +3024,16 @@ body[data-sky="night"] .atmosphere {
 }
 
 .exposure-teaser-card {
-  border-radius: 18px;
+  border-radius: 20px;
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  background: rgba(8, 22, 44, 0.78);
-  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: var(--glass-bg);
+  backdrop-filter: blur(22px) saturate(165%);
+  -webkit-backdrop-filter: blur(22px) saturate(165%);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-highlight), var(--glass-shadow);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.52);
 }
 
 .exposure-teaser-card.expanded {
@@ -3103,8 +3142,8 @@ body[data-sky="night"] .atmosphere {
   width: 100%;
   overflow-x: auto;
   border-radius: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: rgba(6, 16, 34, 0.52);
+  border: 1px solid rgba(255, 255, 255, 0.20);
+  background: rgba(10, 22, 42, 0.34);
 }
 
 .compare-days-table {
@@ -3172,4 +3211,136 @@ body[data-sky="night"] .atmosphere {
     max-width: 620px;
     margin: 0 auto;
   }
+}
+
+/* ==========================================================================
+   Collapsible Compare Forecasts Launcher & Live Location Prompt
+   ========================================================================== */
+.v3-main-stack > .section-panel.card-compact {
+  margin-bottom: 0;
+  padding: 15px 15px 14px;
+}
+
+.compare-collapsible-card {
+  padding: 0 !important;
+  overflow: hidden;
+}
+
+.compare-toggle-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  background: transparent;
+  border: none;
+  color: var(--text);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.16s ease;
+}
+
+.compare-toggle-btn:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.compare-toggle-left {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  min-width: 0;
+}
+
+.compare-toggle-ico {
+  width: 42px;
+  height: 42px;
+  border-radius: 13px;
+  display: grid;
+  place-items: center;
+  font-size: 20px;
+  flex-shrink: 0;
+  background: rgba(56, 189, 248, 0.18);
+  border: 1px solid rgba(125, 211, 252, 0.36);
+}
+
+.compare-toggle-title {
+  font-size: 16px;
+  font-weight: 800;
+  color: #ffffff;
+  line-height: 1.2;
+}
+
+.compare-toggle-sub {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 2px;
+  line-height: 1.3;
+}
+
+.compare-toggle-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.compare-open-pill {
+  padding: 4px 11px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+  color: #e0f2fe;
+  background: rgba(56, 189, 248, 0.22);
+  border: 1px solid rgba(125, 211, 252, 0.45);
+}
+
+.compare-toggle-chevron {
+  font-size: 16px;
+  color: rgba(226, 240, 255, 0.85);
+}
+
+.compare-expand-body {
+  padding: 12px 15px 15px;
+  border-top: 1px solid rgba(255, 255, 255, 0.18);
+}
+
+.compare-expand-body[hidden] {
+  display: none;
+}
+
+.location-needed-card[hidden] {
+  display: none;
+}
+
+.loc-needed-inner {
+  display: flex;
+  align-items: flex-start;
+  gap: 13px;
+}
+
+.loc-needed-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  font-size: 22px;
+  flex-shrink: 0;
+  background: rgba(56, 189, 248, 0.20);
+  border: 1px solid rgba(125, 211, 252, 0.40);
+}
+
+.loc-needed-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+body.awaiting-location .hero-visual-split,
+body.awaiting-location #weather-take-banner,
+body.awaiting-location .v3-main-stack > :not(#location-needed-card) {
+  display: none !important;
 }

@@ -17,14 +17,58 @@ import {
   computeThermalComfort
 } from './physics.js';
 
-export const PRESET_CITIES = [
-  { id: 'sf', name: 'San Francisco, CA', admin1: 'California', country: 'United States', latitude: 37.7749, longitude: -122.4194, timezone: 'America/Los_Angeles', wfo: 'MTR', elevationFt: 52 },
-  { id: 'knightdale', name: 'Knightdale, NC', admin1: 'North Carolina', country: 'United States', latitude: 35.7877, longitude: -78.4806, timezone: 'America/New_York', wfo: 'RAH', elevationFt: 325 },
-  { id: 'nyc', name: 'New York, NY', admin1: 'New York', country: 'United States', latitude: 40.7128, longitude: -74.006, timezone: 'America/New_York', wfo: 'OKX', elevationFt: 33 },
-  { id: 'denver', name: 'Denver, CO', admin1: 'Colorado', country: 'United States', latitude: 39.7392, longitude: -104.9903, timezone: 'America/Denver', wfo: 'BOU', elevationFt: 5280 },
-  { id: 'miami', name: 'Miami, FL', admin1: 'Florida', country: 'United States', latitude: 25.7617, longitude: -80.1918, timezone: 'America/New_York', wfo: 'MFL', elevationFt: 6 },
-  { id: 'seattle', name: 'Seattle, WA', admin1: 'Washington', country: 'United States', latitude: 47.6062, longitude: -122.3321, timezone: 'America/Los_Angeles', wfo: 'SEW', elevationFt: 175 }
-];
+const US_STATE_ABBR = {
+  Alabama: 'AL', Alaska: 'AK', Arizona: 'AZ', Arkansas: 'AR', California: 'CA',
+  Colorado: 'CO', Connecticut: 'CT', Delaware: 'DE', 'District of Columbia': 'DC',
+  Florida: 'FL', Georgia: 'GA', Hawaii: 'HI', Idaho: 'ID', Illinois: 'IL',
+  Indiana: 'IN', Iowa: 'IA', Kansas: 'KS', Kentucky: 'KY', Louisiana: 'LA',
+  Maine: 'ME', Maryland: 'MD', Massachusetts: 'MA', Michigan: 'MI', Minnesota: 'MN',
+  Mississippi: 'MS', Missouri: 'MO', Montana: 'MT', Nebraska: 'NE', Nevada: 'NV',
+  'New Hampshire': 'NH', 'New Jersey': 'NJ', 'New Mexico': 'NM', 'New York': 'NY',
+  'North Carolina': 'NC', 'North Dakota': 'ND', Ohio: 'OH', Oklahoma: 'OK',
+  Oregon: 'OR', Pennsylvania: 'PA', 'Rhode Island': 'RI', 'South Carolina': 'SC',
+  'South Dakota': 'SD', Tennessee: 'TN', Texas: 'TX', Utah: 'UT', Vermont: 'VT',
+  Virginia: 'VA', Washington: 'WA', 'West Virginia': 'WV', Wisconsin: 'WI', Wyoming: 'WY'
+};
+
+function formatStateShort(stateName) {
+  if (!stateName) return '';
+  const trimmed = String(stateName).trim();
+  return US_STATE_ABBR[trimmed] || trimmed;
+}
+
+/**
+ * Reconciles sky condition wording against multi-model cloud cover & thermal weatherKind
+ * so distant airport AWOS "CLR" overrides (blind above 12,000 ft) never show "Sunny"
+ * on an overcast/mostly cloudy day.
+ */
+function reconcileSkyCondition(rawCondition, cloudCover, isDay, rainChance = 0, weatherKind = null, forecastCondition = null) {
+  let cond = String(rawCondition || '').trim();
+  const c = cond.toLowerCase();
+  const wetOrObscured = /rain|shower|drizzle|storm|thunder|t-storm|lightning|snow|sleet|flurr|blizzard|ice|wintry|freez|fog|mist|haze|smoke/.test(c);
+
+  if (!wetOrObscured) {
+    const claimsSunnyOrClear = /\bsunny\b|\bclear\b|\bfair\b|few clouds/.test(c);
+    const claimsPartly = /partly|scattered|mostly sunny/.test(c);
+    const heavilyClouded = (typeof cloudCover === 'number' && Number.isFinite(cloudCover) && cloudCover >= 70) || weatherKind === 'cloudy';
+
+    if (heavilyClouded && (claimsSunnyOrClear || (claimsPartly && cloudCover >= 80) || !cond)) {
+      const fc = String(forecastCondition || '').trim();
+      const fcClean = fc && !/\bsunny\b|\bclear\b|\bfair\b|partly/i.test(fc) ? fc : '';
+      cond = fcClean || (cloudCover >= 90 ? 'Overcast' : 'Mostly Cloudy');
+    } else if (typeof cloudCover === 'number' && Number.isFinite(cloudCover) && cloudCover >= 45 && cloudCover < 70 && claimsSunnyOrClear && !claimsPartly) {
+      cond = 'Partly Cloudy';
+    }
+  }
+
+  if (!isDay) {
+    if (/^sunny$/i.test(cond)) cond = 'Clear';
+    else if (/^mostly sunny$/i.test(cond)) cond = 'Mostly Clear';
+    else if (/^partly sunny$/i.test(cond)) cond = 'Partly Cloudy';
+  }
+
+  return cond || (cloudCover >= 90 ? 'Overcast' : cloudCover >= 70 ? 'Mostly Cloudy' : isDay ? 'Partly Cloudy' : 'Clear');
+}
 
 /**
  * Blend V2 Base Temperature Weights by Lead-Time Horizon (hours ahead)
@@ -318,7 +362,7 @@ export async function searchLocations(query) {
           const a = row.address || {};
           const cityPart = a.city || a.town || a.village || a.hamlet || a.county || '';
           const streetPart = [a.house_number, a.road].filter(Boolean).join(' ');
-          const statePart = a.state || '';
+          const statePart = formatStateShort(a.state || '');
           const zipPart = a.postcode ? ` ${a.postcode.split('-')[0]}` : '';
           const shortName = streetPart
             ? [streetPart, cityPart, statePart].filter(Boolean).join(', ')
@@ -380,13 +424,13 @@ export async function searchLocations(query) {
 export async function reverseGeocodeLocation(lat, lon) {
   try {
     const res = await fetch(
-      `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}&zoom=12`
+      `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}&zoom=13`
     );
     if (res.ok) {
       const data = await res.json();
       const a = data?.address || {};
-      const city = a.city || a.town || a.village || a.county;
-      const state = a.state;
+      const city = a.city || a.town || a.village || a.suburb || a.hamlet || a.county;
+      const state = formatStateShort(a.state);
       if (city) return [city, state].filter(Boolean).join(', ');
     }
   } catch {}
@@ -498,9 +542,12 @@ async function fetchNwsIntelligence(lat, lon) {
  * so V3 matches the main page's exact temperatures, rain chances, hazards, and discussions.
  */
 export async function fetchCompleteFusionForecast(locationInput, { forceRefresh = false } = {}) {
-  const loc = locationInput || PRESET_CITIES[1] || PRESET_CITIES[0];
-  const lat = Number(loc.latitude ?? 35.7877);
-  const lon = Number(loc.longitude ?? -78.4806);
+  if (!locationInput || !Number.isFinite(Number(locationInput.latitude)) || !Number.isFinite(Number(locationInput.longitude))) {
+    throw new Error('Location coordinates are required to fetch a local forecast.');
+  }
+  const loc = locationInput;
+  const lat = Number(loc.latitude);
+  const lon = Number(loc.longitude);
 
   // Fetch canonical main-site backend forecast first (exact NDFD/HRRR/NBM/ECMWF/GEFS/WeatherNext blend + WPC/SPC hazards + NWS AFD)
   const canonicalPromise = fetch(
@@ -540,7 +587,7 @@ export async function fetchCompleteFusionForecast(locationInput, { forceRefresh 
   let baseData = null;
   let multiModelData = null;
   let aqiData = null;
-  let nwsData = { wfo: loc.wfo || 'RAH', alerts: [], afdText: null, nwsHourlyMap: new Map(), available: false };
+  let nwsData = { wfo: loc.wfo || 'NWS', alerts: [], afdText: null, nwsHourlyMap: new Map(), available: false };
 
   try {
     const [canonRes, baseRes, mmRes, aqiRes] = await Promise.all([
@@ -648,14 +695,18 @@ function roundFinite(val, decimals = 0) {
  * prioritizing canonical backend data from /api/weather-fusion/forecast.
  */
 export function buildUnifiedFusionPayload(loc, baseData, multiModelData, aqiData, nwsData, canonicalData = null) {
-  const lat = Number(loc.latitude ?? canonicalData?.location?.latitude ?? 35.7877);
-  const lon = Number(loc.longitude ?? canonicalData?.location?.longitude ?? -78.4806);
+  const lat = Number(loc?.latitude ?? canonicalData?.location?.latitude);
+  const lon = Number(loc?.longitude ?? canonicalData?.location?.longitude);
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+    throw new Error('Valid coordinates are required to build a forecast payload.');
+  }
   const now = new Date();
   const timeZone = canonicalData?.location?.timeZone || baseData?.timezone || loc.timezone || 'America/New_York';
-  const resolvedLocName =
-    (loc.id === 'gps' || !loc.name || loc.name === 'Current Location' || loc.source?.startsWith('device')) && canonicalData?.location?.name
-      ? canonicalData.location.name
-      : (loc.name || canonicalData?.location?.name || 'Current Location');
+  const genericNames = new Set(['', 'Current Location', 'Device location', 'Selected Location', 'Finding your location…']);
+  const explicitName = String(loc?.name || '').trim();
+  const resolvedLocName = !genericNames.has(explicitName)
+    ? explicitName
+    : (canonicalData?.location?.name || 'Current Location');
 
   const isLiveApi = Boolean(canonicalData?.hours?.length || baseData?.hourly?.time?.length);
 
@@ -988,12 +1039,42 @@ export function buildUnifiedFusionPayload(loc, baseData, multiModelData, aqiData
 
     const feelsLikeF = Number.isFinite(csFeels?.value) ? Math.round(csFeels.value) : Number.isFinite(ch?.feelsLike) ? Math.round(ch.feelsLike) : comfort.activeFeelsF;
     const shadeFeelsF = Number.isFinite(csFeels?.shadeValue) ? Math.round(csFeels.shadeValue) : Number.isFinite(csShade?.value) ? Math.round(csShade.value) : Number.isFinite(ch?.feelsLikeShade) ? Math.round(ch.feelsLikeShade) : comfort.shadeFeelsF;
-    const sunFeelsF = Number.isFinite(csFeels?.sunValue) ? Math.round(csFeels.sunValue) : Number.isFinite(csSun?.value) ? Math.round(csSun.value) : Number.isFinite(ch?.feelsLikeSun) ? Math.round(ch.feelsLikeSun) : comfort.sunFeelsF;
+    const canonSunVal = Number.isFinite(csFeels?.sunValue)
+      ? Math.round(csFeels.sunValue)
+      : Number.isFinite(csSun?.value)
+      ? Math.round(csSun.value)
+      : Number.isFinite(ch?.feelsLikeSun)
+      ? Math.round(ch.feelsLikeSun)
+      : null;
 
     const condFallback = describeWeatherCondition(wmoCode, rainLedger.totalPts, tempFusion.blendedF, isDay, windMph);
-    const condLabel = ch?.condition || cr?.condition || condFallback.label;
+    const rawCondLabel = ch?.condition || cr?.condition || condFallback.label;
+    const condLabel = reconcileSkyCondition(
+      rawCondLabel,
+      cloudCover,
+      isDay,
+      rainLedger.totalPts,
+      csFeels?.weatherKind || null,
+      ch?.forecastCondition || null
+    );
     const condIcon = deriveIconFromLabel(condLabel, isDay, rainLedger.totalPts, tempFusion.blendedF) || condFallback.icon;
     const condSky = deriveSkyFromLabel(condLabel, isDay, rainLedger.totalPts) || condFallback.sky;
+
+    const cloudyOrWetHour =
+      cloudCover >= 70 ||
+      rainLedger.totalPts >= 50 ||
+      csFeels?.weatherKind === 'cloudy' ||
+      /overcast|mostly cloudy|\bcloudy\b|fog|rain|shower|storm|snow/i.test(condLabel);
+    const rawSunCandidate = canonSunVal ?? comfort.sunFeelsF;
+    const hasDirectSun = Boolean(
+      isDay &&
+      !cloudyOrWetHour &&
+      (canonSunVal !== null || (rawSunCandidate - shadeFeelsF) >= 2)
+    );
+    const sunFeelsF = hasDirectSun
+      ? Math.max(shadeFeelsF, rawSunCandidate)
+      : Math.max(shadeFeelsF, feelsLikeF);
+    const sunDeltaF = hasDirectSun ? Math.max(0, Math.round(sunFeelsF - shadeFeelsF)) : 0;
 
     const spreadHalf = Math.max(1.2, tempFusion.spreadF * 0.65 + i * 0.025);
 
@@ -1011,8 +1092,9 @@ export function buildUnifiedFusionPayload(loc, baseData, multiModelData, aqiData
       feelsLikeF,
       shadeFeelsF,
       sunFeelsF,
+      hasDirectSun,
       rainFeelsF: comfort.rainFeelsF,
-      sunDeltaF: Math.round(sunFeelsF - shadeFeelsF),
+      sunDeltaF,
       shortwaveWm2: comfort.shortwaveWm2,
       wetBulbF: comfort.wetBulbF,
       comfortCategory: comfort.category,
@@ -1061,8 +1143,9 @@ export function buildUnifiedFusionPayload(loc, baseData, multiModelData, aqiData
     if (typeof cc.feelsLike === 'number' && Number.isFinite(cc.feelsLike)) hours[0].feelsLikeF = Math.round(cc.feelsLike);
     else if (typeof cc.apparent === 'number' && Number.isFinite(cc.apparent)) hours[0].feelsLikeF = Math.round(cc.apparent);
     if (typeof cc.feelsLikeShade === 'number' && Number.isFinite(cc.feelsLikeShade)) hours[0].shadeFeelsF = Math.round(cc.feelsLikeShade);
-    if (typeof cc.feelsLikeSun === 'number' && Number.isFinite(cc.feelsLikeSun)) hours[0].sunFeelsF = Math.round(cc.feelsLikeSun);
-    hours[0].sunDeltaF = Math.round((hours[0].sunFeelsF ?? hours[0].feelsLikeF) - (hours[0].shadeFeelsF ?? hours[0].feelsLikeF));
+    if (typeof cc.skyCover === 'number' && Number.isFinite(cc.skyCover)) {
+      hours[0].cloudCover = clamp(Math.round(cc.skyCover), 0, 100);
+    }
     if (typeof cc.dewpoint === 'number' && Number.isFinite(cc.dewpoint)) hours[0].dewPointF = Math.round(cc.dewpoint);
     if (typeof cc.humidity === 'number' && Number.isFinite(cc.humidity)) hours[0].humidity = Math.round(cc.humidity);
     if (typeof cc.wind === 'number' && Number.isFinite(cc.wind)) hours[0].windMph = Math.round(cc.wind);
@@ -1073,10 +1156,34 @@ export function buildUnifiedFusionPayload(loc, baseData, multiModelData, aqiData
     }
     if (typeof cc.pressure === 'number' && Number.isFinite(cc.pressure)) hours[0].pressureInHg = Number(cc.pressure.toFixed(2));
     if (typeof cc.visibility === 'number' && Number.isFinite(cc.visibility)) hours[0].visibilityMi = Number(cc.visibility.toFixed(1));
-    if (cc.condition) {
-      hours[0].condition = cc.condition;
-      hours[0].icon = deriveIconFromLabel(cc.condition, hours[0].isDay, hours[0].rainChance, hours[0].tempF) || hours[0].icon;
-      hours[0].skyMood = deriveSkyFromLabel(cc.condition, hours[0].isDay, hours[0].rainChance) || hours[0].skyMood;
+
+    const curFeelsSeries = canonSeries.feels?.get(startEpoch);
+    const curCanonHour = canonHours.get(startEpoch) || canonicalData.hours?.[0];
+    const reconciledCurCond = reconcileSkyCondition(
+      cc.condition || hours[0].condition,
+      hours[0].cloudCover,
+      hours[0].isDay,
+      hours[0].rainChance,
+      curFeelsSeries?.weatherKind || null,
+      curCanonHour?.forecastCondition || null
+    );
+    hours[0].condition = reconciledCurCond;
+    hours[0].icon = deriveIconFromLabel(reconciledCurCond, hours[0].isDay, hours[0].rainChance, hours[0].tempF) || hours[0].icon;
+    hours[0].skyMood = deriveSkyFromLabel(reconciledCurCond, hours[0].isDay, hours[0].rainChance) || hours[0].skyMood;
+
+    const curCloudyOrWet =
+      hours[0].cloudCover >= 70 ||
+      hours[0].rainChance >= 50 ||
+      curFeelsSeries?.weatherKind === 'cloudy' ||
+      /overcast|mostly cloudy|\bcloudy\b|fog|rain|shower|storm|snow/i.test(reconciledCurCond);
+    const hasCanonSun = typeof cc.feelsLikeSun === 'number' && Number.isFinite(cc.feelsLikeSun);
+    hours[0].hasDirectSun = Boolean(hours[0].isDay && !curCloudyOrWet && hasCanonSun);
+    if (hours[0].hasDirectSun) {
+      hours[0].sunFeelsF = Math.max(hours[0].shadeFeelsF ?? hours[0].feelsLikeF, Math.round(cc.feelsLikeSun));
+      hours[0].sunDeltaF = Math.max(0, Math.round(hours[0].sunFeelsF - (hours[0].shadeFeelsF ?? hours[0].feelsLikeF)));
+    } else {
+      hours[0].sunFeelsF = Math.max(hours[0].shadeFeelsF ?? hours[0].feelsLikeF, hours[0].feelsLikeF);
+      hours[0].sunDeltaF = 0;
     }
   }
 
@@ -1157,7 +1264,7 @@ function deriveIconFromLabel(condition, isDay, rainChance = 0, tempF = 60) {
   if (/heavy rain|steady rain|showers likely|rain likely/.test(c) || (/rain|shower/.test(c) && rainChance >= 55)) return 'rain';
   if (/drizzle|chance.*rain|slight chance.*rain|sprinkle|scattered shower/.test(c) || rainChance >= 35) return 'drizzle';
   if (/fog|mist|haze|smoke/.test(c)) return 'fog';
-  if (/overcast|mostly cloudy|cloudy/.test(c)) return 'cloudy';
+  if (!/partly/.test(c) && /overcast|mostly cloudy|\bcloudy\b/.test(c)) return 'cloudy';
   if (/partly sunny|partly cloudy|mostly sunny|few clouds|scattered clouds/.test(c)) return isDay ? 'partly-day' : 'partly-night';
   if (/sunny|clear|fair/.test(c)) return isDay ? 'clear-day' : 'clear-night';
   return null;

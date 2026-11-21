@@ -9,19 +9,19 @@
   <link rel="stylesheet" href="/weather-fusion/car-wash.css?v=center-answer-v43" />
   <link rel="stylesheet" href="/weather-fusion/risk-outlooks.css?v=risk-outlooks-v5" />
   <link rel="stylesheet" href="/weather-fusion/forecast-window-banners.css?v=current-rain-20261017-v3" />
-  <link rel="stylesheet" href="/weather-fusion/v3/css/styles.css?v=v3-accuracy-3" />
+  <link rel="stylesheet" href="/weather-fusion/v3/css/styles.css?v=v3-accuracy-4" />
 </head>
 <body data-sky="cloudy">
-  <!-- Living Sky Atmosphere & Subtle Particle Canvas -->
+  <!-- Full-Viewport Fixed Dynamic Living Sky Backdrop (Flows Behind Every Glass Tile) -->
   <div class="atmosphere" aria-hidden="true"></div>
+  <div class="live-sky-backdrop" aria-hidden="true">
+    <img id="hero-bg-photo" class="hero-bg-photo sky-overcast" src="/weather-fusion/today-sky-rain.webp" alt="" />
+    <div class="live-sky-scrim"></div>
+  </div>
   <canvas id="sky-canvas" aria-hidden="true"></canvas>
 
   <!-- Full-Bleed Atmospheric Sky Hero -->
   <div id="top" class="hero-cinematic-shell">
-    <div class="hero-backdrop-layer" aria-hidden="true">
-      <img id="hero-bg-photo" class="hero-bg-photo sky-overcast" src="/weather-fusion/today-sky-rain.webp" alt="" />
-      <div class="hero-bg-scrim"></div>
-    </div>
 
     <!-- Top Header with Exact "Weather Nourie" Brand + Full Address / City / ZIP Search -->
     <header class="topbar">
@@ -83,9 +83,9 @@
     <!-- Hero Current Conditions -->
     <section class="shell hero-stage" aria-label="Current Conditions">
       <div class="hero-city-row">
-        <button id="city-picker-btn" class="hero-city-trigger" type="button" aria-label="Search any city or address">
+        <button id="city-picker-btn" class="hero-city-trigger" type="button" aria-label="Refresh my current location" title="Tap to refresh your current location">
+          <span class="city-pin-ico" aria-hidden="true">📍</span>
           <span id="city-name">Finding your location…</span>
-          <span class="city-chevron" aria-hidden="true">▾</span>
         </button>
         <span id="hero-date" class="hero-date-pill">Today</span>
       </div>
@@ -114,6 +114,23 @@
   </div>
 
   <main class="shell v3-main-stack">
+    <!-- Shown Only When Live Location Permission Is Needed -->
+    <section id="location-needed-card" class="glass section-panel card-compact location-needed-card" hidden>
+      <div class="loc-needed-inner">
+        <div class="loc-needed-icon" aria-hidden="true">📍</div>
+        <div>
+          <h2 class="card-title-clean" style="font-size:18px;">Turn On Location for Your Local Weather</h2>
+          <p class="section-subtitle" style="margin:4px 0 12px;line-height:1.45;">
+            Weather Nourie uses your live location so you always see accurate conditions right where you are. Allow location access or search any US address or ZIP code.
+          </p>
+          <div class="loc-needed-actions">
+            <button id="location-retry-btn" class="rankings-cta-btn" type="button">⌖ Use My Current Location</button>
+            <button id="location-search-btn" class="mode-pill" type="button">⌕ Search Address or ZIP</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <!-- Urgent Official NWS Weather Alerts -->
     <div id="urgent-alerts-container"></div>
 
@@ -243,7 +260,16 @@
       </div>
     </section>
 
-    <!-- Car Wash Forecast Clickable Card (Opens Exact Main-Page Car Wash Forecast) -->
+    <!-- Outside Right Now (Immediately Below How It Feels & What to Wear) -->
+    <section id="skin-exposure">
+      <div class="section-inline-head">
+        <h2 class="card-title-clean">Outside Right Now</h2>
+        <span id="exposure-time-note" class="subtle-note">Tap Shade, Clouds, or Pets to expand</span>
+      </div>
+      <div id="exposure-cards-grid" class="exposure-teaser-stack"></div>
+    </section>
+
+    <!-- Car Wash Forecast Clickable Card (Immediately Below Outside Right Now) -->
     <button id="car-wash-launcher-btn" class="glass carwash-teaser-card" type="button" aria-label="Open 5-Day Car Wash Forecast">
       <div class="carwash-teaser-left">
         <img class="carwash-teaser-thumb" src="/weather-fusion/car-wash-corvette-hood.webp" alt="" />
@@ -257,15 +283,6 @@
         <span class="weather-take-chevron">›</span>
       </div>
     </button>
-
-    <!-- Outside Right Now (Compact Car-Wash-Style Clickable Cartoon Tiles That Expand on Click) -->
-    <section id="skin-exposure">
-      <div class="section-inline-head">
-        <h2 class="card-title-clean">Outside Right Now</h2>
-        <span id="exposure-time-note" class="subtle-note">Tap Shade, Sun, or Pets to expand</span>
-      </div>
-      <div id="exposure-cards-grid" class="exposure-teaser-stack"></div>
-    </section>
 
     <!-- Conditions & Details (8 Interactive Apple/Samsung Tiles) -->
     <section id="your-day" class="your-day-clean">
@@ -325,28 +342,41 @@
       </div>
     </section>
 
-    <!-- Compare Weather Forecasts (Zoomed-In 5-Day / 7-Day / 10-Day + Heavier Weather Nourie Line + Clickable Accuracy) -->
-    <section id="wn-compare-section" class="glass section-panel card-compact">
-      <div class="n24-header">
-        <div>
-          <h2 class="card-title-clean">Compare Weather Forecasts</h2>
-          <p class="section-subtitle" style="margin-top:2px;">Thick white line = Weather Nourie · Thin colored lines = other forecasts</p>
+    <!-- Compare Weather Forecasts (Collapsed by Default — Opens Only When Clicked) -->
+    <section id="wn-compare-section" class="glass section-panel card-compact compare-collapsible-card">
+      <button id="compare-toggle-btn" class="compare-toggle-btn" type="button" aria-expanded="false" aria-controls="compare-expand-body">
+        <div class="compare-toggle-left">
+          <span class="compare-toggle-ico" aria-hidden="true">📊</span>
+          <div>
+            <div class="compare-toggle-title">Compare Weather Forecasts</div>
+            <div id="compare-toggle-sub" class="compare-toggle-sub">See Weather Nourie vs NWS, HRRR, NBM, ECMWF &amp; GEFS · Tap to open</div>
+          </div>
         </div>
-        <button id="compare-rankings-cta" class="rankings-cta-btn" type="button">🏆 Accuracy Rankings ›</button>
-      </div>
-
-      <div class="compare-top-controls">
-        <div id="compare-var-tabs" class="metric-tabs-bar" style="margin-bottom:0;"></div>
-        <div id="compare-horizon-pills" class="n24-pill-group">
-          <button class="n24-pill active" data-cmp-days="5" type="button">5 Days</button>
-          <button class="n24-pill" data-cmp-days="7" type="button">7 Days</button>
-          <button class="n24-pill" data-cmp-days="10" type="button">10 Days</button>
+        <div class="compare-toggle-right">
+          <span id="compare-toggle-pill" class="compare-open-pill">Open</span>
+          <span id="compare-toggle-chevron" class="compare-toggle-chevron" aria-hidden="true">▾</span>
         </div>
-      </div>
+      </button>
 
-      <div id="compare-model-toggles" class="pill-scroll-row" style="margin:10px 0;"></div>
-      <div id="compare-chart-stage"></div>
-      <div id="compare-day-breakdown" style="margin-top:12px;"></div>
+      <div id="compare-expand-body" class="compare-expand-body" hidden>
+        <div class="n24-header" style="margin-bottom:10px;">
+          <p class="section-subtitle" style="margin:0;">Thick white line = Weather Nourie · Thin colored lines = other forecasts</p>
+          <button id="compare-rankings-cta" class="rankings-cta-btn" type="button">🏆 Accuracy Rankings ›</button>
+        </div>
+
+        <div class="compare-top-controls">
+          <div id="compare-var-tabs" class="metric-tabs-bar" style="margin-bottom:0;"></div>
+          <div id="compare-horizon-pills" class="n24-pill-group">
+            <button class="n24-pill active" data-cmp-days="5" type="button">5 Days</button>
+            <button class="n24-pill" data-cmp-days="7" type="button">7 Days</button>
+            <button class="n24-pill" data-cmp-days="10" type="button">10 Days</button>
+          </div>
+        </div>
+
+        <div id="compare-model-toggles" class="pill-scroll-row" style="margin:10px 0;"></div>
+        <div id="compare-chart-stage"></div>
+        <div id="compare-day-breakdown" style="margin-top:12px;"></div>
+      </div>
     </section>
 
     <!-- More Clickable Features (Friendly Language, Zero Clutter) -->
@@ -430,6 +460,6 @@
   </footer>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
-  <script type="module" src="/weather-fusion/v3/js/app.js?v=v3-accuracy-3"></script>
+  <script type="module" src="/weather-fusion/v3/js/app.js?v=v3-accuracy-4"></script>
 </body>
 </html>

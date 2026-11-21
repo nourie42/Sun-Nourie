@@ -2,14 +2,14 @@
  * Weather Nourie · Experimental Fusion V3 Main Application Controller
  */
 
-import { clamp, computePavementProfile } from './physics.js?v=v3-accuracy-3';
+import { clamp, computePavementProfile } from './physics.js?v=v3-accuracy-4';
 import {
   buildUnifiedFusionPayload,
   fetchCompleteFusionForecast,
   reverseGeocodeLocation,
   searchLocations
-} from './fusion-engine.js?v=v3-accuracy-3';
-import { renderWeatherIconSvg } from './icons.js?v=v3-accuracy-3';
+} from './fusion-engine.js?v=v3-accuracy-4';
+import { renderWeatherIconSvg } from './icons.js?v=v3-accuracy-4';
 import {
   COMPARE_MODELS,
   COMPARE_VARIABLES,
@@ -21,11 +21,11 @@ import {
   renderModelCompareChart,
   renderNext24HoursSplineChart,
   renderSevenDayDualSplineChart
-} from './charts.js?v=v3-accuracy-3';
+} from './charts.js?v=v3-accuracy-4';
 import {
   MAP_LAYERS,
   WeatherMapController
-} from './map.js?v=v3-accuracy-3';
+} from './map.js?v=v3-accuracy-4';
 import { dogWalkerScene, referenceScene } from '../../exposure-scene.js?v=true-night-art-v6';
 import { danCard, danOverview, danTakeDisplay } from '../../dans-summary.js?v=afd-discussion-section-v1';
 import { activeRiskOutlooks, outlookDetailHTML } from '../../risk-outlooks.js?v=risk-outlooks-v5';
@@ -33,36 +33,28 @@ import { buildForecastWindows } from '../../forecast-windows.js?v=current-rain-2
 import { forecastWindowDetailHTML } from '../../forecast-window-banners.js?v=current-rain-20261017-v3';
 import { weatherChangeMessages, WEATHER_CHANGE_TITLE } from '../../weather-changes.js?v=current-rain-20261017-v3';
 
-const SAVED_LOC_KEY = 'weather-nourie-v3-location';
+const LEGACY_LOC_KEY = 'weather-nourie-v3-location';
+const SAVED_LOC_KEY = 'weather-nourie-v3-gps-location';
 const DEVICE_LOC_KEY = 'weather-fusion-device-place';
 const RISK_COLORS = { Marginal: '#74d36a', Slight: '#f4e14a', Enhanced: '#e67a22', Moderate: '#e03b3b', High: '#d34cff' };
-const SILENT_FALLBACK_LOC = {
-  id: 'fallback',
-  name: 'Raleigh, NC',
-  latitude: 35.7796,
-  longitude: -78.6382,
-  timezone: 'America/New_York',
-  wfo: 'RAH',
-  isFallback: true
-};
 
-function readLastSearchedFallback() {
-  try {
-    const raw = localStorage.getItem(SAVED_LOC_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (
-        parsed &&
-        parsed.source === 'search' &&
-        Number.isFinite(parsed.latitude) &&
-        Number.isFinite(parsed.longitude) &&
-        (parsed.latitude !== 0 || parsed.longitude !== 0)
-      ) {
-        return parsed;
-      }
-    }
-  } catch {}
-  return SILENT_FALLBACK_LOC;
+// Purge any legacy hardcoded preset/fallback cache on load
+try {
+  localStorage.removeItem(LEGACY_LOC_KEY);
+} catch {}
+
+function isValidCoordPair(lat, lon) {
+  return (
+    typeof lat === 'number' &&
+    typeof lon === 'number' &&
+    Number.isFinite(lat) &&
+    Number.isFinite(lon) &&
+    lat >= -90 &&
+    lat <= 90 &&
+    lon >= -180 &&
+    lon <= 180 &&
+    (lat !== 0 || lon !== 0)
+  );
 }
 
 function loadInitialLocationContext() {
@@ -73,32 +65,20 @@ function loadInitialLocationContext() {
     const qLat = rawLat !== null && rawLat !== '' ? Number(rawLat) : NaN;
     const qLon = rawLon !== null && rawLon !== '' ? Number(rawLon) : NaN;
     const qName = params.get('name');
-    if (Number.isFinite(qLat) && Number.isFinite(qLon) && qLat >= -90 && qLat <= 90 && qLon >= -180 && qLon <= 180) {
+    if (isValidCoordPair(qLat, qLon)) {
       return { id: 'query', name: qName || 'Selected Location', latitude: qLat, longitude: qLon, explicitChoice: true, fromQuery: true };
-    }
-    const devRaw = localStorage.getItem(DEVICE_LOC_KEY);
-    if (devRaw) {
-      const dev = JSON.parse(devRaw);
-      if (dev && Number.isFinite(dev.latitude) && Number.isFinite(dev.longitude) && (dev.latitude !== 0 || dev.longitude !== 0)) {
-        return {
-          ...dev,
-          id: 'gps',
-          name: dev.name && dev.name !== 'Device location' ? dev.name : 'Current Location',
-          fromCache: true
-        };
-      }
     }
     const raw = localStorage.getItem(SAVED_LOC_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (
-        parsed &&
-        parsed.id === 'gps' &&
-        Number.isFinite(parsed.latitude) &&
-        Number.isFinite(parsed.longitude) &&
-        (parsed.latitude !== 0 || parsed.longitude !== 0)
-      ) {
-        return { ...parsed, fromCache: true };
+      if (parsed && parsed.gpsVerified === true && isValidCoordPair(Number(parsed.latitude), Number(parsed.longitude))) {
+        return {
+          ...parsed,
+          id: 'gps',
+          latitude: Number(parsed.latitude),
+          longitude: Number(parsed.longitude),
+          fromCache: true
+        };
       }
     }
   } catch {}
@@ -122,6 +102,7 @@ const state = {
   selectedMetricId: 'temp',
   selectedDayIdx: 0,
   explanationPeriod: 'all',
+  compareExpanded: false,
   compareVariableId: 'highTemp',
   compareHorizonDays: 5,
   enabledCompareModels: new Set(['blend', 'nws', 'hrrr', 'nbm', 'ecmwf', 'gefs', 'weathernext']),
@@ -141,75 +122,78 @@ export function fmtTemp(tempF, includeUnit = false) {
   return `${v}°${includeUnit ? (state.useCelsius ? 'C' : 'F') : ''}`;
 }
 
+function setAwaitingLocationUi(isAwaiting, showCard = false) {
+  document.body.classList.toggle('awaiting-location', Boolean(isAwaiting));
+  const locCard = document.getElementById('location-needed-card');
+  if (locCard) locCard.hidden = !showCard;
+}
+
+function showLocationNeededState() {
+  state.geoDenied = true;
+  const cityNameEl = document.getElementById('city-name');
+  const condEl = document.getElementById('hero-condition');
+  if (cityNameEl) cityNameEl.textContent = 'Location Needed';
+  if (condEl) condEl.textContent = 'Enable location to see your weather';
+  setAwaitingLocationUi(true, true);
+}
+
 function requestAutoDeviceLocation({ hasCachedLoc = false, fromQuery = false } = {}) {
   if (fromQuery) return;
-  const fallbackLoc = readLastSearchedFallback();
 
   if (!navigator.geolocation) {
-    if (!hasCachedLoc) {
-      state.geoDenied = true;
-      loadLocationForecast(fallbackLoc);
-    }
+    if (!hasCachedLoc) showLocationNeededState();
     return;
   }
 
-  let resolvedGeo = false;
-  const fallbackTimer = !hasCachedLoc
-    ? setTimeout(() => {
-        if (!resolvedGeo && !state.forecast && !state.location) {
-          state.geoDenied = true;
-          loadLocationForecast(fallbackLoc);
-        }
-      }, 4000)
-    : null;
-
   navigator.geolocation.getCurrentPosition(
     async (pos) => {
-      resolvedGeo = true;
-      if (fallbackTimer) clearTimeout(fallbackTimer);
       state.geoDenied = false;
 
-      const lat = pos.coords.latitude;
-      const lon = pos.coords.longitude;
+      const lat = Number(pos.coords.latitude.toFixed(4));
+      const lon = Number(pos.coords.longitude.toFixed(4));
       const movedFar =
         !state.location ||
-        state.location.isFallback ||
         state.location.id !== 'gps' ||
-        Math.abs(lat - state.location.latitude) > 0.01 ||
-        Math.abs(lon - state.location.longitude) > 0.01;
+        Math.abs(lat - state.location.latitude) > 0.005 ||
+        Math.abs(lon - state.location.longitude) > 0.005;
 
       const resolvedName = await Promise.race([
         reverseGeocodeLocation(lat, lon),
-        new Promise((r) => setTimeout(() => r(''), 1600))
+        new Promise((r) => setTimeout(() => r(''), 2000))
       ]);
       const cleanName = resolvedName || state.location?.name || 'Current Location';
 
+      const gpsPlace = {
+        id: 'gps',
+        name: cleanName,
+        latitude: lat,
+        longitude: lon,
+        gpsVerified: true,
+        source: 'device'
+      };
+
       try {
-        localStorage.setItem(
-          DEVICE_LOC_KEY,
-          JSON.stringify({ id: 'device', name: cleanName, latitude: lat, longitude: lon, source: 'device' })
-        );
+        localStorage.setItem(SAVED_LOC_KEY, JSON.stringify(gpsPlace));
+        localStorage.setItem(DEVICE_LOC_KEY, JSON.stringify({ id: 'device', name: cleanName, latitude: lat, longitude: lon, source: 'device' }));
       } catch {}
 
       if (movedFar || !state.forecast) {
-        loadLocationForecast({
-          id: 'gps',
-          name: cleanName,
-          latitude: lat,
-          longitude: lon,
-          wfo: 'NWS'
-        });
+        loadLocationForecast(gpsPlace);
+      } else if (cleanName && cleanName !== 'Current Location' && state.forecast?.location) {
+        state.forecast.location.name = cleanName;
+        const cityEl = document.getElementById('city-name');
+        if (cityEl) cityEl.textContent = cleanName;
       }
     },
     () => {
-      resolvedGeo = true;
-      if (fallbackTimer) clearTimeout(fallbackTimer);
       if (!hasCachedLoc && !state.forecast) {
+        showLocationNeededState();
+      } else {
         state.geoDenied = true;
-        loadLocationForecast(fallbackLoc);
+        if (state.forecast) renderTopCompactPills(state.forecast);
       }
     },
-    { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
+    { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
   );
 }
 
@@ -223,7 +207,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const initialLoc = state.location;
   if (initialLoc) {
-    // Load cached GPS / explicit URL query coordinates immediately (never fake Knightdale before GPS!)
+    setAwaitingLocationUi(false, false);
     state.forecast = buildUnifiedFusionPayload(initialLoc, null, null, null, {
       wfo: initialLoc.wfo || 'NWS',
       alerts: [],
@@ -235,6 +219,7 @@ document.addEventListener('DOMContentLoaded', () => {
     loadLocationForecast(initialLoc);
     requestAutoDeviceLocation({ hasCachedLoc: true, fromQuery: Boolean(initialLoc.fromQuery) });
   } else {
+    setAwaitingLocationUi(true, false);
     const cityNameEl = document.getElementById('city-name');
     if (cityNameEl) cityNameEl.textContent = 'Finding your location…';
     requestAutoDeviceLocation({ hasCachedLoc: false, fromQuery: false });
@@ -248,17 +233,19 @@ function initBrandIcon() {
   }
 }
 
-async function loadLocationForecast(loc) {
+async function loadLocationForecast(loc, { forceRefresh = false } = {}) {
+  if (!loc || !isValidCoordPair(Number(loc.latitude), Number(loc.longitude))) return;
   const token = ++state.loadToken;
   state.location = loc;
+  setAwaitingLocationUi(false, false);
   try {
-    if (!loc.isFallback) localStorage.setItem(SAVED_LOC_KEY, JSON.stringify(loc));
+    if (loc.gpsVerified) localStorage.setItem(SAVED_LOC_KEY, JSON.stringify(loc));
   } catch {}
   state.liveAlerts = null;
   state.liveBriefing = null;
 
   const [liveForecast, alertsRes] = await Promise.all([
-    fetchCompleteFusionForecast(loc),
+    fetchCompleteFusionForecast(loc, { forceRefresh }),
     fetch(`/api/weather-fusion/alerts?latitude=${encodeURIComponent(loc.latitude)}&longitude=${encodeURIComponent(loc.longitude)}`)
       .then((r) => (r.ok ? r.json() : null))
       .catch(() => null)
@@ -316,11 +303,33 @@ function renderAll() {
   }
 }
 
+function applyBackdropPhotoForSky(f) {
+  const heroBg = document.getElementById('hero-bg-photo');
+  if (!heroBg || !f?.current) return;
+  let photo;
+  if (state.skyOverride === 'day') {
+    photo = { src: '/weather-fusion/today-sky-clear.webp', cls: '' };
+  } else if (state.skyOverride === 'rain') {
+    photo = { src: '/weather-fusion/today-sky-rain.webp', cls: '' };
+  } else if (state.skyOverride === 'night') {
+    photo = { src: '/weather-fusion/today-sky-night-v2.webp', cls: '' };
+  } else if (state.skyOverride === 'sunset') {
+    photo = { src: '/weather-fusion/today-sky-clouds.webp', cls: 'sky-sunset' };
+  } else {
+    photo = selectHeroBackdropPhoto(f.current);
+  }
+  if (heroBg.getAttribute('src') !== photo.src) {
+    heroBg.setAttribute('src', photo.src);
+  }
+  heroBg.className = photo.cls ? `hero-bg-photo ${photo.cls}` : 'hero-bg-photo';
+}
+
 function updateSkyAtmosphere(f) {
   const autoMood = f.current?.skyMood || (f.current?.isDay ? 'day' : 'night');
   const mood = state.skyOverride === 'auto' ? autoMood : state.skyOverride;
   state.skyMood = mood;
   document.body.setAttribute('data-sky', mood);
+  applyBackdropPhotoForSky(f);
 }
 
 function renderStatusAndAlerts(f) {
@@ -738,14 +747,7 @@ function renderHeroAndBriefing(f) {
   const tz = f.timeZone || f.location?.timeZone || 'America/New_York';
 
   // Dynamic clean photographic sky backdrop matching current conditions (zero false sun on cloudy days)
-  const heroBg = document.getElementById('hero-bg-photo');
-  if (heroBg) {
-    const photo = selectHeroBackdropPhoto(cur);
-    if (heroBg.getAttribute('src') !== photo.src) {
-      heroBg.setAttribute('src', photo.src);
-    }
-    heroBg.className = photo.cls ? `hero-bg-photo ${photo.cls}` : 'hero-bg-photo';
-  }
+  applyBackdropPhotoForSky(f);
 
   const dateEl = document.getElementById('hero-date');
   const cityEl = document.getElementById('city-name');
@@ -990,7 +992,7 @@ function renderHourlyExplorerSection(f) {
               ${h.dateObj.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} · ${h.hourLabel} (${h.condition})
             </div>
             <div class="readout-meta">
-              Blend: ${fmtTemp(h.tempF)} (P10–P90: ${fmtTemp(h.ensemble.p10)}–${fmtTemp(h.ensemble.p90)}) · Shade ${fmtTemp(h.shadeFeelsF)} / Sun ${fmtTemp(h.sunFeelsF)} · Dew point ${fmtTemp(h.dewPointF)}
+              Blend: ${fmtTemp(h.tempF)} (P10–P90: ${fmtTemp(h.ensemble.p10)}–${fmtTemp(h.ensemble.p90)}) · Shade ${fmtTemp(h.shadeFeelsF)} / ${h.hasDirectSun ? `Sun ${fmtTemp(h.sunFeelsF)}` : `Clouds ${fmtTemp(h.feelsLikeF)}`} · Dew point ${fmtTemp(h.dewPointF)}
             </div>
           </div>
         </div>
@@ -1087,20 +1089,26 @@ function renderOutdoorExposureCards(f) {
   const cur = hrs[hIdx] || f.current;
   const pave = computePavementProfile(hrs, hIdx, f.location.latitude, f.location.longitude);
   const tz = f.timeZone || f.location?.timeZone || 'America/New_York';
+  const isRaining = cur.rainChance >= 50 || cur.precipIn >= 0.01;
+  const isCloudyNoSun =
+    !isRaining &&
+    cur.isDay &&
+    (!cur.hasDirectSun || (cur.cloudCover || 0) >= 70 || /overcast|mostly cloudy|\bcloudy\b|fog/i.test(cur.condition || ''));
+  const secondTileKindLabel = isRaining ? 'Rain' : !cur.isDay ? 'Evening' : isCloudyNoSun ? 'Clouds' : 'Sun';
   const noteEl = document.getElementById('exposure-time-note');
   if (noteEl) {
     noteEl.textContent = hIdx === 0
-      ? 'Right now · Tap Shade, Sun, or Pets to expand'
+      ? `Right now · Tap Shade, ${secondTileKindLabel}, or Pets to expand`
       : `Previewing ${formatZonedHourStamp(cur, hIdx, tz)} · Tap tile to expand`;
   }
 
-  const isRaining = cur.rainChance >= 50 || cur.precipIn >= 0.01;
   const sunWindow = f.windows?.sunHours?.[0];
   const sceneCtx = { pop: cur.rainChance, rainExpected: isRaining, snowExpected: /snow|flurr/i.test(cur.condition || '') };
 
-  const shadeSvg = referenceScene(0, Boolean(cur.isDay), cur.condition || 'Clear', cur.shadeFeelsF, sceneCtx);
-  const sunSvg = referenceScene(1, Boolean(cur.isDay), cur.condition || 'Clear', isRaining ? cur.rainFeelsF : cur.sunFeelsF, sceneCtx);
-  const petsSvg = dogWalkerScene(Boolean(cur.isDay), cur.condition || 'Clear', cur.feelsLikeF, sceneCtx);
+  const shadeSvg = referenceScene(0, Boolean(cur.isDay), cur.condition || 'Overcast', cur.shadeFeelsF, sceneCtx);
+  const sunTileFeels = isRaining ? cur.rainFeelsF : isCloudyNoSun ? cur.feelsLikeF : cur.sunFeelsF;
+  const sunSvg = referenceScene(1, Boolean(cur.isDay), cur.condition || 'Overcast', sunTileFeels, sceneCtx);
+  const petsSvg = dogWalkerScene(Boolean(cur.isDay), cur.condition || 'Overcast', cur.feelsLikeF, sceneCtx);
 
   const concretePct = clamp(((pave.concreteTempF - 30) / 120) * 100, 8, 100);
   const asphaltPct = clamp(((pave.asphaltTempF - 30) / 120) * 100, 8, 100);
@@ -1130,40 +1138,44 @@ function renderOutdoorExposureCards(f) {
     },
     {
       id: 'sun',
-      title: isRaining ? 'In the Rain' : cur.isDay ? 'In Direct Sun' : 'Evening Air',
+      title: isRaining ? 'In the Rain' : !cur.isDay ? 'Evening Air' : isCloudyNoSun ? 'Under Clouds' : 'In Direct Sun',
       shortLine: isRaining
         ? `${cur.rainChance}% rain risk · Damp outdoor chill`
+        : !cur.isDay
+        ? 'No direct sunlight outdoors · Tap to expand'
+        : isCloudyNoSun
+        ? 'Overcast sky — no direct sun · Tap to expand'
         : cur.sunDeltaF >= 3
         ? `Sunlight adds +${cur.sunDeltaF}° warmth · Tap to expand`
-        : cur.isDay
-        ? 'Cloud cover softens sun glare · Tap to expand'
-        : 'No direct sunlight outdoors · Tap to expand',
-      badgeVal: fmtTemp(isRaining ? cur.rainFeelsF : cur.sunFeelsF),
-      badgeColor: isRaining ? '#7ac6ff' : '#ffd470',
+        : 'Filtered sunlight outdoors · Tap to expand',
+      badgeVal: fmtTemp(sunTileFeels),
+      badgeColor: isRaining ? '#7ac6ff' : isCloudyNoSun || !cur.isDay ? '#bae6fd' : '#ffd470',
       svg: sunSvg,
       detailsHtml: `
         <div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:6px;">
-          <span class="exposure-big-temp" style="color:${isRaining ? '#7ac6ff' : '#ffd470'};">
-            ${fmtTemp(isRaining ? cur.rainFeelsF : cur.sunFeelsF)}
+          <span class="exposure-big-temp" style="color:${isRaining ? '#7ac6ff' : isCloudyNoSun || !cur.isDay ? '#bae6fd' : '#ffd470'};">
+            ${fmtTemp(sunTileFeels)}
           </span>
-          <span class="wfo-pill">${isRaining ? `${cur.rainChance}% Rain` : cur.uvIndex > 0 ? `UV ${cur.uvIndex}` : 'After Dusk'}</span>
+          <span class="wfo-pill">${isRaining ? `${cur.rainChance}% Rain` : !cur.isDay ? 'After Dusk' : isCloudyNoSun ? `${Math.round(cur.cloudCover || 85)}% Clouds` : `UV ${cur.uvIndex}`}</span>
         </div>
         <div style="font-size:14.5px;font-weight:700;color:#ffffff;margin-bottom:4px;">
           ${
             isRaining
               ? 'Damp breeze makes it feel cooler outside'
+              : !cur.isDay
+              ? 'Cooler evening temperatures settling in'
+              : isCloudyNoSun
+              ? 'Cloud cover blocks direct sunlight'
               : cur.sunDeltaF >= 3
               ? `Sunlight adds +${cur.sunDeltaF}° warmth`
-              : cur.isDay
-              ? 'Clouds soften direct sun warmth'
-              : 'Cooler evening temperatures settling in'
+              : 'Mild filtered sunlight outdoors'
           }
         </div>
         <p style="font-size:13px;color:var(--muted);margin:0;line-height:1.45;">
           ${
             sunWindow
               ? `Next bright sunny break around <strong>${sunWindow.hourLabel}</strong> (${fmtTemp(sunWindow.tempF)}).`
-              : 'No harsh glare expected for outdoor plans.'
+              : 'Cloud cover keeps glare low for outdoor plans.'
           }
         </p>
       `
@@ -1474,7 +1486,32 @@ function renderModelExplanationSection(f) {
   }
 }
 
+function setCompareExpanded(expanded, { scroll = false } = {}) {
+  state.compareExpanded = Boolean(expanded);
+  const body = document.getElementById('compare-expand-body');
+  const toggleBtn = document.getElementById('compare-toggle-btn');
+  const pill = document.getElementById('compare-toggle-pill');
+  const chevron = document.getElementById('compare-toggle-chevron');
+  const sub = document.getElementById('compare-toggle-sub');
+  if (body) body.hidden = !state.compareExpanded;
+  if (toggleBtn) toggleBtn.setAttribute('aria-expanded', String(state.compareExpanded));
+  if (pill) pill.textContent = state.compareExpanded ? 'Hide' : 'Open';
+  if (chevron) chevron.textContent = state.compareExpanded ? '▴' : '▾';
+  if (sub) {
+    sub.textContent = state.compareExpanded
+      ? 'See Weather Nourie vs NWS, HRRR, NBM, ECMWF & GEFS · Tap to hide'
+      : 'See Weather Nourie vs NWS, HRRR, NBM, ECMWF & GEFS · Tap to open';
+  }
+  if (state.compareExpanded && state.forecast) {
+    renderCompareModelsSection(state.forecast);
+  }
+  if (scroll) {
+    document.getElementById('wn-compare-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+}
+
 function renderCompareModelsSection(f) {
+  if (!state.compareExpanded || !f) return;
   const varTabs = document.getElementById('compare-var-tabs');
   const modelToggles = document.getElementById('compare-model-toggles');
   const chartStage = document.getElementById('compare-chart-stage');
@@ -2128,35 +2165,42 @@ function initHeaderControls() {
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
         state.geoDenied = false;
-        const lat = pos.coords.latitude;
-        const lon = pos.coords.longitude;
+        const lat = Number(pos.coords.latitude.toFixed(4));
+        const lon = Number(pos.coords.longitude.toFixed(4));
         const resolvedName = await Promise.race([
           reverseGeocodeLocation(lat, lon),
-          new Promise((r) => setTimeout(() => r('Current Location'), 1600))
+          new Promise((r) => setTimeout(() => r('Current Location'), 2000))
         ]);
         const cleanName = resolvedName || 'Current Location';
-        try {
-          localStorage.setItem(DEVICE_LOC_KEY, JSON.stringify({ id: 'device', name: cleanName, latitude: lat, longitude: lon, source: 'device' }));
-        } catch {}
-        document.getElementById('search-cluster')?.classList.remove('open');
-        loadLocationForecast({
+        const gpsPlace = {
           id: 'gps',
           name: cleanName,
           latitude: lat,
           longitude: lon,
-          wfo: 'NWS'
-        });
+          gpsVerified: true,
+          source: 'device'
+        };
+        try {
+          localStorage.setItem(SAVED_LOC_KEY, JSON.stringify(gpsPlace));
+          localStorage.setItem(DEVICE_LOC_KEY, JSON.stringify({ id: 'device', name: cleanName, latitude: lat, longitude: lon, source: 'device' }));
+        } catch {}
+        document.getElementById('search-cluster')?.classList.remove('open');
+        loadLocationForecast(gpsPlace, { forceRefresh: true });
       },
       () => {
         state.geoDenied = true;
-        if (cityNameEl) cityNameEl.textContent = state.forecast?.location?.name || 'Location needed';
-        renderTopCompactPills(state.forecast);
+        if (!state.forecast) {
+          showLocationNeededState();
+        } else {
+          if (cityNameEl) cityNameEl.textContent = state.forecast?.location?.name || 'Location Needed';
+          renderTopCompactPills(state.forecast);
+        }
         openModal(
           'Allow Location Access',
-          `<p style="color:var(--muted);line-height:1.5;margin-top:0;">To show weather for your exact spot automatically, allow location permission in your browser settings and tap <strong>⌖ Enable Current Location</strong> — or search any address/ZIP above.</p>`
+          `<p style="color:var(--muted);line-height:1.5;margin-top:0;">To show weather for your exact spot automatically, allow location permission in your browser settings and tap <strong>⌖ Use My Current Location</strong> — or search any address or ZIP above.</p>`
         );
       },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
+      { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
     );
   });
 
@@ -2167,7 +2211,11 @@ function initHeaderControls() {
   });
 
   refreshBtn?.addEventListener('click', () => {
-    loadLocationForecast(state.location);
+    if (state.location) {
+      loadLocationForecast(state.location, { forceRefresh: true });
+    } else {
+      locateBtn?.click();
+    }
   });
 
   skySelect?.addEventListener('change', () => {
@@ -2188,10 +2236,15 @@ function initHeaderControls() {
     toolsBtn.setAttribute('aria-expanded', String(Boolean(isOpen)));
   });
 
-  // Mobile Search Toggle & Hero City Picker Trigger
+  // Search Toggle, Hero Live Location Refresh & Location Needed Actions
   const searchCluster = document.getElementById('search-cluster');
   const mobileSearchBtn = document.getElementById('mobile-search-toggle');
   const cityPickerBtn = document.getElementById('city-picker-btn');
+  const openSearchBar = () => {
+    searchCluster?.classList.add('open');
+    showSearchEmptyHelper();
+    searchInput?.focus();
+  };
   mobileSearchBtn?.addEventListener('click', () => {
     const open = searchCluster?.classList.toggle('open');
     if (open) {
@@ -2200,11 +2253,16 @@ function initHeaderControls() {
     }
   });
   cityPickerBtn?.addEventListener('click', () => {
-    if (searchCluster) {
-      searchCluster.classList.add('open');
-    }
-    showSearchEmptyHelper();
-    searchInput?.focus();
+    locateBtn?.click();
+  });
+  document.getElementById('location-retry-btn')?.addEventListener('click', () => {
+    locateBtn?.click();
+  });
+  document.getElementById('location-search-btn')?.addEventListener('click', openSearchBar);
+
+  // Compare Weather Forecasts — collapsed by default, opens only when clicked
+  document.getElementById('compare-toggle-btn')?.addEventListener('click', () => {
+    setCompareExpanded(!state.compareExpanded);
   });
 
   // Weather Take Banner Click -> Scroll smoothly to Nourie Weather Take card or open full modal
@@ -2275,9 +2333,13 @@ function initBottomNavDock() {
   const items = Array.from(document.querySelectorAll('.bnav-item'));
   if (!items.length) return;
   items.forEach((item) => {
-    item.addEventListener('click', () => {
+    item.addEventListener('click', (e) => {
       items.forEach((i) => i.classList.remove('active'));
       item.classList.add('active');
+      if (item.dataset.bnav === 'compare') {
+        e.preventDefault();
+        setCompareExpanded(true, { scroll: true });
+      }
     });
   });
 }
@@ -2637,7 +2699,7 @@ function openWardrobeModal(f) {
           <div class="wardrobe-badge">${advice.title}</div>
           <div style="font-size:28px;font-weight:800;line-height:1.1;margin:6px 0;">Feels Like ${fmtTemp(cur.feelsLikeF)}</div>
           <div style="font-size:13.5px;color:var(--muted);margin-bottom:10px;">
-            Air ${fmtTemp(cur.tempF)} · Shade ${fmtTemp(cur.shadeFeelsF)} · Sun ${fmtTemp(cur.sunFeelsF)} · Wind ${cur.windMph} mph · Rain ${cur.rainChance}% · Air feels <strong>${dpDesc.toLowerCase()}</strong>
+            Air ${fmtTemp(cur.tempF)} · Shade ${fmtTemp(cur.shadeFeelsF)} · ${cur.hasDirectSun ? `Sun ${fmtTemp(cur.sunFeelsF)}` : `Under Clouds ${fmtTemp(cur.feelsLikeF)}`} · Wind ${cur.windMph} mph · Rain ${cur.rainChance}% · Air feels <strong>${dpDesc.toLowerCase()}</strong>
           </div>
           <ul class="wardrobe-list">
             ${advice.items.map((item) => `<li>✓ ${item}</li>`).join('')}
