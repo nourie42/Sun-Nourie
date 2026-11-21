@@ -7,82 +7,82 @@
   <title>Weather Nourie · V3</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
   <link rel="stylesheet" href="/weather-fusion/car-wash.css?v=center-answer-v43" />
-  <link rel="stylesheet" href="/weather-fusion/v3/css/styles.css?v=v3-apple-sam-3" />
+  <link rel="stylesheet" href="/weather-fusion/v3/css/styles.css?v=v3-allages-4" />
 </head>
 <body data-sky="day">
   <!-- Living Sky Atmosphere & Subtle Particle Canvas -->
   <div class="atmosphere" aria-hidden="true"></div>
   <canvas id="sky-canvas" aria-hidden="true"></canvas>
 
-  <!-- Full-Bleed Cinematic Hero Wrapper -->
+  <!-- Full-Bleed Atmospheric Sky Hero -->
   <div id="top" class="hero-cinematic-shell">
     <div class="hero-backdrop-layer" aria-hidden="true">
       <img id="hero-bg-photo" class="hero-bg-photo" src="/weather-fusion/today-sky-clouds.webp" alt="" />
-      <img id="hero-person-photo" class="hero-person-photo" src="/weather-fusion/weather-her-partly-cloudy-day-feels-32-59f.webp" alt="" />
       <div class="hero-bg-scrim"></div>
     </div>
 
-    <!-- Sleek Translucent Top Navigation Header -->
+    <!-- Top Header with Exact "Weather Nourie" Brand + Full Address / City / ZIP Search -->
     <header class="topbar">
       <div class="shell topbar-row">
         <div class="topbar-left">
-          <button id="tools-drawer-btn" class="icon-btn compact-btn glass-chip-btn" type="button" aria-expanded="false" aria-controls="tools-strip" aria-label="Menu & more tools">☰</button>
-          <a class="brand" href="#top">
+          <button id="tools-drawer-btn" class="icon-btn compact-btn glass-chip-btn" type="button" aria-expanded="false" aria-controls="tools-strip" aria-label="Menu & tools">☰</button>
+          <a class="brand" href="#top" aria-label="Weather Nourie home">
             <div class="brand-mark" id="brand-icon-slot"></div>
             <div class="brand-text">
+              <span class="brand-kicker">WEATHER</span>
               <span class="brand-name">Nourie</span>
             </div>
           </a>
         </div>
 
-        <!-- City / ZIP Search + GPS -->
+        <!-- Universal US City / ZIP / Street Address Search + GPS -->
         <div id="search-cluster" class="search-cluster">
           <div class="search-box-wrap">
             <div class="search-input-shell">
               <span class="search-icon" aria-hidden="true">⌕</span>
-              <input id="city-search" type="search" placeholder="Search city or ZIP…" autocomplete="off" />
+              <input id="city-search" type="search" placeholder="Search city, ZIP, or address…" autocomplete="off" />
             </div>
             <div id="search-results" class="search-dropdown" hidden></div>
           </div>
           <button id="locate-btn" class="icon-btn compact-btn glass-chip-btn" type="button" title="Use my current location" aria-label="Use my location">⌖</button>
         </div>
 
-        <!-- Compact Right Action Cluster -->
+        <!-- Compact Action Buttons -->
         <div class="header-actions">
-          <button id="mobile-search-toggle" class="icon-btn compact-btn glass-chip-btn" type="button" title="Search location" aria-label="Search">⌕</button>
+          <button id="mobile-search-toggle" class="icon-btn compact-btn glass-chip-btn" type="button" title="Search city, ZIP, or address" aria-label="Search location">⌕</button>
           <button id="unit-toggle" class="icon-btn compact-btn glass-chip-btn" type="button" title="Toggle Fahrenheit / Celsius">°F</button>
-          <button id="refresh-btn" class="icon-btn compact-btn glass-chip-btn" type="button" title="Refresh weather" aria-label="Refresh">↻</button>
+          <button id="refresh-btn" class="icon-btn compact-btn glass-chip-btn" type="button" title="Refresh forecast" aria-label="Refresh">↻</button>
         </div>
       </div>
     </header>
 
-    <!-- Expandable "More & Settings" Drawer (Saved Cities + Clickable Tools) -->
+    <!-- Slide-Down Menu Drawer (Saved Shortcuts + All Clickable Tools) -->
     <div id="tools-strip" class="tools-strip">
       <div class="shell tools-strip-inner">
-        <div id="preset-city-chips" class="pill-scroll-row" aria-label="Saved Cities"></div>
+        <div id="preset-city-chips" class="pill-scroll-row" aria-label="Quick locations"></div>
         <div class="pill-scroll-row">
-          <button class="mode-pill" id="open-rankings-modal" type="button">🏆 Model Rankings</button>
+          <button class="mode-pill" id="open-carwash-menu" type="button">🚗 Car Wash</button>
+          <button class="mode-pill" id="open-rankings-modal" type="button">🏆 Accuracy Rankings</button>
           <button class="mode-pill" id="open-wardrobe-modal" type="button">👕 What to Wear</button>
           <button class="mode-pill" id="open-snow-modal" type="button">❄️ Snow Outlook</button>
-          <button class="mode-pill" id="open-science-modal" type="button">🔬 Science &amp; Feeds</button>
-          <button class="mode-pill" id="open-afd-modal" type="button">📡 NWS Discussion</button>
-          <button id="sky-audio-btn" class="mode-pill" type="button">🔊 Sky Audio</button>
-          <select id="sky-mood-select" class="sky-select" aria-label="Atmosphere Sky Mode">
+          <button class="mode-pill" id="open-behind-modal" type="button">ℹ Behind Forecast</button>
+          <button id="sky-audio-btn" class="mode-pill" type="button">🔊 Sky Sounds</button>
+          <select id="sky-mood-select" class="sky-select" aria-label="Sky background theme">
             <option value="auto">Sky: Auto</option>
-            <option value="day">Clear Day</option>
-            <option value="rain">Rain / Storm</option>
+            <option value="day">Sunny Sky</option>
+            <option value="rain">Rainy Sky</option>
             <option value="sunset">Sunset</option>
-            <option value="night">Starry Night</option>
+            <option value="night">Night Sky</option>
           </select>
           <a class="mode-pill" href="/weather-fusion/">← Main Page</a>
         </div>
       </div>
     </div>
 
-    <!-- Cinematic Hero Foreground Content -->
+    <!-- Hero Current Conditions -->
     <section class="shell hero-stage" aria-label="Current Conditions">
       <div class="hero-city-row">
-        <button id="city-picker-btn" class="hero-city-trigger" type="button" aria-label="Change city">
+        <button id="city-picker-btn" class="hero-city-trigger" type="button" aria-label="Search any city or address">
           <span id="city-name">Knightdale, NC</span>
           <span class="city-chevron" aria-hidden="true">▾</span>
         </button>
@@ -102,22 +102,28 @@
         </div>
       </div>
 
-      <!-- Frosted "Weather Take" Banner -->
-      <button id="weather-take-banner" class="glass weather-take-bar" type="button" aria-label="Read full Weather Take">
+      <!-- Nourie Weather Take Bar (Tappable) -->
+      <button id="weather-take-banner" class="glass weather-take-bar" type="button" aria-label="Read Nourie Weather Take">
         <span class="weather-take-accent" aria-hidden="true"></span>
-        <span class="weather-take-label">Weather Take</span>
-        <span id="take-banner-copy" class="weather-take-copy">Checking upcoming weather trends for your area…</span>
+        <span class="weather-take-label">Nourie Take</span>
+        <span id="take-banner-copy" class="weather-take-copy">Checking upcoming weather changes for your location…</span>
         <span class="weather-take-chevron" aria-hidden="true">›</span>
       </button>
     </section>
   </div>
 
   <main class="shell v3-main-stack">
-    <!-- Urgent Official NWS Warnings (only shown if active) -->
+    <!-- Urgent Official NWS Weather Alerts -->
     <div id="urgent-alerts-container"></div>
 
-    <!-- 4-Column Quick Stats Glass Strip: Rain | Total Precip | AQI | Weather Meter -->
-    <section id="quick-stats-strip" class="glass quick-stats-strip" aria-label="Key Weather Metrics">
+    <!-- Large Weather Change Alert Banner (Matches Main Page) -->
+    <div id="weather-change-banner" class="weather-change-card" hidden></div>
+
+    <!-- Upcoming Rain / Sun / Storm Outlook Alert Badges (Clickable Pills Like Main Page) -->
+    <div id="forecast-window-banners" class="window-banners-grid"></div>
+
+    <!-- 4-Column Quick Stats Glass Strip (Rain | Precip | AQI Clickable | Weather Meter Clickable) -->
+    <section id="quick-stats-strip" class="glass quick-stats-strip" aria-label="Quick Weather Summary">
       <div class="qs-col">
         <div class="qs-head"><span class="qs-ico" aria-hidden="true">💧</span> Rain</div>
         <div id="qs-rain-val" class="qs-val">--%</div>
@@ -128,23 +134,42 @@
         <div id="qs-precip-val" class="qs-val">0.00"</div>
         <div class="qs-sub">Next 24h</div>
       </div>
-      <div class="qs-col">
-        <div class="qs-head"><span class="qs-ico" aria-hidden="true">🍃</span> AQI</div>
+      <button id="qs-aqi-btn" class="qs-col qs-btn-col" type="button" aria-expanded="false" aria-label="Tap to expand Air Quality details">
+        <div class="qs-head"><span class="qs-ico" aria-hidden="true">🍃</span> AQI <span class="qs-info-dot">▾</span></div>
         <div id="qs-aqi-val" class="qs-val qs-aqi-num">--</div>
-        <div id="qs-aqi-sub" class="qs-sub qs-aqi-label">Loading</div>
-      </div>
-      <div class="qs-col qs-meter-col">
-        <div class="qs-head">Weather Meter</div>
+        <div id="qs-aqi-sub" class="qs-sub qs-aqi-label">Good</div>
+      </button>
+      <button id="qs-weather-meter-btn" class="qs-col qs-meter-col qs-btn-col" type="button" aria-label="Tap to see what Weather Meter means">
+        <div class="qs-head">Weather Meter <span class="qs-info-dot">ⓘ</span></div>
         <div id="qs-weather-meter-arc" class="qs-meter-arc"></div>
-        <div id="qs-meter-sub" class="qs-sub">Comfortable</div>
+        <div id="qs-meter-sub" class="qs-sub">Pleasant</div>
+      </button>
+    </section>
+
+    <!-- Compact Expandable AQI Panel (Only expands when AQI is clicked!) -->
+    <section id="aqi-expand-drawer" class="glass section-panel card-compact" hidden>
+      <div class="n24-header" style="margin-bottom:6px;">
+        <div>
+          <h3 class="card-title-clean" style="font-size:17px;">Air Quality Details</h3>
+          <p id="aqi-advice-text" class="section-subtitle" style="margin-top:2px;">Clean air for outdoor activities.</p>
+        </div>
+        <button id="aqi-close-btn" class="icon-btn compact-btn" type="button" aria-label="Collapse air quality">✕</button>
       </div>
+      <div style="display:flex;align-items:baseline;gap:12px;margin:4px 0 10px;">
+        <span id="aqi-big-number" style="font-size:38px;font-weight:800;line-height:1;">50</span>
+        <div>
+          <div id="aqi-category-label" style="font-size:16px;font-weight:800;color:var(--mint);">Good</div>
+          <div id="aqi-peak-badge" style="font-size:12px;color:var(--muted);">24h Peak: 50</div>
+        </div>
+      </div>
+      <div id="pollutant-bars" class="pollutant-list"></div>
     </section>
 
     <!-- Next 24 Hours Smooth Luminous Spline Card -->
     <section id="next-24-panel" class="glass section-panel card-compact">
       <div class="n24-header">
         <h2 class="card-title-clean">Next 24 Hours</h2>
-        <div id="n24-metric-pills" class="n24-pill-group" role="tablist" aria-label="Next 24 hours metric">
+        <div id="n24-metric-pills" class="n24-pill-group" role="tablist" aria-label="Hourly view">
           <button class="n24-pill active" data-n24-metric="temp" type="button">Temp</button>
           <button class="n24-pill" data-n24-metric="feels" type="button">Feels Like</button>
           <button class="n24-pill" data-n24-metric="rain" type="button">Rain</button>
@@ -153,7 +178,7 @@
       </div>
       <div id="next24-spline-stage"></div>
       <div class="card-more-row">
-        <button id="open-48h-explorer-btn" class="subtle-link-pill" type="button">View Full 48-Hour Charts &amp; Table ›</button>
+        <button id="open-48h-explorer-btn" class="subtle-link-pill" type="button">View 48-Hour Breakdown &amp; Charts ›</button>
       </div>
     </section>
 
@@ -161,21 +186,21 @@
     <section id="daily-panel" class="glass section-panel card-compact">
       <div class="n24-header">
         <h2 class="card-title-clean">7-Day Outlook</h2>
-        <span class="d7-mode-chip">Temp &amp; Rain ▾</span>
+        <span class="d7-mode-chip">High / Low &amp; Rain</span>
       </div>
       <div id="seven-day-dual-stage"></div>
     </section>
 
-    <!-- 3-Column Bottom Comfort & Conditions Trio -->
-    <section id="comfort-trio-section" class="comfort-trio-grid" aria-label="What to Wear, Dew Point, and Wind">
-      <button id="how-feels-card-btn" class="glass trio-card trio-feels-card trio-clickable" type="button" aria-label="Open What to Wear &amp; Comfort guide">
+    <!-- 3-Column Comfort & Conditions Trio -->
+    <section id="comfort-trio-section" class="comfort-trio-grid" aria-label="How It Feels, Dew Point, and Wind">
+      <button id="how-feels-card-btn" class="glass trio-card trio-feels-card trio-clickable" type="button" aria-label="Tap for What to Wear suggestions">
         <div class="trio-head"><span aria-hidden="true">🌡</span> How It Feels <span class="trio-tap-hint">›</span></div>
         <div class="trio-feels-body">
           <div class="trio-feels-text">
             <div id="trio-feels-label" class="trio-feels-verdict">Comfortable</div>
             <div id="trio-feels-note" class="trio-sub">Tap for What to Wear</div>
           </div>
-          <div id="trio-outfit-visual" class="trio-outfit-thumb"></div>
+          <div id="trio-outfit-visual" class="trio-cartoon-thumb"></div>
         </div>
       </button>
 
@@ -200,44 +225,48 @@
       </article>
     </section>
 
-    <!-- Upcoming Windows (Clean Plain-Language Callouts) -->
-    <div id="forecast-window-banners" class="window-banners-grid"></div>
+    <!-- Nourie Weather Take Full Plain-English Card -->
+    <section id="nourie-weather-take" class="glass section-panel card-compact">
+      <div class="card-kicker-row" style="margin-bottom:6px;">
+        <span class="take-badge-title"><span class="take-green-dot"></span> Nourie Weather Take</span>
+        <span id="risk-outlook-pill" class="wfo-pill">Quiet Weather</span>
+      </div>
+      <h2 id="take-headline" class="card-title-clean" style="font-size:17px;margin-bottom:5px;">Checking local forecast…</h2>
+      <p id="take-summary" class="section-subtitle" style="font-size:13.5px;line-height:1.5;margin-bottom:10px;"></p>
+      <ul id="take-bullets" class="take-plain-list"></ul>
+    </section>
 
-    <!-- Real Illustrated Outdoor Comfort Cards (Main-Page Scenes: Shade, Sun, For Pets) -->
+    <!-- Car Wash Forecast Clickable Card (Opens Exact Main-Page Car Wash Forecast) -->
+    <button id="car-wash-launcher-btn" class="glass carwash-teaser-card" type="button" aria-label="Open 5-Day Car Wash Forecast">
+      <div class="carwash-teaser-left">
+        <img class="carwash-teaser-thumb" src="/weather-fusion/car-wash-corvette-hood.webp" alt="" />
+        <div>
+          <div class="carwash-teaser-title">🚗 Car Wash Forecast</div>
+          <div id="carwash-teaser-sub" class="carwash-teaser-sub">Tap to check the best days to wash your car</div>
+        </div>
+      </div>
+      <div class="carwash-teaser-right">
+        <span id="carwash-teaser-pill" class="cw-pill-badge">CHECK</span>
+        <span class="weather-take-chevron">›</span>
+      </div>
+    </button>
+
+    <!-- Outside Right Now (Uncropped 1:1 Main-Page Cartoon Illustrations: Shade, Sun, For Pets) -->
     <section id="skin-exposure">
       <div class="section-inline-head">
         <h2 class="card-title-clean">Outside Right Now</h2>
-        <span class="subtle-note">Real-feel in shade, sun &amp; for pets</span>
+        <span class="subtle-note">How it feels in shade, sun &amp; for pets</span>
       </div>
       <div id="exposure-cards-grid" class="exposure-grid"></div>
     </section>
 
-    <!-- Sleek Apple / Samsung Weather Detail Tiles (UV, Sunrise/Sunset, Humidity, Pressure, Visibility, AQI) -->
+    <!-- Conditions & Details (8 Interactive Apple/Samsung Tiles) -->
     <section id="your-day" class="your-day-clean">
       <div class="section-inline-head">
         <h2 class="card-title-clean">Conditions &amp; Details</h2>
-        <span class="subtle-note">Tap any tile for hourly chart</span>
+        <span class="subtle-note">Tap any card for hourly trend</span>
       </div>
       <div id="metrics-grid" class="apple-tiles-grid"></div>
-    </section>
-
-    <!-- Car Wash Forecast (Exact Main-Page Theme & Cherry-Red Corvette C8 Photography) -->
-    <section id="car-wash-forecast" class="car-wash-forecast" aria-labelledby="car-wash-title"></section>
-
-    <!-- Air Quality Details -->
-    <section id="air-quality" class="glass section-panel card-compact">
-      <div class="card-kicker-row">
-        <span class="card-title-clean" style="font-size:17px;">Air Quality</span>
-        <span id="aqi-peak-badge" class="wfo-pill">Today Peak</span>
-      </div>
-      <div style="display:flex;align-items:baseline;gap:14px;margin:6px 0 10px;">
-        <span id="aqi-big-number" style="font-size:44px;font-weight:800;line-height:1;font-variant-numeric:tabular-nums;">36</span>
-        <div>
-          <div id="aqi-category-label" style="font-size:18px;font-weight:800;color:var(--mint);">Good</div>
-          <div id="aqi-advice-text" style="font-size:13px;color:var(--muted);">Clean air for outdoor activity.</div>
-        </div>
-      </div>
-      <div id="pollutant-bars" class="pollutant-list"></div>
     </section>
 
     <!-- Best Times to Be Outside -->
@@ -245,7 +274,7 @@
       <div class="n24-header">
         <div>
           <h2 class="card-title-clean">Best Times Outside</h2>
-          <p class="section-subtitle" style="margin-top:2px;">Gold = ideal comfort · Blue dot = rain possible</p>
+          <p class="section-subtitle" style="margin-top:2px;">Gold = great outdoor weather · Dot = rain possible</p>
         </div>
         <div id="perfect-hours-badge" class="wfo-pill"></div>
       </div>
@@ -253,16 +282,16 @@
         <div id="best-times-grid" class="heatmap-grid"></div>
       </div>
       <div id="heatmap-hover-readout" style="margin-top:10px;font-size:12.5px;color:var(--blue);font-weight:600;">
-        Tap any hour square to preview its temperature, wind, and rain chance.
+        Tap any hour box to see how it feels.
       </div>
     </section>
 
-    <!-- Smooth Interactive Weather Radar & Layers -->
+    <!-- Live Radar & Weather Maps -->
     <section id="map-panel" class="glass section-panel card-compact">
       <div class="n24-header">
         <div>
-          <h2 class="card-title-clean">Live Radar &amp; Weather Map</h2>
-          <p id="map-layer-caption" class="section-subtitle" style="margin-top:2px;">Live precipitation radar around your location.</p>
+          <h2 class="card-title-clean">Live Radar &amp; Map</h2>
+          <p id="map-layer-caption" class="section-subtitle" style="margin-top:2px;">Live rain radar around your location.</p>
         </div>
         <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
           <div id="basemap-tabs" class="pill-scroll-row">
@@ -282,62 +311,70 @@
       <div class="map-controls-bar">
         <div class="radar-scrubber-wrap">
           <button id="radar-play" class="icon-btn" type="button">▶ Play</button>
-          <input id="radar-time" type="range" min="0" max="10" value="0" aria-label="Map timeline frame scrubber" />
+          <input id="radar-time" type="range" min="0" max="10" value="0" aria-label="Radar time scrubber" />
           <span id="radar-stamp" class="wfo-pill">Live</span>
         </div>
         <div id="map-legend" style="display:flex;gap:10px;flex-wrap:wrap;font-size:11.5px;color:var(--muted);"></div>
       </div>
     </section>
 
-    <!-- 10-Day Model Compare Lab (With Heavier Weather Nourie Blend Line + Clickable Accuracy Ranking) -->
+    <!-- Compare Weather Forecasts (Zoomed-In 5-Day / 7-Day / 10-Day + Heavier Weather Nourie Line + Clickable Accuracy) -->
     <section id="wn-compare-section" class="glass section-panel card-compact">
       <div class="n24-header">
         <div>
-          <h2 class="card-title-clean">Compare Forecast Models</h2>
-          <p class="section-subtitle" style="margin-top:2px;">Bold white/blue line is the Weather Nourie Blend vs individual models.</p>
+          <h2 class="card-title-clean">Compare Weather Forecasts</h2>
+          <p class="section-subtitle" style="margin-top:2px;">Thick white line = Weather Nourie · Thin colored lines = other forecasts</p>
         </div>
-        <button id="compare-rankings-cta" class="rankings-cta-btn" type="button">🏆 Model Accuracy Rankings ›</button>
+        <button id="compare-rankings-cta" class="rankings-cta-btn" type="button">🏆 Accuracy Rankings ›</button>
       </div>
 
-      <div id="compare-var-tabs" class="metric-tabs-bar"></div>
-      <div id="compare-model-toggles" class="pill-scroll-row" style="margin-bottom:10px;"></div>
+      <div class="compare-top-controls">
+        <div id="compare-var-tabs" class="metric-tabs-bar" style="margin-bottom:0;"></div>
+        <div id="compare-horizon-pills" class="n24-pill-group">
+          <button class="n24-pill active" data-cmp-days="5" type="button">5 Days</button>
+          <button class="n24-pill" data-cmp-days="7" type="button">7 Days</button>
+          <button class="n24-pill" data-cmp-days="10" type="button">10 Days</button>
+        </div>
+      </div>
+
+      <div id="compare-model-toggles" class="pill-scroll-row" style="margin:10px 0;"></div>
       <div id="compare-chart-stage"></div>
       <div id="compare-day-breakdown" style="margin-top:12px;"></div>
     </section>
 
-    <!-- Clean Consumer "More & Behind the Forecast" Clickable Launcher (Keeps ALL Science off the Home Screen!) -->
+    <!-- More Clickable Features (Friendly Language, Zero Clutter) -->
     <section id="more-section" class="glass section-panel card-compact">
-      <h2 class="card-title-clean" style="margin-bottom:10px;">More Tools &amp; Forecast Accuracy</h2>
+      <h2 class="card-title-clean" style="margin-bottom:10px;">More Features</h2>
       <div class="more-action-grid">
         <button id="more-rankings-btn" class="more-tile-btn" type="button">
           <span class="more-tile-ico">🏆</span>
           <span>
-            <strong>Past Model Accuracy Rankings</strong>
-            <small>See which weather model performed best here over 7–14 days</small>
+            <strong>Past Forecast Accuracy Rankings</strong>
+            <small>See which forecast has been most accurate here lately</small>
+          </span>
+          <span class="weather-take-chevron">›</span>
+        </button>
+        <button id="more-carwash-btn" class="more-tile-btn" type="button">
+          <span class="more-tile-ico">🚗</span>
+          <span>
+            <strong>5-Day Car Wash Forecast</strong>
+            <small>Best wash days &amp; dry streak outlook</small>
           </span>
           <span class="weather-take-chevron">›</span>
         </button>
         <button id="more-wardrobe-btn" class="more-tile-btn" type="button">
           <span class="more-tile-ico">👕</span>
           <span>
-            <strong>What to Wear &amp; Feel Breakdown</strong>
-            <small>Layering advice &amp; indoor vs outdoor moisture meter</small>
+            <strong>What to Wear Guide</strong>
+            <small>Outfit suggestions for how it feels outside today</small>
           </span>
           <span class="weather-take-chevron">›</span>
         </button>
-        <button id="more-science-btn" class="more-tile-btn" type="button">
-          <span class="more-tile-ico">🔬</span>
+        <button id="more-behind-btn" class="more-tile-btn" type="button">
+          <span class="more-tile-ico">ℹ</span>
           <span>
-            <strong>Scientific Stuff &amp; Model Math</strong>
-            <small>Blend weights, rain scoring ledger, source feeds &amp; NWS AFD</small>
-          </span>
-          <span class="weather-take-chevron">›</span>
-        </button>
-        <button id="more-hourly-btn" class="more-tile-btn" type="button">
-          <span class="more-tile-ico">📈</span>
-          <span>
-            <strong>48-Hour 12-Metric Explorer</strong>
-            <small>Interactive pressure, dew point, cloud cover, UV &amp; rainfall</small>
+            <strong>Behind the Forecast</strong>
+            <small>See the forecasts &amp; weather office updates powering this page</small>
           </span>
           <span class="weather-take-chevron">›</span>
         </button>
@@ -346,7 +383,7 @@
   </main>
 
   <!-- Fixed Bottom 5-Tab Navigation Dock -->
-  <nav class="bottom-nav-dock" aria-label="Primary sections">
+  <nav class="bottom-nav-dock" aria-label="Quick navigation">
     <a class="bnav-item active" href="#top" data-bnav="today">
       <svg class="bnav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 10v10h14V10"/></svg>
       <span>Today</span>
@@ -369,7 +406,7 @@
     </a>
   </nav>
 
-  <!-- Rich Modal Dialog (Handles Model Rankings, What to Wear, 48h Explorer, Science/AFD, Weather Take) -->
+  <!-- Modal Dialog -->
   <dialog id="nourie-dialog" class="nourie-modal">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;gap:10px;">
       <h3 id="modal-title" style="margin:0;font-size:18px;font-weight:800;">Details</h3>
@@ -381,11 +418,11 @@
   <footer class="site-footer">
     <div class="shell">
       <div style="font-weight:700;color:var(--text);margin-bottom:4px;">Weather Nourie · V3</div>
-      <div>Powered by NOAA/NWS, HRRR, NBM, ECMWF &amp; WeatherNext AI</div>
+      <div>Local forecasts powered by National Weather Service &amp; global weather models</div>
     </div>
   </footer>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
-  <script type="module" src="/weather-fusion/v3/js/app.js?v=v3-apple-sam-3"></script>
+  <script type="module" src="/weather-fusion/v3/js/app.js?v=v3-allages-4"></script>
 </body>
 </html>

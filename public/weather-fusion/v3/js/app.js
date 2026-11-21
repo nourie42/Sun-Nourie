@@ -7,6 +7,7 @@ import {
   PRESET_CITIES,
   buildUnifiedFusionPayload,
   fetchCompleteFusionForecast,
+  reverseGeocodeLocation,
   searchLocations
 } from './fusion-engine.js';
 import { renderWeatherIconSvg } from './icons.js';
@@ -26,11 +27,26 @@ import {
   WeatherMapController
 } from './map.js';
 import { dogWalkerScene, referenceScene } from '../../exposure-scene.js?v=true-night-art-v6';
-import { selectWeatherPortrait } from '../../weather-portraits.js?v=weather-portraits-v1';
+
+const SAVED_LOC_KEY = 'weather-nourie-v3-location';
+function loadSavedLocation() {
+  try {
+    const raw = localStorage.getItem(SAVED_LOC_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && Number.isFinite(parsed.latitude) && Number.isFinite(parsed.longitude)) {
+        return parsed;
+      }
+    }
+  } catch {}
+  return PRESET_CITIES[1] || PRESET_CITIES[0];
+}
 
 const state = {
-  location: PRESET_CITIES[1] || PRESET_CITIES[0],
+  location: loadSavedLocation(),
   forecast: null,
+  liveAlerts: null,
+  liveBriefing: null,
   useCelsius: false,
   skyOverride: 'auto',
   activeViewMode: 'experimental',
@@ -40,9 +56,11 @@ const state = {
   selectedDayIdx: 0,
   explanationPeriod: 'all',
   compareVariableId: 'highTemp',
+  compareHorizonDays: 5,
   enabledCompareModels: new Set(['blend', 'nws', 'hrrr', 'nbm', 'ecmwf', 'gefs', 'weathernext']),
   dewPointRangeHours: 48,
   selectedDewPointIdx: 0,
+  aqiExpanded: false,
   mapController: null,
   skyAudioActive: false,
   audioCtx: null,
@@ -88,13 +106,31 @@ function initBrandIcon() {
 
 async function loadLocationForecast(loc) {
   state.location = loc;
-  const statusEl = document.getElementById('status-text');
-  if (statusEl) {
-    statusEl.textContent = `Fusing live models for ${loc.name} (NWS · HRRR · NBM · ECMWF IFS · GEFS · WeatherNext)…`;
-  }
+  try {
+    localStorage.setItem(SAVED_LOC_KEY, JSON.stringify(loc));
+  } catch {}
+  state.liveAlerts = null;
+  state.liveBriefing = null;
   updatePresetChipSelection();
 
-  const liveForecast = await fetchCompleteFusionForecast(loc);
+  const [liveForecast, alertsRes, briefingRes] = await Promise.all([
+    fetchCompleteFusionForecast(loc),
+    fetch(`/api/weather-fusion/alerts?latitude=${encodeURIComponent(loc.latitude)}&longitude=${encodeURIComponent(loc.longitude)}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .catch(() => null),
+    fetch(`/api/weather-fusion/briefing?latitude=${encodeURIComponent(loc.latitude)}&longitude=${encodeURIComponent(loc.longitude)}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .catch(() => null)
+  ]);
+
+  if (alertsRes && Array.isArray(alertsRes.alerts)) {
+    state.liveAlerts = alertsRes.alerts;
+    if (alertsRes.alerts.length) liveForecast.alerts = alertsRes.alerts;
+  }
+  if (briefingRes && (briefingRes.headline || briefingRes.danTake || briefingRes.summary)) {
+    state.liveBriefing = briefingRes;
+  }
+
   state.forecast = liveForecast;
   state.selectedHourIdx = 0;
   state.selectedDayIdx = 0;
@@ -114,7 +150,7 @@ function renderAll() {
   renderSevenDayForecast(f);
   renderOutdoorExposureCards(f);
   renderAqiAndGlanceTiles(f);
-  renderMainStyleCarWashCard(f);
+  renderCarWashTeaser(f);
   renderBestTimesHeatmap(f);
   renderCompareModelsSection(f);
 
@@ -365,62 +401,13 @@ function getDewPointVerdict(dpF) {
   return 'Oppressive';
 }
 
-function selectHeroPortraitInfo(cur) {
-  const portrait = selectWeatherPortrait({
-    condition: cur.condition,
-    temperature: cur.tempF,
-    feels: cur.feelsLikeF,
-    isDay: Boolean(cur.isDay),
-    skyCover: cur.cloudCover,
-    rainNow: (cur.precipIn || 0) >= 0.02 || (cur.rainChance || 0) >= 60
-  });
-  if (portrait?.available && portrait.file) {
-    return `/weather-fusion/${portrait.file}?v=weather-portraits-v1`;
-  }
-  return cur.isDay
-    ? '/weather-fusion/weather-her-partly-cloudy-day-feels-32-59f.webp'
-    : '/weather-fusion/weather-her-cloudy-night-feels-32-59f.webp';
-}
-
-function buildWardrobeAdvice(feelsF, cur) {
-  const isRain = (cur.rainChance || 0) >= 50 || (cur.precipIn || 0) >= 0.02;
-  const windy = (cur.windMph || 0) >= 16;
-  if (feelsF < 32) {
-    return {
-      title: 'Heavy Winter Layers',
-      items: ['Insulated coat or parka', 'Warm sweater + long pants', 'Gloves, scarf & warm hat', isRain ? 'Waterproof boots' : 'Closed insulated shoes']
-    };
-  }
-  if (feelsF < 48) {
-    return {
-      title: 'Chilly Weather Layers',
-      items: [isRain ? 'Lined waterproof jacket' : 'Medium jacket or fleece', 'Long-sleeve shirt', 'Jeans or trousers', windy ? 'Wind-blocking outer layer' : 'Closed-toe shoes']
-    };
-  }
-  if (feelsF < 64) {
-    return {
-      title: isRain ? 'Cool & Rain-Ready' : 'Comfortable Jacket Weather',
-      items: [isRain ? 'Light rain shell or umbrella' : 'Light jacket, hoodie, or cardigan', 'T-shirt or breathable base layer', 'Long pants or leggings', 'Everyday sneakers']
-    };
-  }
-  if (feelsF < 78) {
-    return {
-      title: isRain ? 'Mild with Umbrella' : 'Easy Pleasant Layers',
-      items: ['Short sleeves or light shirt', isRain ? 'Compact umbrella handy' : 'Light optional wrap for evening', 'Shorts or light pants', 'Sunglasses for bright spells']
-    };
-  }
-  return {
-    title: 'Warm & Breathable',
-    items: ['Lightweight short sleeves', 'Shorts or breezy fabrics', 'Sunglasses & SPF protection', 'Carry water outdoors']
-  };
-}
-
 function renderHeroAndBriefing(f) {
   const cur = f.current;
   const today = f.days[0];
   const aqi = f.airQuality?.currentAqi ?? 38;
+  const isRainNow = (cur.rainChance || 0) >= 55 || (cur.precipIn || 0) >= 0.02;
 
-  // Dynamic cinematic photographic backdrop + weather-matched outdoor person portrait
+  // Dynamic clean photographic sky backdrop matching current conditions (no lady portrait!)
   const heroBg = document.getElementById('hero-bg-photo');
   if (heroBg) {
     const nextSrc = selectHeroBackdropPhoto(cur);
@@ -428,10 +415,21 @@ function renderHeroAndBriefing(f) {
       heroBg.setAttribute('src', nextSrc);
     }
   }
-  const personUrl = selectHeroPortraitInfo(cur);
-  const heroPerson = document.getElementById('hero-person-photo');
-  if (heroPerson && heroPerson.getAttribute('src') !== personUrl) {
-    heroPerson.setAttribute('src', personUrl);
+
+  // Render Large Weather Change Alert Banner when triggered
+  const changeBanner = document.getElementById('weather-change-banner');
+  if (changeBanner) {
+    const msgs = f.briefing?.changeAlerts || [];
+    if (msgs.length) {
+      changeBanner.hidden = false;
+      changeBanner.innerHTML = `
+        <div class="wc-kicker">LARGE WEATHER CHANGE ALERT</div>
+        <div class="wc-body">${msgs.join(' ')}</div>
+      `;
+    } else {
+      changeBanner.hidden = true;
+      changeBanner.innerHTML = '';
+    }
   }
 
   const dateEl = document.getElementById('hero-date');
@@ -458,15 +456,32 @@ function renderHeroAndBriefing(f) {
     hiloEl.innerHTML = `High <strong>${fmtTemp(today.highF)}</strong> &nbsp;|&nbsp; Low <strong>${fmtTemp(today.lowF)}</strong>`;
   }
 
-  // Frosted "Weather Take" Banner Copy (consumer plain-English summary)
+  // Frosted "Nourie Take" Hero Bar Copy
   const takeBannerCopy = document.getElementById('take-banner-copy');
+  const b = state.liveBriefing;
+  const takeLeadText = b?.danTake || b?.headline || f.briefing.headline;
+  const takeDetailText = b?.summary || f.briefing.summary;
   if (takeBannerCopy) {
-    const tomorrow = f.days[1] || today;
-    const rainNote =
-      today.rainChance >= 35
-        ? `Rain chance reaches ${today.rainChance}% today.`
-        : `Dry stretch holding today with ${tomorrow.shortWeekday} trending ${tomorrow.highF > today.highF ? 'warmer' : 'comfortable'}.`;
-    takeBannerCopy.textContent = `${cur.condition} · ${rainNote}`;
+    takeBannerCopy.textContent = takeLeadText;
+  }
+
+  // Full Nourie Weather Take Card right on the page (for all ages, plain language!)
+  const takeHead = document.getElementById('take-headline');
+  const takeSum = document.getElementById('take-summary');
+  const takeBullets = document.getElementById('take-bullets');
+  const riskPill = document.getElementById('risk-outlook-pill');
+  if (takeHead) takeHead.textContent = takeLeadText;
+  if (takeSum) takeSum.textContent = takeDetailText;
+  if (riskPill && f.briefing.riskOutlook) {
+    riskPill.textContent = `${f.briefing.riskOutlook.agency}: ${f.briefing.riskOutlook.level}`;
+    riskPill.style.color = f.briefing.riskOutlook.color;
+    riskPill.style.borderColor = f.briefing.riskOutlook.color;
+  }
+  if (takeBullets) {
+    const bulletItems = f.briefing.bullets || [];
+    takeBullets.innerHTML = bulletItems
+      .map((item) => `<li><strong>${item.label}:</strong> ${item.text}</li>`)
+      .join('');
   }
 
   // 4-Column Quick Stats Glass Strip
@@ -495,8 +510,7 @@ function renderHeroAndBriefing(f) {
   if (meterArcEl) meterArcEl.innerHTML = renderWeatherMeterArcSvg(meter.score);
   if (meterSubEl) meterSubEl.textContent = meter.label;
 
-  // 3-Column Bottom Comfort Trio (How It Feels | Dew Point | Wind)
-  const isRainNow = (cur.rainChance || 0) >= 55 || (cur.precipIn || 0) >= 0.02;
+  // 3-Column Bottom Comfort Trio (How It Feels with Cartoon Scene | Dew Point | Wind)
   const feelsVerdict = getFeelsVerdict(cur.feelsLikeF ?? cur.tempF, isRainNow);
   const trioFeelsLbl = document.getElementById('trio-feels-label');
   const trioFeelsNote = document.getElementById('trio-feels-note');
@@ -511,7 +525,8 @@ function renderHeroAndBriefing(f) {
   if (trioFeelsLbl) trioFeelsLbl.textContent = feelsVerdict.label;
   if (trioFeelsNote) trioFeelsNote.textContent = feelsVerdict.note;
   if (trioOutfitEl) {
-    trioOutfitEl.innerHTML = `<img src="${personUrl}" alt="Recommended attire for ${cur.condition}" />`;
+    const sceneCtx = { pop: cur.rainChance, rainExpected: isRainNow, snowExpected: /snow|flurr/i.test(cur.condition || '') };
+    trioOutfitEl.innerHTML = referenceScene(1, Boolean(cur.isDay), cur.condition || 'Clear', cur.feelsLikeF ?? cur.tempF, sceneCtx);
   }
   if (trioDpVal) trioDpVal.textContent = fmtTemp(cur.dewPointF);
   if (trioDpLbl) trioDpLbl.textContent = getDewPointVerdict(cur.dewPointF ?? 50);
@@ -1079,6 +1094,7 @@ function renderCompareModelsSection(f) {
   renderModelCompareChart({
     containerEl: chartStage,
     days: f.days,
+    horizonDays: state.compareHorizonDays,
     variableId: state.compareVariableId,
     enabledModels: state.enabledCompareModels,
     selectedDayIdx: state.selectedDayIdx,
@@ -1086,23 +1102,23 @@ function renderCompareModelsSection(f) {
     onSelectDay: (dIdx) => {
       state.selectedDayIdx = dIdx;
       renderSevenDayForecast(f);
-      renderModelExplanationSection(f);
       renderCompareModelsSection(f);
     }
   });
 
   if (breakdownEl) {
-    const d = f.days[clamp(state.selectedDayIdx, 0, f.days.length - 1)] || f.days[0];
+    const visibleCount = clamp(state.compareHorizonDays, 3, f.days.length);
+    const d = f.days[clamp(state.selectedDayIdx, 0, visibleCount - 1)] || f.days[0];
     breakdownEl.innerHTML = `
-      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:12.5px;">
-        <span class="wfo-pill">Selected Day: <strong>${d.dayName} (${d.dateLabel})</strong></span>
-        <span class="telemetry-chip">Nourie Blend: <strong>${fmtTemp(d.highF)} / ${fmtTemp(d.lowF)}</strong></span>
-        <span class="telemetry-chip" style="border-color:#6bc5ff;">NWS: <strong>${fmtTemp(d.modelHighs.nws)}</strong></span>
-        <span class="telemetry-chip" style="border-color:#ff9f5a;">HRRR: <strong>${d.modelHighs.hrrr !== null ? fmtTemp(d.modelHighs.hrrr) : '48h only'}</strong></span>
-        <span class="telemetry-chip" style="border-color:#5ce0a0;">NBM: <strong>${fmtTemp(d.modelHighs.nbm)}</strong></span>
-        <span class="telemetry-chip" style="border-color:#b88cff;">ECMWF: <strong>${fmtTemp(d.modelHighs.ecmwf)}</strong></span>
-        <span class="telemetry-chip" style="border-color:#ffd166;">GEFS: <strong>${fmtTemp(d.modelHighs.gefs)}</strong></span>
-        <span class="telemetry-chip" style="border-color:#ff7eb6;">WeatherNext AI: <strong>${fmtTemp(d.modelHighs.weathernext)}</strong></span>
+      <div style="display:flex;flex-wrap:wrap;gap:7px;align-items:center;font-size:12.5px;">
+        <span class="wfo-pill"><strong>${d.dayName} (${d.dateLabel})</strong></span>
+        <span class="telemetry-chip" style="border-color:#ffffff;">Weather Nourie: <strong>${fmtTemp(d.highF)} / ${fmtTemp(d.lowF)}</strong></span>
+        <span class="telemetry-chip" style="border-color:#38bdf8;">NWS: <strong>${fmtTemp(d.modelHighs.nws)}</strong></span>
+        <span class="telemetry-chip" style="border-color:#ff9248;">HRRR: <strong>${d.modelHighs.hrrr !== null ? fmtTemp(d.modelHighs.hrrr) : '2d only'}</strong></span>
+        <span class="telemetry-chip" style="border-color:#34d399;">NBM: <strong>${fmtTemp(d.modelHighs.nbm)}</strong></span>
+        <span class="telemetry-chip" style="border-color:#c084fc;">ECMWF: <strong>${fmtTemp(d.modelHighs.ecmwf)}</strong></span>
+        <span class="telemetry-chip" style="border-color:#facc15;">GEFS: <strong>${fmtTemp(d.modelHighs.gefs)}</strong></span>
+        <span class="telemetry-chip" style="border-color:#f472b6;">WeatherNext: <strong>${fmtTemp(d.modelHighs.weathernext)}</strong></span>
       </div>
     `;
   }
@@ -1392,35 +1408,45 @@ function renderAqiAndGlanceTiles(f) {
   }
 }
 
-function renderMainStyleCarWashCard(f) {
-  const panel = document.getElementById('car-wash-forecast');
-  if (!panel || !f) return;
-
+function buildCarWashSummaryData(f) {
   const days5 = f.days.slice(0, 5);
   const first3Low = days5.slice(0, 3).every((d) => d.rainChance <= 25);
   const isRainingNow = (f.current.rainChance || 0) >= 50 || (f.current.precipIn || 0) >= 0.02;
   const canWash = !isRainingNow && first3Low;
   const verdictClass = canWash ? 'wash' : 'wait';
   const verdictText = canWash ? 'YES' : 'WAIT!';
-
   const wetBlocker = days5.slice(0, 3).find((d) => d.rainChance > 25);
   const reason = isRainingNow
-    ? 'Rain is nearby or happening right now.'
+    ? 'Rain is nearby or falling right now.'
     : canWash
-    ? 'Three days at or below 25% rain chance are lined up.'
+    ? 'Three dry days ahead (low rain chance).'
     : wetBlocker
     ? `${wetBlocker.shortWeekday} has a ${wetBlocker.rainChance}% rain chance within 3 days.`
-    : 'Rain possible in the next 3 days.';
+    : 'Rain possible within the next 3 days.';
+  return { days5, canWash, verdictClass, verdictText, reason };
+}
 
+function renderCarWashTeaser(f) {
+  const pill = document.getElementById('carwash-teaser-pill');
+  const sub = document.getElementById('carwash-teaser-sub');
+  if (!f) return;
+  const cw = buildCarWashSummaryData(f);
+  if (pill) {
+    pill.textContent = cw.canWash ? '✓ YES' : 'WAIT!';
+    pill.className = `cw-pill-badge ${cw.verdictClass}`;
+  }
+  if (sub) sub.textContent = `${cw.reason} · Tap for 5-day car wash forecast`;
+}
+
+function renderMainStyleCarWashHtml(f) {
+  const { days5, canWash, verdictClass, verdictText, reason } = buildCarWashSummaryData(f);
   const cur = f.current;
   const today = days5[0] || f.days[0];
   const lowRainDays = days5.slice(0, 3).filter((d) => d.rainChance <= 25).length;
-
-  // Find next best wash window
   const washCandidates = days5.filter((d) => d.rainChance <= 25);
   const bestDay = washCandidates[0] || f.carWash?.bestDay;
   const bestTitle = canWash
-    ? 'Today · Dry Corridor Open'
+    ? 'Today · Great 3-Day Dry Stretch'
     : bestDay
     ? `Try ${bestDay.dayName || bestDay.shortWeekday}`
     : 'Wait for a drier 3-day window';
@@ -1447,65 +1473,70 @@ function renderMainStyleCarWashCard(f) {
     })
     .join('');
 
-  panel.dataset.verdict = verdictClass;
-  panel.innerHTML = `
-    <header class="car-wash-header">
-      <span class="car-wash-logo" aria-hidden="true">💧🚙</span>
-      <span>
-        <h2 id="car-wash-title">Car Wash Forecast</h2>
-        <p>Plan for three days of low rain risk</p>
-      </span>
-      <em>Clean rides.<br>Brighter days.</em>
-    </header>
-    <div class="car-wash-hero">
-      <div class="car-wash-answer">
-        <h3>Can I Wash<br>My Car Today?</h3>
-        <strong class="car-wash-verdict ${verdictClass}" role="status">${canWash ? '✓ ' : ''}${verdictText}</strong>
-        <p>${reason}</p>
+  return `
+    <div class="car-wash-forecast" data-verdict="${verdictClass}">
+      <header class="car-wash-header">
+        <span class="car-wash-logo" aria-hidden="true">💧🚙</span>
+        <span>
+          <h2>Car Wash Forecast</h2>
+          <p>Plan for three days of low rain risk</p>
+        </span>
+        <em>Clean rides.<br>Brighter days.</em>
+      </header>
+      <div class="car-wash-hero">
+        <div class="car-wash-answer">
+          <h3>Can I Wash<br>My Car Today?</h3>
+          <strong class="car-wash-verdict ${verdictClass}" role="status">${canWash ? '✓ ' : ''}${verdictText}</strong>
+          <p>${reason}</p>
+        </div>
+        <div class="car-wash-checks">
+          <span class="car-wash-fact ${today.rainChance <= 25 ? 'good' : ''}">
+            <i aria-hidden="true">💧</i>
+            <span><b>${today.rainChance}%</b><small>Rain chance today</small></span>
+          </span>
+          <span class="car-wash-fact ${lowRainDays === 3 ? 'good' : ''}">
+            <i aria-hidden="true">☀</i>
+            <span><b>${lowRainDays} of 3 days</b><small>Rain chance ≤25%</small></span>
+          </span>
+          <span class="car-wash-fact">
+            <i aria-hidden="true">≋</i>
+            <span><b>${cur.windMph}–${today.maxWindMph} mph</b><small>Wind</small></span>
+          </span>
+          <span class="car-wash-fact">
+            <i aria-hidden="true">♨</i>
+            <span><b>${fmtTemp(today.lowF)}–${fmtTemp(today.highF)}</b><small>Low / high</small></span>
+          </span>
+          <span class="car-wash-fact">
+            <i aria-hidden="true">💦</i>
+            <span><b>${dp}° · ${dpWord}</b><small>Air moisture feel</small></span>
+          </span>
+        </div>
       </div>
-      <div class="car-wash-checks">
-        <span class="car-wash-fact ${today.rainChance <= 25 ? 'good' : ''}">
-          <i aria-hidden="true">💧</i>
-          <span><b>${today.rainChance}%</b><small>Rain chance today</small></span>
-        </span>
-        <span class="car-wash-fact ${lowRainDays === 3 ? 'good' : ''}">
-          <i aria-hidden="true">☀</i>
-          <span><b>${lowRainDays} of 3 days</b><small>Rain chance ≤25%</small></span>
-        </span>
-        <span class="car-wash-fact">
-          <i aria-hidden="true">≋</i>
-          <span><b>${cur.windMph}–${today.maxWindMph} mph</b><small>Wind</small></span>
-        </span>
-        <span class="car-wash-fact">
-          <i aria-hidden="true">♨</i>
-          <span><b>${fmtTemp(today.lowF)}–${fmtTemp(today.highF)}</b><small>Low / high</small></span>
-        </span>
-        <span class="car-wash-fact">
-          <i aria-hidden="true">💦</i>
-          <span><b>${dp}° · ${dpWord}</b><small>Air moisture feel</small></span>
-        </span>
+      <div class="car-wash-photo">
+        <img class="car-wash-art" src="/weather-fusion/car-wash-corvette-hood.webp" alt="Cherry-red Corvette C8 on driveway" loading="lazy" decoding="async" />
       </div>
+      <div class="car-wash-days-wrap">
+        <h3>Next 5 Days</h3>
+        <div class="car-wash-days">${cardsHtml}</div>
+      </div>
+      <div class="car-wash-window">
+        <span class="car-wash-spark" aria-hidden="true">✦</span>
+        <span>
+          <small>Best Washing Window</small>
+          <strong>${bestTitle}</strong>
+          <em>${reason}</em>
+        </span>
+        <span class="car-wash-tip">☀<small>Avoid hot<br>midday sun</small></span>
+        <span class="car-wash-tip">≋<small>Light wind<br>helps drying</small></span>
+        <span class="car-wash-tip">🚙<small>Enjoy that<br>clean shine</small></span>
+      </div>
+      <div class="car-wash-footer">WEATHER NOURIE · CLEAN RIDES, BRIGHTER DAYS</div>
     </div>
-    <div class="car-wash-photo">
-      <img class="car-wash-art" src="/weather-fusion/car-wash-corvette-hood.webp" alt="Cherry-red Corvette C8 on driveway" loading="lazy" decoding="async" />
-    </div>
-    <div class="car-wash-days-wrap">
-      <h3>Next 5 Days</h3>
-      <div class="car-wash-days">${cardsHtml}</div>
-    </div>
-    <div class="car-wash-window">
-      <span class="car-wash-spark" aria-hidden="true">✦</span>
-      <span>
-        <small>Best Washing Window</small>
-        <strong>${bestTitle}</strong>
-        <em>${reason}</em>
-      </span>
-      <span class="car-wash-tip">☀<small>Avoid hot<br>midday sun</small></span>
-      <span class="car-wash-tip">≋<small>Light wind<br>helps drying</small></span>
-      <span class="car-wash-tip">🚙<small>Enjoy that<br>clean shine</small></span>
-    </div>
-    <div class="car-wash-footer">WEATHER NOURIE · CLEAN RIDES, BRIGHTER DAYS</div>
   `;
+}
+
+function openCarWashModal(f) {
+  openModal(`🚗 Car Wash Forecast · ${f.location.name}`, renderMainStyleCarWashHtml(f));
 }
 
 function renderScientificFeedsAndAfd(f) {
@@ -1615,18 +1646,23 @@ function initHeaderControls() {
 
   locateBtn?.addEventListener('click', () => {
     if (!navigator.geolocation) return;
+    const cityNameEl = document.getElementById('city-name');
+    if (cityNameEl) cityNameEl.textContent = 'Finding location…';
     navigator.geolocation.getCurrentPosition(
-      (pos) => {
+      async (pos) => {
+        const lat = pos.coords.latitude;
+        const lon = pos.coords.longitude;
+        const resolvedName = await reverseGeocodeLocation(lat, lon);
         loadLocationForecast({
           id: 'gps',
-          name: 'Current GPS Location',
-          latitude: pos.coords.latitude,
-          longitude: pos.coords.longitude,
+          name: resolvedName,
+          latitude: lat,
+          longitude: lon,
           wfo: 'NWS'
         });
       },
       () => {
-        loadLocationForecast(PRESET_CITIES[0]);
+        loadLocationForecast(PRESET_CITIES[1] || PRESET_CITIES[0]);
       }
     );
   });
@@ -1674,13 +1710,49 @@ function initHeaderControls() {
     searchInput?.focus();
   });
 
-  // Weather Take Banner Click -> Open Clean Plain-English Weather Take Modal
+  // Weather Take Banner Click -> Scroll smoothly to Nourie Weather Take card or open full modal
   const takeBanner = document.getElementById('weather-take-banner');
   takeBanner?.addEventListener('click', () => {
     if (state.forecast) openWeatherTakeModal(state.forecast);
   });
 
-  // How It Feels Trio Card -> Open Rich What to Wear & Comfort Modal
+  // Weather Meter Click -> Plain-English score breakdown modal
+  document.getElementById('qs-weather-meter-btn')?.addEventListener('click', () => {
+    if (state.forecast) openWeatherMeterModal(state.forecast);
+  });
+
+  // Air Quality Badge Click -> Expand / Collapse Air Quality details
+  const toggleAqiDrawer = () => {
+    const drawer = document.getElementById('aqi-expand-drawer');
+    const aqiBtn = document.getElementById('qs-aqi-btn');
+    if (!drawer) return;
+    state.aqiExpanded = !state.aqiExpanded;
+    drawer.hidden = !state.aqiExpanded;
+    aqiBtn?.setAttribute('aria-expanded', String(state.aqiExpanded));
+    if (state.aqiExpanded) {
+      drawer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  };
+  document.getElementById('qs-aqi-btn')?.addEventListener('click', toggleAqiDrawer);
+  document.getElementById('aqi-close-btn')?.addEventListener('click', () => {
+    state.aqiExpanded = false;
+    const drawer = document.getElementById('aqi-expand-drawer');
+    if (drawer) drawer.hidden = true;
+    document.getElementById('qs-aqi-btn')?.setAttribute('aria-expanded', 'false');
+  });
+
+  // Compare horizon pills (5 Days zoomed vs 7 Days vs 10 Days)
+  document.querySelectorAll('[data-cmp-days]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('[data-cmp-days]').forEach((b) => b.classList.remove('active'));
+      btn.classList.add('active');
+      state.compareHorizonDays = Number(btn.dataset.cmpDays) || 5;
+      if (state.selectedDayIdx >= state.compareHorizonDays) state.selectedDayIdx = 0;
+      if (state.forecast) renderCompareModelsSection(state.forecast);
+    });
+  });
+
+  // How It Feels Trio Card -> Open What to Wear & Comfort Modal
   document.getElementById('how-feels-card-btn')?.addEventListener('click', () => {
     if (state.forecast) openWardrobeModal(state.forecast);
   });
@@ -1885,8 +1957,11 @@ function initModalSystem() {
     if (e.target === dialog) dialog.close();
   });
 
-  // Bind all launcher buttons for clickable modals (keeps home screen zero-clutter!)
   const closeTools = () => document.getElementById('tools-strip')?.classList.remove('open');
+
+  document.getElementById('car-wash-launcher-btn')?.addEventListener('click', () => { if (state.forecast) openCarWashModal(state.forecast); });
+  document.getElementById('more-carwash-btn')?.addEventListener('click', () => { if (state.forecast) openCarWashModal(state.forecast); });
+  document.getElementById('open-carwash-menu')?.addEventListener('click', () => { closeTools(); if (state.forecast) openCarWashModal(state.forecast); });
 
   document.getElementById('open-rankings-modal')?.addEventListener('click', () => { closeTools(); if (state.forecast) openModelRankingsModal(state.forecast); });
   document.getElementById('compare-rankings-cta')?.addEventListener('click', () => { if (state.forecast) openModelRankingsModal(state.forecast); });
@@ -1895,11 +1970,10 @@ function initModalSystem() {
   document.getElementById('open-wardrobe-modal')?.addEventListener('click', () => { closeTools(); if (state.forecast) openWardrobeModal(state.forecast); });
   document.getElementById('more-wardrobe-btn')?.addEventListener('click', () => { if (state.forecast) openWardrobeModal(state.forecast); });
 
-  document.getElementById('open-science-modal')?.addEventListener('click', () => { closeTools(); if (state.forecast) openScienceModal(state.forecast); });
-  document.getElementById('more-science-btn')?.addEventListener('click', () => { if (state.forecast) openScienceModal(state.forecast); });
+  document.getElementById('open-behind-modal')?.addEventListener('click', () => { closeTools(); if (state.forecast) openBehindForecastModal(state.forecast); });
+  document.getElementById('more-behind-btn')?.addEventListener('click', () => { if (state.forecast) openBehindForecastModal(state.forecast); });
 
   document.getElementById('open-48h-explorer-btn')?.addEventListener('click', () => { if (state.forecast) open48hExplorerModal(state.forecast); });
-  document.getElementById('more-hourly-btn')?.addEventListener('click', () => { if (state.forecast) open48hExplorerModal(state.forecast); });
 
   document.getElementById('open-snow-modal')?.addEventListener('click', () => {
     closeTools();
@@ -1907,13 +1981,13 @@ function initModalSystem() {
     if (!f) return;
     const total10dSnow = f.days.reduce((s, d) => s + (d.totalSnowIn || 0), 0).toFixed(1);
     openModal(
-      `❄️ Snow & Winter Outlook · ${f.location.name}`,
+      `❄️ Snow Outlook · ${f.location.name}`,
       `
-        <div style="font-size:22px;font-weight:800;margin-bottom:6px;">
-          ${Number(total10dSnow) > 0 ? `${total10dSnow}" Total 10-Day Snow Potential` : 'No Accumulating Snow in the 10-Day Forecast'}
+        <div style="font-size:20px;font-weight:800;margin-bottom:8px;">
+          ${Number(total10dSnow) > 0 ? `${total10dSnow}" snow possible over the next 10 days` : 'No snow expected in the next 10 days'}
         </div>
         <table class="math-table">
-          <thead><tr><th>Day</th><th>High / Low</th><th>Rain Chance</th><th>Snowfall</th><th>Confidence</th></tr></thead>
+          <thead><tr><th>Day</th><th>High / Low</th><th>Rain Chance</th><th>Snow</th><th>Outlook Confidence</th></tr></thead>
           <tbody>
             ${f.days.slice(0, 7).map((d) => `
               <tr>
@@ -1929,32 +2003,90 @@ function initModalSystem() {
       `
     );
   });
+}
 
-  document.getElementById('open-afd-modal')?.addEventListener('click', () => {
-    closeTools();
-    const f = state.forecast;
-    if (!f) return;
-    openModal(
-      `📡 NWS ${f.afd.wfo} Forecast Discussion`,
-      `<pre class="afd-pre" style="max-height:420px;">${f.afd.text}</pre>`
-    );
-  });
+function buildWardrobeAdvice(feelsF, cur) {
+  const isRain = (cur.rainChance || 0) >= 50 || (cur.precipIn || 0) >= 0.02;
+  const windy = (cur.windMph || 0) >= 16;
+  if (feelsF < 32) {
+    return {
+      title: 'Bundle Up Warm',
+      items: ['Heavy winter coat', 'Warm sweater + long pants', 'Gloves, scarf & warm hat', isRain ? 'Waterproof boots' : 'Warm closed shoes']
+    };
+  }
+  if (feelsF < 48) {
+    return {
+      title: 'Chilly Weather Layers',
+      items: [isRain ? 'Warm rain jacket' : 'Medium jacket or fleece', 'Long-sleeve shirt', 'Jeans or long pants', windy ? 'Windbreaker outer layer' : 'Closed-toe shoes']
+    };
+  }
+  if (feelsF < 64) {
+    return {
+      title: isRain ? 'Light Jacket & Umbrella' : 'Light Jacket Weather',
+      items: [isRain ? 'Light rain jacket or umbrella' : 'Light jacket, hoodie, or sweater', 'T-shirt underneath', 'Long pants or jeans', 'Comfortable sneakers']
+    };
+  }
+  if (feelsF < 78) {
+    return {
+      title: isRain ? 'Mild with Rain Gear' : 'Light & Comfortable',
+      items: ['Short sleeves or light top', isRain ? 'Keep an umbrella nearby' : 'Light sweater if out late', 'Shorts or light pants', 'Sunglasses for sunny breaks']
+    };
+  }
+  return {
+    title: 'Keep Cool & Light',
+    items: ['Light, breathable shirt', 'Shorts or light clothing', 'Sunglasses & sunscreen', 'Bring water outdoors']
+  };
+}
+
+function openWeatherMeterModal(f) {
+  const cur = f.current;
+  const today = f.days[0];
+  const aqi = f.airQuality?.currentAqi ?? 38;
+  const meter = computeWeatherMeterScore(cur, today, aqi);
+  const feels = cur.feelsLikeF ?? cur.tempF ?? 65;
+
+  const tempComfort = feels >= 60 && feels <= 78 ? 'Very comfortable' : feels >= 45 && feels < 60 ? 'Crisp / Jacket needed' : feels > 78 ? 'Warm' : 'Chilly';
+  const airComfort = (cur.dewPointF ?? 50) <= 60 ? 'Fresh, not sticky' : (cur.dewPointF ?? 50) <= 66 ? 'A little humid' : 'Muggy / Sticky';
+  const rainNote = today.rainChance <= 20 ? 'Mostly dry today' : today.rainChance <= 50 ? 'Chance of a passing shower' : 'Likely wet at times';
+  const windNote = cur.windMph <= 10 ? 'Light breeze' : cur.windMph <= 18 ? 'Breezy outside' : 'Windy';
+  const aqiNote = aqi <= 50 ? 'Clean air (Good)' : aqi <= 100 ? 'Acceptable (Moderate)' : 'Hazy / Sensitive';
+
+  openModal(
+    `What is the Weather Meter?`,
+    `
+      <div style="text-align:center;padding:8px 0 14px;">
+        <div style="width:155px;margin:0 auto;">${renderWeatherMeterArcSvg(meter.score)}</div>
+        <div style="font-size:20px;font-weight:800;color:#ffffff;margin-top:4px;">${meter.score} / 100 · ${meter.label}</div>
+        <p style="font-size:13.5px;color:var(--muted);margin:6px auto 0;max-width:440px;line-height:1.5;">
+          The <strong>Weather Meter</strong> gives you one quick 0–100 score showing how nice it feels to be outside right now. Higher scores mean comfortable temperatures, fresh air, low rain risk, and gentle wind.
+        </p>
+      </div>
+      <div style="display:grid;gap:8px;">
+        <div class="take-modal-row"><span>🌡 Temperature Feel (${fmtTemp(feels)})</span><strong>${tempComfort}</strong></div>
+        <div class="take-modal-row"><span>💧 Air Freshness</span><strong>${airComfort}</strong></div>
+        <div class="take-modal-row"><span>☔ Rain Risk (${today.rainChance}%)</span><strong>${rainNote}</strong></div>
+        <div class="take-modal-row"><span>💨 Wind (${cur.windMph} mph)</span><strong>${windNote}</strong></div>
+        <div class="take-modal-row"><span>🍃 Air Quality (${aqi} AQI)</span><strong>${aqiNote}</strong></div>
+      </div>
+    `
+  );
 }
 
 function openWeatherTakeModal(f) {
+  const b = state.liveBriefing;
   const tomorrow = f.days[1] || f.days[0];
   openModal(
-    `Weather Take · ${f.location.name}`,
+    `Nourie Weather Take · ${f.location.name}`,
     `
       <div class="take-modal-card">
-        <div style="font-size:18px;font-weight:800;color:#ffffff;margin-bottom:6px;">${f.briefing.headline}</div>
-        <p style="font-size:14px;color:var(--muted);line-height:1.55;margin:0 0 12px;">${f.briefing.summary}</p>
+        <div style="font-size:18px;font-weight:800;color:#ffffff;margin-bottom:6px;">${b?.danTake || b?.headline || f.briefing.headline}</div>
+        <p style="font-size:14px;color:var(--muted);line-height:1.55;margin:0 0 12px;">${b?.summary || f.briefing.summary}</p>
         <div class="take-modal-row">
           <div>
             <strong>Tomorrow (${tomorrow.dayName})</strong>
-            <div style="font-size:13px;color:var(--muted);">${fmtTemp(tomorrow.lowF)} to ${fmtTemp(tomorrow.highF)} · ${tomorrow.rainChance}% rain chance</div>
+            <div style="font-size:13px;color:var(--muted);">${fmtTemp(tomorrow.lowF)} to ${fmtTemp(tomorrow.highF)} · ${tomorrow.rainChance}% chance of rain</div>
           </div>
-          <span class="wfo-pill">${tomorrow.confidence.level} confidence</span>
+          <span class="wfo-pill">${tomorrow.confidence.level} agreement</span>
         </div>
       </div>
     `
@@ -1963,20 +2095,22 @@ function openWeatherTakeModal(f) {
 
 function openWardrobeModal(f) {
   const cur = f.current;
-  const personUrl = selectHeroPortraitInfo(cur);
+  const isRaining = (cur.rainChance || 0) >= 50 || (cur.precipIn || 0) >= 0.02;
+  const sceneCtx = { pop: cur.rainChance, rainExpected: isRaining, snowExpected: /snow|flurr/i.test(cur.condition || '') };
+  const cartoonHtml = referenceScene(1, Boolean(cur.isDay), cur.condition || 'Clear', cur.feelsLikeF ?? cur.tempF, sceneCtx);
   const advice = buildWardrobeAdvice(cur.feelsLikeF ?? cur.tempF, cur);
   const dpDesc = getDewPointVerdict(cur.dewPointF ?? 50);
 
   openModal(
-    `What to Wear & How It Feels · ${f.location.name}`,
+    `What to Wear · ${f.location.name}`,
     `
       <div class="wardrobe-modal-hero">
-        <img class="wardrobe-hero-img" src="${personUrl}" alt="Recommended outfit for ${cur.condition}" />
+        <div class="wardrobe-cartoon-box">${cartoonHtml}</div>
         <div class="wardrobe-hero-info">
           <div class="wardrobe-badge">${advice.title}</div>
           <div style="font-size:28px;font-weight:800;line-height:1.1;margin:6px 0;">Feels Like ${fmtTemp(cur.feelsLikeF)}</div>
           <div style="font-size:13.5px;color:var(--muted);margin-bottom:10px;">
-            In Shade ${fmtTemp(cur.shadeFeelsF)} · In Sun ${fmtTemp(cur.sunFeelsF)} · Air Moisture: <strong>${dpDesc}</strong> (${fmtTemp(cur.dewPointF)} dew point)
+            In Shade ${fmtTemp(cur.shadeFeelsF)} · In Sun ${fmtTemp(cur.sunFeelsF)} · Air feels <strong>${dpDesc.toLowerCase()}</strong>
           </div>
           <ul class="wardrobe-list">
             ${advice.items.map((item) => `<li>✓ ${item}</li>`).join('')}
@@ -2062,49 +2196,39 @@ function open48hExplorerModal(f) {
   drawModalHourly();
 }
 
-function openScienceModal(f) {
+function openBehindForecastModal(f) {
   const day = f.days[clamp(state.selectedDayIdx, 0, f.days.length - 1)] || f.days[0];
-  const wettest = day.hours.reduce((b, h) => (h.rainChance > b.rainChance ? h : b), day.hours[0]);
   const warmest = day.hours.reduce((b, h) => (h.tempF > b.tempF ? h : b), day.hours[0]);
-  const rl = wettest.rainLedger;
-  const bd = rl.breakdown;
-  const tf = warmest.tempFusion;
   const mt = warmest.modelTemps;
-  const ew = tf.effectiveWeights;
-  const bw = tf.baseWeights;
+  const ew = warmest.tempFusion.effectiveWeights;
 
   const modelRows = [
-    { key: 'nws', name: 'NWS Gridpoint', color: '#6bc5ff' },
-    { key: 'hrrr', name: 'NOAA HRRR 3km', color: '#ff9f5a' },
-    { key: 'nbm', name: 'National Blend (NBM)', color: '#5ce0a0' },
-    { key: 'ecmwf', name: 'ECMWF IFS 0.25°', color: '#b88cff' },
-    { key: 'gefs', name: 'GEFS Ensemble Mean', color: '#ffd166' },
-    { key: 'weathernext', name: 'WeatherNext AI', color: '#ff7eb6' }
+    { key: 'nws', name: 'National Weather Service (NWS)', color: '#38bdf8' },
+    { key: 'hrrr', name: 'Short-Range US Radar Model (HRRR)', color: '#ff9248' },
+    { key: 'nbm', name: 'National Blend (NBM)', color: '#34d399' },
+    { key: 'ecmwf', name: 'European Model (ECMWF)', color: '#c084fc' },
+    { key: 'gefs', name: 'Global Ensemble Average', color: '#facc15' },
+    { key: 'weathernext', name: 'Google WeatherNext AI', color: '#f472b6' }
   ];
 
   openModal(
-    `🔬 Scientific Details & Source Feeds · ${f.location.name}`,
+    `ℹ Behind the Forecast · ${f.location.name}`,
     `
-      <div class="feeds-pill-cloud" style="margin-bottom:14px;">
-        ${f.feeds.map((fd) => `
-          <span class="feed-badge">
-            <span class="live-dot" style="margin:0;"></span>
-            <strong style="color:#ffffff;">${fd.name}</strong>
-            <span>· ${fd.status}</span>
-          </span>
-        `).join('')}
-      </div>
+      <p style="font-size:13.5px;color:var(--muted);margin-top:0;line-height:1.5;">
+        Weather Nourie combines official National Weather Service updates with top US, European, and AI forecasts to give you one clear, dependable answer.
+      </p>
 
       <div style="margin-bottom:14px;padding:12px;border-radius:14px;background:rgba(255,255,255,0.05);">
-        <div class="section-kicker" style="margin-bottom:4px;">Blend V2 Weights (${bw.label}) · ${warmest.hourLabel} (${fmtTemp(warmest.tempF, true)})</div>
+        <div style="font-size:13px;font-weight:700;color:#7ac6ff;margin-bottom:8px;">
+          Today's Warmest Hour Comparison (${warmest.hourLabel} → ${fmtTemp(warmest.tempF)})
+        </div>
         <table class="math-table">
-          <thead><tr><th>Model</th><th>Temp</th><th>Base Wt</th><th>Effective Wt</th></tr></thead>
+          <thead><tr><th>Forecast Source</th><th>Temp</th><th>Share Used Today</th></tr></thead>
           <tbody>
             ${modelRows.map((m) => `
               <tr>
                 <td><strong style="color:${m.color};">${m.name}</strong></td>
                 <td>${mt[m.key] !== null ? fmtTemp(mt[m.key]) : '—'}</td>
-                <td>${Math.round((bw[m.key] || 0) * 100)}%</td>
                 <td><strong>${ew[m.key] ? Math.round(ew[m.key] * 100) : 0}%</strong></td>
               </tr>
             `).join('')}
@@ -2112,15 +2236,8 @@ function openScienceModal(f) {
         </table>
       </div>
 
-      <div style="margin-bottom:14px;padding:12px;border-radius:14px;background:rgba(255,255,255,0.05);">
-        <div class="section-kicker" style="margin-bottom:4px;">100-Point Rain Ledger · Peak ${wettest.hourLabel} (${rl.totalPts}/100 pts · ${rl.blendedQpfIn}"/hr)</div>
-        <div style="font-size:12.5px;color:var(--muted);">
-          NWS ${bd.nws.pts}/${bd.nws.maxPts} · HRRR ${bd.hrrr.pts}/${bd.hrrr.maxPts} · NBM ${bd.nbm.pts}/${bd.nbm.maxPts} · ECMWF ${bd.ecmwf.pts}/${bd.ecmwf.maxPts} · WeatherNext +${bd.weathernext.pts}
-        </div>
-      </div>
-
       <details>
-        <summary style="cursor:pointer;font-weight:700;font-size:13.5px;color:var(--blue);">▸ NWS Area Forecast Discussion (${f.afd.wfo})</summary>
+        <summary style="cursor:pointer;font-weight:700;font-size:13.5px;color:var(--blue);">▸ Read Local Weather Office Notes (${f.afd.wfo})</summary>
         <pre class="afd-pre" style="margin-top:8px;">${f.afd.text}</pre>
       </details>
     `
@@ -2140,7 +2257,7 @@ async function openModelRankingsModal(f) {
   const loadAndRender = async () => {
     const host = document.getElementById('modal-rankings-host');
     if (!host) return;
-    host.innerHTML = `<div style="padding:20px;text-align:center;color:var(--muted);">Loading verified ${days}-day accuracy scores (${horizon}h lead)…</div>`;
+    host.innerHTML = `<div style="padding:20px;text-align:center;color:var(--muted);">Loading past ${days}-day accuracy results…</div>`;
     try {
       const url = `/api/weather-fusion/accuracy?latitude=${encodeURIComponent(f.location.latitude)}&longitude=${encodeURIComponent(f.location.longitude)}&days=${days}&horizon=${horizon}`;
       const res = await fetch(url);
@@ -2148,7 +2265,7 @@ async function openModelRankingsModal(f) {
       const data = await res.json();
       renderRankingsUi(host, data);
     } catch {
-      host.innerHTML = `<div style="padding:18px;color:#ff8f8f;">Unable to load model rankings right now. Please try again in a moment.</div>`;
+      host.innerHTML = `<div style="padding:18px;color:#ff8f8f;">Unable to load rankings right now. Please try again in a moment.</div>`;
     }
   };
 

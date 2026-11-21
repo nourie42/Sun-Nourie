@@ -287,7 +287,7 @@ export function describeWeatherCondition(wmoCode, rainChance, tempF, isDay = tru
 }
 
 /**
- * Searches cities or US ZIP codes using Open-Meteo Geocoding API + Preset matching.
+ * Searches any U.S. address, ZIP code, town, or city using Nominatim + backend /api/weather-fusion/search + Open-Meteo.
  */
 export async function searchLocations(query) {
   const q = (query || '').trim();
@@ -297,35 +297,104 @@ export async function searchLocations(query) {
     c.name.toLowerCase().includes(q.toLowerCase())
   );
 
-  try {
-    const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(q)}&count=8&language=en&format=json`;
-    const res = await fetch(url);
-    if (!res.ok) return localMatches;
-    const data = await res.json();
-    const apiResults = (data.results || []).map((item) => {
-      const stateOrRegion = item.admin1 ? `, ${item.admin1}` : '';
-      const countryCode = item.country_code && item.country_code !== 'US' ? ` (${item.country_code})` : '';
-      return {
-        id: `${item.latitude.toFixed(3)},${item.longitude.toFixed(3)}`,
-        name: `${item.name}${stateOrRegion}${countryCode}`,
-        admin1: item.admin1 || '',
-        country: item.country || '',
-        latitude: item.latitude,
-        longitude: item.longitude,
-        timezone: item.timezone || 'America/New_York',
-        elevationFt: item.elevation ? Math.round(item.elevation * 3.28084) : 100
-      };
-    });
-    const seen = new Set();
-    return [...localMatches, ...apiResults].filter((loc) => {
-      const key = `${loc.latitude.toFixed(2)}:${loc.longitude.toFixed(2)}`;
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
-  } catch {
-    return localMatches;
+  const hasStreetOrZip = /\d/.test(q) || q.includes(',');
+
+  const queries = [
+    fetch(`/api/weather-fusion/search?q=${encodeURIComponent(q)}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) =>
+        (d?.results || []).map((item) => ({
+          id: String(item.id || `${item.latitude.toFixed(3)},${item.longitude.toFixed(3)}`),
+          name: item.name,
+          latitude: item.latitude,
+          longitude: item.longitude,
+          timezone: 'America/New_York',
+          elevationFt: 100
+        }))
+      )
+      .catch(() => []),
+    fetch(
+      `https://nominatim.openstreetmap.org/search?format=jsonv2&countrycodes=us&addressdetails=1&limit=6&q=${encodeURIComponent(q)}`
+    )
+      .then((r) => (r.ok ? r.json() : null))
+      .then((rows) =>
+        (Array.isArray(rows) ? rows : []).map((row) => {
+          const a = row.address || {};
+          const cityPart = a.city || a.town || a.village || a.hamlet || a.county || '';
+          const streetPart = [a.house_number, a.road].filter(Boolean).join(' ');
+          const statePart = a.state || '';
+          const zipPart = a.postcode ? ` ${a.postcode.split('-')[0]}` : '';
+          const shortName = streetPart
+            ? [streetPart, cityPart, statePart].filter(Boolean).join(', ')
+            : [cityPart || row.display_name.split(',')[0], statePart].filter(Boolean).join(', ') + zipPart;
+          return {
+            id: `nom-${Number(row.lat).toFixed(4)},${Number(row.lon).toFixed(4)}`,
+            name: shortName || row.display_name.split(',').slice(0, 3).join(','),
+            latitude: Number(row.lat),
+            longitude: Number(row.lon),
+            timezone: 'America/New_York',
+            elevationFt: 100
+          };
+        })
+      )
+      .catch(() => [])
+  ];
+
+  if (!hasStreetOrZip) {
+    queries.push(
+      fetch(
+        `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(q)}&count=8&language=en&format=json`
+      )
+        .then((r) => (r.ok ? r.json() : null))
+        .then((d) =>
+          (d?.results || []).map((item) => {
+            const stateOrRegion = item.admin1 ? `, ${item.admin1}` : '';
+            const countryCode = item.country_code && item.country_code !== 'US' ? ` (${item.country_code})` : '';
+            return {
+              id: `${item.latitude.toFixed(3)},${item.longitude.toFixed(3)}`,
+              name: `${item.name}${stateOrRegion}${countryCode}`,
+              admin1: item.admin1 || '',
+              country: item.country || '',
+              latitude: item.latitude,
+              longitude: item.longitude,
+              timezone: item.timezone || 'America/New_York',
+              elevationFt: item.elevation ? Math.round(item.elevation * 3.28084) : 100
+            };
+          })
+        )
+        .catch(() => [])
+    );
   }
+
+  const batches = await Promise.all(queries);
+  const combined = hasStreetOrZip
+    ? [...batches[1], ...batches[0], ...localMatches]
+    : [...batches[0], ...batches[2], ...batches[1], ...localMatches];
+
+  const seen = new Set();
+  return combined.filter((loc) => {
+    if (!loc || !Number.isFinite(loc.latitude) || !Number.isFinite(loc.longitude)) return false;
+    const key = `${loc.latitude.toFixed(2)}:${loc.longitude.toFixed(2)}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  }).slice(0, 8);
+}
+
+export async function reverseGeocodeLocation(lat, lon) {
+  try {
+    const res = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}&zoom=12`
+    );
+    if (res.ok) {
+      const data = await res.json();
+      const a = data?.address || {};
+      const city = a.city || a.town || a.village || a.county;
+      const state = a.state;
+      if (city) return [city, state].filter(Boolean).join(', ');
+    }
+  } catch {}
+  return 'Current Location';
 }
 
 /**
@@ -911,9 +980,9 @@ function detectForecastWindows(hours48) {
     banners.push({
       id: 'dry-window',
       type: 'clear',
-      title: 'Dry 48-hour corridor',
-      subtitle: 'All contributing deterministic & ensemble models keep precipitation below threshold through 48h.',
-      badge: '100% Dry',
+      title: 'Dry weather next 48 hours',
+      subtitle: 'Low chance of rain across local forecasts through the next two days.',
+      badge: 'Dry Ahead',
       hours: []
     });
   }
@@ -1009,57 +1078,96 @@ function buildNourieWeatherTake(loc, hours, days, windows, pavement, nwsData) {
   const today = days[0];
   const tomorrow = days[1] || today;
 
-  const modelSpreadNote =
-    today.confidence.level === 'High'
-      ? `Model consensus is strong today (±${today.confidence.spreadF}°F spread across NWS, HRRR, NBM & ECMWF).`
-      : `Models show moderate divergence (±${today.confidence.spreadF}°F spread); Blend V2 weights short-range HRRR and NBM highest.`;
+  // Compute plain-English large weather change alerts matching the main page rules
+  const changeAlerts = [];
+  const days5 = days.slice(0, 5);
+  for (let j = 1; j < days5.length; j++) {
+    for (let i = 0; i < j; i++) {
+      const avgTempA = (days5[i].highF + days5[i].lowF) / 2;
+      const avgTempB = (days5[j].highF + days5[j].lowF) / 2;
+      if (Math.abs(avgTempB - avgTempA) >= 18 && !changeAlerts.some((c) => c.kind === 'temp')) {
+        const warmer = avgTempB > avgTempA;
+        changeAlerts.push({
+          kind: 'temp',
+          text: `A ${warmer ? 'much warmer' : 'much colder'} shift arrives by ${days5[j].dayName} (${today.highF}° today vs ${days5[j].highF}° ${days5[j].shortWeekday}).`
+        });
+      }
+      const dpDiff = (days5[j].maxDewPointF || 0) - (days5[i].maxDewPointF || 0);
+      if (Math.abs(dpDiff) >= 18 && !changeAlerts.some((c) => c.kind === 'dewpoint')) {
+        const humid = dpDiff > 0;
+        const rainInSpan = days5.slice(i, j + 1).some((d) => d.rainChance > 25);
+        changeAlerts.push({
+          kind: 'dewpoint',
+          text: `The air will feel ${humid ? 'noticeably more humid' : 'much drier and crisper'} from ${days5[i].dayName} to ${days5[j].dayName}.${!humid && rainInSpan ? ' Rain is still possible during that stretch.' : ''}`
+        });
+      }
+    }
+    if (
+      j >= 2 &&
+      days5[j].rainChance >= 70 &&
+      days5[j - 1].rainChance <= 20 &&
+      days5[j - 2].rainChance <= 20 &&
+      !changeAlerts.some((c) => c.kind === 'rain')
+    ) {
+      changeAlerts.push({
+        kind: 'rain',
+        text: `Rain returns ${days5[j].dayName} (${days5[j].rainChance}% chance) after dry days ahead.`
+      });
+    }
+  }
 
   const rainNote =
     windows.rainHours.length > 0
-      ? `The 100-point rain ledger flags ${windows.rainHours.length} wet hours over the next 48h, peaking at ${today.rainChance}% today (${today.totalQpfIn}" QPF).`
-      : `All deterministic and ensemble feeds keep the next 48 hours dry with high confidence.`;
+      ? `Rain is possible at times (${today.rainChance}% highest chance today, about ${today.totalQpfIn}" expected).`
+      : `Dry skies should hold steady with no meaningful rain expected over the next 48 hours.`;
+
+  const consensusNote =
+    today.confidence.level === 'High'
+      ? `Forecasters closely agree on today's temperatures.`
+      : `Forecasts vary slightly on exact timing today, so check back for quick updates.`;
 
   const thermalNote =
     cur.sunDeltaF >= 5
-      ? `Direct solar radiation (${cur.shortwaveWm2} W/m²) adds +${cur.sunDeltaF}°F in the sun (${cur.sunFeelsF}°F sun vs ${cur.shadeFeelsF}°F shade).`
-      : `Shade and open-exposure apparent temperatures stay closely aligned near ${cur.feelsLikeF}°F.`;
+      ? `Direct sun makes it feel warmer (+${cur.sunDeltaF}° in sun vs shade).`
+      : `Feels-like temperatures stay close to ${cur.feelsLikeF}° whether in sun or shade.`;
 
   return {
-    headline: `${cur.condition} at ${cur.tempF}°F · Today's range ${today.lowF}°–${today.highF}°F`,
-    summary: `${rainNote} ${modelSpreadNote} ${thermalNote}`,
+    headline: `${cur.condition} at ${cur.tempF}° · High ${today.highF}° / Low ${today.lowF}°`,
+    summary: `${rainNote} ${consensusNote} ${thermalNote}`,
+    changeAlerts: changeAlerts.map((c) => c.text),
     bullets: [
       {
-        label: 'Multi-Model Blend V2',
-        text: `Current hour fuses NWS (${Math.round(cur.modelTemps.nws)}°), HRRR (${cur.modelTemps.hrrr !== null ? Math.round(cur.modelTemps.hrrr) + '°' : 'N/A'}), NBM (${Math.round(cur.modelTemps.nbm)}°), and ECMWF (${Math.round(cur.modelTemps.ecmwf)}°).`
+        label: 'Rest of Today',
+        text: `${cur.condition} with temperatures ranging from ${today.lowF}° to ${today.highF}° and ${cur.windMph} mph breeze.`
       },
       {
-        label: 'Tomorrow Outlook',
-        text: `${tomorrow.dayName} trends ${tomorrow.highF > today.highF ? 'warmer' : tomorrow.highF < today.highF ? 'cooler' : 'steady'} (${tomorrow.lowF}°–${tomorrow.highF}°F) with a ${tomorrow.rainChance}% rain chance and ${tomorrow.confidence.level.toLowerCase()} confidence.`
+        label: 'Tomorrow',
+        text: `${tomorrow.dayName} looks ${tomorrow.highF > today.highF ? 'warmer' : tomorrow.highF < today.highF ? 'cooler' : 'similar'} (${tomorrow.lowF}° to ${tomorrow.highF}°) with a ${tomorrow.rainChance}% chance of rain.`
       },
       {
-        label: 'Surface & Pet Safety',
-        text: `Concrete is estimated at ${pavement.concreteTempF}°F and dark asphalt at ${pavement.asphaltTempF}°F (${pavement.pawSafety.label}).`
+        label: 'Outdoors & Pets',
+        text: `Sidewalks are around ${pavement.concreteTempF}° and streets ${pavement.asphaltTempF}° — ${pavement.pawSafety.label.toLowerCase()} for dog walks.`
       }
     ],
     riskOutlook:
       today.rainChance >= 70 && today.totalQpfIn >= 0.5
         ? {
-            level: 'Slight Risk',
-            agency: 'WPC / Local Hydro',
-            title: 'Localized ponding & wet-pavement travel possible during peak rain rates',
+            level: 'Wet Weather Watch',
+            agency: 'Rain Outlook',
+            title: 'Heavier rain showers could bring wet roads and puddles at times',
             color: '#ffd166'
           }
         : nwsData.alerts?.length > 0
         ? {
-            level: nwsData.alerts[0].severity || 'Active Advisory',
-            agency: `NWS ${nwsData.wfo}`,
+            level: nwsData.alerts[0].severity || 'Active Weather Alert',
+            agency: `Weather Alert`,
             title: nwsData.alerts[0].headline || nwsData.alerts[0].event,
             color: '#ff7b7b'
           }
         : {
-            level: 'No Hazardous Outlooks',
-            agency: 'SPC & WPC Day 1–3',
-            title: 'No organized severe thunderstorm or excessive rainfall thresholds exceeded for this grid point.',
+            level: 'Quiet Weather',
+            agency: 'Storm & Flood Outlook',
+            title: 'No severe storm or flooding hazards expected over the next 3 days.',
             color: '#5ce0a0'
           }
   };

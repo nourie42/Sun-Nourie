@@ -507,32 +507,17 @@ body[data-sky="night"] .atmosphere {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  object-position: 28% 22%;
-  filter: saturate(1.12) contrast(1.04) brightness(0.86);
+  object-position: 30% 25%;
+  filter: saturate(1.1) contrast(1.04) brightness(0.88);
   transform: scale(1.02);
-}
-
-.hero-person-photo {
-  position: absolute;
-  left: 0;
-  top: 42px;
-  width: min(68%, 560px);
-  height: calc(100% - 42px);
-  object-fit: cover;
-  object-position: 56% 8%;
-  opacity: 0.94;
-  -webkit-mask-image: linear-gradient(90deg, rgba(0, 0, 0, 1) 46%, rgba(0, 0, 0, 0) 96%), linear-gradient(180deg, rgba(0, 0, 0, 0.25) 0%, rgba(0, 0, 0, 1) 18%, rgba(0, 0, 0, 1) 66%, rgba(0, 0, 0, 0) 100%);
-  -webkit-mask-composite: source-in;
-  mask-image: linear-gradient(90deg, rgba(0, 0, 0, 1) 46%, rgba(0, 0, 0, 0) 96%), linear-gradient(180deg, rgba(0, 0, 0, 0.25) 0%, rgba(0, 0, 0, 1) 18%, rgba(0, 0, 0, 1) 66%, rgba(0, 0, 0, 0) 100%);
-  mask-composite: intersect;
 }
 
 .hero-bg-scrim {
   position: absolute;
   inset: 0;
   background:
-    linear-gradient(180deg, rgba(6, 15, 30, 0.42) 0%, rgba(7, 17, 34, 0.04) 24%, rgba(7, 18, 36, 0.34) 72%, #071324 100%),
-    linear-gradient(90deg, rgba(6, 15, 30, 0.0) 0%, rgba(6, 15, 30, 0.14) 50%, rgba(6, 16, 34, 0.68) 100%);
+    linear-gradient(180deg, rgba(6, 15, 30, 0.44) 0%, rgba(7, 17, 34, 0.14) 26%, rgba(7, 18, 36, 0.46) 72%, #071324 100%),
+    linear-gradient(90deg, rgba(6, 15, 30, 0.08) 0%, rgba(6, 15, 30, 0.18) 52%, rgba(6, 16, 34, 0.62) 100%);
 }
 
 .topbar {
@@ -1069,21 +1054,186 @@ body[data-sky="night"] .atmosphere {
   color: var(--blue);
 }
 
-.trio-outfit-thumb {
-  width: 56px;
-  height: 56px;
+.trio-cartoon-thumb {
+  width: 58px;
+  height: 58px;
   border-radius: 14px;
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.24);
   flex-shrink: 0;
+  background: #0a1830;
   box-shadow: 0 6px 14px rgba(0, 0, 0, 0.35);
 }
 
-.trio-outfit-thumb img {
+.trio-cartoon-thumb svg.reference-scene {
   width: 100%;
   height: 100%;
+  display: block;
+}
+
+.qs-btn-col {
+  background: transparent;
+  border: none;
+  font-family: inherit;
+  color: inherit;
+  cursor: pointer;
+  border-radius: 12px;
+  transition: background 0.15s ease;
+}
+
+.qs-btn-col:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.qs-info-dot {
+  font-size: 10.5px;
+  color: var(--blue);
+  opacity: 0.9;
+}
+
+.weather-change-card {
+  padding: 13px 16px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.22), rgba(24, 48, 86, 0.72));
+  border: 1px solid rgba(251, 191, 36, 0.48);
+  color: #ffffff;
+}
+
+.wc-kicker {
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  color: #fcd34d;
+  margin-bottom: 4px;
+}
+
+.wc-body {
+  font-size: 13.5px;
+  line-height: 1.45;
+  color: rgba(240, 247, 255, 0.95);
+}
+
+.take-badge-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 800;
+  color: #ffffff;
+}
+
+.take-green-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #4ade80;
+  box-shadow: 0 0 10px rgba(74, 222, 128, 0.75);
+}
+
+.take-plain-list {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 5px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.carwash-teaser-card {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 15px;
+  border-radius: 18px;
+  color: var(--text);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  background: linear-gradient(135deg, rgba(8, 36, 58, 0.85), rgba(6, 22, 42, 0.9)) !important;
+  border-color: rgba(56, 201, 255, 0.45) !important;
+  transition: transform 0.15s ease, border-color 0.15s ease;
+}
+
+.carwash-teaser-card:hover {
+  transform: translateY(-1px);
+  border-color: rgba(110, 222, 255, 0.78) !important;
+}
+
+.carwash-teaser-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.carwash-teaser-thumb {
+  width: 68px;
+  height: 48px;
+  border-radius: 10px;
   object-fit: cover;
-  object-position: 56% 14%;
+  border: 1px solid rgba(88, 216, 255, 0.4);
+  flex-shrink: 0;
+}
+
+.carwash-teaser-title {
+  font-size: 15.5px;
+  font-weight: 800;
+  color: #ffffff;
+}
+
+.carwash-teaser-sub {
+  font-size: 12.5px;
+  color: #bceaff;
+  margin-top: 2px;
+}
+
+.carwash-teaser-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.cw-pill-badge {
+  padding: 5px 12px;
+  border-radius: 999px;
+  font-size: 12.5px;
+  font-weight: 900;
+  background: linear-gradient(#ff4750, #bf1725);
+  border: 1px solid #ff806e;
+  color: #ffffff;
+  box-shadow: 0 0 12px rgba(255, 54, 79, 0.45);
+}
+
+.cw-pill-badge.wash {
+  background: linear-gradient(#42ef67, #0b9c35);
+  border-color: #81ff92;
+  color: #032b13;
+  box-shadow: 0 0 12px rgba(49, 255, 104, 0.5);
+}
+
+.compare-top-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.wardrobe-cartoon-box {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  border-radius: 16px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: #0a1830;
+}
+
+.wardrobe-cartoon-box svg.reference-scene {
+  width: 100%;
+  height: 100%;
   display: block;
 }
 
@@ -1830,6 +1980,19 @@ body[data-sky="night"] .atmosphere {
   border-bottom: 1px solid rgba(255, 255, 255, 0.14);
 }
 
+.exposure-art-banner.exposure-real-scene {
+  height: auto;
+  aspect-ratio: 1 / 1;
+  max-height: none;
+  background: #0a1830;
+}
+
+.exposure-art-banner.exposure-real-scene svg.reference-scene {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
 .exposure-art-svg {
   width: 100%;
   height: 100%;
@@ -2421,17 +2584,18 @@ body[data-sky="night"] .atmosphere {
   .wardrobe-modal-hero {
     grid-template-columns: 1fr;
   }
-  .wardrobe-hero-img {
-    max-height: 210px;
+  .wardrobe-cartoon-box {
+    max-width: 220px;
+    margin: 0 auto;
   }
-  .hero-person-photo {
-    width: 82%;
-    object-position: 52% 6%;
-  }
-  .trio-outfit-thumb {
+  .trio-cartoon-thumb {
     width: 44px;
     height: 44px;
     border-radius: 12px;
+  }
+  .carwash-teaser-thumb {
+    width: 56px;
+    height: 42px;
   }
   .trio-big-val {
     font-size: 22px;

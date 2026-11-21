@@ -8,28 +8,28 @@
 import { clamp } from './physics.js';
 
 export const HOURLY_METRICS = [
-  { id: 'temp', label: 'Temp', unit: '°', color: '#63e2b7', color2: 'rgba(99, 226, 183, 0.26)', showBand: true, desc: 'Blended 2m temperature with multi-model P10–P90 uncertainty ribbon' },
-  { id: 'feels', label: 'Feels', unit: '°', color: '#7cc4ff', color2: 'rgba(124, 196, 255, 0.25)', showDualSun: true, desc: 'Hybrid UTCI / Steadman / Wind-Chill apparent temperature (solid = active, dashed = direct sun)' },
-  { id: 'rainChance', label: 'Rain chance', unit: '%', color: '#58b8ff', color2: 'rgba(88, 184, 255, 0.28)', min: 0, max: 100, isBarLine: true, desc: '100-Point Multi-Model Rain Scoring Ledger probability' },
-  { id: 'rainfall', label: 'Rainfall', unit: '"', color: '#3ea6ff', color2: 'rgba(62, 166, 255, 0.32)', min: 0, isBarLine: true, decimals: 3, desc: 'Blended hourly Quantitative Precipitation Forecast (inches/hr)' },
-  { id: 'wind', label: 'Wind', unit: ' mph', color: '#9be2ff', color2: 'rgba(155, 226, 255, 0.22)', min: 0, desc: '10-meter sustained wind speed (mph)' },
-  { id: 'gusts', label: 'Gusts', unit: ' mph', color: '#ffbe6b', color2: 'rgba(255, 190, 107, 0.24)', min: 0, desc: 'Peak 10-meter wind gusts (mph) vs sustained baseline' },
+  { id: 'temp', label: 'Temp', unit: '°', color: '#63e2b7', color2: 'rgba(99, 226, 183, 0.26)', showBand: true, desc: 'Hour-by-hour temperature trend' },
+  { id: 'feels', label: 'Feels Like', unit: '°', color: '#7cc4ff', color2: 'rgba(124, 196, 255, 0.25)', showDualSun: true, desc: 'How it actually feels outside (solid = shade/ambient, dashed = direct sun)' },
+  { id: 'rainChance', label: 'Rain Chance', unit: '%', color: '#58b8ff', color2: 'rgba(88, 184, 255, 0.28)', min: 0, max: 100, isBarLine: true, desc: 'Hourly chance of rain (%)' },
+  { id: 'rainfall', label: 'Rainfall', unit: '"', color: '#3ea6ff', color2: 'rgba(62, 166, 255, 0.32)', min: 0, isBarLine: true, decimals: 3, desc: 'Expected rainfall per hour (inches)' },
+  { id: 'wind', label: 'Wind', unit: ' mph', color: '#9be2ff', color2: 'rgba(155, 226, 255, 0.22)', min: 0, desc: 'Wind speed (mph)' },
+  { id: 'gusts', label: 'Wind Gusts', unit: ' mph', color: '#ffbe6b', color2: 'rgba(255, 190, 107, 0.24)', min: 0, desc: 'Strongest wind gusts (mph)' },
   { id: 'humidity', label: 'Humidity', unit: '%', color: '#78d5f5', color2: 'rgba(120, 213, 245, 0.22)', min: 0, max: 100, desc: 'Relative humidity (%)' },
-  { id: 'dewPoint', label: 'Dew Point', unit: '°', color: '#52e0c4', color2: 'rgba(82, 224, 196, 0.24)', desc: 'Absolute moisture comfort temperature (°F)' },
-  { id: 'cloudCover', label: 'Cloud cover', unit: '%', color: '#b7c8e8', color2: 'rgba(183, 200, 232, 0.24)', min: 0, max: 100, desc: 'Total atmospheric cloud cover fraction (%)' },
-  { id: 'uvIndex', label: 'UV Index', unit: '', color: '#ffd166', color2: 'rgba(255, 209, 102, 0.26)', min: 0, max: 11, decimals: 1, desc: 'Clear & cloud-attenuated erythemally weighted UV Index' },
-  { id: 'pressure', label: 'Pressure', unit: ' inHg', color: '#c89eff', color2: 'rgba(200, 158, 255, 0.22)', decimals: 2, desc: 'Sea-level / surface barometric pressure (inHg)' },
-  { id: 'airQuality', label: 'Air quality', unit: ' AQI', color: '#72e59c', color2: 'rgba(114, 229, 156, 0.24)', min: 0, desc: 'US EPA Air Quality Index (CAMS / Open-Meteo blend)' }
+  { id: 'dewPoint', label: 'Dew Point', unit: '°', color: '#52e0c4', color2: 'rgba(82, 224, 196, 0.24)', desc: 'How muggy or dry the air feels' },
+  { id: 'cloudCover', label: 'Clouds', unit: '%', color: '#b7c8e8', color2: 'rgba(183, 200, 232, 0.24)', min: 0, max: 100, desc: 'Expected sky cloud cover (%)' },
+  { id: 'uvIndex', label: 'UV Index', unit: '', color: '#ffd166', color2: 'rgba(255, 209, 102, 0.26)', min: 0, max: 11, decimals: 1, desc: 'Sun strength / UV index' },
+  { id: 'pressure', label: 'Pressure', unit: ' inHg', color: '#c89eff', color2: 'rgba(200, 158, 255, 0.22)', decimals: 2, desc: 'Barometric air pressure (inHg)' },
+  { id: 'airQuality', label: 'Air Quality', unit: ' AQI', color: '#72e59c', color2: 'rgba(114, 229, 156, 0.24)', min: 0, desc: 'Air quality index' }
 ];
 
 export const COMPARE_MODELS = [
-  { id: 'blend', label: 'Weather Nourie', color: '#ffffff', glowColor: 'rgba(122, 214, 255, 0.55)', width: 5.5, alwaysOn: true },
-  { id: 'nws', label: 'NWS Official', color: '#6bc5ff', width: 2.0 },
-  { id: 'hrrr', label: 'HRRR 3km', color: '#ff9f5a', width: 2.0 },
-  { id: 'nbm', label: 'National Blend', color: '#5ce0a0', width: 2.0 },
-  { id: 'ecmwf', label: 'ECMWF IFS', color: '#b88cff', width: 2.0 },
-  { id: 'gefs', label: 'GEFS Ensemble', color: '#ffd166', width: 1.8 },
-  { id: 'weathernext', label: 'WeatherNext AI', color: '#ff7eb6', width: 2.0 }
+  { id: 'blend', label: 'Weather Nourie', color: '#ffffff', width: 4.8, dash: '', alwaysOn: true },
+  { id: 'nws', label: 'NWS', color: '#38bdf8', width: 2.2, dash: '' },
+  { id: 'hrrr', label: 'HRRR', color: '#ff9248', width: 2.2, dash: '' },
+  { id: 'nbm', label: 'NBM', color: '#34d399', width: 2.2, dash: '6 3' },
+  { id: 'ecmwf', label: 'ECMWF', color: '#c084fc', width: 2.2, dash: '' },
+  { id: 'gefs', label: 'GEFS', color: '#facc15', width: 2.0, dash: '3 3' },
+  { id: 'weathernext', label: 'WeatherNext AI', color: '#f472b6', width: 2.2, dash: '8 3' }
 ];
 
 export const COMPARE_VARIABLES = [
@@ -355,6 +355,7 @@ export function renderHourlyExplorerChart({
 export function renderModelCompareChart({
   containerEl,
   days,
+  horizonDays = 5,
   variableId = 'highTemp',
   enabledModels = new Set(['blend', 'nws', 'hrrr', 'nbm', 'ecmwf', 'gefs', 'weathernext']),
   selectedDayIdx = 0,
@@ -363,6 +364,7 @@ export function renderModelCompareChart({
 }) {
   if (!containerEl || !Array.isArray(days) || days.length === 0) return;
 
+  const visibleDays = days.slice(0, clamp(horizonDays, 3, days.length));
   const variable = COMPARE_VARIABLES.find((v) => v.id === variableId) || COMPARE_VARIABLES[0];
   const convT = (f) => (f === null || f === undefined ? null : useCelsius ? Math.round(((f - 32) * 5) / 9) : f);
 
@@ -409,83 +411,81 @@ export function renderModelCompareChart({
     }
   }
 
-  const W = 900;
-  const H = 310;
+  const W = 680;
+  const H = 340;
   const padL = 46;
-  const padR = 26;
-  const padT = 32;
-  const padB = 40;
+  const padR = 24;
+  const padT = 30;
+  const padB = 38;
   const plotW = W - padL - padR;
   const plotH = H - padT - padB;
 
   const allNums = [];
   COMPARE_MODELS.forEach((m) => {
     if (!enabledModels.has(m.id) && !m.alwaysOn) return;
-    days.forEach((d) => {
+    visibleDays.forEach((d) => {
       const v = getDayModelValue(d, m.id);
       if (typeof v === 'number' && !Number.isNaN(v)) allNums.push(v);
     });
   });
 
+  // Tight bounds so model differences stand out clearly (not zoomed way out!)
   let minV = allNums.length ? Math.min(...allNums) : 40;
   let maxV = allNums.length ? Math.max(...allNums) : 80;
-  if (maxV - minV < (variable.decimals ? 0.4 : 6)) {
-    minV = Math.max(0, minV - (variable.decimals ? 0.2 : 3));
-    maxV += variable.decimals ? 0.3 : 4;
+  if (maxV - minV < (variable.decimals ? 0.35 : 4)) {
+    minV = Math.max(0, minV - (variable.decimals ? 0.15 : 2));
+    maxV += variable.decimals ? 0.2 : 2.5;
   } else {
     const span = maxV - minV;
-    minV -= span * 0.14;
-    maxV += span * 0.18;
+    minV = Math.floor(minV - span * 0.08);
+    maxV = Math.ceil(maxV + span * 0.12);
     if (['qpf', 'rainChance', 'wind', 'cloudCover', 'uvIndex', 'snow', 'aqi'].includes(variableId)) {
       minV = Math.max(0, minV);
     }
   }
 
-  const xForDay = (i) => padL + (i / Math.max(1, days.length - 1)) * plotW;
+  const xForDay = (i) => padL + (i / Math.max(1, visibleDays.length - 1)) * plotW;
   const yForVal = (v) => padT + plotH - clamp((v - minV) / (maxV - minV || 1), 0, 1) * plotH;
 
-  // Draw individual models first, and Weather Nourie Blend last so it stays prominent on top
+  // Individual models first, Weather Nourie Blend cleanly on top with crisp contrast halo
   const orderedModels = [
     ...COMPARE_MODELS.filter((m) => m.id !== 'blend'),
     ...COMPARE_MODELS.filter((m) => m.id === 'blend')
   ];
 
-  let blendAreaSvg = '';
+  const selIdx = clamp(selectedDayIdx, 0, visibleDays.length - 1);
+  const selX = xForDay(selIdx);
+
   const modelPathsSvg = orderedModels.map((m) => {
     if (!enabledModels.has(m.id) && !m.alwaysOn) return '';
     const pts = [];
-    days.forEach((d, idx) => {
+    visibleDays.forEach((d, idx) => {
       const val = getDayModelValue(d, m.id);
       if (typeof val === 'number' && !Number.isNaN(val)) {
         pts.push({ x: xForDay(idx), y: yForVal(val), val, dayIdx: idx });
       }
     });
     if (pts.length < 2) return '';
-    const pathD = buildSmoothSvgPath(pts, 0.2);
+    const pathD = buildSmoothSvgPath(pts, 0.18);
     const isBlend = m.id === 'blend';
-    if (isBlend) {
-      const areaD = `${pathD} L ${pts[pts.length - 1].x.toFixed(1)} ${(padT + plotH).toFixed(1)} L ${pts[0].x.toFixed(1)} ${(padT + plotH).toFixed(1)} Z`;
-      blendAreaSvg = `<path d="${areaD}" fill="url(#cmp-blend-area)"/>`;
-    }
     return `
       <g class="compare-model-series" data-model="${m.id}">
         ${
           isBlend
-            ? `<path d="${pathD}" fill="none" stroke="rgba(88, 198, 255, 0.42)" stroke-width="11" stroke-linecap="round" filter="url(#cmp-glow)"/>`
+            ? `<path d="${pathD}" fill="none" stroke="rgba(6, 16, 34, 0.9)" stroke-width="8.5" stroke-linecap="round"/>`
             : ''
         }
-        <path d="${pathD}" fill="none" stroke="${m.color}" stroke-width="${isBlend ? 5.6 : m.width}" stroke-linecap="round" stroke-linejoin="round" opacity="${isBlend ? '1' : '0.72'}"/>
+        <path d="${pathD}" fill="none" stroke="${m.color}" stroke-width="${isBlend ? 4.8 : m.width}" stroke-dasharray="${m.dash || ''}" stroke-linecap="round" stroke-linejoin="round" opacity="${isBlend ? '1' : '0.92'}"/>
         ${pts
           .map((p, idx) => {
-            const isSel = p.dayIdx === selectedDayIdx;
-            const showPill = isBlend && (isSel || idx % 2 === 0 || idx === pts.length - 1);
+            const isSel = p.dayIdx === selIdx;
             return `
-              <circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="${isBlend ? (isSel ? '6.5' : '4.8') : (isSel ? '4.2' : '2.6')}" fill="${m.color}" stroke="${isBlend ? '#0c2340' : '#081426'}" stroke-width="${isBlend ? '2' : '1'}"/>
+              <circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="${isBlend ? (isSel ? '6.5' : '4.5') : (isSel ? '4.8' : '3.2')}" fill="${m.color}" stroke="#081426" stroke-width="${isBlend ? '2' : '1.2'}"/>
               ${
-                showPill
-                  ? `<g transform="translate(${p.x.toFixed(1)}, ${(p.y - 13).toFixed(1)})">
-                      <rect x="-20" y="-13" width="40" height="17" rx="8" fill="${isSel ? 'rgba(14, 165, 233, 0.94)' : 'rgba(9, 20, 40, 0.9)'}" stroke="${isSel ? '#ffffff' : 'rgba(140, 205, 255, 0.42)'}" stroke-width="${isSel ? '1.3' : '0.9'}"/>
-                      <text text-anchor="middle" y="-1" fill="#ffffff" font-size="11.5" font-weight="800">${
+                isBlend && (isSel || visibleDays.length <= 7 || idx % 2 === 0)
+                  ? `<g transform="translate(${p.x.toFixed(1)}, ${(p.y - 14).toFixed(1)})">
+                      <rect x="-21" y="-13" width="42" height="18" rx="8" fill="${isSel ? 'rgba(14, 165, 233, 0.95)' : 'rgba(8, 19, 38, 0.92)'}" stroke="${isSel ? '#ffffff' : 'rgba(255, 255, 255, 0.4)'}" stroke-width="${isSel ? '1.3' : '0.9'}"/>
+                      <text text-anchor="middle" y="0" fill="#ffffff" font-size="12" font-weight="800">${
                         variable.decimals ? p.val.toFixed(variable.decimals) : Math.round(p.val)
                       }${variable.unit}</text>
                     </g>`
@@ -498,7 +498,7 @@ export function renderModelCompareChart({
     `;
   }).join('');
 
-  // Y grid ticks
+  // Clean horizontal gridlines
   const yTicks = [];
   for (let i = 0; i <= 4; i++) {
     const v = minV + ((maxV - minV) * i) / 4;
@@ -508,40 +508,25 @@ export function renderModelCompareChart({
     });
   }
 
-  const selIdx = clamp(selectedDayIdx, 0, days.length - 1);
-  const selX = xForDay(selIdx);
-
   containerEl.innerHTML = `
     <svg class="compare-models-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet">
-      <defs>
-        <linearGradient id="cmp-blend-area" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stop-color="#58b8ff" stop-opacity="0.22"/>
-          <stop offset="100%" stop-color="#58b8ff" stop-opacity="0.0"/>
-        </linearGradient>
-        <filter id="cmp-glow" x="-10%" y="-25%" width="120%" height="150%">
-          <feGaussianBlur stdDeviation="4" result="b"/>
-          <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
-        </filter>
-      </defs>
-
       ${yTicks
         .map(
           (t) => `
-        <line x1="${padL}" y1="${t.y.toFixed(1)}" x2="${W - padR}" y2="${t.y.toFixed(1)}" stroke="rgba(255,255,255,0.08)"/>
-        <text x="${padL - 8}" y="${(t.y + 4).toFixed(1)}" text-anchor="end" fill="rgba(205,222,248,0.72)" font-size="12.5" font-weight="500">${t.label}</text>
+        <line x1="${padL}" y1="${t.y.toFixed(1)}" x2="${W - padR}" y2="${t.y.toFixed(1)}" stroke="rgba(255,255,255,0.1)"/>
+        <text x="${padL - 8}" y="${(t.y + 4).toFixed(1)}" text-anchor="end" fill="rgba(210,226,250,0.78)" font-size="13.5" font-weight="600">${t.label}</text>
       `
         )
         .join('')}
 
-      ${blendAreaSvg}
-      <line x1="${selX.toFixed(1)}" y1="${padT}" x2="${selX.toFixed(1)}" y2="${padT + plotH}" stroke="rgba(122, 198, 255, 0.55)" stroke-width="1.8" stroke-dasharray="4 4"/>
+      <line x1="${selX.toFixed(1)}" y1="${padT}" x2="${selX.toFixed(1)}" y2="${padT + plotH}" stroke="rgba(122, 198, 255, 0.65)" stroke-width="1.8" stroke-dasharray="4 4"/>
 
       ${modelPathsSvg}
 
-      ${days
+      ${visibleDays
         .map(
           (d, i) => `
-        <text x="${xForDay(i).toFixed(1)}" y="${H - 12}" text-anchor="middle" fill="${i === selIdx ? '#ffffff' : 'rgba(200,218,245,0.76)'}" font-size="13.5" font-weight="${i === selIdx ? '800' : '600'}">${d.shortWeekday}</text>
+        <text x="${xForDay(i).toFixed(1)}" y="${H - 12}" text-anchor="middle" fill="${i === selIdx ? '#ffffff' : 'rgba(205,222,248,0.8)'}" font-size="14" font-weight="${i === selIdx ? '800' : '600'}">${d.shortWeekday}</text>
       `
         )
         .join('')}
@@ -554,7 +539,7 @@ export function renderModelCompareChart({
       const rect = svg.getBoundingClientRect();
       const relX = ((e.clientX - rect.left) / Math.max(1, rect.width)) * W;
       const ratio = clamp((relX - padL) / plotW, 0, 1);
-      onSelectDay(Math.round(ratio * (days.length - 1)));
+      onSelectDay(Math.round(ratio * (visibleDays.length - 1)));
     });
   }
 }

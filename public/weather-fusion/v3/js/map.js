@@ -13,73 +13,73 @@ export const MAP_LAYERS = [
   {
     id: 'radar',
     label: 'Live radar',
-    caption: 'NEXRAD / RainViewer High-Resolution Composite Reflectivity (dBZ) with 5 / 12 / 36 mi proximity rings',
+    caption: 'Live precipitation radar near your location',
     legend: [
-      { label: 'Light (15 dBZ)', color: '#38d39f' },
-      { label: 'Moderate (30 dBZ)', color: '#f5d042' },
-      { label: 'Heavy (45 dBZ)', color: '#ff6b4a' },
-      { label: 'Extreme (55+ dBZ)', color: '#d845ff' }
+      { label: 'Light Rain', color: '#38d39f' },
+      { label: 'Moderate', color: '#f5d042' },
+      { label: 'Heavy', color: '#ff6b4a' },
+      { label: 'Intense', color: '#d845ff' }
     ]
   },
   {
     id: 'hrrr',
-    label: 'HRRR',
-    caption: 'NOAA HRRR 3km CONUS Simulated Composite Reflectivity (Iowa State Mesonet / NCEP)',
+    label: 'Short-range rain',
+    caption: 'High-resolution short-range rain radar outlook',
     legend: [
-      { label: 'Light Echo', color: '#47e5a0' },
-      { label: 'Mod Echo', color: '#ffd166' },
-      { label: 'Convective Core', color: '#ff5964' }
+      { label: 'Light Showers', color: '#47e5a0' },
+      { label: 'Steady Rain', color: '#ffd166' },
+      { label: 'Heavy Storms', color: '#ff5964' }
     ]
   },
   {
     id: 'ecmwf',
     label: 'ECMWF rain',
-    caption: 'ECMWF IFS 0.25° Open Data Precipitation Rate & Synoptic Moisture Plume',
+    caption: 'European rain outlook for your area',
     legend: [
-      { label: '0.01–0.05"/hr', color: '#58c4ff' },
-      { label: '0.05–0.20"/hr', color: '#2b7fff' },
-      { label: '0.25"+/hr', color: '#a855f7' }
+      { label: 'Light', color: '#58c4ff' },
+      { label: 'Moderate', color: '#2b7fff' },
+      { label: 'Heavy', color: '#a855f7' }
     ]
   },
   {
     id: 'nbm',
-    label: 'NBM rain',
-    caption: 'NOAA National Blend of Models (NBM v4.2) Calibrated Quantitative Precipitation',
+    label: 'US Blend rain',
+    caption: 'US rain forecast for your area',
     legend: [
-      { label: 'Trace–Light', color: '#6ee7b7' },
-      { label: 'Moderate QPF', color: '#3b82f6' },
-      { label: 'Heavy QPF', color: '#ec4899' }
+      { label: 'Light', color: '#6ee7b7' },
+      { label: 'Moderate', color: '#3b82f6' },
+      { label: 'Heavy', color: '#ec4899' }
     ]
   },
   {
     id: 'temperature',
     label: 'Temperature',
-    caption: '2-Meter Surface Air Temperature Isotherm Field & Local Thermal Gradient',
+    caption: 'Current outdoor temperatures across your area',
     legend: [
-      { label: '<32°F Freeze', color: '#3b82f6' },
-      { label: '50–65°F Cool', color: '#34d399' },
-      { label: '70–85°F Warm', color: '#fbbf24' },
-      { label: '90°F+ Hot', color: '#ef4444' }
+      { label: 'Freezing (<32°)', color: '#3b82f6' },
+      { label: 'Cool (50–65°)', color: '#34d399' },
+      { label: 'Warm (70–85°)', color: '#fbbf24' },
+      { label: 'Hot (90°+)', color: '#ef4444' }
     ]
   },
   {
     id: 'wind',
     label: 'Wind',
-    caption: '10-Meter Surface Wind Streamlines & Gust Isotach Vector Field',
+    caption: 'Wind direction and breeze speed',
     legend: [
       { label: '5–12 mph', color: '#7dd3fc' },
       { label: '15–25 mph', color: '#fde047' },
-      { label: '30+ mph Gale', color: '#fb7185' }
+      { label: '30+ mph', color: '#fb7185' }
     ]
   },
   {
     id: 'clouds',
     label: 'Clouds',
-    caption: 'Total Atmospheric Cloud Cover & Infrared Satellite Albedo Composite',
+    caption: 'Expected cloud cover overhead',
     legend: [
-      { label: 'Scattered (25%)', color: 'rgba(180,205,245,0.45)' },
-      { label: 'Broken (65%)', color: 'rgba(210,226,255,0.72)' },
-      { label: 'Overcast (95%)', color: '#ffffff' }
+      { label: 'Partly Cloudy', color: 'rgba(180,205,245,0.45)' },
+      { label: 'Mostly Cloudy', color: 'rgba(210,226,255,0.72)' },
+      { label: 'Overcast', color: '#ffffff' }
     ]
   }
 ];
