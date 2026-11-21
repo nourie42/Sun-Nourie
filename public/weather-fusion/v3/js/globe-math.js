@@ -5,8 +5,10 @@ export function globeCoordinates([x,y,z]){const r=Math.hypot(x,y,z);return {lati
 export function sampleGlobeWind(grid,latitude,longitude){
  if(!grid?.vectors?.length||!Number.isFinite(latitude)||!Number.isFinite(longitude))return null;
  const y=(latitude-grid.lat0)/grid.dy;if(y<0||y>grid.ny-1)return null;
- const x=(((longitude-grid.lon0)/grid.dx)%grid.nx+grid.nx)%grid.nx,x0=Math.floor(x),y0=Math.floor(y),xf=x-x0,yf=y-y0;
- const corners=[[x0,y0,(1-xf)*(1-yf)],[(x0+1)%grid.nx,y0,xf*(1-yf)],[x0,Math.min(grid.ny-1,y0+1),(1-xf)*yf],[(x0+1)%grid.nx,Math.min(grid.ny-1,y0+1),xf*yf]];
+ if(grid.lon0>=0)longitude=((longitude%360)+360)%360;
+ const rawX=(longitude-grid.lon0)/grid.dx,wrap=grid.wrapLongitude!==false;if(!wrap&&(rawX<0||rawX>grid.nx-1))return null;
+ const x=wrap?((rawX%grid.nx+grid.nx)%grid.nx):rawX,x0=Math.floor(x),y0=Math.floor(y),xf=x-x0,yf=y-y0;
+ const corners=[[x0,y0,(1-xf)*(1-yf)],[(wrap?(x0+1)%grid.nx:Math.min(grid.nx-1,x0+1)),y0,xf*(1-yf)],[x0,Math.min(grid.ny-1,y0+1),(1-xf)*yf],[(wrap?(x0+1)%grid.nx:Math.min(grid.nx-1,x0+1)),Math.min(grid.ny-1,y0+1),xf*yf]];
  let u=0,v=0;for(const [col,row,w]of corners){if(w<1e-9)continue;const p=grid.vectors[row*grid.nx+col];if(!p?.every(Number.isFinite))return null;u+=p[0]*w;v+=p[1]*w;}return {u,v,speed:Math.hypot(u,v)};
 }
 export function windParticleCount(speed){return Number.isFinite(speed)&&speed>0?Math.min(22,Math.floor(speed*1.6)):0;}
@@ -19,3 +21,6 @@ export function subsolarPoint(now=Date.now()){
  const minutes=d.getUTCHours()*60+d.getUTCMinutes()+d.getUTCSeconds()/60;
  return {latitude:declination/D,longitude:((180-(minutes+equation)/4+540)%360)-180};
 }
+
+export function sampleWindField(grid,latitude,longitude){return (grid?.regional?sampleGlobeWind(grid.regional,latitude,longitude):null)||sampleGlobeWind(grid,latitude,longitude);}
+export function screenWindDensity(area,speed){return Math.min(1400,Math.max(0,Math.round(area/260*Math.min(2,Math.max(0,speed)/7))));}

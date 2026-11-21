@@ -13,7 +13,7 @@
   <link rel="stylesheet" href="/weather-fusion/weather-glass.css?v=ice-v2" />
   <link rel="stylesheet" href="/weather-fusion/outlook-panel.css?v=compact-v3" />
   <link rel="stylesheet" href="/weather-fusion/v3/css/styles.css?v=v3-sky-8" />
-  <link rel="stylesheet" href="/weather-fusion/v3/css/people-globe.css?v=beta-polish-v1" />
+  <link rel="stylesheet" href="/weather-fusion/v3/css/people-globe.css?v=refined-12" />
 </head>
 <body data-sky="cloudy">
   <!-- Full-Viewport Fixed Dynamic Living Sky Backdrop (Flows Behind Every Glass Tile) -->
@@ -33,7 +33,8 @@
         <div class="topbar-left">
           <button id="tools-drawer-btn" class="icon-btn compact-btn glass-chip-btn" type="button" aria-expanded="false" aria-controls="tools-strip" aria-label="Menu & tools">☰</button>
           <a class="brand" href="#top" aria-label="Weather Nourie home">
-            <svg class="main-brand-art" viewBox="50 18 525 180" role="img" aria-label="Weather Nourie"><image href="/weather-fusion/header-cloudy.webp" width="1440" height="273" /></svg>
+            <img class="beta-brand-logo" src="/weather-fusion/logo.svg" width="43" height="43" alt="" />
+            <span class="beta-brand-wordmark"><span>WEATHER</span><strong>Nourie</strong></span>
           </a>
         </div>
 
@@ -276,7 +277,7 @@
     <!-- Outside Right Now (Immediately Below How It Feels & What to Wear) -->
     <section id="skin-exposure" class="glass comfort-people-panel">
       <div class="section-inline-head">
-        <h2 id="exposure-section-title" class="card-title-clean">How it feels outside right now</h2>
+        <h2 id="exposure-section-title" class="card-title-clean">How it feels outside</h2>
         <span id="exposure-time-note" class="subtle-note">Right now</span>
       </div>
       <p id="exposure-weather-context" class="comfort-current-context"></p>
@@ -465,12 +466,12 @@
 
   <dialog id="weather-globe-dialog" class="weather-globe-dialog" aria-labelledby="weather-globe-title">
     <header class="globe-dialog-header"><div><h2 id="weather-globe-title">Weather globe</h2><p id="globe-point-label"></p></div><button id="close-weather-globe" class="icon-btn" type="button" aria-label="Close globe">×</button></header>
-    <div class="globe-toolbar" role="group" aria-label="Weather globe layers"><button data-globe-layer="radar" class="mode-pill active" aria-pressed="true" type="button">Radar</button><button data-globe-layer="clouds" class="mode-pill active" aria-pressed="true" type="button">Satellite</button><button data-globe-layer="wind" class="mode-pill active" aria-pressed="true" type="button">Wind</button><button id="globe-recenter" class="mode-pill" type="button">⌖ My location</button><button id="globe-refresh" class="mode-pill" type="button">Refresh layers</button><button id="globe-motion" class="mode-pill" type="button" aria-pressed="true">Pause motion</button></div>
+    <div class="globe-toolbar" role="group" aria-label="Weather globe layers"><button data-globe-layer="radar" class="mode-pill active" aria-pressed="true" type="button">Radar</button><button data-globe-layer="clouds" class="mode-pill active" aria-pressed="true" type="button">Satellite</button><button data-globe-layer="wind" class="mode-pill active" aria-pressed="true" type="button">Wind</button><button id="globe-recenter" class="mode-pill" type="button">⌖ Recenter</button><button id="globe-refresh" class="mode-pill" type="button">Refresh layers</button><button id="globe-basemap" class="mode-pill" type="button" aria-pressed="false">Street map</button><button id="globe-motion" class="mode-pill" type="button" aria-pressed="true">Pause motion</button></div>
     <div id="globe-expanded-mount" class="globe-expanded-mount"></div>
     <div class="globe-view-controls"><button id="globe-zoom-in" class="icon-btn" type="button" aria-label="Zoom in">+</button><button id="globe-zoom-out" class="icon-btn" type="button" aria-label="Zoom out">−</button><span>Drag to rotate · Pinch or use + / − to zoom</span></div>
     <div class="globe-radar-time"><button id="globe-radar-play" class="mode-pill" type="button" aria-pressed="false">Play radar</button><input id="globe-radar-time" type="range" min="0" max="0" value="0" aria-label="Observed radar frame" /><output id="globe-radar-stamp">Radar loading…</output></div>
     <p id="globe-layer-status" class="globe-layer-status" aria-live="polite">Checking current radar, satellite and wind feeds…</p>
-    <p class="globe-attribution">Earth: NASA · Radar: NOAA MRMS, continental US · Satellite infrared: UW–Madison SSEC RealEarth · Wind: GFS via Open-Meteo. Bright infrared areas can include cold ground. Wind paths show model flow, not storm tracks.</p>
+    <p class="globe-attribution">Map: Esri / OpenStreetMap · Radar: NOAA MRMS, continental US · Satellite infrared: UW–Madison SSEC RealEarth · Wind: NOAA GFS. Bright infrared areas can include cold ground. Wind trails show forecast flow.</p>
     <button id="globe-open-radar-map" class="mode-pill" type="button">Open detailed local radar map ›</button>
   </dialog>
 
@@ -482,6 +483,6 @@
   </footer>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
-  <script type="module" src="/weather-fusion/v3/js/app.js?v=v3-globe-people-11"></script>
+  <script type="module" src="/weather-fusion/v3/js/app.js?v=v3-refined-12"></script>
 </body>
 </html>

@@ -29,7 +29,7 @@ import { dogWalkerScene, referenceScene } from '../../exposure-scene.js?v=true-n
 import { danCard, danOverview, danTakeDisplay } from '../../dans-summary.js?v=afd-discussion-section-v1';
 import { activeRiskOutlooks, outlookDetailHTML } from '../../risk-outlooks.js?v=risk-outlooks-v5';
 import { forecastWindowDetailHTML } from '../../forecast-window-banners.js?v=current-rain-20261017-v3';
-import {GlobePanel} from './globe-panel.js?v=globe-v2';
+import {GlobePanel} from './globe-panel.js?v=tiled-v3';
 import {outlookItems,renderOutlookPanel,openOutlookNote} from '../../outlook-panel.js?v=compact-v1';
 
 const LEGACY_LOC_KEY = 'weather-nourie-v3-location';
@@ -1221,7 +1221,7 @@ function renderOutdoorExposureCards(f) {
     (!cur.hasDirectSun || (cur.cloudCover || 0) >= 70 || /overcast|mostly cloudy|\bcloudy\b|fog/i.test(cur.condition || ''));
   const titleEl = document.getElementById('exposure-section-title');
   if (titleEl) {
-    titleEl.textContent = hIdx === 0 ? 'How it feels outside right now' : 'Outside Forecast';
+    titleEl.textContent = hIdx === 0 ? 'How it feels outside' : 'Outside Forecast';
   }
   const noteEl = document.getElementById('exposure-time-note');
   if (noteEl) {
@@ -1358,7 +1358,7 @@ function renderOutdoorExposureCards(f) {
     const value=pets?fmtTemp(pave.concreteTempF):item.badgeVal;
     const subtitle=pets?pave.pawSafety.label:!Number.isFinite(item.id==='shade'?cur.shadeFeelsF:sunTileFeels)?'Estimate unavailable':item.id==='shade'?getFeelsVerdict(cur.shadeFeelsF,isRaining).label:getFeelsVerdict(sunTileFeels,isRaining).label;
     const caption=pets?'Concrete surface':item.id==='shade'?'Feels like in shade':!cur.isDay?'Feels like at night':isRaining||isCloudyNoSun?'Feels like outdoors':'Feels like in sun';
-    return `<article class="glass exposure-person-card" data-exp-card="${item.id}"><button type="button" class="exposure-person-button" data-exp-toggle="${item.id}" aria-expanded="${isOpen}" aria-controls="exposure-detail-${item.id}"><span class="person-card-title">${titles[item.id]}</span><span class="person-card-description">${subtitle}</span><span class="person-card-scene">${item.svg}</span><span class="person-card-reading"><strong>${value}</strong><span>${caption}</span>${pets?`<b>Asphalt ${fmtTemp(pave.asphaltTempF)}</b><small>Est. surface temp</small>`:''}<small class="person-card-detail-hint">Details ${isOpen?'⌃':'⌄'}</small></span></button></article>`;
+    return `<article class="glass exposure-person-card" data-exp-card="${item.id}"><button type="button" class="exposure-person-button" data-exp-toggle="${item.id}" aria-expanded="${isOpen}" aria-controls="exposure-detail-${item.id}"><span class="person-card-title">${titles[item.id]}</span><span class="person-card-scene">${item.svg}</span><span class="person-card-reading"><strong>${value}</strong><span>${caption}</span>${pets?`<b>Asphalt ${fmtTemp(pave.asphaltTempF)}</b><small>Est. surface temp</small>`:''}</span><span class="person-card-description"${pets?` style="color:${pave.pawSafety.color}"`:''}>${subtitle}</span><small class="person-card-detail-hint">${isOpen?'Close details':'Details'} ›</small></button></article>`;
   }).join('')+items.filter(item=>state.expandedExposureIds.has(item.id)).map(item=>`<section class="exposure-expanded-body" id="exposure-detail-${item.id}" data-exp-id="${item.id}" aria-label="${titles[item.id]} details">${item.detailsHtml}</section>`).join('');
 
   container.querySelectorAll('[data-exp-toggle]').forEach((btn) => {

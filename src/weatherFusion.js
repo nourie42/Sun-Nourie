@@ -805,7 +805,7 @@ export function registerWeatherFusionRoutes(app, options = {}) {
     'v3/css/styles.css',
     'v3/css/people-globe.css',
     'v3/js/globe-panel.js','v3/js/globe-renderer.js','v3/js/globe-math.js',
-    'v3/vendor/three.module.min.js','v3/textures/earth-day.jpg','v3/textures/earth-night.jpg',
+    'v3/vendor/three.module.min.js','v3/vendor/maplibre-gl.js','v3/vendor/maplibre-gl.css','v3/vendor/maplibre-license.txt','v3/textures/earth-day.jpg','v3/textures/earth-night.jpg',
     'v3/js/app.js',
     'v3/js/charts.js',
     'v3/js/fusion-engine.js',
