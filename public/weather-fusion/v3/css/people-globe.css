@@ -169,3 +169,16 @@ html body.beta-weather-app #today-forecast .beta-today-graph :is(.today-sky,.tod
 html body.beta-weather-app #today-forecast .today-weather-card.beta-today-graph {cursor:default}
 html body.beta-weather-app #today-forecast .beta-today-graph button.today-more {font-family:inherit;cursor:pointer;min-height:40px}
 #skin-exposure .person-card-reading>.pet-surface-status {font-size:clamp(20px,5vw,30px);letter-spacing:0;font-weight:700}
+
+.beta-hourly-preview-legend {font-size:11px;gap:4px 9px}
+.beta-hourly-preview-legend [data-metric="dewpoint"]::before {height:0;border-top:2px dashed var(--series-color);background:none}
+.beta-today-hourly-svg text {font-size:11px}
+.today-hour-controls {display:grid;grid-template-columns:44px 1fr 44px;gap:6px;align-items:center;margin:5px 0 4px;text-align:center}
+.today-hour-controls button {min-height:44px;width:44px;border:1px solid #b9e4ff55;border-radius:10px;background:#173752af;color:#f3faff;font-family:inherit;font-size:23px;font-weight:650;line-height:1;cursor:pointer}
+.today-hour-controls button:disabled {opacity:.36;cursor:default}
+.today-hour-label {font-size:12px;font-weight:650;color:#e9f6ff}
+.today-hour-details dl {grid-template-columns:repeat(4,minmax(0,1fr))}
+.today-hour-details dt {font-size:11px}
+@media(max-width:360px){.today-hour-details dl {grid-template-columns:repeat(2,minmax(0,1fr))}}
+.today-point-muted {opacity:0}
+.today-point-selected {opacity:1;r:4px;stroke:#f7fcff;stroke-width:1.3px}

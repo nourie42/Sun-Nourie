@@ -894,12 +894,8 @@ export function buildUnifiedFusionPayload(loc, baseData, multiModelData, aqiData
       1,
       100
     );
-    const rawDewPointF = Math.round(
-      csDp?.value ??
-      ch?.dewpoint ??
-      (bIdx !== undefined ? baseData?.hourly?.dew_point_2m?.[bIdx] : undefined) ??
-      calcDewPointF(rawBaseTemp, rh)
-    );
+    const forecastDewPoint = csDp?.value ?? ch?.dewpoint ?? baseData?.hourly?.dew_point_2m?.[bIdx];
+    const rawDewPointF = Math.round(forecastDewPoint ?? calcDewPointF(rawBaseTemp, rh));
     const dayLowBoundForHour =
       typeof cdForHour?.low === 'number' && Number.isFinite(cdForHour.low)
         ? Math.round(cdForHour.low)
@@ -1240,6 +1236,7 @@ export function buildUnifiedFusionPayload(loc, baseData, multiModelData, aqiData
       comfortCategory: comfort.category,
       humidity: rh,
       forecastHumidity: Number.isFinite(forecastHumidity) ? rh : null,
+      forecastDewPointF: Number.isFinite(forecastDewPoint) ? forecastDewPoint : null,
       dewPointF,
       indoorRh70F: calcIndoorRhAt70F(dewPointF),
       rainChance: rainLedger.totalPts,

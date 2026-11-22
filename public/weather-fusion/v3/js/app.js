@@ -8,8 +8,8 @@ import {
   nextSunnyBreak,
   outdoorExposureReadings,
   searchLocations
-} from './fusion-engine.js?v=hour-details-v1';
-import {bindTodayHourPicker,todayHourlyPreview,todaySummary} from './today-preview.js?v=hour-details-v1';
+} from './fusion-engine.js?v=today-dewpoint-v1';
+import {bindTodayHourPicker,todayHourlyPreview,todaySummary} from './today-preview.js?v=today-dewpoint-v1';
 import {hourlyRainInputsHTML, rainPercent} from './hourly-rain.js?v=local-hourly-v1';
 import { getLunarPhaseFraction, renderWeatherIconSvg } from './icons.js?v=v3-sky-8';
 import {

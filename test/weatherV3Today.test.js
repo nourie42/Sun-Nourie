@@ -67,3 +67,13 @@ test('the daily headline follows supported forecast weather, wind and high tempe
   assert.equal(todaySummary([overcast,overcast],56),'Cloudy and cool today');
   assert.equal(todaySummary([{}],null),'');
 });
+
+test('Today plots published dew point on the temperature axis, with gaps for missing readings',()=>{
+  const first=hour('2026-11-22T12:00:00Z',{forecastDewPointF:32});
+  const missing=hour('2026-11-22T13:00:00Z',{forecastDewPointF:null,dewPointF:50});
+  const third=hour('2026-11-22T14:00:00Z',{forecastDewPointF:35.6});
+  const chart=todayHourlyPreview([first,missing,third],'America/New_York',true);
+  assert.match(chart,/Dew point/);
+  assert.match(chart,/<g data-today-series="dewpoint"><path d="M43\.0,[\d.]+ M322\.0,[\d.]+ /);
+  assert.doesNotMatch(todayHourlyPreview([missing],'America/New_York'),/data-today-series="dewpoint"/);
+});

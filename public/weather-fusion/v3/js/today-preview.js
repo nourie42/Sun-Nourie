@@ -6,6 +6,7 @@ const percent = value => Number.isFinite(value) && value >= 0 && value <= 100 ? 
 const windSpeed = value => Number.isFinite(value) && value >= 0 ? value : null;
 const metrics = [
   {id:'temperature',label:'Temperature',color:'#ffd394'},
+  {id:'dewpoint',label:'Dew point',color:'#d1b8ff'},
   {id:'rain',label:'Rain chance',color:'#79d1ef'},
   {id:'cloud',label:'Cloud cover',color:'#e0dbff'},
   {id:'wind',label:'Wind',color:'#a6efd3'}
@@ -16,6 +17,7 @@ export function todayHourlyPreview(hours, timeZone, useCelsius = false) {
   const readings = hours.map(hour => ({
     time: Date.parse(hour.time),
     temperature: temperatureFor(hour, useCelsius),
+    dewpoint: fromFahrenheit(hour.forecastDewPointF,useCelsius),
     rain: percent(hour.rainChance),
     cloud: percent(hour.forecastCloudCover),
     wind: windSpeed(hour.forecastWindMph)
@@ -29,7 +31,7 @@ export function todayHourlyPreview(hours, timeZone, useCelsius = false) {
   const windFloor = 166, windHeight = 32, percentHeight = 29;
   const byId = Object.fromEntries(available.map(metric => [metric.id,metric]));
   const height = byId.wind ? 194 : 140;
-  const temperatures = readings.map(hour => hour.temperature).filter(Number.isFinite);
+  const temperatures = readings.flatMap(hour => [hour.temperature,hour.dewpoint]).filter(Number.isFinite);
   const actualHigh = temperatures.length ? Math.max(...temperatures) : 0;
   const actualLow = temperatures.length ? Math.min(...temperatures) : 0;
   const step = Math.max(2, Math.ceil((actualHigh - actualLow) / 4));
@@ -51,7 +53,7 @@ export function todayHourlyPreview(hours, timeZone, useCelsius = false) {
       const isolated = !adjacent && !(upcoming && upcoming.time - hour.time === HOUR && upcoming[id] !== null);
       const cx = x(hour.time).toFixed(1), cy = y(value).toFixed(1);
       path += `${adjacent ? 'L' : 'M'}${cx},${cy} `;
-      if (showDots || isolated) dots += `<circle cx="${cx}" cy="${cy}" r="2.15" fill="${byId[id].color}"/>`;
+      dots += `<circle data-hour-point="${index}" class="${showDots || isolated ? 'today-point' : 'today-point today-point-muted'}" cx="${cx}" cy="${cy}" r="2.15" fill="${byId[id].color}"/>`;
       previous = hour;
     }
     return `<g data-today-series="${id}"><path d="${path}" fill="none" stroke="${byId[id].color}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"${dash ? ` stroke-dasharray="${dash}"` : ''}/>${dots}</g>`;
@@ -76,19 +78,30 @@ export function todayHourlyPreview(hours, timeZone, useCelsius = false) {
       <span class="beta-hourly-preview-legend">${available.map(({id,label,color})=>`<span data-metric="${id}" style="--series-color:${color}">${label}</span>`).join('')}</span>
     </span>
     <svg class="beta-today-hourly-svg" viewBox="0 0 ${width} ${height}" role="slider" tabindex="0" aria-label="Select a forecast hour" aria-valuemin="1" aria-valuemax="${readings.length}" aria-valuenow="1">
-      ${byId.temperature ? axis(min+'°',yTemp(min)) + axis(max+'°',yTemp(max)) + line('temperature',yTemp,'',true) : ''}
+      ${temperatures.length ? axis(min+'°',yTemp(min)) + axis(max+'°',yTemp(max)) : ''}
+      ${byId.temperature ? line('temperature',yTemp,'',true) : ''}
+      ${byId.dewpoint ? line('dewpoint',yTemp,'6 3') : ''}
       ${percentScale}<g data-today-series="rain">${bars}</g>
       ${byId.cloud ? line('cloud',yPercent,'3 4') : ''}
       ${byId.wind ? axis(maxWind+' mph',yWind(maxWind)) + axis('0',yWind(0)) + line('wind',yWind) : ''}
       ${labels}<line class="today-hour-cursor" y1="7" y2="${height-21}" hidden/>
     </svg>
+    <div class="today-hour-controls" role="group" aria-label="Browse forecast hours">
+      <button type="button" data-hour-step="-1" aria-label="Previous forecast hour" disabled>‹</button>
+      <span class="today-hour-label">Tap the chart or use the arrows</span>
+      <button type="button" data-hour-step="1" aria-label="Next forecast hour">›</button>
+    </div>
     <div class="today-hour-details" aria-live="polite" hidden></div>
   </section>`;
 }
 
+function fromFahrenheit(value,useCelsius) {
+  return Number.isFinite(value) ? (useCelsius ? (value-32)*5/9 : value) : null;
+}
+
 function temperatureFor(hour, useCelsius) {
   const value = Object.hasOwn(hour,'forecastTempF') ? hour.forecastTempF : hour.tempF;
-  return Number.isFinite(value) ? (useCelsius ? (value-32)*5/9 : value) : null;
+  return fromFahrenheit(value,useCelsius);
 }
 
 function timePosition(times) {
@@ -103,11 +116,13 @@ export function bindTodayHourPicker(host, hours, {timeZone, useCelsius, selected
   const times = points.map(hour=>Date.parse(hour.time));
   const cursor = svg.querySelector('.today-hour-cursor');
   const details = host.querySelector('.today-hour-details');
+  const stepBack = host.querySelector('[data-hour-step="-1"]');
+  const stepForward = host.querySelector('[data-hour-step="1"]');
+  const hourLabel = host.querySelector('.today-hour-label');
   const date = new Intl.DateTimeFormat('en-US',{timeZone,hour:'numeric',minute:'2-digit',timeZoneName:'short'});
   const x = timePosition(times);
-  let index = 0;
+  let index = -1;
   const reading = (value,suffix) => Number.isFinite(value) ? Math.round(value)+suffix : '—';
-  const needTemp = n => Number.isFinite(n) && useCelsius ? (n-32)*5/9 : n;
 
   function select(i) {
     index = Math.max(0,Math.min(i,points.length-1));
@@ -116,20 +131,26 @@ export function bindTodayHourPicker(host, hours, {timeZone, useCelsius, selected
     const condition = hour.forecastCondition || 'Sky conditions unavailable';
     const values = [
       ['Temperature',reading(temperatureFor(hour,useCelsius),'°')],
-      ['Feels like',reading(needTemp(hour.forecastFeelsLikeF),'°')],
+      ['Feels like',reading(fromFahrenheit(hour.forecastFeelsLikeF,useCelsius),'°')],
+      ['Dew point',reading(fromFahrenheit(hour.forecastDewPointF,useCelsius),'°')],
+      ['Humidity',reading(percent(hour.forecastHumidity),'%')],
       ['Cloud cover',reading(percent(hour.forecastCloudCover),'%')],
       ['Wind',reading(windSpeed(hour.forecastWindMph),' mph')],
       ['Rain chance',reading(percent(hour.rainChance),'%')],
-      ['Rainfall',Number.isFinite(hour.precipIn) ? hour.precipIn.toFixed(2)+'″' : '—'],
-      ['Humidity',reading(percent(hour.forecastHumidity),'%')]
+      ['Rainfall',Number.isFinite(hour.precipIn) ? hour.precipIn.toFixed(2)+'″' : '—']
     ];
+    hourLabel.textContent = clock;
+    stepBack.disabled = index === 0;
+    stepForward.disabled = index === points.length-1;
     svg.setAttribute('aria-valuenow',index+1);
     svg.setAttribute('aria-valuetext',clock);
     cursor.setAttribute('x1',x(times[index]));
     cursor.setAttribute('x2',x(times[index]));
     cursor.removeAttribute('hidden');
     const title = document.createElement('strong');
-    title.textContent = `${clock} · ${condition}`;
+    svg.querySelectorAll('.today-point-selected').forEach(dot=>dot.classList.remove('today-point-selected'));
+    svg.querySelectorAll(`[data-hour-point="${index}"]`).forEach(dot=>dot.classList.add('today-point-selected'));
+    title.textContent = condition;
     const list = document.createElement('dl');
     list.innerHTML = values.map(([label,value])=>`<div><dt>${label}</dt><dd>${value}</dd></div>`).join('');
     details.replaceChildren(title,list);
@@ -137,6 +158,8 @@ export function bindTodayHourPicker(host, hours, {timeZone, useCelsius, selected
     onSelect(hour.time);
   }
 
+  stepBack.onclick = () => select(index-1);
+  stepForward.onclick = () => select(index+1);
   svg.setAttribute('aria-valuetext',date.format(times[0]));
   const saved = points.findIndex(hour=>hour.time===selectedTime);
   if (saved >= 0) select(saved);
