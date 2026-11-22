@@ -38,6 +38,7 @@ import {
   deliverAlertExternally,
   getChannelStatus,
 } from './notifications.js';
+import { cleanDealsWithAi } from './ai.js';
 
 export function createBlackFridayEngine({
   store,
@@ -303,6 +304,9 @@ export function createBlackFridayEngine({
         if (Object.keys(adapterOut.cashbackRates || {}).length) {
           state.cashbackRates = { ...state.cashbackRates, ...adapterOut.cashbackRates };
         }
+
+        // 3.5 Optional AI cleanup of feed titles (no-op without GEMINI_API_KEY)
+        await cleanDealsWithAi(allFetchedDeals, { fetchImpl }).catch(() => null);
 
         // 4. Merge deals & record real price history
         const previousDealsById = store.mergeDeals(allFetchedDeals, startedIso);

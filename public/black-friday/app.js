@@ -292,7 +292,8 @@ function renderProductCardHtml(deal, recMeta = null) {
           <span class="badge ${deal.decision?.action === 'BUY NOW' ? 'badge-buy' : 'badge-wait'}">${esc(deal.decision?.action || 'WAIT')}</span>
         </div>
 
-        <h3 class="deal-title" title="${esc(deal.title)}">${esc(deal.title)}</h3>
+        <h3 class="deal-title" title="${esc(deal.title)}">${esc(deal.displayTitle || deal.title)}</h3>
+        ${deal.aiSummary ? `<div class="deal-summary">${esc(deal.aiSummary)}</div>` : ''}
         ${(deal.brand || deal.modelNumber) ? `<div class="small muted">${esc([deal.brand, deal.modelNumber ? `Model: ${deal.modelNumber}` : null].filter(Boolean).join(' · '))}</div>` : ''}
 
         <div class="deal-price-box">
