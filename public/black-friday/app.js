@@ -289,7 +289,7 @@ function renderHomePage() {
     : (d.favoriteStores.length ? d.favoriteStores : d.storesDirectory.slice(0, 20));
 
   $('home-favorite-stores-rail').innerHTML = storesToShow.map((st) => `
-    <a class="store-logo-tile" href="${esc(st.url)}" target="_blank" rel="noopener noreferrer" data-store-id="${esc(st.id)}" title="Open ${esc(st.name)} official website in a new tab">
+    <a class="store-logo-tile" href="${esc(st.blackFridayUrl || st.dealsUrl || st.url)}" target="_blank" rel="noopener noreferrer" data-store-id="${esc(st.id)}" title="Open ${esc(st.name)} deals in a new browser tab">
       ${renderStoreAvatar(st, false)}
       <span class="store-tile-name">${esc(st.name)}</span>
       <span class="small muted" style="font-size:10px;">${st.verifiedDealsCount > 0 ? `${st.verifiedDealsCount} ${st.verifiedDealsCount === 1 ? 'deal' : 'deals'}` : 'Shop ↗'}</span>
@@ -342,6 +342,14 @@ function renderHomePage() {
     t34Host.innerHTML = `<div class="deals-grid">${combinedLove.slice(0, 9).map((rec) => renderProductCardHtml(rec.deal, rec)).join('')}</div>`;
   } else {
     t34Host.innerHTML = `<div class="small muted">No additional Tier 3/4 deals currently match your configured wish lists or family profile interests. Add favorite brands or hobbies in Family Profiles, or tap <strong>LOVE IT</strong> on deals you like.</div>`;
+  }
+
+  // Move store-wide deals above family tracking: all retailer promotions first,
+  // then a distinct section for uploaded/tracked family products.
+  const storeSales = $('home-bf-store-sales')?.closest('section');
+  const trackedDeals = $('home-tier1-wishlist')?.closest('section');
+  if (storeSales && trackedDeals && storeSales.parentElement === trackedDeals.parentElement) {
+    trackedDeals.before(storeSales);
   }
 
   // 6. BLACK FRIDAY STORE SALES (Direct working retailer Black Friday / deals links)
@@ -1203,9 +1211,13 @@ function fileToBase64(file) {
 
 /* ==================== GLOBAL EVENT WIRING ==================== */
 function bindEvents() {
-  $('nav-list').addEventListener('click', (e) => {
-    const btn = e.target.closest('.nav-btn[data-view]');
-    if (btn) switchView(btn.dataset.view);
+  // Delegate navigation from the document so sidebar clicks remain functional
+  // even if the sidebar is rerendered or a mobile overlay is active.
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest('#nav-list .nav-btn[data-view]');
+    if (!btn) return;
+    e.preventDefault();
+    switchView(btn.dataset.view);
   });
 
   $('mobile-menu-btn').addEventListener('click', () => {
