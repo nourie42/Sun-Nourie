@@ -94,6 +94,13 @@ export async function fetchWithRetry(url, {
   return { ok: false, status: 0, latencyMs: 0, error: String(lastError?.message || 'Request failed'), text: '' };
 }
 
+const DEAL_TRACKER_HOSTS = ['slickdeals.net', 'dealnews.com', 'hip2save.com', '9to5toys.com', 'dealcatcher.com', 'dansdeals.com', 'bradsdeals.com', 'camelcamelcamel.com', 'cheapshark.com'];
+
+function isTrackerHost(url) {
+  const lower = String(url || '').toLowerCase();
+  return DEAL_TRACKER_HOSTS.some((h) => lower.includes(h));
+}
+
 function pickDirectRetailerUrl(rawItem, sourceId) {
   const link = rawItem.link || '';
   // CamelCamelCamel ASIN -> direct Amazon product page
@@ -103,24 +110,25 @@ function pickDirectRetailerUrl(rawItem, sourceId) {
       return {
         retailerUrl: `https://www.amazon.com/dp/${asinMatch[1].toUpperCase()}`,
         dealPageUrl: link,
+        isDirectProductUrl: true,
       };
     }
   }
 
-  // If primary link is already directly on a known retailer domain
-  if (RETAILER_DOMAINS.some((d) => link.toLowerCase().includes(d))) {
-    return { retailerUrl: link, dealPageUrl: link };
+  // If primary link is already directly on a known non-tracker retailer domain
+  if (!isTrackerHost(link) && RETAILER_DOMAINS.some((d) => link.toLowerCase().includes(d))) {
+    return { retailerUrl: link, dealPageUrl: link, isDirectProductUrl: true };
   }
 
   // Check embedded links in RSS HTML for a clean direct retailer URL
   for (const href of rawItem.embeddedLinks || []) {
     const lower = href.toLowerCase();
-    if (RETAILER_DOMAINS.some((d) => lower.includes(d)) && !/redirect|track|doubleclick|googleadservices/i.test(lower)) {
-      return { retailerUrl: href, dealPageUrl: link };
+    if (!isTrackerHost(lower) && RETAILER_DOMAINS.some((d) => lower.includes(d)) && !/redirect|track|doubleclick|googleadservices/i.test(lower)) {
+      return { retailerUrl: href, dealPageUrl: link, isDirectProductUrl: true };
     }
   }
 
-  return { retailerUrl: link, dealPageUrl: link };
+  return { retailerUrl: link, dealPageUrl: link, isDirectProductUrl: false };
 }
 
 function parseSlickdealsThumbScore(text) {
@@ -140,7 +148,7 @@ export function normalizeRssItemToDeal(rawItem, source, nowIso) {
   if (!rawItem?.title || !rawItem.link) return null;
 
   const fullText = `${rawItem.title}\n${rawItem.contentText || rawItem.descriptionText || ''}`;
-  const { retailerUrl, dealPageUrl } = pickDirectRetailerUrl(rawItem, source.id);
+  const { retailerUrl, dealPageUrl, isDirectProductUrl } = pickDirectRetailerUrl(rawItem, source.id);
 
   // Clean CamelCamelCamel title suffix ("- down 16.88% ($3.90) to $19.20 from $23.10") for clean display name
   const displayTitle = source.id.startsWith('camel')
@@ -218,6 +226,7 @@ export function normalizeRssItemToDeal(rawItem, source, nowIso) {
     imageUrl: rawItem.imageUrl || null,
     retailerUrl,
     dealPageUrl,
+    isDirectProductUrl,
     priceHistoryUrl: source.id.startsWith('camel') ? dealPageUrl : null,
     availabilityStatus: 'unverified',
     localPickupKnightdale: 'unverified',
@@ -947,6 +956,50 @@ export async function inspectRetailerUrl(rawUrl, { fetchImpl = globalThis.fetch,
     description: meta?.description || '',
     inspectedAt: nowIso,
   };
+}
+
+/**
+ * Politely verify a batch of retailer URLs, clearly distinguishing:
+ * - 'verified' (HTTP 2xx/3xx reachable)
+ * - 'bot_protected' (HTTP 403/429/435 — retailer blocks automated checks, opens fine in user's browser)
+ * - 'unverified' (timeout / network error / 5xx)
+ * - 'broken' (HTTP 404 / 410)
+ */
+export async function verifyRetailerDirectoryLinks(retailers = RETAILER_DIRECTORY, { fetchImpl = globalThis.fetch, now = () => new Date() } = {}) {
+  const checkedAt = now().toISOString();
+  const out = {};
+  const batchSize = 10;
+
+  for (let i = 0; i < retailers.length; i += batchSize) {
+    const batch = retailers.slice(i, i + batchSize);
+    await Promise.all(
+      batch.map(async (r) => {
+        try {
+          const res = await fetchImpl(r.url, {
+            method: 'GET',
+            redirect: 'follow',
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+              Accept: 'text/html,application/xhtml+xml;q=0.9,*/*;q=0.8',
+            },
+            signal: AbortSignal.timeout(7000),
+          });
+          if (res.status >= 200 && res.status < 400) {
+            out[r.id] = { status: 'verified', httpStatus: res.status, finalUrl: res.url || r.url, checkedAt };
+          } else if ([401, 403, 429, 435, 503].includes(res.status)) {
+            out[r.id] = { status: 'bot_protected', httpStatus: res.status, note: 'Retailer blocks automated bots — opens normally in your browser', checkedAt };
+          } else if ([404, 410].includes(res.status)) {
+            out[r.id] = { status: 'broken', httpStatus: res.status, note: `HTTP ${res.status}`, checkedAt };
+          } else {
+            out[r.id] = { status: 'unverified', httpStatus: res.status, note: `HTTP ${res.status}`, checkedAt };
+          }
+        } catch (err) {
+          out[r.id] = { status: 'unverified', httpStatus: null, note: String(err?.message || err), checkedAt };
+        }
+      })
+    );
+  }
+  return out;
 }
 
 export { PRIMARY_LOCATION };

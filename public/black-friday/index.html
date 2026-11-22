@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#060a13" />
   <meta name="robots" content="noindex, nofollow" />
-  <title>Black Friday Command Center · Knightdale, NC 27545</title>
+  <title>Family Shopping HQ · Black Friday Command Center</title>
   <link rel="icon" href="/black-friday/icon.svg" type="image/svg+xml" />
   <link rel="manifest" href="/black-friday/manifest.webmanifest" />
   <link rel="stylesheet" href="/black-friday/styles.css" />
@@ -18,9 +18,9 @@
     <!-- Persistent Navigation Sidebar -->
     <aside id="sidebar" class="sidebar" aria-label="Primary Navigation">
       <div class="brand-header">
-        <img src="/black-friday/icon.svg" class="brand-logo" alt="Black Friday Command Center" />
+        <img src="/black-friday/icon.svg" class="brand-logo" alt="Family Shopping HQ" />
         <div class="brand-title">
-          <span class="brand-kicker">Command Center</span>
+          <span class="brand-kicker">Family Shopping HQ</span>
           <span class="brand-name">Black Friday Intel</span>
         </div>
       </div>
@@ -35,28 +35,31 @@
 
       <nav class="nav-list" id="nav-list">
         <button class="nav-btn is-active" data-view="command-center" type="button">
-          <span class="nav-icon">⚡</span><span>Command Center</span>
+          <span class="nav-icon">🏠</span><span>Shopping HQ</span>
+        </button>
+        <button class="nav-btn" data-view="all-stores" type="button">
+          <span class="nav-icon">🏬</span><span>Shop All Stores</span>
+          <span class="nav-badge tabular" id="badge-stores">96</span>
+        </button>
+        <button class="nav-btn" data-view="upload-center" type="button">
+          <span class="nav-icon">⬆️</span><span>Upload Center</span>
         </button>
         <button class="nav-btn" data-view="wishlists" type="button">
-          <span class="nav-icon">🎯</span><span>Our Wish Lists</span>
+          <span class="nav-icon">🎯</span><span>Wish Lists &amp; Deals</span>
           <span class="nav-badge tabular" id="badge-wishlist">0</span>
         </button>
-        <button class="nav-btn" data-view="best-deals" type="button">
-          <span class="nav-icon">💎</span><span>Best Deals</span>
-          <span class="nav-badge tabular" id="badge-deals">0</span>
+        <button class="nav-btn" data-view="profiles" type="button">
+          <span class="nav-icon">👨‍👩‍👧‍👦</span><span>Family Profiles</span>
+          <span class="nav-badge tabular" id="badge-profiles">2</span>
         </button>
         <button class="nav-btn" data-view="black-friday-live" type="button">
-          <span class="nav-icon">🔥</span><span>Black Friday Live</span>
-        </button>
-        <button class="nav-btn" data-view="deal-hunter" type="button">
-          <span class="nav-icon">🧭</span><span>Deal Hunter</span>
-          <span class="nav-badge tabular" id="badge-hunter">0</span>
+          <span class="nav-icon">🔥</span><span>Black Friday Sales</span>
         </button>
         <button class="nav-btn" data-view="compare" type="button">
-          <span class="nav-icon">⚖️</span><span>Compare Products</span>
+          <span class="nav-icon">⚖️</span><span>Compare Prices</span>
         </button>
         <button class="nav-btn" data-view="local-deals" type="button">
-          <span class="nav-icon">📍</span><span>Local Deals</span>
+          <span class="nav-icon">📍</span><span>Knightdale Local</span>
         </button>
         <button class="nav-btn" data-view="price-history" type="button">
           <span class="nav-icon">📈</span><span>Price History</span>
@@ -65,17 +68,18 @@
           <span class="nav-icon">🔔</span><span>Alerts</span>
           <span class="nav-badge is-alert tabular" id="badge-alerts" hidden>0</span>
         </button>
-        <button class="nav-btn" data-view="all-stores" type="button">
-          <span class="nav-icon">🏬</span><span>All Stores</span>
+        <button class="nav-btn" data-view="best-deals" type="button">
+          <span class="nav-icon">🔍</span><span>Browse All Feeds</span>
+          <span class="nav-badge tabular" id="badge-deals">0</span>
         </button>
         <button class="nav-btn" data-view="settings" type="button">
-          <span class="nav-icon">⚙️</span><span>Settings</span>
+          <span class="nav-icon">⚙️</span><span>Settings &amp; Health</span>
         </button>
       </nav>
 
       <div class="sidebar-footer">
         <a class="back-exp-link" href="/weather-fusion/experimental-weather.html">← Experimental Weather</a>
-        <div class="small muted tabular" id="sidebar-scheduler-line">Scheduler: initializing…</div>
+        <div class="small muted tabular" id="sidebar-scheduler-line">Monitor: initializing…</div>
       </div>
     </aside>
 
@@ -85,103 +89,202 @@
         <div class="topbar-left">
           <button id="mobile-menu-btn" class="mobile-menu-btn" type="button" aria-label="Open navigation menu">☰</button>
           <div class="topbar-title-group">
-            <h1 class="topbar-title" id="topbar-title">Command Center</h1>
-            <div class="topbar-sub" id="topbar-sub">Live autonomous deal intelligence · Knightdale, NC 27545 · Zero simulated prices</div>
+            <h1 class="topbar-title" id="topbar-title">Family Shopping HQ</h1>
+            <div class="topbar-sub" id="topbar-sub">Your favorite stores, uploaded wish lists &amp; personalized deals · Knightdale, NC 27545</div>
           </div>
         </div>
         <div class="topbar-actions">
-          <button id="quick-add-btn" class="btn btn-primary" type="button">+ Add Wish-List Item</button>
-          <button id="refresh-now-btn" class="btn" type="button">↻ Refresh Feeds</button>
+          <button id="top-upload-btn" class="btn btn-primary" type="button">+ ADD WISH LIST / UPLOAD DEALS</button>
+          <button id="top-stores-btn" class="btn" type="button">🏬 Shop All Stores</button>
+          <button id="refresh-now-btn" class="btn" type="button">↻ Refresh</button>
           <button id="theme-toggle-btn" class="btn" type="button" aria-label="Toggle dark or light theme">☀️ Light</button>
         </div>
       </header>
 
       <main class="workspace">
-        <!-- 1. COMMAND CENTER -->
-        <section id="view-command-center" class="view-panel is-active" aria-label="Command Center">
-          <div id="offline-banner" class="banner-notice" hidden>
-            Offline mode detected — showing last cached verified snapshot. Background monitoring resumes automatically when reconnected.
-          </div>
+        <div id="offline-banner" class="banner-notice" hidden>
+          Offline mode detected — showing cached verified snapshot. Background monitoring resumes when reconnected.
+        </div>
 
-          <div id="kpi-grid" class="kpi-grid"></div>
-
-          <div class="glass-panel">
+        <!-- ==================== 1. HOME PAGE (EXACT PRIORITY 5 ORDER: 1 -> 8) ==================== -->
+        <section id="view-command-center" class="view-panel is-active" aria-label="Family Shopping HQ">
+          <!-- 1. SHOP ALL STORES (Immediately visible, horizontal favorite logos + VIEW ALL STORES) -->
+          <div class="glass-panel" id="home-shop-stores">
             <div class="section-head">
               <div>
-                <div class="section-kicker">Verified Value Ranked by Decision Engine</div>
-                <h2>Best Deals Right Now</h2>
+                <div class="section-kicker">Direct Official Websites — Tap Any Store Logo to Shop Immediately</div>
+                <h2>1. Shop All Stores</h2>
               </div>
-              <button class="btn btn-sm" data-goto="best-deals" type="button">Explore All Deals →</button>
+              <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                <input id="home-store-quick-search" type="search" placeholder="Filter favorite stores…" style="width:190px;" />
+                <button class="btn btn-primary btn-sm" data-goto="all-stores" type="button" id="home-view-all-stores-btn">VIEW ALL STORES →</button>
+              </div>
             </div>
-            <div id="cc-best-deals" class="deals-grid"></div>
+            <div id="home-favorite-stores-rail" class="store-rail-wrap"></div>
           </div>
 
-          <div class="glass-panel">
-            <div class="section-head">
+          <!-- 2. ADD WISH LIST / UPLOAD DEALS (Two large unmistakable buttons) -->
+          <div class="glass-panel" id="home-upload-panel" style="padding:14px 18px;">
+            <div class="section-head" style="margin-bottom:10px;">
               <div>
-                <div class="section-kicker">Automated Tracking Radar</div>
-                <h2>Family Wish-List Status</h2>
+                <div class="section-kicker">Excel, CSV, PDF, Word, Screenshots, Pasted Lists, Emails &amp; URLs</div>
+                <h2>2. Add Wish List / Upload Deals</h2>
               </div>
-              <button class="btn btn-sm btn-primary" data-goto="wishlists" type="button">Manage Wish Lists →</button>
             </div>
-            <div id="cc-wishlist-radar"></div>
+            <div class="upload-hero-grid" id="home-upload-ctas" style="margin-bottom:0;">
+              <button id="hero-upload-wishlist-btn" class="upload-cta-card" type="button">
+                <span class="upload-cta-icon">🎯</span>
+                <div>
+                  <div class="upload-cta-title">+ ADD WISH LIST</div>
+                  <div class="upload-cta-sub">Upload Excel (.xlsx/.xls), CSV, PDF, Word, screenshots, pasted lists, emails, or URLs — preview, edit &amp; auto-track deals</div>
+                </div>
+              </button>
+              <button id="hero-upload-deals-btn" class="upload-cta-card is-deals" type="button">
+                <span class="upload-cta-icon">🏷️</span>
+                <div>
+                  <div class="upload-cta-title">+ UPLOAD DEALS</div>
+                  <div class="upload-cta-sub">Save deals you already found (screenshots, links, spreadsheets, text) — preserves original retailer, price, URL &amp; date</div>
+                </div>
+              </button>
+            </div>
           </div>
 
-          <div class="glass-panel">
+          <!-- 3. BEST DEALS ON OUR WISH LISTS (Tier 1 Exact Matches ONLY) -->
+          <div class="glass-panel" id="home-wishlist-deals-panel">
             <div class="section-head">
               <div>
-                <div class="section-kicker">Transparent Telemetry — Failed Sources Are Never Hidden</div>
-                <h2>Retailer &amp; Deal Source Health</h2>
+                <div class="section-kicker">Tier 1 — Exact Matches From Your Uploaded Wish Lists</div>
+                <h2>3. Best Deals on Our Wish Lists</h2>
               </div>
-              <button class="btn btn-sm" data-goto="settings" type="button">Configure Sources →</button>
+              <button class="btn btn-sm" data-goto="wishlists" type="button">Manage Wish Lists &amp; Saved Deals →</button>
             </div>
-            <div id="cc-source-health" class="health-grid"></div>
+            <div id="home-tier1-wishlist"></div>
+          </div>
+
+          <!-- 4. BETTER ALTERNATIVES (Tier 2 Close Comparable Products) -->
+          <div class="glass-panel" id="home-alternatives-panel">
+            <div class="section-head">
+              <div>
+                <div class="section-kicker">Tier 2 — Very Close Alternatives &amp; Better Value Comparisons</div>
+                <h2>4. Better Alternatives</h2>
+              </div>
+              <button class="btn btn-sm" data-goto="compare" type="button">Full Price Comparison →</button>
+            </div>
+            <div id="home-tier2-alternatives"></div>
+          </div>
+
+          <!-- 5. DEALS YOU MIGHT LOVE (Tier 3 Related + Tier 4 Profile-Matched ONLY — Zero Random Filler) -->
+          <div class="glass-panel" id="home-personalized-panel">
+            <div class="section-head">
+              <div>
+                <div class="section-kicker">Tier 3 &amp; 4 — Strictly Driven by Your Wish Lists, Family Profiles &amp; LOVE IT Feedback</div>
+                <h2>5. Deals You Might Love</h2>
+              </div>
+              <button class="btn btn-sm" data-goto="profiles" type="button">Edit Family Profiles →</button>
+            </div>
+            <div id="home-tier34-love"></div>
+          </div>
+
+          <!-- 6. BLACK FRIDAY STORE SALES (Direct Working Retailer Sale Links) -->
+          <div class="glass-panel" id="home-bf-sales-panel">
+            <div class="section-head">
+              <div>
+                <div class="section-kicker">Official Black Friday &amp; Holiday Store Sale Pages</div>
+                <h2>6. Black Friday Store Sales</h2>
+              </div>
+              <button class="btn btn-sm" data-goto="black-friday-live" type="button">Event Timeline &amp; Countdowns →</button>
+            </div>
+            <div id="home-bf-store-sales" class="stores-grid"></div>
+          </div>
+
+          <!-- 7. LOCAL KNIGHTDALE / RALEIGH DEALS -->
+          <div class="glass-panel" id="home-local-panel">
+            <div class="section-head">
+              <div>
+                <div class="section-kicker">Knightdale 27545 · North Raleigh · Garner · Cary · Wake Forest</div>
+                <h2>7. Local Knightdale / Raleigh Deals &amp; Pickup Stores</h2>
+              </div>
+              <button class="btn btn-sm" data-goto="local-deals" type="button">All Local Stores &amp; Deals →</button>
+            </div>
+            <div id="home-local-stores" class="stores-grid"></div>
+          </div>
+
+          <!-- 8. DEAL MONITORING STATUS -->
+          <div class="glass-panel" id="home-monitoring-panel">
+            <div class="section-head">
+              <div>
+                <div class="section-kicker">Honest Automated Monitoring &amp; Persistence Telemetry</div>
+                <h2>8. Deal Monitoring Status</h2>
+              </div>
+              <button class="btn btn-sm" data-goto="settings" type="button">Full Source Diagnostics →</button>
+            </div>
+            <div id="home-monitoring-status"></div>
           </div>
         </section>
 
-        <!-- 2. OUR WISH LISTS -->
-        <section id="view-wishlists" class="view-panel" aria-label="Our Wish Lists">
+        <!-- ==================== 2. REAL UPLOAD CENTER (PRIORITY 2) ==================== -->
+        <section id="view-upload-center" class="view-panel" aria-label="Upload Center">
           <div class="glass-panel">
             <div class="section-head">
               <div>
-                <div class="section-kicker">7-Mode Intake Engine</div>
-                <h2>Add Products or Gift Ideas</h2>
+                <div class="section-kicker">Preview, Edit &amp; Approve Before Saving — Original Files Always Preserved</div>
+                <h2>Upload Wish Lists or Discovered Deals</h2>
               </div>
-              <button id="new-profile-toggle" class="btn btn-sm" type="button">+ New Family Profile</button>
-            </div>
-
-            <div id="new-profile-form-wrap" style="display:none;margin-bottom:14px;padding:12px;border-radius:12px;background:var(--bg-chip);border:1px solid var(--border-glass);">
-              <div class="intake-grid">
-                <div class="field"><label for="np-name">Profile / Category Name</label><input id="np-name" type="text" placeholder="e.g. Mom, Kids Stocking Stuffers, Garage Tools" /></div>
-                <div class="field"><label for="np-budget">Budget ($)</label><input id="np-budget" type="number" min="1" value="300" /></div>
-                <div class="field" style="display:flex;align-items:flex-end;gap:8px;">
-                  <button id="np-save-btn" class="btn btn-primary" type="button">Create Profile</button>
-                  <button id="np-cancel-btn" class="btn" type="button">Cancel</button>
-                </div>
+              <div class="pill-tabs" id="upload-type-toggle" style="margin:0;">
+                <button class="pill-tab is-active" data-utype="wishlist" type="button">🎯 UPLOAD WISH LIST (Monitor for Deals)</button>
+                <button class="pill-tab" data-utype="deal" type="button">🏷️ UPLOAD DEALS (Save Discovered Deals)</button>
               </div>
             </div>
 
-            <div class="pill-tabs" id="intake-mode-tabs">
-              <button class="pill-tab is-active" data-intake="manual" type="button">1. Type Product</button>
-              <button class="pill-tab" data-intake="url" type="button">2. Paste Link</button>
-              <button class="pill-tab" data-intake="screenshot" type="button">3. Upload Screenshot</button>
-              <button class="pill-tab" data-intake="file" type="button">4. Spreadsheet / Doc</button>
-              <button class="pill-tab" data-intake="bulk" type="button">5. Bulk Paste List</button>
-              <button class="pill-tab" data-intake="import" type="button">6. Import Shopping List</button>
-              <button class="pill-tab" data-intake="gift_idea" type="button">7. Gift Idea</button>
+            <div class="pill-tabs" id="upload-mode-tabs">
+              <button class="pill-tab is-active" data-umode="file" type="button">📁 File / Excel / CSV / PDF / Word / Screenshot</button>
+              <button class="pill-tab" data-umode="bulk" type="button">📋 Paste List or Email</button>
+              <button class="pill-tab" data-umode="urls" type="button">🔗 Paste Product URL(s)</button>
+              <button class="pill-tab" data-umode="manual" type="button">✏️ Manual Entry</button>
             </div>
 
-            <div id="intake-panel-body"></div>
+            <div id="upload-input-stage"></div>
           </div>
 
+          <!-- Interactive Extraction Preview & Correction Table -->
+          <div id="upload-preview-panel" class="glass-panel" hidden>
+            <div class="section-head">
+              <div>
+                <div class="section-kicker" id="upload-preview-kicker">Review &amp; Correct Extracted Products Before Saving</div>
+                <h2 id="upload-preview-title">Extracted Products Preview</h2>
+              </div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                <button id="upload-add-blank-row-btn" class="btn btn-sm" type="button">+ Add Row</button>
+                <button id="upload-cancel-preview-btn" class="btn btn-sm" type="button">Cancel</button>
+                <button id="upload-commit-btn" class="btn btn-primary" type="button">✓ Save Approved Items &amp; Search Deals</button>
+              </div>
+            </div>
+            <div id="upload-preview-warning" class="banner-notice" hidden></div>
+            <div id="upload-preview-table-host" class="table-wrap"></div>
+          </div>
+
+          <!-- Preserved Original Uploaded Files Vault -->
           <div class="glass-panel">
             <div class="section-head">
               <div>
-                <div class="section-kicker">Profiles &amp; Duplicate Purchase Protection</div>
-                <h2>Tracked Family Wish Lists</h2>
+                <div class="section-kicker">Zero Silent Discards — Original Uploads Saved Permanently</div>
+                <h2>Uploaded Files Vault</h2>
+              </div>
+            </div>
+            <div id="uploaded-files-vault" class="table-wrap"></div>
+          </div>
+        </section>
+
+        <!-- ==================== 3. WISH LISTS & USER-SAVED DEALS ==================== -->
+        <section id="view-wishlists" class="view-panel" aria-label="Our Wish Lists and Saved Deals">
+          <div class="glass-panel">
+            <div class="section-head">
+              <div>
+                <div class="section-kicker">Automatically Monitored Products · Move Between Family Members Anytime</div>
+                <h2>Our Family Wish Lists</h2>
               </div>
               <div style="display:flex;gap:8px;flex-wrap:wrap;">
-                <select id="wl-status-filter" style="width:auto;min-width:160px;">
+                <select id="wl-status-filter" style="width:auto;min-width:150px;">
                   <option value="all">All Statuses</option>
                   <option value="wanted">Wanted</option>
                   <option value="monitoring">Monitoring</option>
@@ -189,21 +292,228 @@
                   <option value="purchased">Purchased</option>
                   <option value="no_longer_interested">No Longer Interested</option>
                 </select>
+                <button id="wl-open-upload-btn" class="btn btn-primary btn-sm" type="button">+ Upload Wish List</button>
                 <a class="btn btn-sm" href="/api/black-friday/export?format=csv">↓ Export CSV</a>
               </div>
             </div>
             <div id="profile-tabs" class="pill-tabs"></div>
             <div id="wishlist-container" class="wishlist-list"></div>
           </div>
-        </section>
 
-        <!-- 3. BEST DEALS -->
-        <section id="view-best-deals" class="view-panel" aria-label="Best Deals">
           <div class="glass-panel">
             <div class="section-head">
               <div>
-                <div class="section-kicker">Persistent Filters &amp; Verified True Discount Tiers</div>
-                <h2>Verified Deals Explorer</h2>
+                <div class="section-kicker">Deals You Discovered &amp; Uploaded — Original Price Preserved as History</div>
+                <h2>My Saved Uploaded Deals</h2>
+              </div>
+              <button id="sd-open-upload-btn" class="btn btn-gold btn-sm" type="button">+ Upload Deal</button>
+            </div>
+            <div id="saved-deals-container" class="wishlist-list"></div>
+          </div>
+        </section>
+
+        <!-- ==================== 4. FAMILY SHOPPING PROFILES (PRIORITY 4) ==================== -->
+        <section id="view-profiles" class="view-panel" aria-label="Family Shopping Profiles">
+          <div class="glass-panel">
+            <div class="section-head">
+              <div>
+                <div class="section-kicker">Your Family Controls Every Recommendation — Zero Invented Preferences</div>
+                <h2>Editable Family Member Profiles</h2>
+              </div>
+              <button id="create-member-toggle" class="btn btn-primary" type="button">+ Add Family Member Profile</button>
+            </div>
+
+            <div id="create-member-panel" style="display:none;margin-bottom:16px;padding:16px;border-radius:14px;background:var(--bg-chip);border:1px solid var(--border-glass);">
+              <form id="create-member-form" class="intake-grid">
+                <div class="field"><label for="cm-name">Name *</label><input id="cm-name" type="text" required placeholder="e.g. Mom, Dad, Alex, Maya" /></div>
+                <div class="field"><label for="cm-budget">Gift Budget ($)</label><input id="cm-budget" type="number" min="1" value="300" /></div>
+                <div class="field"><label for="cm-sizes">Clothing / Shoe Sizes</label><input id="cm-sizes" type="text" placeholder="e.g. Shirt M, Shoes 10, Jeans 32x30" /></div>
+                <div class="field"><label for="cm-brands">Favorite Brands (comma-separated)</label><input id="cm-brands" type="text" placeholder="e.g. Nike, Apple, Lululemon, LEGO" /></div>
+                <div class="field"><label for="cm-interests">Interests &amp; Hobbies (comma-separated)</label><input id="cm-interests" type="text" placeholder="e.g. golf, espresso, running, skincare" /></div>
+                <div class="field"><label for="cm-retailers">Preferred Retailers (comma-separated IDs or names)</label><input id="cm-retailers" type="text" placeholder="e.g. target, nike, sephora, bestbuy" /></div>
+                <div class="field span-3" style="display:flex;gap:8px;justify-content:flex-end;">
+                  <button id="cm-cancel-btn" class="btn" type="button">Cancel</button>
+                  <button class="btn btn-primary" type="submit">Create Family Profile</button>
+                </div>
+              </form>
+            </div>
+
+            <div id="profiles-grid" class="profiles-grid"></div>
+          </div>
+        </section>
+
+        <!-- ==================== 5. PERMANENT SHOP ALL STORES DIRECTORY (PRIORITY 1) ==================== -->
+        <section id="view-all-stores" class="view-panel" aria-label="Shop All Stores Directory">
+          <div class="glass-panel">
+            <div class="section-head">
+              <div>
+                <div class="section-kicker">Tap Any Store Logo or Button to Open the Official Website Directly in a New Tab</div>
+                <h2>Shop All Favorite Stores (96+ Retailers)</h2>
+              </div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                <input id="stores-search" type="search" placeholder="Search 96+ stores…" style="width:200px;" />
+                <select id="stores-category-filter" style="width:auto;min-width:175px;">
+                  <option value="all">All Categories</option>
+                </select>
+                <label class="small" style="display:inline-flex;align-items:center;gap:5px;cursor:pointer;">
+                  <input id="stores-fav-only" type="checkbox" style="width:auto;" /> ★ Favorites Only
+                </label>
+                <button id="verify-store-links-btn" class="btn btn-sm" type="button">✓ Verify Store Links</button>
+              </div>
+            </div>
+            <div id="all-stores-container"></div>
+          </div>
+        </section>
+
+        <!-- ==================== 6. BLACK FRIDAY STORE SALES & EVENT CENTER ==================== -->
+        <section id="view-black-friday-live" class="view-panel" aria-label="Black Friday Live Event Center">
+          <div id="bf-countdowns" class="countdown-hero"></div>
+          <div class="glass-panel">
+            <div class="section-head">
+              <div>
+                <div class="section-kicker">Confirmed 2026 Retail Calendar</div>
+                <h2>Upcoming Shopping Events Timeline</h2>
+              </div>
+            </div>
+            <div id="bf-timeline" class="timeline-grid"></div>
+          </div>
+          <div class="glass-panel">
+            <div class="section-head">
+              <div>
+                <div class="section-kicker">Verified Live Holiday Promotions</div>
+                <h2>Black Friday &amp; Cyber Monday Stream</h2>
+              </div>
+            </div>
+            <div class="pill-tabs" id="bf-subtabs">
+              <button class="pill-tab is-active" data-bf="all" type="button">All Black Friday</button>
+              <button class="pill-tab" data-bf="early" type="button">Early Black Friday</button>
+              <button class="pill-tab" data-bf="cyber" type="button">Cyber Monday</button>
+              <button class="pill-tab" data-bf="doorbuster" type="button">Doorbusters</button>
+              <button class="pill-tab" data-bf="local" type="button">Local Pickup Retailers</button>
+              <button class="pill-tab" data-bf="archived" type="button">Archived Expired</button>
+            </div>
+            <div id="bf-deals-grid" class="deals-grid"></div>
+          </div>
+        </section>
+
+        <!-- ==================== 7. COMPARE PRODUCTS ==================== -->
+        <section id="view-compare" class="view-panel" aria-label="Compare Products">
+          <div class="glass-panel">
+            <div class="section-head">
+              <div>
+                <div class="section-kicker">3-Tier Verified Alternatives Engine</div>
+                <h2>Smarter Alternatives for Your Wish Lists</h2>
+              </div>
+              <select id="alt-wishlist-select" style="width:auto;min-width:260px;"></select>
+            </div>
+            <div id="alternatives-stage"></div>
+          </div>
+
+          <div class="glass-panel">
+            <div class="section-head">
+              <div>
+                <div class="section-kicker">Up to 4 Offers Side-by-Side</div>
+                <h2>Side-by-Side Price Comparison Matrix</h2>
+              </div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                <select id="compare-add-select" style="width:auto;min-width:240px;"></select>
+                <button id="compare-add-btn" class="btn btn-sm btn-primary" type="button">+ Add to Compare</button>
+                <button id="compare-clear-btn" class="btn btn-sm" type="button">Clear</button>
+              </div>
+            </div>
+            <div id="compare-matrix"></div>
+          </div>
+        </section>
+
+        <!-- ==================== 8. LOCAL KNIGHTDALE / RALEIGH DEALS ==================== -->
+        <section id="view-local-deals" class="view-panel" aria-label="Local Knightdale and Raleigh Deals">
+          <div class="banner-notice">
+            <strong>Knightdale, NC 27545 Inventory Honesty Notice:</strong> Online pricing does <em>not</em> guarantee shelf stock at Knightdale or Raleigh stores. Always confirm pickup availability via the direct store link before driving. Wake County NC tax is estimated at <strong>7.25%</strong>.
+          </div>
+          <div class="glass-panel">
+            <div class="section-head">
+              <div>
+                <div class="section-kicker">Verified Nearby Store Locations Around 27545</div>
+                <h2>Knightdale &amp; Triangle Physical Stores</h2>
+              </div>
+            </div>
+            <div id="local-stores-grid" class="stores-grid"></div>
+          </div>
+          <div class="glass-panel">
+            <div class="section-head">
+              <div>
+                <div class="section-kicker">Local Chain &amp; Warehouse-Club Offers</div>
+                <h2>Deals at Local Knightdale / Raleigh Retailers</h2>
+              </div>
+            </div>
+            <div class="pill-tabs" id="local-filter-tabs">
+              <button class="pill-tab is-active" data-local="all" type="button">All Triangle Chains</button>
+              <button class="pill-tab" data-local="knightdale" type="button">In Knightdale (≤ 2 mi)</button>
+              <button class="pill-tab" data-local="warehouse" type="button">Warehouse Clubs (Costco / Sam's)</button>
+              <button class="pill-tab" data-local="pickup_verified" type="button">Pickup / Store Promo</button>
+            </div>
+            <div id="local-deals-grid" class="deals-grid"></div>
+          </div>
+        </section>
+
+        <!-- ==================== 9. PRICE HISTORY ==================== -->
+        <section id="view-price-history" class="view-panel" aria-label="Interactive Price History">
+          <div class="glass-panel">
+            <div class="section-head">
+              <div>
+                <div class="section-kicker">Genuine Timestamped Observations Only</div>
+                <h2>Interactive Multi-Retailer Price History</h2>
+              </div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                <select id="history-product-select" style="width:auto;min-width:290px;"></select>
+                <div class="pill-tabs" id="history-range-tabs" style="margin:0;">
+                  <button class="pill-tab" data-range="7d" type="button">7D</button>
+                  <button class="pill-tab" data-range="30d" type="button">30D</button>
+                  <button class="pill-tab" data-range="90d" type="button">90D</button>
+                  <button class="pill-tab" data-range="1y" type="button">1Y</button>
+                  <button class="pill-tab is-active" data-range="all" type="button">ALL</button>
+                </div>
+              </div>
+            </div>
+            <div id="history-chart-host"></div>
+            <div id="history-table-host" class="table-wrap" style="margin-top:16px;"></div>
+          </div>
+        </section>
+
+        <!-- ==================== 10. ALERTS ==================== -->
+        <section id="view-alerts" class="view-panel" aria-label="Smart Alerts">
+          <div class="glass-panel">
+            <div class="section-head">
+              <div>
+                <div class="section-kicker">Honest Delivery Channel Verification</div>
+                <h2>Notification Delivery Channels</h2>
+              </div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                <button id="enable-browser-push-btn" class="btn btn-sm" type="button">🔔 Enable Browser Alerts</button>
+                <button id="send-test-alert-btn" class="btn btn-sm btn-primary" type="button">Send Test Alert</button>
+              </div>
+            </div>
+            <div id="alert-channels-grid" class="health-grid"></div>
+          </div>
+          <div class="glass-panel">
+            <div class="section-head">
+              <div>
+                <div class="section-kicker">Deduplicated Smart Alerts</div>
+                <h2>Alert History</h2>
+              </div>
+              <button id="mark-alerts-read-btn" class="btn btn-sm" type="button">Mark All Read</button>
+            </div>
+            <div id="alerts-feed" style="display:flex;flex-direction:column;gap:10px;"></div>
+          </div>
+        </section>
+
+        <!-- ==================== 11. BROWSE ALL LIVE FEEDS (Secondary, Never Clutters Home) ==================== -->
+        <section id="view-best-deals" class="view-panel" aria-label="Browse All Live Feeds">
+          <div class="glass-panel">
+            <div class="section-head">
+              <div>
+                <div class="section-kicker">Full Multi-Retailer Live Feed Explorer (Rejected Items Permanently Hidden)</div>
+                <h2>Browse All Verified Live Feed Deals</h2>
               </div>
               <div class="small muted tabular" id="deals-count-label">0 verified deals</div>
             </div>
@@ -249,236 +559,28 @@
           </div>
         </section>
 
-        <!-- 4. BLACK FRIDAY LIVE -->
-        <section id="view-black-friday-live" class="view-panel" aria-label="Black Friday Live Event Center">
-          <div id="bf-countdowns" class="countdown-hero"></div>
-
+        <!-- ==================== 12. SETTINGS & SOURCE DIAGNOSTICS ==================== -->
+        <section id="view-settings" class="view-panel" aria-label="Settings and Diagnostics">
           <div class="glass-panel">
             <div class="section-head">
               <div>
-                <div class="section-kicker">Confirmed 2026 Retail Calendar</div>
-                <h2>Upcoming Shopping Events Timeline</h2>
-              </div>
-              <span class="small muted">Transitions automatically into year-round shopping intelligence after the holidays</span>
-            </div>
-            <div id="bf-timeline" class="timeline-grid"></div>
-          </div>
-
-          <div class="glass-panel">
-            <div class="section-head">
-              <div>
-                <div class="section-kicker">Live Holiday Event Deals</div>
-                <h2>Black Friday &amp; Cyber Monday Stream</h2>
-              </div>
-            </div>
-            <div class="pill-tabs" id="bf-subtabs">
-              <button class="pill-tab is-active" data-bf="all" type="button">All Black Friday</button>
-              <button class="pill-tab" data-bf="early" type="button">Early Black Friday</button>
-              <button class="pill-tab" data-bf="cyber" type="button">Cyber Monday</button>
-              <button class="pill-tab" data-bf="doorbuster" type="button">Doorbusters</button>
-              <button class="pill-tab" data-bf="online" type="button">Online-Only</button>
-              <button class="pill-tab" data-bf="local" type="button">Local Pickup Retailers</button>
-              <button class="pill-tab" data-bf="archived" type="button">Archived Expired</button>
-            </div>
-            <div id="bf-deals-grid" class="deals-grid"></div>
-          </div>
-        </section>
-
-        <!-- 5. DEAL HUNTER -->
-        <section id="view-deal-hunter" class="view-panel" aria-label="Autonomous Deal Hunter">
-          <div class="glass-panel">
-            <div class="section-head">
-              <div>
-                <div class="section-kicker">Adaptive Discovery Engine</div>
-                <h2>What The Deal Hunter Learned About Your Family</h2>
-              </div>
-              <button id="hunter-reset-btn" class="btn btn-sm" type="button">Reset Dismissed Items</button>
-            </div>
-            <div id="hunter-signals"></div>
-          </div>
-
-          <div class="glass-panel">
-            <div class="section-head">
-              <div>
-                <div class="section-kicker">Every Recommendation Explains Why Your Family Would Want It</div>
-                <h2>Autonomous Gift &amp; Bargain Discoveries</h2>
-              </div>
-            </div>
-            <div class="pill-tabs" id="hunter-filter-tabs">
-              <button class="pill-tab is-active" data-htag="all" type="button">All Discoveries</button>
-              <button class="pill-tab" data-htag="unexpected_black_friday" type="button">Unexpected Black Friday</button>
-              <button class="pill-tab" data-htag="deep_discount" type="button">Deep Verified Drops</button>
-              <button class="pill-tab" data-htag="clearance" type="button">Clearance &amp; Closeout</button>
-              <button class="pill-tab" data-htag="coupon_opportunity" type="button">Hidden Coupons</button>
-              <button class="pill-tab" data-htag="price_mistake" type="button">⚠️ Price Mistakes</button>
-              <button class="pill-tab" data-htag="premium_made_affordable" type="button">Premium Made Affordable</button>
-              <button class="pill-tab" data-htag="high_value_gift" type="button">High-Value Gifts</button>
-              <button class="pill-tab" data-htag="refurbished" type="button">Refurbished / Open-Box</button>
-            </div>
-            <div id="hunter-grid" class="deals-grid"></div>
-          </div>
-        </section>
-
-        <!-- 6. COMPARE PRODUCTS -->
-        <section id="view-compare" class="view-panel" aria-label="Compare Products & Smarter Alternatives">
-          <div class="glass-panel">
-            <div class="section-head">
-              <div>
-                <div class="section-kicker">3-Tier Verified Alternatives Engine</div>
-                <h2>Smarter Alternatives for Your Wish List</h2>
-              </div>
-              <select id="alt-wishlist-select" style="width:auto;min-width:260px;"></select>
-            </div>
-            <div id="alternatives-stage"></div>
-          </div>
-
-          <div class="glass-panel">
-            <div class="section-head">
-              <div>
-                <div class="section-kicker">Up to 4 Deals Side-by-Side</div>
-                <h2>Interactive Product Comparison Matrix</h2>
+                <div class="section-kicker">Customizable Thresholds, Weights &amp; Persistent Backup</div>
+                <h2>Shopping Preferences &amp; Persistence</h2>
               </div>
               <div style="display:flex;gap:8px;flex-wrap:wrap;">
-                <select id="compare-add-select" style="width:auto;min-width:240px;"></select>
-                <button id="compare-add-btn" class="btn btn-sm btn-primary" type="button">+ Add to Compare</button>
-                <button id="compare-clear-btn" class="btn btn-sm" type="button">Clear</button>
-              </div>
-            </div>
-            <div id="compare-matrix"></div>
-          </div>
-        </section>
-
-        <!-- 7. LOCAL DEALS (KNIGHTDALE 27545) -->
-        <section id="view-local-deals" class="view-panel" aria-label="Local Knightdale and Raleigh Deals">
-          <div class="banner-notice">
-            <strong>Knightdale, NC 27545 Inventory Honesty Notice:</strong> Online pricing and retailer promotions do <em>not</em> guarantee shelf inventory at local Wake County stores. Always verify Knightdale / Raleigh store pickup availability via the direct store link before driving. Wake County estimated sales tax is calculated at <strong>7.25%</strong>.
-          </div>
-
-          <div class="glass-panel">
-            <div class="section-head">
-              <div>
-                <div class="section-kicker">Knightdale · Raleigh · Garner · Wake Forest · Cary · North Raleigh</div>
-                <h2>Local Pickup &amp; Warehouse-Club Deals</h2>
-              </div>
-            </div>
-            <div class="pill-tabs" id="local-filter-tabs">
-              <button class="pill-tab is-active" data-local="all" type="button">All Triangle Chains</button>
-              <button class="pill-tab" data-local="knightdale" type="button">In Knightdale (≤ 2 mi)</button>
-              <button class="pill-tab" data-local="warehouse" type="button">Warehouse Clubs (Costco / Sam's)</button>
-              <button class="pill-tab" data-local="pickup_verified" type="button">Pickup / Store Promo Mentioned</button>
-            </div>
-            <div id="local-deals-grid" class="deals-grid"></div>
-          </div>
-
-          <div class="glass-panel">
-            <div class="section-head">
-              <div>
-                <div class="section-kicker">Verified Nearby Store Locations Around 27545</div>
-                <h2>Triangle Area Physical Stores &amp; Clearance Hubs</h2>
-              </div>
-            </div>
-            <div id="local-stores-grid" class="stores-grid"></div>
-          </div>
-        </section>
-
-        <!-- 8. PRICE HISTORY -->
-        <section id="view-price-history" class="view-panel" aria-label="Interactive Price History">
-          <div class="glass-panel">
-            <div class="section-head">
-              <div>
-                <div class="section-kicker">Genuine Recorded Observations Only — Zero Synthetic Curves</div>
-                <h2>Interactive Multi-Retailer Price History</h2>
-              </div>
-              <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
-                <select id="history-product-select" style="width:auto;min-width:290px;"></select>
-                <div class="pill-tabs" id="history-range-tabs" style="margin:0;">
-                  <button class="pill-tab" data-range="7d" type="button">7D</button>
-                  <button class="pill-tab" data-range="30d" type="button">30D</button>
-                  <button class="pill-tab" data-range="90d" type="button">90D</button>
-                  <button class="pill-tab" data-range="1y" type="button">1Y</button>
-                  <button class="pill-tab is-active" data-range="all" type="button">ALL</button>
-                </div>
-              </div>
-            </div>
-            <div id="history-chart-host"></div>
-            <div id="history-table-host" class="table-wrap" style="margin-top:16px;"></div>
-          </div>
-        </section>
-
-        <!-- 9. ALERTS -->
-        <section id="view-alerts" class="view-panel" aria-label="Smart Alerts">
-          <div class="glass-panel">
-            <div class="section-head">
-              <div>
-                <div class="section-kicker">Honest Channel Verification</div>
-                <h2>Notification Delivery Channels</h2>
-              </div>
-              <div style="display:flex;gap:8px;flex-wrap:wrap;">
-                <button id="enable-browser-push-btn" class="btn btn-sm" type="button">🔔 Enable Browser Alerts</button>
-                <button id="send-test-alert-btn" class="btn btn-sm btn-primary" type="button">Send Test Alert</button>
-              </div>
-            </div>
-            <div id="alert-channels-grid" class="health-grid"></div>
-          </div>
-
-          <div class="glass-panel">
-            <div class="section-head">
-              <div>
-                <div class="section-kicker">Deduplicated Trigger Feed</div>
-                <h2>Alert History</h2>
-              </div>
-              <button id="mark-alerts-read-btn" class="btn btn-sm" type="button">Mark All Read</button>
-            </div>
-            <div id="alerts-feed" style="display:flex;flex-direction:column;gap:10px;"></div>
-          </div>
-        </section>
-
-        <!-- 10. ALL STORES DIRECTORY -->
-        <section id="view-all-stores" class="view-panel" aria-label="All Stores Directory">
-          <div class="glass-panel">
-            <div class="section-head">
-              <div>
-                <div class="section-kicker">Validated Official Links &amp; Honest Monitoring Status</div>
-                <h2>All Supported Retailers Directory (60+ Stores)</h2>
-              </div>
-              <div style="display:flex;gap:8px;flex-wrap:wrap;">
-                <input id="stores-search" type="search" placeholder="Search retailer name…" style="width:220px;" />
-                <select id="stores-category-filter" style="width:auto;min-width:190px;">
-                  <option value="all">All Store Categories</option>
-                </select>
-                <select id="stores-status-filter" style="width:auto;min-width:190px;">
-                  <option value="all">All Monitoring Statuses</option>
-                  <option value="live_feed_aggregated">Live Feed Monitored</option>
-                  <option value="direct_api_ready">Official API Ready</option>
-                  <option value="direct_api_active">Direct API Active</option>
-                  <option value="directory_only">Directory Links Only</option>
-                </select>
-              </div>
-            </div>
-            <div id="all-stores-container"></div>
-          </div>
-        </section>
-
-        <!-- 11. SETTINGS -->
-        <section id="view-settings" class="view-panel" aria-label="Settings and Source Diagnostics">
-          <div class="glass-panel">
-            <div class="section-head">
-              <div>
-                <div class="section-kicker">Customizable Intelligence Engine</div>
-                <h2>Shopping Preferences, Thresholds &amp; Decision Weights</h2>
-              </div>
-              <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                <button id="reset-rejected-btn" class="btn btn-sm" type="button">Restore Rejected Products</button>
                 <a class="btn btn-sm" href="/api/black-friday/export?format=json">↓ Full JSON Backup</a>
                 <button id="save-settings-btn" class="btn btn-primary" type="button">Save Settings</button>
               </div>
             </div>
+            <div id="persistence-banner" class="banner-notice"></div>
             <div id="settings-form-host"></div>
           </div>
 
           <div class="glass-panel">
             <div class="section-head">
               <div>
-                <div class="section-kicker">Live Adapter Telemetry &amp; Error Reporting</div>
+                <div class="section-kicker">Live Adapter Telemetry — Failed &amp; Blocked Sources Always Shown</div>
                 <h2>Data Sources &amp; Background Worker Diagnostics</h2>
               </div>
               <button id="diag-refresh-btn" class="btn btn-sm" type="button">Run Health Check Sweep</button>
@@ -488,27 +590,27 @@
         </section>
       </main>
 
-      <!-- Persistent Version Number Footer on Every Page -->
+      <!-- Persistent Version Number Footer -->
       <footer class="app-footer">
         <div>
-          <strong>Black Friday Command Center</strong> · Version <span id="footer-version" class="tabular">1.0.0-bf2026.1</span> · Knightdale, NC 27545
+          <strong>Family Shopping HQ · Black Friday Command Center</strong> · Version <span id="footer-version" class="tabular">2.0.0-bf2026.2</span> · Knightdale, NC 27545
         </div>
-        <div id="footer-integrity">
-          Strict Live Data Policy: Zero Simulated Prices · Failed Sources Visibly Reported
+        <div>
+          Strict Honesty Policy: Zero Simulated Prices · Verified Direct Retailer Links · Failed Sources Reported
         </div>
       </footer>
     </div>
   </div>
 
-  <!-- Deal Detail & Score Breakdown Modal -->
+  <!-- Actionable Modal (Deal Details / Compare Prices / Find Similar / Find Cheaper / Edit Profile) -->
   <div id="deal-modal" class="modal-backdrop" hidden role="dialog" aria-modal="true" aria-labelledby="deal-modal-title">
     <div class="modal-sheet">
       <div class="section-head">
         <div>
           <div class="section-kicker" id="deal-modal-kicker">Verified Offer Intelligence</div>
-          <h2 id="deal-modal-title">Deal Details</h2>
+          <h2 id="deal-modal-title">Details</h2>
         </div>
-        <button id="deal-modal-close" class="btn btn-sm" type="button" aria-label="Close detail dialog">✕ Close</button>
+        <button id="deal-modal-close" class="btn btn-sm" type="button" aria-label="Close dialog">✕ Close</button>
       </div>
       <div id="deal-modal-body"></div>
     </div>

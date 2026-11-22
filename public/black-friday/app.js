@@ -1,26 +1,26 @@
 /**
- * Black Friday Command Center — Interactive Client Application.
- * Zero placeholder buttons, persistent filters & preferences, live SSE updates,
- * immediate cached rendering, and strict honest status reporting.
+ * Family Shopping HQ · Black Friday Command Center v2.0 Client Application.
+ * Zero decorative fluff, zero dead buttons, zero invented preferences.
  */
 
 import { renderPriceHistoryChart, renderRetailerCompareBars } from './charts.js';
 
-const STORAGE_PREFS_KEY = 'bf_command_prefs_v1';
-const STORAGE_CACHE_KEY = 'bf_command_cache_v1';
+const STORAGE_PREFS_KEY = 'bf_command_prefs_v2';
+const STORAGE_CACHE_KEY = 'bf_command_cache_v2';
 
 const VIEW_META = {
-  'command-center': ['Command Center', 'Live autonomous deal intelligence · Knightdale, NC 27545'],
-  wishlists: ['Our Wish Lists', '7-mode intake, family profiles, exact product matching & duplicate purchase guard'],
-  'best-deals': ['Best Deals', 'Verified discounts ranked by decision score with all-in NC 7.25% tax'],
-  'black-friday-live': ['Black Friday Live', 'Confirmed 2026 event countdowns, doorbusters, Cyber Monday & expired archive'],
-  'deal-hunter': ['Deal Hunter', 'Autonomous family discovery engine learning from your wish lists & feedback'],
-  compare: ['Compare Products', '3-tier smarter alternatives & side-by-side verified offer matrix'],
-  'local-deals': ['Local Deals', 'Knightdale 27545, Raleigh, Garner, Wake Forest & Cary stores and warehouse clubs'],
+  'command-center': ['Family Shopping HQ', 'Favorite stores, upload center, wish-list matches & personalized deals · Knightdale, NC 27545'],
+  'all-stores': ['Shop All Stores', 'Tap any store logo to open the official website directly in a new tab'],
+  'upload-center': ['Upload Center', 'Upload Excel (.xlsx/.xls), CSV, PDF, Word, screenshots, emails, or URLs — preview & edit before saving'],
+  wishlists: ['Wish Lists & Saved Deals', 'Monitored family wish lists & user-uploaded deals with original price history preserved'],
+  profiles: ['Family Shopping Profiles', 'Editable member brands, sizes, hobbies, preferred stores & gift budgets'],
+  'black-friday-live': ['Black Friday Sales', 'Confirmed 2026 event countdowns, retailer Black Friday links & verified holiday deals'],
+  compare: ['Compare Prices', 'Cross-retailer exact comparisons & 3-tier smarter alternatives'],
+  'local-deals': ['Knightdale / Raleigh Local', 'Nearby physical stores around 27545, pickup options & local chain deals'],
   'price-history': ['Price History', 'Genuine timestamped multi-retailer observations — never fabricated'],
-  alerts: ['Alerts', 'Deduplicated smart notifications, quiet hours & verified delivery channels'],
-  'all-stores': ['All Stores', 'Searchable 60+ retailer directory with honest monitoring status & direct links'],
-  settings: ['Settings', 'Customizable discount thresholds, decision weights, schedules & source diagnostics'],
+  alerts: ['Alerts', 'Deduplicated smart notifications, quiet hours & delivery channel status'],
+  'best-deals': ['Browse All Live Feeds', 'Optional full live-feed explorer across authorized deal sources'],
+  settings: ['Settings & Source Health', 'Thresholds, decision weights, persistence diagnostics & JSON backup'],
 };
 
 const TIER_LABELS = {
@@ -28,47 +28,34 @@ const TIER_LABELS = {
   great: 'Great 25–39%',
   good: 'Good 15–24%',
   watch: 'Watch <15%',
-  unverified: 'Unverified Baseline',
+  unverified: 'Baseline Unknown',
 };
 
 const CAT_ICONS = {
-  electronics: '💻',
-  gaming: '🎮',
-  home: '🏠',
-  tools: '🛠️',
-  apparel: '👟',
-  beauty: '✨',
-  toys: '🧱',
-  outdoors: '⛺',
-  pets: '🐾',
-  other: '🛍️',
+  electronics: '💻', gaming: '🎮', home: '🏠', tools: '🛠️',
+  apparel: '👟', beauty: '✨', toys: '🧱', outdoors: '⛺', pets: '🐾', other: '🛍️',
 };
 
 const appState = {
   data: null,
   activeView: 'command-center',
-  intakeMode: 'manual',
+  homeStoreQuery: '',
+  uploadType: 'wishlist', // 'wishlist' | 'deal'
+  uploadMode: 'file',     // 'file' | 'bulk' | 'urls' | 'manual'
+  uploadPreview: null,    // { uploadType, uploadFileId, parseWarning, items: [...] }
   selectedProfileId: 'all',
   wishlistStatusFilter: 'all',
   bfSubtab: 'all',
-  hunterTag: 'all',
   localTab: 'all',
   historyKey: '',
   historyRange: 'all',
   altWishlistId: '',
   compareDealIds: [],
   filters: {
-    q: '',
-    tier: 'all',
-    retailer: 'all',
-    category: 'all',
-    sort: 'score',
-    maxPrice: '',
-    freeShip: false,
-    newOnly: false,
-    localOnly: false,
+    q: '', tier: 'all', retailer: 'all', category: 'all', sort: 'score',
+    maxPrice: '', freeShip: false, newOnly: false, localOnly: false,
   },
-  storeFilters: { q: '', category: 'all', status: 'all' },
+  storeFilters: { q: '', category: 'all', favOnly: false },
   sse: null,
   countdownTimer: null,
 };
@@ -97,11 +84,7 @@ function formatClock(iso) {
   const d = new Date(iso || '');
   if (!Number.isFinite(d.getTime())) return '—';
   return new Intl.DateTimeFormat('en-US', {
-    timeZone: 'America/New_York',
-    month: 'short',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
+    timeZone: 'America/New_York', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
   }).format(d);
 }
 
@@ -112,7 +95,34 @@ function toast(msg) {
   el.className = 'toast';
   el.textContent = msg;
   stack.appendChild(el);
-  setTimeout(() => el.remove(), 4200);
+  setTimeout(() => el.remove(), 4500);
+}
+
+function getStoreMeta(retailerId) {
+  return appState.data?.storesDirectory?.find((s) => s.id === retailerId) || null;
+}
+
+function renderStoreAvatar(store, small = false) {
+  const accent = store?.accent || '#38bdf8';
+  const mono = store?.monogram || (store?.name || 'ST').replace(/[^A-Za-z0-9]/g, '').slice(0, 2).toUpperCase();
+  const logoUrl = store?.logoUrl || '';
+  return `
+    <span class="store-logo-avatar ${small ? 'is-sm' : ''}" style="background:${logoUrl ? '#ffffff' : esc(accent)};">
+      ${logoUrl ? `<img src="${esc(logoUrl)}" alt="${esc(store?.name || '')}" loading="lazy" data-monogram="${esc(mono)}" data-accent="${esc(accent)}" />` : `<span class="store-logo-monogram">${esc(mono)}</span>`}
+    </span>`;
+}
+
+function attachLogoFallbacks(root = document) {
+  root.querySelectorAll('.store-logo-avatar img').forEach((img) => {
+    if (img.dataset.boundFallback) return;
+    img.dataset.boundFallback = '1';
+    img.addEventListener('error', () => {
+      const parent = img.parentElement;
+      if (!parent) return;
+      parent.style.background = img.dataset.accent || '#38bdf8';
+      parent.innerHTML = `<span class="store-logo-monogram">${esc(img.dataset.monogram || 'ST')}</span>`;
+    });
+  });
 }
 
 function loadPrefs() {
@@ -121,7 +131,6 @@ function loadPrefs() {
     if (raw.theme === 'light' || raw.theme === 'dark') applyTheme(raw.theme, false);
     if (raw.filters) appState.filters = { ...appState.filters, ...raw.filters };
     if (Array.isArray(raw.compareDealIds)) appState.compareDealIds = raw.compareDealIds.slice(0, 4);
-    if (raw.activeView && VIEW_META[raw.activeView]) appState.activeView = raw.activeView;
   } catch {}
 }
 
@@ -131,7 +140,6 @@ function savePrefs() {
       theme: document.documentElement.dataset.theme || 'dark',
       filters: appState.filters,
       compareDealIds: appState.compareDealIds,
-      activeView: appState.activeView,
     }));
   } catch {}
 }
@@ -141,9 +149,7 @@ function applyTheme(theme, persistServer = false) {
   const btn = $('theme-toggle-btn');
   if (btn) btn.textContent = theme === 'light' ? '🌙 Dark' : '☀️ Light';
   savePrefs();
-  if (persistServer) {
-    api('/api/black-friday/settings', { method: 'PATCH', body: { theme } }).catch(() => {});
-  }
+  if (persistServer) api('/api/black-friday/settings', { method: 'PATCH', body: { theme } }).catch(() => {});
 }
 
 async function api(url, { method = 'GET', body } = {}) {
@@ -156,59 +162,58 @@ async function api(url, { method = 'GET', body } = {}) {
   const text = await res.text();
   let json = null;
   try { json = JSON.parse(text); } catch {}
-  if (!res.ok) {
-    throw new Error(json?.error || `Request failed (HTTP ${res.status})`);
-  }
+  if (!res.ok) throw new Error(json?.error || `Request failed (HTTP ${res.status})`);
   return json;
 }
 
-/* ==================== NAVIGATION ==================== */
 function switchView(viewId) {
   if (!VIEW_META[viewId]) return;
   appState.activeView = viewId;
-  savePrefs();
-
-  document.querySelectorAll('.view-panel').forEach((el) => {
-    el.classList.toggle('is-active', el.id === `view-${viewId}`);
-  });
-  document.querySelectorAll('#nav-list .nav-btn').forEach((btn) => {
-    btn.classList.toggle('is-active', btn.dataset.view === viewId);
-  });
-
+  document.querySelectorAll('.view-panel').forEach((el) => el.classList.toggle('is-active', el.id === `view-${viewId}`));
+  document.querySelectorAll('#nav-list .nav-btn').forEach((btn) => btn.classList.toggle('is-active', btn.dataset.view === viewId));
   const [title, sub] = VIEW_META[viewId];
   $('topbar-title').textContent = title;
   $('topbar-sub').textContent = sub;
-
-  // Close mobile drawer
   $('sidebar').classList.remove('is-open');
   $('sidebar-scrim').classList.remove('is-open');
-
   renderActiveView();
 }
 
-/* ==================== DEAL CARD RENDERER (ALL 16 REQUIRED FIELDS) ==================== */
-function renderDealCardHtml(deal, { showHunterWhy = null, hunterMeta = null } = {}) {
+function openUploadCenter(type = 'wishlist', mode = 'file') {
+  appState.uploadType = type;
+  appState.uploadMode = mode;
+  switchView('upload-center');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+/* ==================== ACTIONABLE PRODUCT CARD (PRIORITY 6) ==================== */
+function renderProductCardHtml(deal, recMeta = null) {
+  const store = getStoreMeta(deal.retailerId) || { name: deal.retailerName, monogram: (deal.retailerName || 'ST').slice(0, 2).toUpperCase(), accent: '#38bdf8' };
   const tierClass = `tier-${deal.tier || 'unverified'}`;
   const badgeClass = `badge-${deal.tier || 'unverified'}`;
-  const discountLabel = deal.verifiedDiscountPct !== null
+  const hasRealDrop = deal.verifiedDiscountPct !== null && deal.verifiedDiscountPct >= 2 && deal.normalPrice !== null && deal.normalPrice > deal.currentPrice;
+  const discountLabel = hasRealDrop
     ? `${deal.verifiedDiscountPct}% OFF`
-    : 'Baseline Unknown';
-  const actionClass = deal.decision?.action === 'BUY NOW' ? 'badge-buy' : deal.decision?.action === 'CONSIDER ALTERNATIVE' ? 'badge-alt' : 'badge-wait';
-  const inCompare = appState.compareDealIds.includes(deal.id);
-  const freshnessLabel = deal.freshness === 'live_verified' ? 'Live Verified' : deal.freshness === 'recently_verified' ? 'Recently Verified' : deal.freshness === 'stale' ? 'Stale' : 'Unverified';
-  const stockLabel = deal.availabilityStatus === 'in_stock' ? 'In Stock (Verified)' : deal.availabilityStatus === 'limited' ? 'Limited Stock' : deal.availabilityStatus === 'out_of_stock' ? 'Out of Stock' : 'Stock Unverified';
-  const shippingLabel = deal.shippingFree ? 'Free Ship' : deal.shippingCost !== null ? `+${money(deal.shippingCost)} ship` : 'Verify ship';
-
-  const rev = deal.reviewData;
-  const reviewHtml = rev?.verifiedOwnerRating
-    ? `<span class="badge badge-great">★ ${esc(rev.verifiedOwnerRating)}/${esc(rev.ratingScale || 5)}${rev.reviewCount ? ` (${esc(rev.reviewCount)})` : ''} · Verified Reviews</span>`
-    : deal.sourceScore != null
-      ? `<span class="badge badge-watch">👍 Community Score ${deal.sourceScore > 0 ? '+' : ''}${esc(deal.sourceScore)}</span>`
-      : '';
-
+    : (deal.normalPrice !== null && deal.currentPrice >= deal.normalPrice
+      ? 'At Typical Price'
+      : (deal.verifiedDiscountPct !== null && deal.verifiedDiscountPct > 0 ? 'Near Typical' : 'Baseline Unknown'));
   const imgHtml = deal.imageUrl
     ? `<img src="${esc(deal.imageUrl)}" alt="${esc(deal.title)}" loading="lazy" decoding="async" />`
     : `<div class="deal-media-fallback" aria-hidden="true">${CAT_ICONS[deal.category] || '🛍️'}</div>`;
+
+  // Priority 6: Honest SHOP NOW label — never disguise a tracker page as a direct retailer product listing
+  const shopLabel = deal.isDirectProductUrl
+    ? `SHOP NOW ↗`
+    : `VIEW DEAL (${esc(deal.sourceName?.split(' ')[0] || 'Deal')}) ↗`;
+
+  const recExplanationHtml = recMeta
+    ? `<div class="rec-why-grid">
+        <div><strong>${esc(recMeta.tierLabel)}</strong> · Triggered by: <strong>${esc(recMeta.triggeredBy)}</strong></div>
+        <div><strong>Why relevant:</strong> ${esc(recMeta.whyRelevant)}</div>
+        <div><strong>Better / Worse:</strong> ${esc(recMeta.betterOrWorse)}</div>
+        <div><strong>Savings &amp; Store:</strong> ${recMeta.savesMoney ? `Saves ~${money(recMeta.estimatedSavings)}` : 'Current live price'} · Buy at <strong>${esc(recMeta.whereToBuy)}</strong></div>
+      </div>`
+    : `<div class="deal-why"><strong>Why consider:</strong> ${esc(deal.whyWorthConsidering)}</div>`;
 
   return `
     <article class="deal-card ${tierClass}" data-deal-id="${esc(deal.id)}">
@@ -216,288 +221,411 @@ function renderDealCardHtml(deal, { showHunterWhy = null, hunterMeta = null } = 
         ${imgHtml}
         <div class="deal-media-top">
           <span class="badge ${badgeClass} tabular">${esc(discountLabel)}</span>
-          <span class="score-pill tabular" title="Shopping Decision Score (0-100 · ${esc(deal.decision?.evidenceCoveragePct ?? 0)}% evidenced)">
-            Score ${esc(deal.decision?.score ?? 0)}/100
-          </span>
+          <span class="score-pill tabular">Score ${esc(deal.decision?.score ?? 0)}/100</span>
         </div>
       </div>
 
       <div class="deal-body">
         <div class="deal-meta-row">
-          <span class="retailer-tag">${esc(deal.retailerName || 'Retailer')}</span>
-          <span class="badge ${actionClass}">${esc(deal.decision?.action || 'WAIT')}</span>
+          <span style="display:inline-flex;align-items:center;gap:7px;">
+            ${renderStoreAvatar(store, true)}
+            <span class="retailer-tag">${esc(deal.retailerName || 'Retailer')}</span>
+          </span>
+          <span class="badge ${deal.decision?.action === 'BUY NOW' ? 'badge-buy' : 'badge-wait'}">${esc(deal.decision?.action || 'WAIT')}</span>
         </div>
 
         <h3 class="deal-title" title="${esc(deal.title)}">${esc(deal.title)}</h3>
-        ${(deal.brand || deal.modelNumber) ? `<div class="small muted">${esc([deal.brand, deal.modelNumber ? `Model ${deal.modelNumber}` : null].filter(Boolean).join(' · '))}</div>` : ''}
+        ${(deal.brand || deal.modelNumber) ? `<div class="small muted">${esc([deal.brand, deal.modelNumber ? `Model: ${deal.modelNumber}` : null].filter(Boolean).join(' · '))}</div>` : ''}
 
         <div class="deal-price-box">
           <span class="price-now tabular">${money(deal.currentPrice)}</span>
           <span class="tabular">
-            ${deal.normalPrice !== null ? `<span class="price-normal">${money(deal.normalPrice)}</span>` : '<span class="small muted">Normal price unknown</span>'}
+            ${deal.normalPrice !== null && deal.normalPrice > deal.currentPrice
+              ? `<span class="price-normal">${money(deal.normalPrice)}</span>`
+              : deal.normalPrice !== null
+                ? `<span class="small muted">Typical ${money(deal.normalPrice)}</span>`
+                : '<span class="small muted">Typical price unknown</span>'}
           </span>
           <div class="price-breakdown tabular">
-            <span>Ship: <strong>${esc(shippingLabel)}</strong></span>
-            <span>Est. NC Tax (${esc(deal.taxRatePct ?? 7.25)}%): <strong>${money(deal.estimatedTax)}</strong></span>
-            <span>Est. All-In: <strong>${money(deal.finalAllInTotal)}</strong></span>
-            ${deal.cashbackPercent ? `<span style="color:var(--accent-emerald);">After ~${esc(deal.cashbackPercent)}% CB: <strong>${money(deal.effectiveAfterCashback)}</strong></span>` : ''}
+            <span>Ship: <strong>${deal.shippingFree ? 'Free' : deal.shippingCost != null ? money(deal.shippingCost) : 'Verify'}</strong></span>
+            <span>NC Tax (${esc(deal.taxRatePct ?? 7.25)}%): <strong>${money(deal.estimatedTax)}</strong></span>
+            <span>All-In: <strong>${money(deal.finalAllInTotal)}</strong></span>
           </div>
         </div>
 
-        <div class="deal-tags">
-          <span class="badge ${badgeClass}">${esc(TIER_LABELS[deal.tier] || 'Unverified')}</span>
-          ${deal.isBlackFriday ? '<span class="badge badge-bf">Black Friday</span>' : ''}
-          ${deal.isDoorbuster ? '<span class="badge badge-bf">Doorbuster</span>' : ''}
-          ${deal.isPriceMistake ? '<span class="badge badge-danger">⚠️ Possible Price Mistake</span>' : ''}
-          ${deal.inflatedListWarning ? '<span class="badge badge-danger">⚠️ Inflated List Warning</span>' : ''}
-          ${deal.couponCode ? `<span class="badge badge-good">Code: ${esc(deal.couponCode)}</span>` : ''}
-          ${deal.condition !== 'new' ? `<span class="badge badge-watch">${esc(deal.condition.replace('_', '-').toUpperCase())}</span>` : ''}
-          ${deal.localPickupKnightdale === 'available' ? '<span class="badge badge-local">📍 Knightdale Pickup Verified</span>' : deal.localPickupKnightdale === 'check_store' ? '<span class="badge badge-local">📍 Local Chain (Check Stock)</span>' : '<span class="badge badge-watch">Online Only</span>'}
-          <span class="badge badge-watch">${esc(stockLabel)}</span>
-          ${deal.expiresAt ? `<span class="badge badge-danger">Ends ${esc(formatClock(deal.expiresAt))}</span>` : ''}
-          ${reviewHtml}
-        </div>
-
-        <div class="deal-why">
-          <strong>${showHunterWhy ? 'Why our family would want this:' : 'Why consider:'}</strong>
-          ${esc(showHunterWhy || deal.whyWorthConsidering)}
-        </div>
+        ${recExplanationHtml}
 
         <div class="deal-verify-line tabular">
-          <span>${esc(freshnessLabel)} · ${esc(timeAgo(deal.verifiedAt))} (${esc(deal.sourceName)})</span>
-          <span>Confidence: <strong>${esc(deal.confidenceLabel)} (${esc(deal.confidenceScore)}%)</strong></span>
+          <span>Verified ${esc(timeAgo(deal.verifiedAt))} via ${esc(deal.sourceName)}</span>
+          <span>${deal.isDirectProductUrl ? 'Direct Product Link' : 'Verified Deal Page'}</span>
         </div>
 
         <div class="deal-actions">
-          <a class="btn btn-primary btn-sm" href="${esc(deal.retailerUrl)}" target="_blank" rel="noopener noreferrer">Open at ${esc(deal.retailerName)} ↗</a>
+          <a class="btn btn-primary btn-sm" href="${esc(deal.retailerUrl)}" target="_blank" rel="noopener noreferrer">${shopLabel}</a>
+          <button class="btn btn-sm" data-action="compare-prices" data-deal-id="${esc(deal.id)}" type="button">COMPARE PRICES</button>
           <button class="btn btn-sm" data-action="detail" data-deal-id="${esc(deal.id)}" type="button">Details</button>
-          <button class="btn btn-sm" data-action="history" data-key="${esc(deal.canonicalKey)}" type="button">📈</button>
-          <button class="btn btn-sm" data-action="compare" data-deal-id="${esc(deal.id)}" type="button">${inCompare ? '✓ Comparing' : '⚖️'}</button>
-          ${hunterMeta ? `
-            <button class="btn btn-sm" data-action="hunter-add-wl" data-deal-id="${esc(deal.id)}" type="button">+ Wish List</button>
-            <button class="btn btn-sm" data-action="hunter-save" data-deal-id="${esc(deal.id)}" type="button">${hunterMeta.saved ? '★ Saved' : '☆ Save'}</button>
-            <button class="btn btn-sm btn-danger" data-action="hunter-reject" data-deal-id="${esc(deal.id)}" data-brand="${esc(deal.brand || '')}" type="button">✕</button>
-          ` : ''}
+        </div>
+
+        <div class="feedback-row">
+          <button class="fb-btn ${deal.isLoved ? 'is-loved' : ''}" data-fb="love" data-deal-id="${esc(deal.id)}" type="button">${deal.isLoved ? '♥ SAVED / LOVED' : '♡ LOVE IT / SAVE'}</button>
+          <button class="fb-btn is-reject" data-fb="reject" data-deal-id="${esc(deal.id)}" data-title="${esc(deal.title)}" type="button">✕ NOT INTERESTED</button>
+          <button class="fb-btn" data-action="find-similar" data-deal-id="${esc(deal.id)}" type="button">≈ FIND SIMILAR</button>
+          <button class="fb-btn" data-action="find-cheaper" data-deal-id="${esc(deal.id)}" type="button">↓ FIND CHEAPER</button>
+          <button class="fb-btn" data-fb="bought" data-deal-id="${esc(deal.id)}" type="button">✓ ALREADY BOUGHT</button>
         </div>
       </div>
     </article>`;
 }
 
-/* ==================== RENDERERS FOR ALL 11 VIEWS ==================== */
-
-function renderSidebarBadges() {
+/* ==================== 1. HOME PAGE (EXACT PRIORITY 5 ORDER: 1 -> 8) ==================== */
+function renderHomePage() {
   const d = appState.data;
   if (!d) return;
-  $('badge-wishlist').textContent = String(d.kpis.wishlistTotalCount || 0);
-  $('badge-deals').textContent = String(d.kpis.totalActiveDeals || 0);
-  $('badge-hunter').textContent = String(d.kpis.newGiftRecommendationsCount || 0);
 
-  const unread = d.kpis.unreadAlertsCount || 0;
-  const alBadge = $('badge-alerts');
-  alBadge.textContent = String(unread);
-  alBadge.hidden = unread === 0;
+  // 1. SHOP ALL STORES horizontal logo strip
+  const q = appState.homeStoreQuery.trim().toLowerCase();
+  const storesToShow = q
+    ? d.storesDirectory.filter((s) => s.name.toLowerCase().includes(q) || s.category.toLowerCase().includes(q))
+    : (d.favoriteStores.length ? d.favoriteStores : d.storesDirectory.slice(0, 20));
 
-  $('sidebar-location').textContent = `${d.location.city}, ${d.location.state} ${d.location.zip}`;
-  $('sidebar-tax').textContent = `${(d.location.salesTaxRate * 100).toFixed(2)}% tax`;
-  $('footer-version').textContent = d.version;
+  $('home-favorite-stores-rail').innerHTML = storesToShow.map((st) => `
+    <a class="store-logo-tile" href="${esc(st.url)}" target="_blank" rel="noopener noreferrer" data-store-id="${esc(st.id)}" title="Open ${esc(st.name)} official website in a new tab">
+      ${renderStoreAvatar(st, false)}
+      <span class="store-tile-name">${esc(st.name)}</span>
+      <span class="small muted" style="font-size:10px;">${st.verifiedDealsCount > 0 ? `${st.verifiedDealsCount} ${st.verifiedDealsCount === 1 ? 'deal' : 'deals'}` : 'Shop ↗'}</span>
+    </a>`).join('') || '<div class="small muted" style="padding:12px;">No favorite stores match that search — click VIEW ALL STORES to browse all 96 retailers.</div>';
 
-  const dot = $('live-dot');
-  dot.className = `live-dot ${d.kpis.monitoringStatus.running ? 'is-busy' : ''}`;
-  $('sidebar-scheduler-line').textContent = d.kpis.lastSuccessfulUpdate
-    ? `Updated ${timeAgo(d.kpis.lastSuccessfulUpdate)} · Next ${formatClock(d.kpis.nextScheduledUpdate)}`
-    : 'Background monitor initializing…';
-}
+  const p = d.personalized || { hasPreferences: false, tier1Exact: [], tier2Alternatives: [], tier3Related: [], tier4Discoveries: [] };
 
-function renderCommandCenter() {
-  const d = appState.data;
-  if (!d) return;
-  const k = d.kpis;
-  const m = k.monitoringStatus;
+  // 3. BEST DEALS ON OUR WISH LISTS (Tier 1)
+  const t1Host = $('home-tier1-wishlist');
+  if (!d.wishlist.length && !d.savedDeals?.length) {
+    t1Host.innerHTML = `
+      <div class="onboarding-box">
+        <h3>Upload Your Family Wish Lists to Unlock Personalized Deal Tracking</h3>
+        <p>We intentionally do <strong>not</strong> clutter your homepage with random unrelated deals. Upload an Excel sheet, CSV, PDF, Word doc, screenshot, pasted email, or product links — we’ll extract every product, let you review &amp; edit, and automatically find the best verified prices and closer alternatives.</p>
+        <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
+          <button class="btn btn-primary" data-open-upload="wishlist" type="button">+ Upload Wish List Now</button>
+          <button class="btn" data-goto="profiles" type="button">👨‍👩‍👧‍👦 Set Up Family Member Profiles</button>
+        </div>
+      </div>`;
+  } else if (p.tier1Exact.length) {
+    t1Host.innerHTML = `<div class="deals-grid">${p.tier1Exact.slice(0, 9).map((rec) => renderProductCardHtml(rec.deal, rec)).join('')}</div>`;
+  } else {
+    t1Host.innerHTML = `
+      <div class="onboarding-box">
+        <h3>Tracking ${esc(d.wishlist.length)} Wish-List Item${d.wishlist.length === 1 ? '' : 's'} — Monitoring for Exact Verified Deals</h3>
+        <p>No exact live feed matches dropped yet for your current items. Click below to run an immediate live check or add product URLs for direct verification.</p>
+        <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
+          <button class="btn btn-primary" data-goto="wishlists" type="button">View Our Wish Lists (${esc(d.wishlist.length)})</button>
+          <button class="btn" id="home-recheck-now" type="button">↻ Run Live Check Now</button>
+        </div>
+      </div>`;
+  }
 
-  $('kpi-grid').innerHTML = `
-    <div class="kpi-card">
-      <div class="kpi-label">Active Verified Deals</div>
-      <div class="kpi-value tabular">${esc(k.totalActiveDeals)}</div>
-      <div class="kpi-sub">${esc(k.archivedDealsCount)} expired/archived automatically</div>
+  // 4. BETTER ALTERNATIVES (Tier 2)
+  const t2Host = $('home-tier2-alternatives');
+  if (!p.hasPreferences) {
+    t2Host.innerHTML = `<div class="small muted">Once you upload wish-list items, genuinely comparable alternatives (same brand, better version at similar price, or comparable quality for less) will appear here automatically.</div>`;
+  } else if (p.tier2Alternatives.length) {
+    t2Host.innerHTML = `<div class="deals-grid">${p.tier2Alternatives.slice(0, 6).map((rec) => renderProductCardHtml(rec.deal, rec)).join('')}</div>`;
+  } else {
+    t2Host.innerHTML = `<div class="small muted">No closely matching alternatives found yet for your current wish-list items — automated sweeps re-check continuously.</div>`;
+  }
+
+  // 5. DEALS YOU MIGHT LOVE (Tier 3 Related + Tier 4 Profile-Matched)
+  const t34Host = $('home-tier34-love');
+  const combinedLove = [...(p.tier3Related || []), ...(p.tier4Discoveries || [])];
+  if (!p.hasPreferences) {
+    t34Host.innerHTML = `<div class="small muted">Add your family members' favorite brands, hobbies, clothing sizes, preferred stores, and gift budgets in <button class="btn btn-sm" data-goto="profiles" type="button" style="margin-left:6px;">Family Profiles</button> — every recommendation will explain exactly which family preference triggered it.</div>`;
+  } else if (combinedLove.length) {
+    t34Host.innerHTML = `<div class="deals-grid">${combinedLove.slice(0, 9).map((rec) => renderProductCardHtml(rec.deal, rec)).join('')}</div>`;
+  } else {
+    t34Host.innerHTML = `<div class="small muted">No additional Tier 3/4 deals currently match your configured wish lists or family profile interests. Add favorite brands or hobbies in Family Profiles, or tap <strong>LOVE IT</strong> on deals you like.</div>`;
+  }
+
+  // 6. BLACK FRIDAY STORE SALES (Direct working retailer Black Friday / deals links)
+  const bfHighlightIds = ['amazon', 'target', 'walmart', 'bestbuy', 'homedepot', 'lowes', 'macys', 'kohls', 'nike', 'sephora', 'ulta', 'lego'];
+  const bfStores = bfHighlightIds.map((id) => d.storesDirectory.find((s) => s.id === id)).filter(Boolean);
+  $('home-bf-store-sales').innerHTML = bfStores.map((s) => `
+    <div class="store-card">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+        <a href="${esc(s.url)}" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;gap:9px;text-decoration:none;color:var(--text-primary);">
+          ${renderStoreAvatar(s, true)}
+          <strong>${esc(s.name)}</strong>
+        </a>
+        <span class="badge badge-bf">${s.hasDedicatedBlackFridayUrl ? 'Black Friday' : 'Deals Page'}</span>
+      </div>
+      <div class="small muted">${s.verifiedDealsCount > 0 ? `${s.verifiedDealsCount} live deals tracked` : 'Direct official retailer sale page'}${s.cashback ? ` · Up to ${s.cashback.percent}% CB` : ''}</div>
+      <div class="store-links">
+        <a class="btn btn-sm btn-primary" href="${esc(s.blackFridayUrl)}" target="_blank" rel="noopener noreferrer">${s.hasDedicatedBlackFridayUrl ? 'Black Friday Sale ↗' : 'Shop Deals ↗'}</a>
+        <a class="btn btn-sm" href="${esc(s.dealsUrl)}" target="_blank" rel="noopener noreferrer">Clearance / Deals ↗</a>
+      </div>
+    </div>`).join('');
+
+  // 7. LOCAL KNIGHTDALE / RALEIGH STORES
+  $('home-local-stores').innerHTML = d.localStores.slice(0, 8).map((st) => {
+    const storeMeta = getStoreMeta(st.retailerId);
+    return `
+      <div class="store-card">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
+          <span style="display:inline-flex;align-items:center;gap:8px;">
+            ${renderStoreAvatar(storeMeta || { name: st.retailerName }, true)}
+            <strong>${esc(st.branchName)}</strong>
+          </span>
+          <span class="badge badge-local tabular">${esc(st.distanceMiles)} mi</span>
+        </div>
+        <div class="small muted">${esc(st.address)}</div>
+        <div class="store-links">
+          <a class="btn btn-sm btn-primary" href="${esc(st.storeUrl)}" target="_blank" rel="noopener noreferrer">Local Store ↗</a>
+          <a class="btn btn-sm" href="${esc(st.clearanceUrl)}" target="_blank" rel="noopener noreferrer">Deals ↗</a>
+        </div>
+      </div>`;
+  }).join('');
+
+  // 8. DEAL MONITORING STATUS
+  const m = d.kpis.monitoringStatus;
+  const persist = d.persistence || {};
+  $('home-monitoring-status').innerHTML = `
+    <div class="health-grid" style="margin-bottom:12px;">
+      <div class="health-item status-ok">
+        <strong>Products Monitored</strong>
+        <div class="small muted tabular">${esc(d.kpis.wishlistTotalCount)} wish-list items · ${esc(d.kpis.savedDealsCount)} uploaded deals · ${esc(d.kpis.uploadedFilesCount)} files preserved</div>
+      </div>
+      <div class="health-item ${m.failed > 0 ? 'status-error' : 'status-ok'}">
+        <strong>Authorized Feed Health</strong>
+        <div class="small muted tabular">${esc(m.healthy)} OK · ${esc(m.failed)} Error/Blocked · ${esc(m.apiKeyRequired)} Optional API Keys Needed</div>
+      </div>
+      <div class="health-item status-ok">
+        <strong>Background Monitoring</strong>
+        <div class="small muted tabular">Last: ${esc(timeAgo(d.kpis.lastSuccessfulUpdate))} · Next: ${esc(formatClock(d.kpis.nextScheduledUpdate))}</div>
+      </div>
+      <div class="health-item ${persist.survivesRedeploys ? 'status-ok' : 'status-api_key_required'}">
+        <strong>Persistence Mode</strong>
+        <div class="small muted">${esc(persist.mode?.replace(/_/g, ' ') || 'local disk')}</div>
+      </div>
     </div>
-    <div class="kpi-card is-emerald">
-      <div class="kpi-label">Wish-List Discounted</div>
-      <div class="kpi-value tabular">${esc(k.wishlistDiscountedCount)} <span class="small muted">/ ${esc(k.wishlistTotalCount)}</span></div>
-      <div class="kpi-sub">Matched across authorized live feeds</div>
-    </div>
-    <div class="kpi-card is-gold">
-      <div class="kpi-label">Verified 25%+ Discounts</div>
-      <div class="kpi-value tabular">${esc(k.verified25PlusCount)}</div>
-      <div class="kpi-sub">Against defensible baselines only</div>
-    </div>
-    <div class="kpi-card is-emerald">
-      <div class="kpi-label">Largest Verified Drop</div>
-      <div class="kpi-value tabular">${k.largestVerifiedDiscountPct != null ? `${k.largestVerifiedDiscountPct}%` : '—'}</div>
-      <div class="kpi-sub" title="${esc(k.largestDiscountTitle || '')}">${esc(k.largestDiscountTitle || 'Awaiting sweep')}</div>
-    </div>
-    <div class="kpi-card is-violet">
-      <div class="kpi-label">Est. Savings vs Normal</div>
-      <div class="kpi-value tabular">${money(k.estimatedSavingsVsNormal)}</div>
-      <div class="kpi-sub">${esc(k.savingsBasis)}</div>
-    </div>
-    <div class="kpi-card">
-      <div class="kpi-label">Gift Recommendations</div>
-      <div class="kpi-value tabular">${esc(k.newGiftRecommendationsCount)}</div>
-      <div class="kpi-sub">Autonomous Deal Hunter discoveries</div>
-    </div>
-    <div class="kpi-card">
-      <div class="kpi-label">Last &amp; Next Update</div>
-      <div class="kpi-value tabular" style="font-size:18px;padding-top:4px;">${esc(timeAgo(k.lastSuccessfulUpdate))}</div>
-      <div class="kpi-sub">Next: ${esc(formatClock(k.nextScheduledUpdate))} (${esc(m.lastWorkerSource || 'server')})</div>
-    </div>
-    <div class="kpi-card ${m.failed > 0 ? 'is-warn' : 'is-emerald'}">
-      <div class="kpi-label">Retailer Monitoring</div>
-      <div class="kpi-value tabular">${esc(m.healthy)} <span class="small muted">OK</span> · ${esc(m.failed)} <span class="small" style="color:var(--accent-rose);">Err/Blk</span></div>
-      <div class="kpi-sub">${esc(m.apiKeyRequired)} optional APIs awaiting key</div>
+    <div class="health-grid">${d.sourceHealth.slice(0, 8).map((s) => `
+      <div class="health-item status-${esc(s.status)}">
+        <div style="display:flex;justify-content:space-between;gap:6px;">
+          <strong>${esc(s.name)}</strong>
+          <span class="badge ${s.status === 'ok' ? 'badge-exceptional' : s.status === 'api_key_required' ? 'badge-good' : 'badge-danger'}">${esc(s.status.replace(/_/g, ' '))}</span>
+        </div>
+        <div class="muted tabular">${s.status === 'ok' ? `${s.dealsParsed} offers · ${timeAgo(s.lastSuccessAt)}` : esc(s.lastError || `HTTP ${s.httpStatus || 'N/A'}`)}</div>
+      </div>`).join('')}
     </div>`;
 
-  // Best Deals Right Now
-  const bestEl = $('cc-best-deals');
-  if (!d.bestDealsRightNow.length) {
-    bestEl.innerHTML = `<div class="chart-empty" style="grid-column:1/-1;"><div class="chart-empty-title">Running live sweep across authorized retail feeds…</div><p class="muted">Click "Refresh Feeds" above or wait a few seconds for live verified deals to populate.</p></div>`;
-  } else {
-    bestEl.innerHTML = d.bestDealsRightNow.slice(0, 8).map((deal) => renderDealCardHtml(deal)).join('');
-  }
-
-  // Wish-list Radar
-  const radarEl = $('cc-wishlist-radar');
-  if (!d.wishlist.length) {
-    radarEl.innerHTML = `<div class="chart-empty"><div class="chart-empty-title">No family wish-list items tracked yet</div><p class="muted">Add a product by name, retailer link, screenshot, spreadsheet, bulk paste, or general gift idea — monitoring starts automatically.</p><button class="btn btn-primary" data-goto="wishlists" type="button">+ Add Your First Wish-List Item</button></div>`;
-  } else {
-    radarEl.innerHTML = `<div class="table-wrap"><table class="data-table">
-      <thead><tr><th>Product</th><th>Recipient</th><th>Status</th><th>Target / Max</th><th>Best Verified Offer</th><th>All-In Est.</th><th>Action</th></tr></thead>
-      <tbody>${d.wishlist.slice(0, 8).map((w) => `
-        <tr>
-          <td><strong>${esc(w.name)}</strong><div class="small muted">${esc([w.brand, w.modelNumber].filter(Boolean).join(' · '))}</div></td>
-          <td>${esc(w.recipient || 'Family')}</td>
-          <td><span class="badge ${w.status === 'deal_found' ? 'badge-exceptional' : w.status === 'purchased' ? 'badge-great' : 'badge-watch'}">${esc(w.status.replace(/_/g, ' '))}</span></td>
-          <td class="tabular">${money(w.preferredPrice)} / ${money(w.maxPrice)}</td>
-          <td>${w.bestOffer ? `<strong>${money(w.bestOffer.currentPrice)}</strong> at ${esc(w.bestOffer.retailerName)}${w.bestOffer.verifiedDiscountPct != null ? ` <span class="badge badge-${esc(w.bestOffer.tier)}">${w.bestOffer.verifiedDiscountPct}% off</span>` : ''}` : '<span class="muted">Monitoring…</span>'}</td>
-          <td class="tabular">${w.bestOffer ? money(w.bestOffer.finalAllInTotal) : '—'}</td>
-          <td>${w.bestOffer ? `<a class="btn btn-sm btn-primary" href="${esc(w.bestOffer.retailerUrl)}" target="_blank" rel="noopener noreferrer">Buy ↗</a>` : `<button class="btn btn-sm" data-wl-search="${esc(w.id)}" type="button">Check Now</button>`}</td>
-        </tr>`).join('')}
-      </tbody></table></div>`;
-  }
-
-  // Source Health Strip
-  $('cc-source-health').innerHTML = d.sourceHealth.map((s) => `
-    <div class="health-item status-${esc(s.status)}">
-      <div style="display:flex;justify-content:space-between;gap:6px;margin-bottom:3px;">
-        <strong>${esc(s.name)}</strong>
-        <span class="badge ${s.status === 'ok' ? 'badge-exceptional' : s.status === 'api_key_required' || s.status === 'pending' ? 'badge-good' : 'badge-danger'}">${esc(s.status.replace(/_/g, ' '))}</span>
-      </div>
-      <div class="muted tabular">${s.status === 'ok' ? `${s.dealsParsed} verified · ${s.latencyMs}ms · ${timeAgo(s.lastSuccessAt)}` : esc(s.lastError || `HTTP ${s.httpStatus || 'N/A'}`)}</div>
-    </div>`).join('');
+  attachLogoFallbacks($('view-command-center'));
 }
 
-/* ==================== WISH LISTS (ALL 7 INTAKE MODES) ==================== */
-function renderIntakePanel() {
+/* ==================== 2. REAL UPLOAD CENTER (PRIORITY 2) ==================== */
+function renderUploadCenter() {
   const d = appState.data;
-  const profiles = d?.profiles || [];
-  const profileOpts = profiles.map((p) => `<option value="${esc(p.id)}">${esc(p.icon || '🎁')} ${esc(p.name)}</option>`).join('');
-  const mode = appState.intakeMode;
-  const host = $('intake-panel-body');
+  if (!d) return;
 
-  if (mode === 'manual') {
-    host.innerHTML = `
-      <form id="wl-manual-form" class="intake-grid">
-        <div class="field span-2"><label for="wl-name">Product Name *</label><input id="wl-name" type="text" required placeholder="e.g. Sony WH-1000XM5 Wireless Noise Canceling Headphones" /></div>
-        <div class="field"><label for="wl-profile">Family Profile / List</label><select id="wl-profile">${profileOpts}</select></div>
-        <div class="field"><label for="wl-brand">Brand (auto-detected if blank)</label><input id="wl-brand" type="text" placeholder="e.g. Sony, Apple, LEGO" /></div>
-        <div class="field"><label for="wl-model">Model / SKU / UPC / ASIN</label><input id="wl-model" type="text" placeholder="e.g. WH1000XM5 or B09XS7JWHH" /></div>
-        <div class="field"><label for="wl-recipient">Intended Recipient</label><input id="wl-recipient" type="text" placeholder="e.g. Mom, Dad, Kids, Household" /></div>
-        <div class="field"><label for="wl-pref-price">Preferred Target Price ($)</label><input id="wl-pref-price" type="number" step="0.01" min="1" placeholder="e.g. 249.99" /></div>
-        <div class="field"><label for="wl-max-price">Maximum Acceptable Price ($)</label><input id="wl-max-price" type="number" step="0.01" min="1" placeholder="e.g. 299.99" /></div>
-        <div class="field"><label for="wl-priority">Priority</label>
-          <select id="wl-priority"><option value="high">High (15-min monitoring)</option><option value="standard" selected>Standard</option><option value="low">Low</option></select>
-        </div>
-        <div class="field"><label for="wl-color">Color / Size / Specs</label><input id="wl-color" type="text" placeholder="e.g. Midnight Blue, 256GB, 65&quot;" /></div>
-        <div class="field span-2"><label for="wl-features">Required Features / Notes</label><input id="wl-features" type="text" placeholder="e.g. Must be new sealed, USB-C, local pickup preferred" /></div>
-        <div class="field span-3" style="display:flex;gap:18px;align-items:center;flex-wrap:wrap;">
-          <label class="small" style="display:inline-flex;gap:6px;align-items:center;cursor:pointer;"><input id="wl-allow-refurb" type="checkbox" style="width:auto;" /> Allow manufacturer refurbished</label>
-          <label class="small" style="display:inline-flex;gap:6px;align-items:center;cursor:pointer;"><input id="wl-allow-openbox" type="checkbox" style="width:auto;" /> Allow open-box</label>
-          <button class="btn btn-primary" type="submit" style="margin-left:auto;">+ Add &amp; Search Retailers Immediately</button>
-        </div>
-      </form>`;
-  } else if (mode === 'url') {
-    host.innerHTML = `
-      <form id="wl-url-form" class="intake-grid">
-        <div class="field span-2"><label for="wl-url-input">Paste Retailer Product URL *</label><input id="wl-url-input" type="url" required placeholder="https://www.amazon.com/dp/... or Target / Best Buy / Walmart / Home Depot URL" /></div>
-        <div class="field" style="display:flex;align-items:flex-end;"><button id="wl-url-preview-btn" class="btn" type="button" style="width:100%;">🔍 Inspect Link Live</button></div>
-        <div id="wl-url-preview-box" class="span-3"></div>
-        <div class="field"><label for="wl-url-profile">Profile</label><select id="wl-url-profile">${profileOpts}</select></div>
-        <div class="field"><label for="wl-url-recipient">Recipient</label><input id="wl-url-recipient" type="text" placeholder="Who is this for?" /></div>
-        <div class="field"><label for="wl-url-pref">Target Price ($)</label><input id="wl-url-pref" type="number" step="0.01" placeholder="Optional" /></div>
-        <div class="field span-3" style="display:flex;justify-content:flex-end;">
-          <button class="btn btn-primary" type="submit">+ Add Product from Link &amp; Track</button>
-        </div>
-      </form>`;
-  } else if (mode === 'screenshot') {
-    host.innerHTML = `
-      <form id="wl-screenshot-form" class="intake-grid">
-        <div class="field span-2"><label for="wl-ss-file">Upload Product Screenshot (PNG / JPG / WebP)</label><input id="wl-ss-file" type="file" accept="image/*" required /></div>
-        <div class="field"><label for="wl-ss-profile">Profile</label><select id="wl-ss-profile">${profileOpts}</select></div>
-        <div class="field span-3"><label for="wl-ss-text">Product Name / Text Visible in Screenshot (one per line if multiple)</label><textarea id="wl-ss-text" rows="2" placeholder="Optional: type or paste the product name & model shown in the screenshot for exact cross-retailer matching"></textarea></div>
-        <div id="wl-ss-preview" class="span-3"></div>
-        <div class="field span-3" style="display:flex;justify-content:flex-end;">
-          <button class="btn btn-primary" type="submit">+ Save Screenshot &amp; Track Product</button>
-        </div>
-      </form>`;
-  } else if (mode === 'file' || mode === 'import') {
-    host.innerHTML = `
-      <form id="wl-file-form" class="intake-grid">
-        <div class="field span-2"><label for="wl-doc-file">${mode === 'import' ? 'Import Shopping List (Amazon/Target CSV/HTML, Google Sheets CSV, JSON)' : 'Upload Spreadsheet or Document (CSV, TSV, XLSX, DOCX, DOC, RTF, JSON, TXT)'}</label><input id="wl-doc-file" type="file" accept=".csv,.tsv,.xlsx,.docx,.doc,.rtf,.json,.txt,.html,.htm" required /></div>
-        <div class="field"><label for="wl-doc-profile">Default Profile</label><select id="wl-doc-profile">${profileOpts}</select></div>
-        <div class="field"><label for="wl-doc-recipient">Default Recipient</label><input id="wl-doc-recipient" type="text" placeholder="Optional" /></div>
-        <div class="field span-2" style="display:flex;align-items:flex-end;justify-content:flex-end;">
-          <button class="btn btn-primary" type="submit">↑ Parse &amp; Import Items</button>
-        </div>
-      </form>`;
-  } else if (mode === 'bulk') {
-    host.innerHTML = `
-      <form id="wl-bulk-form" class="intake-grid">
+  document.querySelectorAll('#upload-type-toggle .pill-tab').forEach((b) => b.classList.toggle('is-active', b.dataset.utype === appState.uploadType));
+  document.querySelectorAll('#upload-mode-tabs .pill-tab').forEach((b) => b.classList.toggle('is-active', b.dataset.umode === appState.uploadMode));
+
+  const profileOpts = (d.profiles || []).map((p) => `<option value="${esc(p.id)}">${esc(p.icon || '👤')} ${esc(p.name)}</option>`).join('');
+  const stage = $('upload-input-stage');
+  const isDeal = appState.uploadType === 'deal';
+
+  if (appState.uploadMode === 'file') {
+    stage.innerHTML = `
+      <form id="uc-file-form" class="intake-grid">
         <div class="field span-3">
-          <label for="wl-bulk-text">Bulk Paste Wish List (one product per line — supports inline URLs, "for Mom", "target $199", "under $250", "[high]")</label>
-          <textarea id="wl-bulk-text" rows="5" required placeholder="Sony WH-1000XM5 Headphones target $249 for Dad [high]&#10;KitchenAid Artisan Stand Mixer under $329 for Mom&#10;LEGO Star Wars Millennium Falcon 75375 under $65 for Kids"></textarea>
+          <label for="uc-file-input">Choose File — Excel (.xlsx, .xls), CSV, TSV, PDF, Word (.docx/.doc), RTF, Text, HTML List, JSON, or Screenshot/Image (.png/.jpg/.webp)</label>
+          <input id="uc-file-input" type="file" accept=".xlsx,.xls,.csv,.tsv,.pdf,.docx,.doc,.rtf,.txt,.html,.htm,.json,image/*" required />
         </div>
-        <div class="field"><label for="wl-bulk-profile">Default Profile</label><select id="wl-bulk-profile">${profileOpts}</select></div>
-        <div class="field span-2" style="display:flex;align-items:flex-end;justify-content:flex-end;">
-          <button class="btn btn-primary" type="submit">+ Import Bulk List</button>
+        <div class="field"><label for="uc-profile">Assign to Family Profile</label><select id="uc-profile">${profileOpts}</select></div>
+        <div class="field"><label for="uc-recipient">Recipient (optional)</label><input id="uc-recipient" type="text" placeholder="e.g. Mom, Kids" /></div>
+        <div class="field"><label for="uc-priority">Monitoring Priority</label>
+          <select id="uc-priority"><option value="high">High (15 min)</option><option value="standard" selected>Standard</option><option value="low">Low</option></select>
+        </div>
+        <div class="field span-3" id="uc-screenshot-notes-wrap" style="display:none;">
+          <label for="uc-ocr-text">Screenshot Text / Deal Notes (e.g. "Sony WH-1000XM5 $249.99 at Best Buy" — optional, you can also edit in the preview table)</label>
+          <textarea id="uc-ocr-text" rows="2" placeholder="Optional: paste or type product name, retailer, price, or URL shown in the screenshot"></textarea>
+          <div id="uc-img-preview" style="margin-top:8px;"></div>
+        </div>
+        <div class="field span-3" style="display:flex;justify-content:flex-end;">
+          <button class="btn btn-primary" type="submit">🔍 Extract &amp; Preview ${isDeal ? 'Deals' : 'Wish-List Products'}</button>
         </div>
       </form>`;
-  } else if (mode === 'gift_idea') {
-    host.innerHTML = `
-      <form id="wl-gift-form" class="intake-grid">
-        <div class="field span-2"><label for="wl-gift-prompt">Describe a General Gift Idea *</label><input id="wl-gift-prompt" type="text" required placeholder="e.g. great Christmas gifts for a college student under $100" /></div>
-        <div class="field"><label for="wl-gift-profile">Save Under Profile</label><select id="wl-gift-profile">${profileOpts}</select></div>
-        <div class="field span-3" style="display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap;">
-          <button id="wl-gift-match-btn" class="btn" type="button">🔍 Preview Matching Live Deals</button>
-          <button class="btn btn-primary" type="submit">+ Save &amp; Track Gift Idea</button>
+  } else if (appState.uploadMode === 'bulk') {
+    stage.innerHTML = `
+      <form id="uc-bulk-form" class="intake-grid">
+        <div class="field span-3">
+          <label for="uc-bulk-text">Paste Copied List, Email, or Spreadsheet Rows (one item per line — extracts product, brand, model, price, retailer &amp; URL)</label>
+          <textarea id="uc-bulk-text" rows="6" required placeholder="JBL Clip 5 Bluetooth Speaker $50 Amazon https://www.amazon.com/dp/B0...&#10;Nike Air Pegasus 41 Size 10 Black target $95 for Dad [high]&#10;LEGO Star Wars Millennium Falcon 75375 under $65 for Kids"></textarea>
         </div>
-        <div id="wl-gift-results" class="span-3"></div>
+        <div class="field"><label for="uc-bulk-profile">Family Profile</label><select id="uc-bulk-profile">${profileOpts}</select></div>
+        <div class="field"><label for="uc-bulk-recipient">Default Recipient</label><input id="uc-bulk-recipient" type="text" placeholder="Optional" /></div>
+        <div class="field" style="display:flex;align-items:flex-end;justify-content:flex-end;">
+          <button class="btn btn-primary" type="submit" style="width:100%;">🔍 Extract &amp; Preview</button>
+        </div>
+      </form>`;
+  } else if (appState.uploadMode === 'urls') {
+    stage.innerHTML = `
+      <form id="uc-urls-form" class="intake-grid">
+        <div class="field span-3">
+          <label for="uc-urls-text">Paste One or Multiple Product URLs (one URL per line — inspects each link live)</label>
+          <textarea id="uc-urls-text" rows="5" required placeholder="https://www.amazon.com/dp/B09XS7JWHH&#10;https://www.target.com/p/...&#10;https://www.bestbuy.com/site/..."></textarea>
+        </div>
+        <div class="field"><label for="uc-urls-profile">Family Profile</label><select id="uc-urls-profile">${profileOpts}</select></div>
+        <div class="field"><label for="uc-urls-recipient">Default Recipient</label><input id="uc-urls-recipient" type="text" placeholder="Optional" /></div>
+        <div class="field" style="display:flex;align-items:flex-end;justify-content:flex-end;">
+          <button class="btn btn-primary" type="submit" style="width:100%;">🔍 Inspect URLs &amp; Preview</button>
+        </div>
+      </form>`;
+  } else {
+    stage.innerHTML = `
+      <form id="uc-manual-form" class="intake-grid">
+        <div class="field span-2"><label for="uc-m-name">Product Name *</label><input id="uc-m-name" type="text" required placeholder="e.g. Dyson V15 Detect Cordless Vacuum" /></div>
+        <div class="field"><label for="uc-m-profile">Family Profile</label><select id="uc-m-profile">${profileOpts}</select></div>
+        <div class="field"><label for="uc-m-brand">Brand</label><input id="uc-m-brand" type="text" placeholder="Auto-detected if blank" /></div>
+        <div class="field"><label for="uc-m-model">Model / SKU</label><input id="uc-m-model" type="text" placeholder="Optional" /></div>
+        <div class="field"><label for="uc-m-retailer">Retailer</label><input id="uc-m-retailer" type="text" placeholder="e.g. Target, Amazon, Nike" /></div>
+        <div class="field"><label for="uc-m-size">Size / Capacity</label><input id="uc-m-size" type="text" placeholder="e.g. Size M, 10.5, 256GB" /></div>
+        <div class="field"><label for="uc-m-color">Color</label><input id="uc-m-color" type="text" placeholder="e.g. Black, Midnight" /></div>
+        <div class="field"><label for="uc-m-price">${isDeal ? 'Deal Price ($) *' : 'Target Price ($)'}</label><input id="uc-m-price" type="number" step="0.01" ${isDeal ? 'required' : ''} placeholder="e.g. 149.99" /></div>
+        <div class="field span-2"><label for="uc-m-url">Product URL</label><input id="uc-m-url" type="url" placeholder="https://..." /></div>
+        <div class="field"><label for="uc-m-recipient">Recipient</label><input id="uc-m-recipient" type="text" placeholder="Who is this for?" /></div>
+        <div class="field span-3" style="display:flex;justify-content:flex-end;">
+          <button class="btn btn-primary" type="submit">✓ Preview &amp; Save ${isDeal ? 'Deal' : 'Wish-List Item'}</button>
+        </div>
       </form>`;
   }
+
+  renderUploadPreviewPanel();
+  renderUploadedFilesVault();
 }
 
+function renderUploadPreviewPanel() {
+  const panel = $('upload-preview-panel');
+  const prev = appState.uploadPreview;
+  if (!prev) {
+    panel.hidden = true;
+    return;
+  }
+  panel.hidden = false;
+  const isDeal = prev.uploadType === 'deal';
+  $('upload-preview-kicker').textContent = `${isDeal ? 'SAVING AS DISCOVERED DEALS' : 'SAVING TO MONITORED WISH LISTS'} · ${prev.items.length} Extracted · ${prev.duplicatesCount || 0} Duplicates · ${prev.needsReviewCount || 0} Flagged for Review`;
+  $('upload-preview-title').textContent = `Preview & Correct Before Saving${prev.filename ? ` (${prev.filename})` : ''}`;
+
+  const warn = $('upload-preview-warning');
+  if (prev.parseWarning) {
+    warn.hidden = false;
+    warn.textContent = prev.parseWarning;
+  } else {
+    warn.hidden = true;
+  }
+
+  const profileOpts = (appState.data?.profiles || []).map((p) => ({ id: p.id, label: `${p.icon || '👤'} ${p.name}` }));
+  $('upload-preview-table-host').innerHTML = `
+    <table class="data-table preview-table">
+      <thead>
+        <tr>
+          <th>Keep</th>
+          <th>Product Name</th>
+          <th>Brand / Model</th>
+          <th>Size / Color</th>
+          <th>${isDeal ? 'Deal $' : 'Target $'}</th>
+          <th>Retailer</th>
+          <th>Product URL</th>
+          <th>Profile</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>${prev.items.map((it, idx) => `
+        <tr class="${it.needsReview ? 'preview-row-warn' : ''} ${it.isDuplicate ? 'preview-row-dup' : ''}" data-pidx="${idx}">
+          <td><input type="checkbox" class="pv-sel" ${it.selected ? 'checked' : ''} style="width:auto;" /></td>
+          <td><input type="text" class="pv-name" value="${esc(it.name)}" style="min-width:190px;" /></td>
+          <td>
+            <input type="text" class="pv-brand" value="${esc(it.brand || '')}" placeholder="Brand" style="margin-bottom:4px;min-width:100px;" />
+            <input type="text" class="pv-model" value="${esc(it.modelNumber || '')}" placeholder="Model" style="min-width:100px;" />
+          </td>
+          <td>
+            <input type="text" class="pv-size" value="${esc(it.size || '')}" placeholder="Size" style="margin-bottom:4px;min-width:80px;" />
+            <input type="text" class="pv-color" value="${esc(it.color || '')}" placeholder="Color" style="min-width:80px;" />
+          </td>
+          <td><input type="number" step="0.01" class="pv-price" value="${it.price ?? ''}" placeholder="$" style="width:88px;" /></td>
+          <td><input type="text" class="pv-retailer" value="${esc(it.retailerName || '')}" placeholder="Store" style="min-width:105px;" /></td>
+          <td><input type="text" class="pv-url" value="${esc(it.url || '')}" placeholder="https://..." style="min-width:150px;" /></td>
+          <td>
+            <select class="pv-profile" style="min-width:125px;">
+              ${profileOpts.map((po) => `<option value="${esc(po.id)}" ${it.profileId === po.id ? 'selected' : ''}>${esc(po.label)}</option>`).join('')}
+            </select>
+          </td>
+          <td class="small">
+            ${it.isDuplicate ? `<span class="badge badge-danger" title="${esc(it.duplicateReason || '')}">Duplicate</span>` : ''}
+            ${it.needsReview ? `<span class="badge badge-good" title="${esc(it.reviewReason || '')}">Check</span><div class="muted" style="font-size:10.5px;">${esc(it.reviewReason || '')}</div>` : (!it.isDuplicate ? '<span class="badge badge-exceptional">Ready</span>' : '')}
+          </td>
+        </tr>`).join('')}
+      </tbody>
+    </table>`;
+}
+
+function collectPreviewItemsFromDom() {
+  const prev = appState.uploadPreview;
+  if (!prev) return [];
+  const rows = [...document.querySelectorAll('#upload-preview-table-host tbody tr[data-pidx]')];
+  return rows.map((tr) => {
+    const base = prev.items[Number(tr.dataset.pidx)] || {};
+    return {
+      ...base,
+      selected: tr.querySelector('.pv-sel')?.checked ?? true,
+      name: tr.querySelector('.pv-name')?.value?.trim() || base.name,
+      brand: tr.querySelector('.pv-brand')?.value?.trim() || '',
+      modelNumber: tr.querySelector('.pv-model')?.value?.trim() || '',
+      size: tr.querySelector('.pv-size')?.value?.trim() || '',
+      color: tr.querySelector('.pv-color')?.value?.trim() || '',
+      price: tr.querySelector('.pv-price')?.value ? Number(tr.querySelector('.pv-price').value) : null,
+      retailerName: tr.querySelector('.pv-retailer')?.value?.trim() || '',
+      url: tr.querySelector('.pv-url')?.value?.trim() || '',
+      profileId: tr.querySelector('.pv-profile')?.value || base.profileId || 'family-main',
+    };
+  });
+}
+
+function renderUploadedFilesVault() {
+  const files = appState.data?.uploadedFiles || [];
+  const host = $('uploaded-files-vault');
+  if (!files.length) {
+    host.innerHTML = '<div class="small muted">No files uploaded yet. Every Excel sheet, CSV, PDF, Word doc, screenshot, or text list you upload is preserved here permanently.</div>';
+    return;
+  }
+  host.innerHTML = `
+    <table class="data-table">
+      <thead><tr><th>File Name</th><th>Type</th><th>Extracted</th><th>Size</th><th>Uploaded</th><th>Notes / Action</th></tr></thead>
+      <tbody>${files.map((f) => `
+        <tr>
+          <td><strong>${esc(f.filename)}</strong></td>
+          <td><span class="badge ${f.uploadType === 'deal' ? 'badge-good' : 'badge-great'}">${esc(f.uploadType)}</span></td>
+          <td class="tabular">${esc(f.extractedCount)} items</td>
+          <td class="tabular small muted">${Math.max(1, Math.round((f.sizeBytes || 0) / 1024))} KB</td>
+          <td class="small tabular">${esc(formatClock(f.uploadedAt))}</td>
+          <td>
+            ${f.parseWarning ? `<div class="small" style="color:var(--accent-gold);margin-bottom:4px;">${esc(f.parseWarning)}</div>` : ''}
+            <a class="btn btn-sm" href="/api/black-friday/uploads/${encodeURIComponent(f.id)}" target="_blank" rel="noopener noreferrer">Open Original ↗</a>
+          </td>
+        </tr>`).join('')}
+      </tbody>
+    </table>`;
+}
+
+/* ==================== 3. WISH LISTS & USER-SAVED DEALS ==================== */
 function renderWishlistsView() {
   const d = appState.data;
   if (!d) return;
-  renderIntakePanel();
 
   const profiles = d.profiles || [];
-  const tabsHtml = [
-    `<button class="pill-tab ${appState.selectedProfileId === 'all' ? 'is-active' : ''}" data-profile="all" type="button">All Lists (${d.wishlist.length})</button>`,
+  $('profile-tabs').innerHTML = [
+    `<button class="pill-tab ${appState.selectedProfileId === 'all' ? 'is-active' : ''}" data-profile="all" type="button">All Family Lists (${d.wishlist.length})</button>`,
     ...profiles.map((p) => {
       const cnt = d.wishlist.filter((w) => w.profileId === p.id).length;
-      return `<button class="pill-tab ${appState.selectedProfileId === p.id ? 'is-active' : ''}" data-profile="${esc(p.id)}" type="button">${esc(p.icon || '🎁')} ${esc(p.name)} (${cnt})</button>`;
+      return `<button class="pill-tab ${appState.selectedProfileId === p.id ? 'is-active' : ''}" data-profile="${esc(p.id)}" type="button">${esc(p.icon || '👤')} ${esc(p.name)} (${cnt})</button>`;
     }),
   ].join('');
-  $('profile-tabs').innerHTML = tabsHtml;
 
   let items = [...d.wishlist];
   if (appState.selectedProfileId !== 'all') items = items.filter((w) => w.profileId === appState.selectedProfileId);
@@ -505,467 +633,147 @@ function renderWishlistsView() {
 
   const container = $('wishlist-container');
   if (!items.length) {
-    container.innerHTML = `<div class="chart-empty"><div class="chart-empty-title">No items in this wish list yet</div><p class="muted">Use any of the 7 intake tabs above to add products, links, screenshots, spreadsheets, or gift ideas.</p></div>`;
-    return;
-  }
-
-  container.innerHTML = items.map((item) => {
-    const thumb = item.bestOffer?.imageUrl || item.imageUrl || item.screenshotThumbnail;
-    const best = item.bestOffer;
-    return `
-      <article class="wishlist-card" data-wl-id="${esc(item.id)}">
-        <div class="wishlist-thumb">
-          ${thumb ? `<img src="${esc(thumb)}" alt="${esc(item.name)}" loading="lazy" />` : `<span style="font-size:28px;">${CAT_ICONS[item.category] || '🎁'}</span>`}
-        </div>
-        <div>
-          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px;">
-            <strong style="font-size:15.5px;">${esc(item.name)}</strong>
-            <span class="badge ${item.priority === 'high' ? 'badge-danger' : item.priority === 'low' ? 'badge-watch' : 'badge-great'}">${esc(item.priority)} priority</span>
-            ${item.isGiftIdea ? '<span class="badge badge-local">💡 Gift Idea</span>' : ''}
-            ${item.recipient ? `<span class="badge badge-watch">For: ${esc(item.recipient)}</span>` : ''}
-          </div>
-          <div class="small muted" style="margin-bottom:6px;">
-            ${esc([item.brand, item.modelNumber ? `Model: ${item.modelNumber}` : null, item.upc ? `UPC: ${item.upc}` : null, item.asin ? `ASIN: ${item.asin}` : null, item.color, item.size, item.specs].filter(Boolean).join(' · ') || 'Auto-normalized tracking active')}
-          </div>
-          <div style="display:flex;gap:14px;flex-wrap:wrap;font-size:12.5px;margin-bottom:8px;" class="tabular">
-            <span>Target: <strong>${money(item.preferredPrice)}</strong></span>
-            <span>Max: <strong>${money(item.maxPrice)}</strong></span>
-            <span>Matched Offers: <strong>${esc(item.matchedOffersCount)}</strong></span>
-            <span>Last Checked: <strong>${esc(timeAgo(item.lastCheckedAt))}</strong></span>
-          </div>
-          ${best ? `
-            <div class="deal-why" style="margin-bottom:8px;">
-              <strong>Best Verified Offer:</strong> ${money(best.currentPrice)} (Est. ${money(best.finalAllInTotal)} all-in) at <strong>${esc(best.retailerName)}</strong>
-              ${best.verifiedDiscountPct != null ? ` · <span class="badge badge-${esc(best.tier)}">${best.verifiedDiscountPct}% OFF</span>` : ''}
-              · <a href="${esc(best.retailerUrl)}" target="_blank" rel="noopener noreferrer" style="color:var(--accent-cyan);font-weight:700;">Open Deal ↗</a>
-            </div>` : `<div class="small muted" style="margin-bottom:8px;">No exact live feed match yet — background monitor searches continuously every ${item.priority === 'high' ? '15 min' : 'cycle'}.</div>`}
-          ${item.notes ? `<div class="small muted">${esc(item.notes)}</div>` : ''}
-        </div>
-        <div class="wishlist-card-actions" style="display:flex;flex-direction:column;gap:6px;min-width:155px;">
-          <select class="wl-status-select" data-wl-id="${esc(item.id)}" aria-label="Item status">
-            ${['wanted', 'monitoring', 'deal_found', 'purchased', 'no_longer_interested'].map((st) => `<option value="${st}" ${item.status === st ? 'selected' : ''}>${st.replace(/_/g, ' ')}</option>`).join('')}
-          </select>
-          <button class="btn btn-sm btn-primary" data-wl-search="${esc(item.id)}" type="button">🔍 Search Live Now</button>
-          <button class="btn btn-sm" data-wl-alts="${esc(item.id)}" type="button">💡 Alternatives</button>
-          <button class="btn btn-sm" data-action="history" data-key="${esc(best?.canonicalKey || item.canonicalKey)}" type="button">📈 History (${esc(item.historyCount)})</button>
-          <button class="btn btn-sm btn-danger" data-wl-delete="${esc(item.id)}" type="button">Remove</button>
-        </div>
-      </article>`;
-  }).join('');
-}
-
-/* ==================== BEST DEALS VIEW ==================== */
-function renderBestDealsView() {
-  const d = appState.data;
-  if (!d) return;
-
-  // Populate retailer dropdown cleanly
-  const retSel = $('filter-retailer');
-  const existingVal = appState.filters.retailer;
-  const activeRetMap = new Map();
-  for (const deal of d.deals) activeRetMap.set(deal.retailerId, deal.retailerName);
-  retSel.innerHTML = `<option value="all">All Retailers (${activeRetMap.size})</option>` +
-    [...activeRetMap.entries()].sort((a, b) => a[1].localeCompare(b[1])).map(([id, name]) => `<option value="${esc(id)}">${esc(name)}</option>`).join('');
-  retSel.value = activeRetMap.has(existingVal) ? existingVal : 'all';
-
-  $('filter-q').value = appState.filters.q;
-  $('filter-tier').value = appState.filters.tier;
-  $('filter-category').value = appState.filters.category;
-  $('filter-sort').value = appState.filters.sort;
-  $('filter-max-price').value = appState.filters.maxPrice;
-  $('filter-free-ship').checked = Boolean(appState.filters.freeShip);
-  $('filter-new-only').checked = Boolean(appState.filters.newOnly);
-  $('filter-local-only').checked = Boolean(appState.filters.localOnly);
-
-  let list = [...d.deals];
-  const f = appState.filters;
-  if (f.q.trim()) {
-    const q = f.q.trim().toLowerCase();
-    list = list.filter((x) => `${x.title} ${x.brand || ''} ${x.modelNumber || ''} ${x.retailerName} ${x.description || ''}`.toLowerCase().includes(q));
-  }
-  if (f.tier !== 'all') list = list.filter((x) => x.tier === f.tier);
-  if (f.retailer !== 'all') list = list.filter((x) => x.retailerId === f.retailer);
-  if (f.category !== 'all') list = list.filter((x) => x.category === f.category);
-  if (f.maxPrice && Number(f.maxPrice) > 0) list = list.filter((x) => x.currentPrice !== null && x.currentPrice <= Number(f.maxPrice));
-  if (f.freeShip) list = list.filter((x) => x.shippingFree);
-  if (f.newOnly) list = list.filter((x) => x.condition === 'new');
-  if (f.localOnly) list = list.filter((x) => x.localPickupKnightdale === 'available' || x.localPickupKnightdale === 'check_store');
-
-  if (f.sort === 'discount') list.sort((a, b) => (b.verifiedDiscountPct ?? -1) - (a.verifiedDiscountPct ?? -1));
-  else if (f.sort === 'price_asc') list.sort((a, b) => (a.finalAllInTotal ?? 1e9) - (b.finalAllInTotal ?? 1e9));
-  else if (f.sort === 'price_desc') list.sort((a, b) => (b.finalAllInTotal ?? -1) - (a.finalAllInTotal ?? -1));
-  else if (f.sort === 'newest') list.sort((a, b) => Date.parse(b.publishedAt || 0) - Date.parse(a.publishedAt || 0));
-  else list.sort((a, b) => (b.decision?.score ?? 0) - (a.decision?.score ?? 0));
-
-  $('deals-count-label').textContent = `${list.length} verified deal${list.length === 1 ? '' : 's'} shown`;
-  const grid = $('best-deals-grid');
-  grid.innerHTML = list.length
-    ? list.slice(0, 80).map((deal) => renderDealCardHtml(deal)).join('')
-    : '<div class="chart-empty" style="grid-column:1/-1;"><div class="chart-empty-title">No deals match your current filters</div><p class="muted">Adjust or reset filters above to view all live verified deals.</p></div>';
-}
-
-/* ==================== BLACK FRIDAY LIVE VIEW ==================== */
-function formatCountdownParts(targetIso) {
-  const diff = Math.max(0, Date.parse(targetIso) - Date.now());
-  const d = Math.floor(diff / 86400000);
-  const h = Math.floor((diff % 86400000) / 3600000);
-  const m = Math.floor((diff % 3600000) / 60000);
-  const s = Math.floor((diff % 60000) / 1000);
-  return { live: diff === 0, d, h, m, s };
-}
-
-function renderBlackFridayLiveView() {
-  const d = appState.data;
-  if (!d) return;
-
-  const bfEvent = d.events.find((e) => e.id === 'black-friday-2026');
-  const cmEvent = d.events.find((e) => e.id === 'cyber-monday-2026');
-
-  const drawCountdowns = () => {
-    const cards = [
-      { label: 'Black Friday 2026 · Nov 27', event: bfEvent },
-      { label: 'Cyber Monday 2026 · Nov 30', event: cmEvent },
-    ];
-    $('bf-countdowns').innerHTML = cards.map(({ label, event }) => {
-      const p = formatCountdownParts(event?.startsAt || '2026-11-27T05:00:00Z');
+    container.innerHTML = `<div class="onboarding-box"><h3>No wish-list products here yet</h3><p>Click "+ Upload Wish List" to import Excel, CSV, PDF, Word, screenshots, URLs, or type products.</p><button class="btn btn-primary" data-open-upload="wishlist" type="button">+ Add Wish List</button></div>`;
+  } else {
+    container.innerHTML = items.map((item) => {
+      const thumb = item.bestOffer?.imageUrl || item.imageUrl || item.screenshotThumbnail;
+      const best = item.bestOffer;
       return `
-        <div class="countdown-card">
-          <div class="section-kicker">${p.live ? 'EVENT ACTIVE NOW' : 'CONFIRMED COUNTDOWN'}</div>
-          <h2 style="margin:0;">${esc(label)}</h2>
-          <div class="small muted">${esc(event?.summary || '')}</div>
-          <div class="countdown-digits tabular">
-            <div class="cd-box"><div class="cd-num">${String(p.d).padStart(2, '0')}</div><div class="cd-unit">Days</div></div>
-            <div class="cd-box"><div class="cd-num">${String(p.h).padStart(2, '0')}</div><div class="cd-unit">Hours</div></div>
-            <div class="cd-box"><div class="cd-num">${String(p.m).padStart(2, '0')}</div><div class="cd-unit">Mins</div></div>
-            <div class="cd-box"><div class="cd-num">${String(p.s).padStart(2, '0')}</div><div class="cd-unit">Secs</div></div>
+        <article class="wishlist-card" data-wl-id="${esc(item.id)}">
+          <div class="wishlist-thumb">
+            ${thumb ? `<img src="${esc(thumb)}" alt="${esc(item.name)}" loading="lazy" />` : `<span style="font-size:28px;">${CAT_ICONS[item.category] || '🎁'}</span>`}
           </div>
-        </div>`;
+          <div>
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px;">
+              <strong style="font-size:15.5px;">${esc(item.name)}</strong>
+              <span class="badge ${item.priority === 'high' ? 'badge-danger' : 'badge-great'}">${esc(item.priority)}</span>
+              ${item.recipient ? `<span class="badge badge-watch">For: ${esc(item.recipient)}</span>` : ''}
+            </div>
+            <div class="small muted" style="margin-bottom:6px;">
+              ${esc([item.brand, item.modelNumber ? `Model: ${item.modelNumber}` : null, item.size, item.color, item.retailerName].filter(Boolean).join(' · '))}
+            </div>
+            <div style="display:flex;gap:14px;flex-wrap:wrap;font-size:12.5px;margin-bottom:8px;" class="tabular">
+              <span>Target: <strong>${money(item.preferredPrice)}</strong></span>
+              <span>Max: <strong>${money(item.maxPrice)}</strong></span>
+              <span>Live Matches: <strong>${esc(item.matchedOffersCount)}</strong></span>
+              <span>Last Checked: <strong>${esc(timeAgo(item.lastCheckedAt))}</strong></span>
+            </div>
+            ${best ? `
+              <div class="deal-why" style="margin-bottom:8px;">
+                <strong>Best Verified Match:</strong> ${money(best.currentPrice)} (Est. ${money(best.finalAllInTotal)} all-in) at <strong>${esc(best.retailerName)}</strong>
+                ${best.verifiedDiscountPct != null ? ` · <span class="badge badge-${esc(best.tier)}">${best.verifiedDiscountPct}% OFF</span>` : ''}
+                · <a href="${esc(best.retailerUrl)}" target="_blank" rel="noopener noreferrer" style="color:var(--accent-cyan);font-weight:800;">${best.isDirectProductUrl ? 'SHOP NOW ↗' : 'View Deal ↗'}</a>
+              </div>` : `<div class="small muted" style="margin-bottom:8px;">Monitoring continuously across authorized feeds${item.sourceUrl ? ` · <a href="${esc(item.sourceUrl)}" target="_blank" rel="noopener noreferrer" style="color:var(--accent-cyan);">Open Saved Product Link ↗</a>` : ''}</div>`}
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px;">
+              <label class="small muted">Move to profile:</label>
+              <select class="wl-move-select" data-wl-id="${esc(item.id)}" style="width:auto;padding:4px 8px;font-size:12px;">
+                ${profiles.map((p) => `<option value="${esc(p.id)}" ${p.id === item.profileId ? 'selected' : ''}>${esc(p.icon || '👤')} ${esc(p.name)}</option>`).join('')}
+              </select>
+            </div>
+          </div>
+          <div class="wishlist-card-actions" style="display:flex;flex-direction:column;gap:6px;min-width:155px;">
+            <select class="wl-status-select" data-wl-id="${esc(item.id)}" aria-label="Item status">
+              ${['wanted', 'monitoring', 'deal_found', 'purchased', 'no_longer_interested'].map((st) => `<option value="${st}" ${item.status === st ? 'selected' : ''}>${st.replace(/_/g, ' ')}</option>`).join('')}
+            </select>
+            <button class="btn btn-sm btn-primary" data-wl-search="${esc(item.id)}" type="button">🔍 Check Prices Now</button>
+            <button class="btn btn-sm" data-wl-alts="${esc(item.id)}" type="button">💡 Alternatives</button>
+            <button class="btn btn-sm" data-action="history" data-key="${esc(best?.canonicalKey || item.canonicalKey)}" type="button">📈 History (${esc(item.historyCount)})</button>
+            <button class="btn btn-sm btn-danger" data-wl-delete="${esc(item.id)}" type="button">Remove</button>
+          </div>
+        </article>`;
     }).join('');
-  };
-  drawCountdowns();
-  if (appState.countdownTimer) clearInterval(appState.countdownTimer);
-  appState.countdownTimer = setInterval(() => {
-    if (appState.activeView === 'black-friday-live') drawCountdowns();
-  }, 1000);
+  }
 
-  const nowMs = Date.now();
-  $('bf-timeline').innerHTML = d.events.map((ev) => {
-    const start = Date.parse(ev.startsAt);
-    const end = Date.parse(ev.endsAt);
-    const status = nowMs >= start && nowMs <= end ? 'LIVE NOW' : nowMs > end ? 'Ended' : 'Upcoming';
+  // Render User-Uploaded Saved Deals (UPLOAD DEALS)
+  const sdHost = $('saved-deals-container');
+  const savedDeals = d.savedDeals || [];
+  if (!savedDeals.length) {
+    sdHost.innerHTML = '<div class="small muted">No uploaded deals saved yet. Use <strong>+ UPLOAD DEALS</strong> to save screenshots, links, or lists of deals you discover yourself — we preserve the original retailer, price, URL, and date forever.</div>';
+  } else {
+    sdHost.innerHTML = savedDeals.map((sd) => {
+      const changed = sd.originalUploadedPrice != null && sd.currentPrice != null && sd.currentPrice !== sd.originalUploadedPrice;
+      const storeMeta = getStoreMeta(sd.retailerId);
+      return `
+        <article class="wishlist-card">
+          <div class="wishlist-thumb">
+            ${sd.imageUrl || sd.screenshotThumbnail ? `<img src="${esc(sd.imageUrl || sd.screenshotThumbnail)}" alt="${esc(sd.name)}" loading="lazy" />` : `<span style="font-size:26px;">🏷️</span>`}
+          </div>
+          <div>
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px;">
+              ${renderStoreAvatar(storeMeta || { name: sd.retailerName }, true)}
+              <strong>${esc(sd.name)}</strong>
+              <span class="badge badge-good">${esc(sd.retailerName || 'Saved Deal')}</span>
+            </div>
+            <div style="display:flex;gap:14px;flex-wrap:wrap;font-size:13px;margin:6px 0;" class="tabular">
+              <span>Current Price: <strong style="color:var(--accent-emerald);">${money(sd.currentPrice)}</strong></span>
+              <span>Original Uploaded: <strong>${money(sd.originalUploadedPrice)}</strong> (${esc(formatClock(sd.uploadedAt))})</span>
+              ${changed ? `<span class="badge badge-great">Price Changed — History Preserved (${sd.priceHistory?.length || 1} pts)</span>` : ''}
+            </div>
+            ${sd.notes ? `<div class="small muted">${esc(sd.notes)}</div>` : ''}
+          </div>
+          <div class="wishlist-card-actions" style="display:flex;flex-direction:column;gap:6px;min-width:140px;">
+            ${sd.url ? `<a class="btn btn-sm btn-primary" href="${esc(sd.url)}" target="_blank" rel="noopener noreferrer">SHOP NOW ↗</a>` : ''}
+            ${sd.uploadFileId ? `<a class="btn btn-sm" href="/api/black-friday/uploads/${encodeURIComponent(sd.uploadFileId)}" target="_blank" rel="noopener noreferrer">Original File ↗</a>` : ''}
+            <button class="btn btn-sm btn-danger" data-sd-delete="${esc(sd.id)}" type="button">Delete</button>
+          </div>
+        </article>`;
+    }).join('');
+    attachLogoFallbacks(sdHost);
+  }
+}
+
+/* ==================== 4. FAMILY SHOPPING PROFILES (PRIORITY 4) ==================== */
+function renderProfilesView() {
+  const d = appState.data;
+  if (!d) return;
+
+  $('profiles-grid').innerHTML = (d.profiles || []).map((prof) => {
+    const items = d.wishlist.filter((w) => w.profileId === prof.id);
+    const bought = items.filter((w) => w.status === 'purchased');
     return `
-      <div class="timeline-card ${status === 'LIVE NOW' ? 'is-live' : ''}">
-        <div style="display:flex;justify-content:space-between;gap:6px;margin-bottom:5px;">
-          <strong>${esc(ev.name)}</strong>
-          <span class="badge ${status === 'LIVE NOW' ? 'badge-exceptional' : status === 'Ended' ? 'badge-watch' : 'badge-great'}">${esc(status)}</span>
+      <div class="profile-card" data-prof-id="${esc(prof.id)}">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
+          <div style="font-size:17px;font-weight:800;">${esc(prof.icon || '👤')} ${esc(prof.name)}</div>
+          <span class="badge badge-great tabular">Budget: ${money(prof.budget)}</span>
         </div>
-        <div class="small muted tabular" style="margin-bottom:5px;">${esc(ev.startsAt.slice(0, 10))} → ${esc(ev.endsAt.slice(0, 10))}</div>
-        <div class="small">${esc(ev.summary)}</div>
+        <div class="small muted">${esc(items.length)} wish-list items · ${esc(bought.length)} purchased</div>
+
+        <div class="field"><label>Favorite Brands (comma-separated)</label><input type="text" class="pf-brands" value="${esc((prof.favoriteBrands || []).join(', '))}" placeholder="e.g. Nike, Apple, Lululemon" /></div>
+        <div class="field"><label>Interests &amp; Hobbies (comma-separated)</label><input type="text" class="pf-interests" value="${esc((prof.interests || []).join(', '))}" placeholder="e.g. golf, espresso, LEGO, skincare" /></div>
+        <div class="field"><label>Clothing / Shoe Sizes</label><input type="text" class="pf-sizes" value="${esc(prof.clothingSizes || '')}" placeholder="e.g. Shirt L, Shoes 10.5" /></div>
+        <div class="field"><label>Preferred Retailers (comma-separated)</label><input type="text" class="pf-retailers" value="${esc((prof.preferredRetailers || []).join(', '))}" placeholder="e.g. target, nike, sephora" /></div>
+        <div class="field"><label>Gift Budget ($)</label><input type="number" class="pf-budget" value="${esc(prof.budget || 300)}" min="1" /></div>
+        <div class="field"><label>Saved Ideas (comma-separated)</label><input type="text" class="pf-ideas" value="${esc((prof.savedIdeas || []).join(', '))}" placeholder="Gift notes or ideas" /></div>
+
+        ${prof.dislikedProducts?.length ? `<div class="small muted"><strong>Disliked Products:</strong> ${esc(prof.dislikedProducts.join(', '))}</div>` : ''}
+        <div style="display:flex;gap:8px;justify-content:space-between;margin-top:4px;">
+          <button class="btn btn-sm btn-primary" data-save-profile="${esc(prof.id)}" type="button">Save Profile</button>
+          ${prof.id !== 'family-main' ? `<button class="btn btn-sm btn-danger" data-del-profile="${esc(prof.id)}" type="button">Delete</button>` : ''}
+        </div>
       </div>`;
   }).join('');
-
-  let list = [];
-  if (appState.bfSubtab === 'archived') {
-    list = d.archivedDeals || [];
-  } else {
-    list = d.deals.filter((x) => {
-      if (appState.bfSubtab === 'early') return x.isEarlyBlackFriday || x.isBlackFriday;
-      if (appState.bfSubtab === 'cyber') return x.isCyberMonday;
-      if (appState.bfSubtab === 'doorbuster') return x.isDoorbuster || (x.verifiedDiscountPct != null && x.verifiedDiscountPct >= 35);
-      if (appState.bfSubtab === 'online') return x.localPickupKnightdale === 'online_only';
-      if (appState.bfSubtab === 'local') return x.localPickupKnightdale === 'available' || x.localPickupKnightdale === 'check_store';
-      return x.isBlackFriday || x.isEarlyBlackFriday || x.isCyberMonday || x.isDoorbuster || (x.verifiedDiscountPct != null && x.verifiedDiscountPct >= 25);
-    });
-  }
-
-  $('bf-deals-grid').innerHTML = list.length
-    ? list.slice(0, 60).map((deal) => renderDealCardHtml(deal)).join('')
-    : `<div class="chart-empty" style="grid-column:1/-1;"><div class="chart-empty-title">No deals currently in this event filter</div><p class="muted">Deals populate automatically as verified holiday promotions go live.</p></div>`;
 }
 
-/* ==================== DEAL HUNTER VIEW ==================== */
-function renderDealHunterView() {
-  const d = appState.data;
-  if (!d) return;
-  const h = d.hunter || { learnedSignals: {}, recommendations: [] };
-  const sig = h.learnedSignals || {};
-
-  $('hunter-signals').innerHTML = `
-    <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
-      <span class="badge badge-great">Comfort Budget ≤ ${money(sig.comfortMaxBudget || 300)}</span>
-      <span class="badge badge-exceptional">Saved Signals: ${esc(sig.savedCount || 0)}</span>
-      <span class="badge badge-watch">Dismissed: ${esc(sig.rejectedCount || 0)}</span>
-      ${(sig.preferredBrands || []).map((b) => `<span class="badge badge-local">Brand: ${esc(b)}</span>`).join('')}
-      ${(sig.activeCategories || []).map((c) => `<span class="badge badge-good">Category: ${esc(c)}</span>`).join('')}
-      ${!(sig.preferredBrands?.length || sig.activeCategories?.length) ? '<span class="small muted">Add items to your Family Wish Lists or save recommendations below to sharpen Deal Hunter learning.</span>' : ''}
-    </div>`;
-
-  let recs = h.recommendations || [];
-  if (appState.hunterTag !== 'all') {
-    recs = recs.filter((r) => (r.discoveryTags || []).includes(appState.hunterTag) || (appState.hunterTag === 'refurbished' && (r.discoveryTags || []).includes('open_box')));
-  }
-
-  $('hunter-grid').innerHTML = recs.length
-    ? recs.slice(0, 40).map((rec) => renderDealCardHtml(rec.deal, {
-        showHunterWhy: rec.whyFamilyWouldWantThis,
-        hunterMeta: { saved: rec.saved, score: rec.hunterScore },
-      })).join('')
-    : '<div class="chart-empty" style="grid-column:1/-1;"><div class="chart-empty-title">No discoveries match this opportunity tag yet</div><p class="muted">Select "All Discoveries" or run a live sweep to scan for fresh family bargains.</p></div>';
-}
-
-/* ==================== COMPARE & SMARTER ALTERNATIVES VIEW ==================== */
-async function renderCompareView() {
-  const d = appState.data;
-  if (!d) return;
-
-  // 1. Smarter Alternatives selector
-  const wlSel = $('alt-wishlist-select');
-  if (!d.wishlist.length) {
-    wlSel.innerHTML = '<option value="">Add a wish-list item first</option>';
-    $('alternatives-stage').innerHTML = '<div class="chart-empty"><div class="chart-empty-title">No wish-list items yet</div><p class="muted">Add a product in "Our Wish Lists" to automatically discover Same Product Better Price, Better Product Similar Price, and Similar Product Much Lower Price alternatives.</p></div>';
-  } else {
-    wlSel.innerHTML = d.wishlist.map((w) => `<option value="${esc(w.id)}">${esc(w.name)}${w.preferredPrice ? ` (Target ${money(w.preferredPrice)})` : ''}</option>`).join('');
-    if (!appState.altWishlistId || !d.wishlist.some((w) => w.id === appState.altWishlistId)) {
-      appState.altWishlistId = d.wishlist[0].id;
-    }
-    wlSel.value = appState.altWishlistId;
-
-    try {
-      const alts = await api(`/api/black-friday/alternatives/${encodeURIComponent(appState.altWishlistId)}`);
-      const renderBucket = (title, kicker, items) => `
-        <div style="margin-bottom:16px;">
-          <div class="section-kicker">${esc(kicker)}</div>
-          <h3 style="margin:2px 0 10px;">${esc(title)} (${items.length})</h3>
-          ${items.length ? `<div class="deals-grid">${items.map((a) => `
-            <div class="deal-card">
-              <div class="deal-body">
-                <div class="deal-meta-row">
-                  <span class="retailer-tag">${esc(a.retailerName)}</span>
-                  ${a.savings > 0 ? `<span class="badge badge-exceptional tabular">Save ${money(a.savings)}</span>` : '<span class="badge badge-great">Comparable Price</span>'}
-                </div>
-                <h4 class="deal-title">${esc(a.name)}</h4>
-                <div class="tabular"><strong style="font-size:20px;color:var(--accent-emerald);">${money(a.currentPrice)}</strong> <span class="small muted">(Est. ${money(a.finalAllInTotal)} all-in)</span></div>
-                <div class="deal-why"><strong>Why recommended:</strong> ${esc(a.reason)}</div>
-                <div class="small"><strong>Differences:</strong> ${esc(a.differences)}</div>
-                <div class="small" style="color:var(--accent-emerald);"><strong>Pros:</strong> ${esc((a.advantages || []).join(' · '))}</div>
-                <div class="small muted"><strong>Cons:</strong> ${esc((a.disadvantages || []).join(' · '))}</div>
-                <div class="deal-actions">
-                  <a class="btn btn-primary btn-sm" href="${esc(a.retailerUrl)}" target="_blank" rel="noopener noreferrer">Open Offer ↗</a>
-                  <button class="btn btn-sm" data-action="compare" data-deal-id="${esc(a.dealId)}" type="button">⚖️ Compare</button>
-                </div>
-              </div>
-            </div>`).join('')}</div>` : `<div class="small muted">No verified live offers currently qualify for this bucket — the engine re-checks automatically every sweep.</div>`}
-        </div>`;
-
-      $('alternatives-stage').innerHTML =
-        renderBucket('Same Product, Better Price', 'Identical Model / Identifier Cross-Retailer Savings', alts.same_better_price || []) +
-        renderBucket('Better Product, Similar Price', 'Higher Verified Quality or Retail Tier at Comparable Cost', alts.better_similar_price || []) +
-        renderBucket('Similar Product, Much Lower Price', 'Verified Lower-Cost Category Alternatives (≥ 20% Less)', alts.similar_lower_price || []);
-    } catch (e) {
-      $('alternatives-stage').innerHTML = `<div class="small muted">Could not load alternatives: ${esc(e.message)}</div>`;
-    }
-  }
-
-  // 2. Side-by-side Comparison Matrix
-  const addSel = $('compare-add-select');
-  addSel.innerHTML = d.deals.slice(0, 80).map((x) => `<option value="${esc(x.id)}">${esc(x.retailerName)} — ${esc(x.title.slice(0, 62))} (${money(x.currentPrice)})</option>`).join('');
-
-  const selectedDeals = appState.compareDealIds
-    .map((id) => d.deals.find((x) => x.id === id))
-    .filter(Boolean);
-
-  const matrixEl = $('compare-matrix');
-  if (!selectedDeals.length) {
-    matrixEl.innerHTML = '<div class="chart-empty"><div class="chart-empty-title">Select 2 to 4 deals to compare side-by-side</div><p class="muted">Click the ⚖️ button on any deal card anywhere in the dashboard or add one from the dropdown above.</p></div>';
-    return;
-  }
-
-  const rows = [
-    ['Retailer', (x) => `<strong>${esc(x.retailerName)}</strong>`],
-    ['Current Price', (x) => `<strong class="tabular" style="font-size:18px;color:var(--accent-emerald);">${money(x.currentPrice)}</strong>`],
-    ['Normal Baseline', (x) => `<span class="tabular">${money(x.normalPrice)}</span><div class="small muted">${esc(x.baselineLabel)}</div>`],
-    ['Verified Discount', (x) => x.verifiedDiscountPct != null ? `<span class="badge badge-${esc(x.tier)} tabular">${x.verifiedDiscountPct}% OFF (-${money(x.estimatedSavings)})</span>` : '<span class="badge badge-unverified">Unknown</span>'],
-    ['Shipping + NC 7.25% Tax', (x) => `<span class="tabular">${x.shippingFree ? 'Free ship' : x.shippingCost != null ? money(x.shippingCost) : 'Verify'} + ${money(x.estimatedTax)} tax</span>`],
-    ['Final Est. All-In Total', (x) => `<strong class="tabular">${money(x.finalAllInTotal)}</strong>${x.cashbackPercent ? `<div class="small" style="color:var(--accent-emerald);">After ~${x.cashbackPercent}% CB: ${money(x.effectiveAfterCashback)}</div>` : ''}`],
-    ['Decision Score & Advice', (x) => `<strong class="tabular">${x.decision?.score ?? 0}/100</strong> · <span class="badge ${x.decision?.action === 'BUY NOW' ? 'badge-buy' : 'badge-wait'}">${esc(x.decision?.action || 'WAIT')}</span>`],
-    ['Reviews & Quality', (x) => x.reviewData?.verifiedOwnerRating ? `★ ${x.reviewData.verifiedOwnerRating}/${x.reviewData.ratingScale || 5} (${x.reviewData.reviewCount || 0} verified)` : x.sourceScore != null ? `Community score ${x.sourceScore}` : '<span class="muted">Not retrieved</span>'],
-    ['Local Pickup (27545)', (x) => esc(x.localPickupKnightdale.replace(/_/g, ' '))],
-    ['Condition & Coupon', (x) => `${esc(x.condition)} ${x.couponCode ? `· Code ${esc(x.couponCode)}` : ''}`],
-    ['Direct Link', (x) => `<a class="btn btn-sm btn-primary" href="${esc(x.retailerUrl)}" target="_blank" rel="noopener noreferrer">Open Store ↗</a> <button class="btn btn-sm btn-danger" data-action="compare" data-deal-id="${esc(x.id)}" type="button">Remove</button>`],
-  ];
-
-  matrixEl.innerHTML = `<div id="compare-bars-host" style="margin-bottom:14px;"></div>
-    <div class="table-wrap"><table class="data-table">
-      <thead><tr><th>Attribute</th>${selectedDeals.map((x) => `<th>${esc(x.title.slice(0, 64))}</th>`).join('')}</tr></thead>
-      <tbody>${rows.map(([label, fn]) => `<tr><td><strong>${esc(label)}</strong></td>${selectedDeals.map((x) => `<td>${fn(x)}</td>`).join('')}</tr>`).join('')}</tbody>
-    </table></div>`;
-  renderRetailerCompareBars($('compare-bars-host'), selectedDeals);
-}
-
-/* ==================== LOCAL DEALS (KNIGHTDALE 27545) ==================== */
-function renderLocalDealsView() {
-  const d = appState.data;
-  if (!d) return;
-
-  const knightdaleRetailerIds = new Set(d.localStores.filter((s) => s.distanceMiles <= 2.5).map((s) => s.retailerId));
-  const warehouseIds = new Set(['costco', 'samsclub']);
-
-  let localDeals = d.deals.filter((x) => x.localPickupKnightdale === 'available' || x.localPickupKnightdale === 'check_store');
-  if (appState.localTab === 'knightdale') localDeals = localDeals.filter((x) => knightdaleRetailerIds.has(x.retailerId));
-  else if (appState.localTab === 'warehouse') localDeals = localDeals.filter((x) => warehouseIds.has(x.retailerId));
-  else if (appState.localTab === 'pickup_verified') localDeals = localDeals.filter((x) => x.mentionsLocalPickup || x.localPickupKnightdale === 'available');
-
-  $('local-deals-grid').innerHTML = localDeals.length
-    ? localDeals.slice(0, 48).map((deal) => renderDealCardHtml(deal)).join('')
-    : '<div class="chart-empty" style="grid-column:1/-1;"><div class="chart-empty-title">No local deals matched this filter right now</div><p class="muted">Switch to "All Triangle Chains" or check the verified Knightdale/Raleigh clearance links below.</p></div>';
-
-  $('local-stores-grid').innerHTML = d.localStores.map((st) => `
-    <div class="store-card">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
-        <strong>${esc(st.branchName)}</strong>
-        <span class="badge badge-local tabular">${esc(st.distanceMiles)} mi</span>
-      </div>
-      <div class="small muted">${esc(st.address)} · ${esc(st.area)}</div>
-      <div class="deal-tags">
-        ${st.pickup ? '<span class="badge badge-exceptional">Store Pickup</span>' : ''}
-        ${st.sameDayDelivery ? '<span class="badge badge-great">Same-Day Delivery</span>' : ''}
-        ${st.warehouseClub ? '<span class="badge badge-good">Warehouse Club</span>' : ''}
-      </div>
-      <div class="store-links">
-        <a class="btn btn-sm btn-primary" href="${esc(st.storeUrl)}" target="_blank" rel="noopener noreferrer">Store Page ↗</a>
-        <a class="btn btn-sm" href="${esc(st.clearanceUrl)}" target="_blank" rel="noopener noreferrer">Clearance ↗</a>
-      </div>
-    </div>`).join('');
-}
-
-/* ==================== PRICE HISTORY VIEW ==================== */
-async function renderPriceHistoryView() {
-  const d = appState.data;
-  if (!d) return;
-
-  const index = d.priceHistoryIndex || [];
-  const dealByKey = new Map();
-  for (const deal of d.deals) if (!dealByKey.has(deal.canonicalKey)) dealByKey.set(deal.canonicalKey, deal);
-
-  const sel = $('history-product-select');
-  if (!index.length) {
-    sel.innerHTML = '<option value="">Awaiting first recorded observations</option>';
-    renderPriceHistoryChart($('history-chart-host'), { entries: [] });
-    $('history-table-host').innerHTML = '';
-    return;
-  }
-
-  const sorted = [...index].sort((a, b) => b.observationsCount - a.observationsCount || Date.parse(b.latestObservedAt || 0) - Date.parse(a.latestObservedAt || 0));
-  sel.innerHTML = sorted.slice(0, 120).map((row) => {
-    const deal = dealByKey.get(row.canonicalKey);
-    const label = deal ? `${deal.title.slice(0, 65)} (${row.observationsCount} obs · ${money(row.latestPrice)})` : `${row.canonicalKey} (${row.observationsCount} obs)`;
-    return `<option value="${esc(row.canonicalKey)}">${esc(label)}</option>`;
-  }).join('');
-
-  if (!appState.historyKey || !sorted.some((r) => r.canonicalKey === appState.historyKey)) {
-    appState.historyKey = sorted[0].canonicalKey;
-  }
-  sel.value = appState.historyKey;
-
-  try {
-    const hist = await api(`/api/black-friday/history/${encodeURIComponent(appState.historyKey)}?range=${encodeURIComponent(appState.historyRange)}`);
-    const linkedDeal = dealByKey.get(appState.historyKey);
-    const linkedWish = d.wishlist.find((w) => w.canonicalKey === appState.historyKey || w.bestOffer?.canonicalKey === appState.historyKey);
-
-    renderPriceHistoryChart($('history-chart-host'), {
-      entries: hist.entries,
-      normalPrice: linkedDeal?.normalPrice ?? null,
-      preferredPrice: linkedWish?.preferredPrice ?? null,
-      honestyNote: hist.honestyNote,
-    });
-
-    $('history-table-host').innerHTML = hist.entries.length ? `
-      <table class="data-table">
-        <thead><tr><th>Observed Timestamp (ET)</th><th>Retailer</th><th>Price</th><th>Est. All-In</th><th>Source</th><th>Condition</th><th>Link</th></tr></thead>
-        <tbody>${[...hist.entries].reverse().slice(0, 40).map((e) => `
-          <tr>
-            <td class="tabular">${esc(formatClock(e.observedAt))}</td>
-            <td><strong>${esc(e.retailerName)}</strong></td>
-            <td class="tabular"><strong>${money(e.price)}</strong></td>
-            <td class="tabular">${money(e.allInTotal)}</td>
-            <td class="small muted">${esc(e.sourceId)}</td>
-            <td>${esc(e.condition || 'new')}</td>
-            <td>${e.url ? `<a href="${esc(e.url)}" target="_blank" rel="noopener noreferrer" class="btn btn-sm">Open ↗</a>` : '—'}</td>
-          </tr>`).join('')}
-        </tbody>
-      </table>` : '';
-  } catch (e) {
-    $('history-chart-host').innerHTML = `<div class="chart-empty">${esc(e.message)}</div>`;
-  }
-}
-
-/* ==================== ALERTS VIEW ==================== */
-function renderAlertsView() {
-  const d = appState.data;
-  if (!d) return;
-
-  const ch = d.alertChannels || {};
-  const browserPerm = typeof Notification !== 'undefined' ? Notification.permission : 'unsupported';
-  const cards = [
-    ch.inDashboard,
-    {
-      label: 'Browser Push Notifications',
-      active: browserPerm === 'granted',
-      configured: browserPerm === 'granted',
-      detail: browserPerm === 'granted' ? 'Browser permission GRANTED — click Send Test Alert to verify.' : browserPerm === 'denied' ? 'Blocked in browser settings.' : 'Click "Enable Browser Alerts" to activate.',
-    },
-    ch.email,
-    ch.webhook,
-  ].filter(Boolean);
-
-  $('alert-channels-grid').innerHTML = cards.map((c) => `
-    <div class="health-item ${c.active ? 'status-ok' : 'status-api_key_required'}">
-      <div style="display:flex;justify-content:space-between;gap:6px;margin-bottom:4px;">
-        <strong>${esc(c.label)}</strong>
-        <span class="badge ${c.active ? 'badge-exceptional' : 'badge-good'}">${c.active ? 'Active' : 'Not Active'}</span>
-      </div>
-      <div class="muted">${esc(c.detail)}</div>
-    </div>`).join('');
-
-  const feed = $('alerts-feed');
-  if (!d.alerts?.length) {
-    feed.innerHTML = '<div class="chart-empty"><div class="chart-empty-title">No alerts triggered yet</div><p class="muted">Alerts trigger automatically when wish-list items drop ≥ 25%, hit target prices, reach historical lows, or when you click "Send Test Alert".</p></div>';
-    return;
-  }
-
-  feed.innerHTML = d.alerts.map((a) => `
-    <div class="alert-card ${a.read ? '' : 'is-unread'}">
-      <div>
-        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:4px;">
-          <span class="badge ${a.severity === 'high' ? 'badge-exceptional' : 'badge-great'}">${esc(a.type.replace(/_/g, ' '))}</span>
-          <strong>${esc(a.title)}</strong>
-          ${!a.read ? '<span class="badge badge-danger">NEW</span>' : ''}
-        </div>
-        <div class="small">${esc(a.message)}</div>
-        <div class="small muted tabular" style="margin-top:4px;">${esc(formatClock(a.triggeredAt))} · Delivered: ${esc((a.channelsDelivered || ['in_dashboard']).join(', '))}</div>
-      </div>
-      ${a.retailerUrl ? `<a class="btn btn-sm btn-primary" href="${esc(a.retailerUrl)}" ${a.retailerUrl.startsWith('http') ? 'target="_blank" rel="noopener noreferrer"' : ''}>Open ↗</a>` : ''}
-    </div>`).join('');
-}
-
-/* ==================== ALL STORES DIRECTORY VIEW ==================== */
+/* ==================== 5. PERMANENT SHOP ALL STORES DIRECTORY (PRIORITY 1) ==================== */
 function renderAllStoresView() {
   const d = appState.data;
   if (!d) return;
 
   const categories = [...new Set(d.storesDirectory.map((s) => s.category))];
   const catSel = $('stores-category-filter');
-  const prevCat = appState.storeFilters.category;
-  catSel.innerHTML = '<option value="all">All Store Categories</option>' + categories.map((c) => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
-  catSel.value = prevCat;
+  catSel.innerHTML = '<option value="all">All 9 Categories (' + d.storesDirectory.length + ')</option>' +
+    categories.map((c) => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
+  catSel.value = appState.storeFilters.category;
+  $('stores-search').value = appState.storeFilters.q;
+  $('stores-fav-only').checked = appState.storeFilters.favOnly;
 
   let list = [...d.storesDirectory];
   if (appState.storeFilters.q.trim()) {
     const q = appState.storeFilters.q.trim().toLowerCase();
-    list = list.filter((s) => s.name.toLowerCase().includes(q) || s.category.toLowerCase().includes(q));
+    list = list.filter((s) => s.name.toLowerCase().includes(q) || s.category.toLowerCase().includes(q) || s.domain.toLowerCase().includes(q));
   }
   if (appState.storeFilters.category !== 'all') list = list.filter((s) => s.category === appState.storeFilters.category);
-  if (appState.storeFilters.status !== 'all') list = list.filter((s) => s.liveMonitoringStatus === appState.storeFilters.status);
+  if (appState.storeFilters.favOnly) list = list.filter((s) => s.isFavorite);
 
   const grouped = new Map();
   for (const s of list) {
@@ -974,187 +782,374 @@ function renderAllStoresView() {
     grouped.set(s.category, arr);
   }
 
-  const modeBadge = (mode) => {
-    if (mode === 'direct_api_active') return '<span class="badge badge-exceptional">Direct API Active</span>';
-    if (mode === 'direct_api_ready') return '<span class="badge badge-great">Live Feeds + API Ready</span>';
-    if (mode === 'live_feed_aggregated') return '<span class="badge badge-great">Live Deal Feeds</span>';
-    return '<span class="badge badge-watch">Directory Links Only</span>';
+  const linkBadge = (lv) => {
+    if (!lv || lv.status === 'unverified') return '<span class="badge badge-unverified">Link Unverified</span>';
+    if (lv.status === 'verified') return '<span class="badge badge-exceptional">✓ Link Verified</span>';
+    if (lv.status === 'bot_protected') return '<span class="badge badge-great" title="Retailer blocks automated bots — opens normally in your browser">Browser Direct</span>';
+    return `<span class="badge badge-danger">Check URL (${esc(lv.httpStatus || 'err')})</span>`;
   };
 
   $('all-stores-container').innerHTML = [...grouped.entries()].map(([cat, stores]) => `
-    <div style="margin-bottom:20px;">
-      <h3 style="margin:0 0 10px;font-size:15px;color:var(--accent-cyan);">${esc(cat)} (${stores.length})</h3>
+    <div style="margin-bottom:22px;">
+      <h3 style="margin:0 0 10px;font-size:15.5px;color:var(--accent-cyan);">${esc(cat)} (${stores.length})</h3>
       <div class="stores-grid">${stores.map((s) => `
-        <div class="store-card">
-          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:6px;">
-            <strong>${esc(s.name)}</strong>
-            ${modeBadge(s.liveMonitoringStatus)}
+        <div class="store-card" data-store-id="${esc(s.id)}">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
+            <a href="${esc(s.url)}" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;gap:10px;text-decoration:none;color:var(--text-primary);min-width:0;">
+              ${renderStoreAvatar(s, false)}
+              <div style="min-width:0;">
+                <strong style="display:block;font-size:14.5px;">${esc(s.name)}</strong>
+                <span class="small muted">${esc(s.domain)}</span>
+              </div>
+            </a>
+            <button class="store-fav-star ${s.isFavorite ? 'is-fav' : ''}" data-toggle-fav="${esc(s.id)}" type="button" title="Toggle favorite store" aria-label="Favorite ${esc(s.name)}">${s.isFavorite ? '★' : '☆'}</button>
           </div>
-          <div class="small muted tabular">
-            Verified Deals: <strong>${esc(s.verifiedDealsCount)}</strong> · Wish-List Matches: <strong>${esc(s.matchingWishlistCount)}</strong>
-            ${s.cashback ? ` · <span style="color:var(--accent-emerald);">~${esc(s.cashback.percent)}% CB</span>` : ''}
+          <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+            ${linkBadge(s.linkVerification)}
+            ${s.verifiedDealsCount > 0 ? `<span class="badge badge-good tabular">${s.verifiedDealsCount} tracked ${s.verifiedDealsCount === 1 ? 'deal' : 'deals'}</span>` : ''}
+            ${s.cashback ? `<span class="badge badge-exceptional tabular">Up to ${s.cashback.percent}% CB</span>` : ''}
+            ${s.localPresence ? '<span class="badge badge-local">📍 NC Local</span>' : ''}
           </div>
-          <div class="small muted">Last Check: ${esc(timeAgo(s.lastCheckedAt))}${s.localPresence ? ' · 📍 Local NC Store' : ''}</div>
           <div class="store-links">
             <a class="btn btn-sm btn-primary" href="${esc(s.url)}" target="_blank" rel="noopener noreferrer">Official Site ↗</a>
-            ${s.dealsUrl ? `<a class="btn btn-sm" href="${esc(s.dealsUrl)}" target="_blank" rel="noopener noreferrer">Deals ↗</a>` : ''}
-            ${s.blackFridayUrl ? `<a class="btn btn-sm" href="${esc(s.blackFridayUrl)}" target="_blank" rel="noopener noreferrer">Black Friday ↗</a>` : ''}
+            <a class="btn btn-sm" href="${esc(s.dealsUrl)}" target="_blank" rel="noopener noreferrer">Deals ↗</a>
+            <a class="btn btn-sm" href="${esc(s.blackFridayUrl)}" target="_blank" rel="noopener noreferrer">${s.hasDedicatedBlackFridayUrl ? 'Black Friday ↗' : 'Sales ↗'}</a>
             ${s.storeFinderUrl ? `<a class="btn btn-sm" href="${esc(s.storeFinderUrl)}" target="_blank" rel="noopener noreferrer">27545 Stores ↗</a>` : ''}
           </div>
         </div>`).join('')}
       </div>
     </div>`).join('') || '<div class="chart-empty">No retailers match your search.</div>';
+
+  attachLogoFallbacks($('all-stores-container'));
 }
 
-/* ==================== SETTINGS & DIAGNOSTICS VIEW ==================== */
+/* ==================== REMAINING VIEWS (BF Live, Compare, Local, History, Alerts, Browse, Settings) ==================== */
+function renderBlackFridayLiveView() {
+  const d = appState.data;
+  if (!d) return;
+  const bfEvent = d.events.find((e) => e.id === 'black-friday-2026');
+  const cmEvent = d.events.find((e) => e.id === 'cyber-monday-2026');
+  const fmtCd = (iso) => {
+    const diff = Math.max(0, Date.parse(iso) - Date.now());
+    return { d: Math.floor(diff / 86400000), h: Math.floor((diff % 86400000) / 3600000), m: Math.floor((diff % 3600000) / 60000), s: Math.floor((diff % 60000) / 1000) };
+  };
+  const drawCd = () => {
+    $('bf-countdowns').innerHTML = [
+      { label: 'Black Friday 2026 · Nov 27', ev: bfEvent },
+      { label: 'Cyber Monday 2026 · Nov 30', ev: cmEvent },
+    ].map(({ label, ev }) => {
+      const p = fmtCd(ev?.startsAt || '2026-11-27T05:00:00Z');
+      return `<div class="countdown-card"><div class="section-kicker">CONFIRMED 2026 EVENT</div><h2 style="margin:0;">${esc(label)}</h2><div class="small muted">${esc(ev?.summary || '')}</div><div class="countdown-digits tabular"><div class="cd-box"><div class="cd-num">${String(p.d).padStart(2, '0')}</div><div class="cd-unit">Days</div></div><div class="cd-box"><div class="cd-num">${String(p.h).padStart(2, '0')}</div><div class="cd-unit">Hours</div></div><div class="cd-box"><div class="cd-num">${String(p.m).padStart(2, '0')}</div><div class="cd-unit">Mins</div></div><div class="cd-box"><div class="cd-num">${String(p.s).padStart(2, '0')}</div><div class="cd-unit">Secs</div></div></div></div>`;
+    }).join('');
+  };
+  drawCd();
+  if (appState.countdownTimer) clearInterval(appState.countdownTimer);
+  appState.countdownTimer = setInterval(() => { if (appState.activeView === 'black-friday-live') drawCd(); }, 1000);
+
+  const nowMs = Date.now();
+  $('bf-timeline').innerHTML = d.events.map((ev) => {
+    const st = nowMs >= Date.parse(ev.startsAt) && nowMs <= Date.parse(ev.endsAt) ? 'LIVE NOW' : nowMs > Date.parse(ev.endsAt) ? 'Ended' : 'Upcoming';
+    return `<div class="timeline-card ${st === 'LIVE NOW' ? 'is-live' : ''}"><div style="display:flex;justify-content:space-between;gap:6px;margin-bottom:4px;"><strong>${esc(ev.name)}</strong><span class="badge ${st === 'LIVE NOW' ? 'badge-exceptional' : 'badge-great'}">${st}</span></div><div class="small muted tabular">${ev.startsAt.slice(0, 10)} → ${ev.endsAt.slice(0, 10)}</div><div class="small">${esc(ev.summary)}</div></div>`;
+  }).join('');
+
+  const list = appState.bfSubtab === 'archived'
+    ? d.archivedDeals || []
+    : d.deals.filter((x) => {
+        if (appState.bfSubtab === 'early') return x.isEarlyBlackFriday || x.isBlackFriday;
+        if (appState.bfSubtab === 'cyber') return x.isCyberMonday;
+        if (appState.bfSubtab === 'doorbuster') return x.isDoorbuster || (x.verifiedDiscountPct >= 35);
+        if (appState.bfSubtab === 'local') return x.localPickupKnightdale === 'available' || x.localPickupKnightdale === 'check_store';
+        return x.isBlackFriday || x.isEarlyBlackFriday || x.isCyberMonday || x.isDoorbuster || (x.verifiedDiscountPct >= 25);
+      });
+  $('bf-deals-grid').innerHTML = list.length ? list.slice(0, 50).map((x) => renderProductCardHtml(x)).join('') : '<div class="small muted">No deals in this tab yet.</div>';
+  attachLogoFallbacks($('bf-deals-grid'));
+}
+
+async function renderCompareView() {
+  const d = appState.data;
+  if (!d) return;
+  const wlSel = $('alt-wishlist-select');
+  if (!d.wishlist.length) {
+    wlSel.innerHTML = '<option value="">Upload a wish-list item first</option>';
+    $('alternatives-stage').innerHTML = '<div class="onboarding-box"><h3>No wish-list items yet</h3><p>Upload your wish lists to unlock automatic cross-retailer price comparison &amp; smarter alternatives.</p><button class="btn btn-primary" data-open-upload="wishlist" type="button">+ Upload Wish List</button></div>';
+  } else {
+    wlSel.innerHTML = d.wishlist.map((w) => `<option value="${esc(w.id)}">${esc(w.name)}</option>`).join('');
+    if (!appState.altWishlistId || !d.wishlist.some((w) => w.id === appState.altWishlistId)) appState.altWishlistId = d.wishlist[0].id;
+    wlSel.value = appState.altWishlistId;
+    try {
+      const alts = await api(`/api/black-friday/alternatives/${encodeURIComponent(appState.altWishlistId)}`);
+      const bucket = (title, items) => `
+        <div style="margin-bottom:14px;">
+          <h3 style="margin:0 0 8px;">${esc(title)} (${items.length})</h3>
+          ${items.length ? `<div class="deals-grid">${items.map((a) => `
+            <div class="deal-card"><div class="deal-body">
+              <div class="deal-meta-row"><span class="retailer-tag">${esc(a.retailerName)}</span>${a.savings > 0 ? `<span class="badge badge-exceptional tabular">Save ${money(a.savings)}</span>` : ''}</div>
+              <h4 class="deal-title">${esc(a.name)}</h4>
+              <div class="tabular"><strong style="font-size:20px;color:var(--accent-emerald);">${money(a.currentPrice)}</strong> <span class="small muted">(All-In ${money(a.finalAllInTotal)})</span></div>
+              <div class="deal-why">${esc(a.reason)}</div>
+              <div class="small muted">${esc(a.differences)}</div>
+              <div class="deal-actions"><a class="btn btn-primary btn-sm" href="${esc(a.retailerUrl)}" target="_blank" rel="noopener noreferrer">Open Offer ↗</a></div>
+            </div></div>`).join('')}</div>` : '<div class="small muted">No matching offers currently in this bucket.</div>'}
+        </div>`;
+      $('alternatives-stage').innerHTML =
+        bucket('Same Product, Better Price', alts.same_better_price || []) +
+        bucket('Better Product, Similar Price', alts.better_similar_price || []) +
+        bucket('Similar Product, Much Lower Price', alts.similar_lower_price || []);
+    } catch (e) { $('alternatives-stage').innerHTML = `<div class="small muted">${esc(e.message)}</div>`; }
+  }
+
+  const addSel = $('compare-add-select');
+  addSel.innerHTML = d.deals.slice(0, 80).map((x) => `<option value="${esc(x.id)}">${esc(x.retailerName)} — ${esc(x.title.slice(0, 60))} (${money(x.currentPrice)})</option>`).join('');
+  const selected = appState.compareDealIds.map((id) => d.deals.find((x) => x.id === id)).filter(Boolean);
+  const matrixEl = $('compare-matrix');
+  if (!selected.length) {
+    matrixEl.innerHTML = '<div class="small muted">Click <strong>COMPARE PRICES</strong> on any product card or add deals above to compare side-by-side.</div>';
+    return;
+  }
+  matrixEl.innerHTML = `<div id="compare-bars-host" style="margin-bottom:14px;"></div><div class="table-wrap"><table class="data-table"><thead><tr><th>Metric</th>${selected.map((x) => `<th>${esc(x.title.slice(0, 56))}</th>`).join('')}</tr></thead><tbody>
+    <tr><td><strong>Retailer</strong></td>${selected.map((x) => `<td>${esc(x.retailerName)}</td>`).join('')}</tr>
+    <tr><td><strong>Current Price</strong></td>${selected.map((x) => `<td class="tabular"><strong>${money(x.currentPrice)}</strong></td>`).join('')}</tr>
+    <tr><td><strong>Est. All-In (7.25% NC Tax)</strong></td>${selected.map((x) => `<td class="tabular"><strong>${money(x.finalAllInTotal)}</strong></td>`).join('')}</tr>
+    <tr><td><strong>Verified Discount</strong></td>${selected.map((x) => `<td>${x.verifiedDiscountPct != null ? `${x.verifiedDiscountPct}% OFF` : 'Baseline Unknown'}</td>`).join('')}</tr>
+    <tr><td><strong>Action</strong></td>${selected.map((x) => `<td><a class="btn btn-sm btn-primary" href="${esc(x.retailerUrl)}" target="_blank" rel="noopener noreferrer">${x.isDirectProductUrl ? 'SHOP NOW ↗' : 'View Deal ↗'}</a></td>`).join('')}</tr>
+  </tbody></table></div>`;
+  renderRetailerCompareBars($('compare-bars-host'), selected);
+}
+
+function renderLocalDealsView() {
+  const d = appState.data;
+  if (!d) return;
+  $('local-stores-grid').innerHTML = d.localStores.map((st) => {
+    const storeMeta = getStoreMeta(st.retailerId);
+    return `
+      <div class="store-card">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
+          <span style="display:inline-flex;align-items:center;gap:8px;">${renderStoreAvatar(storeMeta || { name: st.retailerName }, true)}<strong>${esc(st.branchName)}</strong></span>
+          <span class="badge badge-local tabular">${esc(st.distanceMiles)} mi</span>
+        </div>
+        <div class="small muted">${esc(st.address)} · ${esc(st.area)}</div>
+        <div class="store-links">
+          <a class="btn btn-sm btn-primary" href="${esc(st.storeUrl)}" target="_blank" rel="noopener noreferrer">Store Page ↗</a>
+          <a class="btn btn-sm" href="${esc(st.clearanceUrl)}" target="_blank" rel="noopener noreferrer">Clearance ↗</a>
+        </div>
+      </div>`;
+  }).join('');
+
+  const kIds = new Set(d.localStores.filter((s) => s.distanceMiles <= 2.5).map((s) => s.retailerId));
+  let list = d.deals.filter((x) => x.localPickupKnightdale === 'available' || x.localPickupKnightdale === 'check_store');
+  if (appState.localTab === 'knightdale') list = list.filter((x) => kIds.has(x.retailerId));
+  else if (appState.localTab === 'warehouse') list = list.filter((x) => x.retailerId === 'costco' || x.retailerId === 'samsclub');
+  else if (appState.localTab === 'pickup_verified') list = list.filter((x) => x.mentionsLocalPickup || x.localPickupKnightdale === 'available');
+  $('local-deals-grid').innerHTML = list.length ? list.slice(0, 36).map((x) => renderProductCardHtml(x)).join('') : '<div class="small muted">No local deals match this filter right now.</div>';
+  attachLogoFallbacks($('view-local-deals'));
+}
+
+async function renderPriceHistoryView() {
+  const d = appState.data;
+  if (!d) return;
+  const index = d.priceHistoryIndex || [];
+  const dealByKey = new Map();
+  for (const deal of d.deals) if (!dealByKey.has(deal.canonicalKey)) dealByKey.set(deal.canonicalKey, deal);
+  const sel = $('history-product-select');
+  if (!index.length) {
+    sel.innerHTML = '<option value="">No observations recorded yet</option>';
+    renderPriceHistoryChart($('history-chart-host'), { entries: [] });
+    return;
+  }
+  const sorted = [...index].sort((a, b) => b.observationsCount - a.observationsCount);
+  sel.innerHTML = sorted.slice(0, 120).map((row) => {
+    const deal = dealByKey.get(row.canonicalKey);
+    return `<option value="${esc(row.canonicalKey)}">${esc(deal ? `${deal.title.slice(0, 62)} (${row.observationsCount} obs)` : row.canonicalKey)}</option>`;
+  }).join('');
+  if (!appState.historyKey || !sorted.some((r) => r.canonicalKey === appState.historyKey)) appState.historyKey = sorted[0].canonicalKey;
+  sel.value = appState.historyKey;
+  const hist = await api(`/api/black-friday/history/${encodeURIComponent(appState.historyKey)}?range=${encodeURIComponent(appState.historyRange)}`);
+  const linked = dealByKey.get(appState.historyKey);
+  renderPriceHistoryChart($('history-chart-host'), { entries: hist.entries, normalPrice: linked?.normalPrice ?? null, honestyNote: hist.honestyNote });
+  $('history-table-host').innerHTML = hist.entries.length ? `<table class="data-table"><thead><tr><th>Observed (ET)</th><th>Retailer</th><th>Price</th><th>All-In</th><th>Source</th></tr></thead><tbody>${[...hist.entries].reverse().slice(0, 30).map((e) => `<tr><td class="tabular">${esc(formatClock(e.observedAt))}</td><td>${esc(e.retailerName)}</td><td class="tabular"><strong>${money(e.price)}</strong></td><td class="tabular">${money(e.allInTotal)}</td><td class="small muted">${esc(e.sourceId)}</td></tr>`).join('')}</tbody></table>` : '';
+}
+
+function renderAlertsView() {
+  const d = appState.data;
+  if (!d) return;
+  const ch = d.alertChannels || {};
+  const perm = typeof Notification !== 'undefined' ? Notification.permission : 'unsupported';
+  const cards = [
+    ch.inDashboard,
+    { label: 'Browser Notifications', active: perm === 'granted', detail: perm === 'granted' ? 'Browser permission granted.' : 'Click "Enable Browser Alerts" to activate.' },
+    ch.email, ch.webhook,
+  ].filter(Boolean);
+  $('alert-channels-grid').innerHTML = cards.map((c) => `<div class="health-item ${c.active ? 'status-ok' : 'status-api_key_required'}"><div style="display:flex;justify-content:space-between;gap:6px;margin-bottom:4px;"><strong>${esc(c.label)}</strong><span class="badge ${c.active ? 'badge-exceptional' : 'badge-good'}">${c.active ? 'Active' : 'Not Active'}</span></div><div class="muted">${esc(c.detail)}</div></div>`).join('');
+  $('alerts-feed').innerHTML = d.alerts?.length ? d.alerts.map((a) => `<div class="alert-card ${a.read ? '' : 'is-unread'}"><div><strong>${esc(a.title)}</strong><div class="small">${esc(a.message)}</div><div class="small muted tabular">${esc(formatClock(a.triggeredAt))}</div></div>${a.retailerUrl ? `<a class="btn btn-sm btn-primary" href="${esc(a.retailerUrl)}" ${a.retailerUrl.startsWith('http') ? 'target="_blank" rel="noopener noreferrer"' : ''}>Open ↗</a>` : ''}</div>`).join('') : '<div class="small muted">No alerts triggered yet.</div>';
+}
+
+function renderBestDealsView() {
+  const d = appState.data;
+  if (!d) return;
+  const retSel = $('filter-retailer');
+  const activeRetMap = new Map();
+  for (const deal of d.deals) activeRetMap.set(deal.retailerId, deal.retailerName);
+  retSel.innerHTML = `<option value="all">All Retailers (${activeRetMap.size})</option>` + [...activeRetMap.entries()].sort((a, b) => a[1].localeCompare(b[1])).map(([id, name]) => `<option value="${esc(id)}">${esc(name)}</option>`).join('');
+  retSel.value = activeRetMap.has(appState.filters.retailer) ? appState.filters.retailer : 'all';
+
+  let list = [...d.deals];
+  const f = appState.filters;
+  if (f.q.trim()) { const q = f.q.trim().toLowerCase(); list = list.filter((x) => `${x.title} ${x.brand || ''} ${x.retailerName}`.toLowerCase().includes(q)); }
+  if (f.tier !== 'all') list = list.filter((x) => x.tier === f.tier);
+  if (f.retailer !== 'all') list = list.filter((x) => x.retailerId === f.retailer);
+  if (f.category !== 'all') list = list.filter((x) => x.category === f.category);
+  if (f.maxPrice && Number(f.maxPrice) > 0) list = list.filter((x) => x.currentPrice !== null && x.currentPrice <= Number(f.maxPrice));
+  if (f.freeShip) list = list.filter((x) => x.shippingFree);
+  if (f.newOnly) list = list.filter((x) => x.condition === 'new');
+  if (f.localOnly) list = list.filter((x) => x.localPickupKnightdale === 'available' || x.localPickupKnightdale === 'check_store');
+  if (f.sort === 'discount') list.sort((a, b) => (b.verifiedDiscountPct ?? -1) - (a.verifiedDiscountPct ?? -1));
+  else if (f.sort === 'price_asc') list.sort((a, b) => (a.finalAllInTotal ?? 1e9) - (b.finalAllInTotal ?? 1e9));
+  else if (f.sort === 'price_desc') list.sort((a, b) => (b.finalAllInTotal ?? -1) - (a.finalAllInTotal ?? -1));
+  else if (f.sort === 'newest') list.sort((a, b) => Date.parse(b.publishedAt || 0) - Date.parse(a.publishedAt || 0));
+
+  $('deals-count-label').textContent = `${list.length} verified live-feed deals`;
+  $('best-deals-grid').innerHTML = list.length ? list.slice(0, 60).map((x) => renderProductCardHtml(x)).join('') : '<div class="small muted">No deals match your filters.</div>';
+  attachLogoFallbacks($('best-deals-grid'));
+}
+
 function renderSettingsView() {
   const d = appState.data;
   if (!d) return;
   const s = d.settings;
   const w = s.decisionWeights;
-
+  $('persistence-banner').innerHTML = `<strong>Persistence Status (${esc(d.persistence?.mode || 'disk')}):</strong> ${esc(d.persistence?.note || '')}`;
   $('settings-form-host').innerHTML = `
     <div class="intake-grid">
       <div class="field"><label for="set-zip">Primary ZIP Code</label><input id="set-zip" type="text" value="${esc(s.location.zip)}" /></div>
-      <div class="field"><label for="set-tax">Estimated Sales Tax Rate (%)</label><input id="set-tax" type="number" step="0.01" value="${esc((s.location.salesTaxRate * 100).toFixed(2))}" /></div>
+      <div class="field"><label for="set-tax">Sales Tax Rate (%)</label><input id="set-tax" type="number" step="0.01" value="${esc((s.location.salesTaxRate * 100).toFixed(2))}" /></div>
       <div class="field"><label for="set-budget">Total Holiday Budget ($)</label><input id="set-budget" type="number" value="${esc(s.budgets.totalHolidayBudget)}" /></div>
-
-      <div class="field"><label for="set-t-exc">Exceptional Deal Threshold (%)</label><input id="set-t-exc" type="number" value="${esc(s.thresholds.exceptionalPct)}" /></div>
-      <div class="field"><label for="set-t-great">Great Deal Threshold (%)</label><input id="set-t-great" type="number" value="${esc(s.thresholds.greatPct)}" /></div>
-      <div class="field"><label for="set-t-good">Good Deal Threshold (%)</label><input id="set-t-good" type="number" value="${esc(s.thresholds.goodPct)}" /></div>
-
-      <div class="field"><label for="set-alert-pct">Default Alert Trigger (% Off)</label><input id="set-alert-pct" type="number" value="${esc(s.alerts.defaultDiscountTriggerPct)}" /></div>
-      <div class="field"><label for="set-quiet-start">Quiet Hours Start (ET)</label><input id="set-quiet-start" type="time" value="${esc(s.alerts.quietHoursStart)}" /></div>
-      <div class="field"><label for="set-quiet-end">Quiet Hours End (ET)</label><input id="set-quiet-end" type="time" value="${esc(s.alerts.quietHoursEnd)}" /></div>
-
-      <div class="field"><label for="set-email">Alert Email Recipient (requires RESEND_API_KEY)</label><input id="set-email" type="email" value="${esc(s.alerts.emailRecipient || '')}" placeholder="family@example.com" /></div>
-      <div class="field"><label for="set-cadence-hp">High-Priority Cadence (min)</label><input id="set-cadence-hp" type="number" min="10" max="120" value="${esc(s.monitoring.highPriorityMinutes)}" /></div>
-      <div class="field"><label for="set-cadence-std">Standard Cadence (min)</label><input id="set-cadence-std" type="number" min="15" max="360" value="${esc(s.monitoring.standardMinutes)}" /></div>
-
-      <div class="span-3" style="padding-top:8px;border-top:1px solid var(--border-subtle);">
-        <div class="section-kicker">Decision Engine Weights (Normalized Automatically)</div>
-        <div class="intake-grid" style="margin-top:8px;">
-          <div class="field"><label for="w-discount">Verified Discount (${esc(w.discount)}%)</label><input id="w-discount" type="number" min="0" max="100" value="${esc(w.discount)}" /></div>
-          <div class="field"><label for="w-history">Historical Attractiveness (${esc(w.history)}%)</label><input id="w-history" type="number" min="0" max="100" value="${esc(w.history)}" /></div>
-          <div class="field"><label for="w-quality">Product Quality (${esc(w.quality)}%)</label><input id="w-quality" type="number" min="0" max="100" value="${esc(w.quality)}" /></div>
-          <div class="field"><label for="w-relevance">Wish-List Relevance (${esc(w.relevance)}%)</label><input id="w-relevance" type="number" min="0" max="100" value="${esc(w.relevance)}" /></div>
-          <div class="field"><label for="w-allin">All-In Cost (${esc(w.allInCost)}%)</label><input id="w-allin" type="number" min="0" max="100" value="${esc(w.allInCost)}" /></div>
-          <div class="field"><label for="w-avail">Availability (${esc(w.availability)}%)</label><input id="w-avail" type="number" min="0" max="100" value="${esc(w.availability)}" /></div>
-          <div class="field"><label for="w-conf">Deal Confidence (${esc(w.confidence)}%)</label><input id="w-conf" type="number" min="0" max="100" value="${esc(w.confidence)}" /></div>
-        </div>
-      </div>
+      <div class="field"><label for="set-t-exc">Exceptional %</label><input id="set-t-exc" type="number" value="${esc(s.thresholds.exceptionalPct)}" /></div>
+      <div class="field"><label for="set-t-great">Great %</label><input id="set-t-great" type="number" value="${esc(s.thresholds.greatPct)}" /></div>
+      <div class="field"><label for="set-t-good">Good %</label><input id="set-t-good" type="number" value="${esc(s.thresholds.goodPct)}" /></div>
+      <div class="field"><label for="set-alert-pct">Alert Trigger (% Off)</label><input id="set-alert-pct" type="number" value="${esc(s.alerts.defaultDiscountTriggerPct)}" /></div>
+      <div class="field"><label for="set-quiet-start">Quiet Start (ET)</label><input id="set-quiet-start" type="time" value="${esc(s.alerts.quietHoursStart)}" /></div>
+      <div class="field"><label for="set-quiet-end">Quiet End (ET)</label><input id="set-quiet-end" type="time" value="${esc(s.alerts.quietHoursEnd)}" /></div>
+      <div class="field"><label for="set-email">Email Recipient</label><input id="set-email" type="email" value="${esc(s.alerts.emailRecipient || '')}" /></div>
+      <div class="field"><label for="set-cadence-hp">High-Priority Min</label><input id="set-cadence-hp" type="number" value="${esc(s.monitoring.highPriorityMinutes)}" /></div>
+      <div class="field"><label for="set-cadence-std">Standard Min</label><input id="set-cadence-std" type="number" value="${esc(s.monitoring.standardMinutes)}" /></div>
+      <div class="field"><label for="w-discount">Wt: Discount</label><input id="w-discount" type="number" value="${esc(w.discount)}" /></div>
+      <div class="field"><label for="w-history">Wt: History</label><input id="w-history" type="number" value="${esc(w.history)}" /></div>
+      <div class="field"><label for="w-quality">Wt: Quality</label><input id="w-quality" type="number" value="${esc(w.quality)}" /></div>
+      <div class="field"><label for="w-relevance">Wt: Relevance</label><input id="w-relevance" type="number" value="${esc(w.relevance)}" /></div>
+      <div class="field"><label for="w-allin">Wt: All-In</label><input id="w-allin" type="number" value="${esc(w.allInCost)}" /></div>
+      <div class="field"><label for="w-avail">Wt: Availability</label><input id="w-avail" type="number" value="${esc(w.availability)}" /></div>
+      <div class="field"><label for="w-conf">Wt: Confidence</label><input id="w-conf" type="number" value="${esc(w.confidence)}" /></div>
     </div>`;
 
-  $('settings-diagnostics-host').innerHTML = `
-    <table class="data-table">
-      <thead><tr><th>Source</th><th>Type</th><th>Status</th><th>HTTP</th><th>Deals Parsed</th><th>Latency</th><th>Last Success</th><th>Diagnostic / Error Detail</th></tr></thead>
-      <tbody>${d.sourceHealth.map((src) => `
-        <tr>
-          <td><strong>${esc(src.name)}</strong><div class="small muted">${esc(src.category)}</div></td>
-          <td class="small">${esc(src.kind)}</td>
-          <td><span class="badge ${src.status === 'ok' ? 'badge-exceptional' : src.status === 'api_key_required' || src.status === 'pending' ? 'badge-good' : 'badge-danger'}">${esc(src.status.replace(/_/g, ' '))}</span></td>
-          <td class="tabular">${esc(src.httpStatus ?? '—')}</td>
-          <td class="tabular">${esc(src.dealsParsed)} / ${esc(src.itemsFetched)}</td>
-          <td class="tabular">${src.latencyMs ? `${src.latencyMs}ms` : '—'}</td>
-          <td class="small tabular">${esc(src.lastSuccessAt ? formatClock(src.lastSuccessAt) : 'Never')}</td>
-          <td class="small muted">${esc(src.lastError || 'Healthy')}</td>
-        </tr>`).join('')}
-      </tbody>
-    </table>`;
+  $('settings-diagnostics-host').innerHTML = `<table class="data-table"><thead><tr><th>Source</th><th>Status</th><th>HTTP</th><th>Offers</th><th>Last Success</th><th>Detail</th></tr></thead><tbody>${d.sourceHealth.map((src) => `<tr><td><strong>${esc(src.name)}</strong></td><td><span class="badge ${src.status === 'ok' ? 'badge-exceptional' : src.status === 'api_key_required' ? 'badge-good' : 'badge-danger'}">${esc(src.status.replace(/_/g, ' '))}</span></td><td class="tabular">${esc(src.httpStatus ?? '—')}</td><td class="tabular">${esc(src.dealsParsed)}/${esc(src.itemsFetched)}</td><td class="small tabular">${esc(src.lastSuccessAt ? formatClock(src.lastSuccessAt) : 'Never')}</td><td class="small muted">${esc(src.lastError || 'Healthy')}</td></tr>`).join('')}</tbody></table>`;
 }
 
-/* ==================== DEAL DETAIL MODAL ==================== */
-async function openDealModal(dealId) {
+/* ==================== ACTIONABLE MODALS (COMPARE PRICES / FIND SIMILAR / FIND CHEAPER / DETAILS) ==================== */
+async function openCompareModal(dealId, initialMode = 'compare') {
   const modal = $('deal-modal');
   modal.hidden = false;
-  $('deal-modal-body').innerHTML = '<div class="muted">Loading verified offer details &amp; price history…</div>';
+  $('deal-modal-kicker').textContent = initialMode === 'cheaper' ? 'Find Cheaper Verified Alternatives' : initialMode === 'similar' ? 'Find Similar Verified Products' : 'Cross-Retailer Price Comparison';
+  $('deal-modal-title').textContent = 'Searching live offers…';
+  $('deal-modal-body').innerHTML = '<div class="muted">Comparing verified prices across monitored retailers…</div>';
 
   try {
-    const res = await api(`/api/black-friday/deals/${encodeURIComponent(dealId)}`);
-    const deal = res.deal;
-    $('deal-modal-kicker').textContent = `${deal.retailerName} · Verified via ${deal.sourceName}`;
+    const out = await api(`/api/black-friday/deals/${encodeURIComponent(dealId)}/compare`);
+    const deal = out.deal;
     $('deal-modal-title').textContent = deal.title;
 
-    const rev = deal.reviewData;
-    const revBlock = rev?.verifiedOwnerRating
-      ? `<strong>${rev.verifiedOwnerRating}/${rev.ratingScale || 5}</strong> across ${rev.reviewCount ?? 'unknown'} verified owner reviews (${rev.source})${rev.metacriticScore ? ` · Metacritic ${rev.metacriticScore}/100` : ''}`
-      : 'Independent owner review ratings were not retrieved from this source. No score is invented.';
+    const exactBlock = out.exactMatches.length
+      ? `<div id="modal-compare-bars" style="margin-bottom:12px;"></div>
+         <div class="deals-grid">${out.exactMatches.map((m) => renderProductCardHtml(m)).join('')}</div>`
+      : `<div class="banner-notice">No other exact matching retailer listings were located across live monitored feeds right now for "${esc(deal.title)}". We keep watching automatically — check comparable cheaper/similar options below.</div>`;
 
-    $('deal-modal-body').innerHTML = `
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px;margin-bottom:16px;">
-        <div class="deal-price-box" style="margin:0;">
-          <span class="price-now tabular">${money(deal.currentPrice)}</span>
-          <span class="tabular">${deal.normalPrice ? `<span class="price-normal">${money(deal.normalPrice)}</span>` : '<span class="small muted">Baseline unknown</span>'}</span>
-          <div class="price-breakdown tabular">
-            <span>Discount: <strong>${deal.verifiedDiscountPct != null ? `${deal.verifiedDiscountPct}%` : 'Unverified'}</strong></span>
-            <span>Shipping: <strong>${deal.shippingFree ? 'Free' : money(deal.shippingCost)}</strong></span>
-            <span>Est. NC Tax: <strong>${money(deal.estimatedTax)}</strong></span>
-            <span>Final Est. All-In: <strong>${money(deal.finalAllInTotal)}</strong></span>
-          </div>
-        </div>
-        <div style="padding:12px;border-radius:12px;background:var(--bg-chip);border:1px solid var(--border-subtle);">
-          <div class="section-kicker">Decision Engine (${esc(deal.decision?.score ?? 0)}/100 · ${esc(deal.decision?.evidenceCoveragePct ?? 0)}% Evidenced)</div>
-          <div style="margin:4px 0;"><span class="badge ${deal.decision?.action === 'BUY NOW' ? 'badge-buy' : 'badge-wait'}">${esc(deal.decision?.action)}</span> <span class="small muted">${esc(deal.decision?.scoreConfidence?.replace(/_/g, ' '))}</span></div>
-          <div class="small">${esc((deal.decision?.reasons || []).join(' '))}</div>
-        </div>
-      </div>
+    const simList = initialMode === 'cheaper' ? out.cheaper : out.similar;
+    const altTitle = initialMode === 'cheaper' ? `Cheaper Verified Options (${out.cheaper.length})` : `Similar Verified Products (${out.similar.length})`;
+    const altBlock = simList.length
+      ? `<div class="deals-grid">${simList.map((s) => renderProductCardHtml(s.deal, {
+          tierLabel: initialMode === 'cheaper' ? 'Cheaper Option' : 'Similar Product',
+          triggeredBy: deal.title.slice(0, 48),
+          whyRelevant: s.reason,
+          betterOrWorse: s.savings > 0 ? `Saves ${money(s.savings)} vs $${deal.currentPrice?.toFixed(2)}` : 'Compare specs & features',
+          savesMoney: s.savings > 0,
+          estimatedSavings: s.savings,
+          whereToBuy: s.deal.retailerName,
+        })).join('')}</div>`
+      : `<div class="small muted">No ${initialMode === 'cheaper' ? 'cheaper' : 'similar'} verified products found in the same category right now.</div>`;
 
-      <div style="margin-bottom:14px;padding:12px;border-radius:12px;background:var(--bg-chip);border:1px solid var(--border-subtle);">
-        <div class="section-kicker">Real Product Reviews &amp; Quality Intelligence</div>
-        <div class="small">${revBlock}</div>
-      </div>
+    $('deal-modal-body').innerHTML = initialMode === 'compare'
+      ? `<div class="section-kicker" style="margin-bottom:8px;">Exact Cross-Retailer Matching Offers (${out.exactMatches.length + 1} total)</div>${exactBlock}<h3 style="margin:18px 0 10px;">${altTitle}</h3>${altBlock}`
+      : `<h3 style="margin:0 0 10px;">${altTitle}</h3>${altBlock}`;
 
-      <div style="margin-bottom:14px;">
-        <div class="section-kicker">7-Factor Decision Score Breakdown (0 pts for unavailable evidence)</div>
-        <div class="table-wrap"><table class="data-table">
-          <thead><tr><th>Factor</th><th>Score</th><th>Evidenced</th><th>Basis</th></tr></thead>
-          <tbody>${(deal.decision?.breakdown || []).map((b) => `
-            <tr>
-              <td><strong>${esc(b.factor)}</strong></td>
-              <td class="tabular">${b.score} / ${b.max}</td>
-              <td><span class="badge ${b.evidenced ? 'badge-exceptional' : 'badge-unverified'}">${b.evidenced ? 'Verified' : 'No Data'}</span></td>
-              <td class="small muted">${esc(b.note)}</td>
-            </tr>`).join('')}
-          </tbody>
-        </table></div>
-      </div>
-
-      <div style="margin-bottom:14px;">
-        <div class="section-kicker">Recorded Price History</div>
-        <div id="modal-chart-host"></div>
-      </div>
-
-      <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;">
-        ${deal.priceHistoryUrl ? `<a class="btn btn-sm" href="${esc(deal.priceHistoryUrl)}" target="_blank" rel="noopener noreferrer">CamelCamelCamel Chart ↗</a>` : ''}
-        <a class="btn btn-primary" href="${esc(deal.retailerUrl)}" target="_blank" rel="noopener noreferrer">Open at ${esc(deal.retailerName)} ↗</a>
-      </div>`;
-
-    renderPriceHistoryChart($('modal-chart-host'), {
-      entries: res.history || [],
-      normalPrice: deal.normalPrice,
-      honestyNote: (res.history || []).length < 2
-        ? 'Recording real observations going forward. Historical prices are never fabricated.'
-        : `Showing ${res.history.length} genuine timestamped observations.`,
-    });
+    if (initialMode === 'compare' && out.exactMatches.length) {
+      renderRetailerCompareBars($('modal-compare-bars'), [deal, ...out.exactMatches]);
+    }
+    attachLogoFallbacks($('deal-modal-body'));
   } catch (e) {
     $('deal-modal-body').innerHTML = `<div class="banner-notice">${esc(e.message)}</div>`;
   }
 }
 
-/* ==================== RENDER DISPATCHER ==================== */
+async function openDealDetailModal(dealId) {
+  const modal = $('deal-modal');
+  modal.hidden = false;
+  $('deal-modal-kicker').textContent = 'Verified Offer Intelligence';
+  $('deal-modal-title').textContent = 'Loading…';
+  $('deal-modal-body').innerHTML = '<div class="muted">Loading details…</div>';
+  try {
+    const res = await api(`/api/black-friday/deals/${encodeURIComponent(dealId)}`);
+    const deal = res.deal;
+    $('deal-modal-kicker').textContent = `${deal.retailerName} · Verified via ${deal.sourceName}`;
+    $('deal-modal-title').textContent = deal.title;
+    $('deal-modal-body').innerHTML = `
+      <div class="deal-price-box" style="margin-bottom:14px;">
+        <span class="price-now tabular">${money(deal.currentPrice)}</span>
+        <span class="tabular">${deal.normalPrice ? `<span class="price-normal">${money(deal.normalPrice)}</span>` : '<span class="small muted">Baseline unknown</span>'}</span>
+        <div class="price-breakdown tabular">
+          <span>Discount: <strong>${deal.verifiedDiscountPct != null ? `${deal.verifiedDiscountPct}%` : 'Unverified'}</strong></span>
+          <span>NC Tax: <strong>${money(deal.estimatedTax)}</strong></span>
+          <span>All-In: <strong>${money(deal.finalAllInTotal)}</strong></span>
+        </div>
+      </div>
+      <div class="table-wrap" style="margin-bottom:14px;"><table class="data-table"><thead><tr><th>Decision Factor</th><th>Points</th><th>Basis</th></tr></thead><tbody>${(deal.decision?.breakdown || []).map((b) => `<tr><td><strong>${esc(b.factor)}</strong></td><td class="tabular">${b.score}/${b.max}</td><td class="small muted">${esc(b.note)}</td></tr>`).join('')}</tbody></table></div>
+      <div id="modal-chart-host"></div>
+      <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px;">
+        <a class="btn btn-primary" href="${esc(deal.retailerUrl)}" target="_blank" rel="noopener noreferrer">${deal.isDirectProductUrl ? 'SHOP NOW ↗' : `Open via ${esc(deal.sourceName)} ↗`}</a>
+      </div>`;
+    renderPriceHistoryChart($('modal-chart-host'), { entries: res.history || [], normalPrice: deal.normalPrice });
+  } catch (e) { $('deal-modal-body').innerHTML = `<div class="banner-notice">${esc(e.message)}</div>`; }
+}
+
+/* ==================== DISPATCH & SYNC ==================== */
+function renderSidebarBadges() {
+  const d = appState.data;
+  if (!d) return;
+  $('badge-stores').textContent = String(d.storesDirectory?.length || 96);
+  $('badge-wishlist').textContent = String((d.wishlist?.length || 0) + (d.savedDeals?.length || 0));
+  $('badge-profiles').textContent = String(d.profiles?.length || 0);
+  $('badge-deals').textContent = String(d.kpis.totalActiveDeals || 0);
+  const unread = d.kpis.unreadAlertsCount || 0;
+  $('badge-alerts').textContent = String(unread);
+  $('badge-alerts').hidden = unread === 0;
+  $('footer-version').textContent = d.version;
+  $('sidebar-scheduler-line').textContent = d.kpis.lastSuccessfulUpdate
+    ? `Checked ${timeAgo(d.kpis.lastSuccessfulUpdate)} · Next ${formatClock(d.kpis.nextScheduledUpdate)}`
+    : 'Monitor initializing…';
+}
+
 function renderActiveView() {
   renderSidebarBadges();
   switch (appState.activeView) {
-    case 'command-center': renderCommandCenter(); break;
+    case 'command-center': renderHomePage(); break;
+    case 'upload-center': renderUploadCenter(); break;
     case 'wishlists': renderWishlistsView(); break;
-    case 'best-deals': renderBestDealsView(); break;
+    case 'profiles': renderProfilesView(); break;
+    case 'all-stores': renderAllStoresView(); break;
     case 'black-friday-live': renderBlackFridayLiveView(); break;
-    case 'deal-hunter': renderDealHunterView(); break;
     case 'compare': void renderCompareView(); break;
     case 'local-deals': renderLocalDealsView(); break;
     case 'price-history': void renderPriceHistoryView(); break;
     case 'alerts': renderAlertsView(); break;
-    case 'all-stores': renderAllStoresView(); break;
+    case 'best-deals': renderBestDealsView(); break;
     case 'settings': renderSettingsView(); break;
   }
 }
@@ -1172,11 +1167,10 @@ async function fetchBootstrap() {
     hydrateData(data);
   } catch (e) {
     $('offline-banner').hidden = false;
-    toast(`Could not refresh live state: ${e.message}`);
+    toast(`Could not load live state: ${e.message}`);
   }
 }
 
-/* ==================== LIVE SSE STREAM ==================== */
 function connectSse() {
   if (appState.sse) appState.sse.close();
   try {
@@ -1185,541 +1179,14 @@ function connectSse() {
     es.onmessage = (ev) => {
       try {
         const msg = JSON.parse(ev.data);
-        if (msg.type === 'sweep_started') {
-          $('live-dot')?.classList.add('is-busy');
-        } else if (msg.type === 'sweep_complete' || msg.type === 'wishlist_search_complete') {
+        if (msg.type === 'sweep_started') $('live-dot')?.classList.add('is-busy');
+        else if (['sweep_complete', 'wishlist_search_complete', 'alert_created'].includes(msg.type)) {
           $('live-dot')?.classList.remove('is-busy');
           void fetchBootstrap();
-          if (msg.alertsTriggered > 0) {
-            toast(`🔔 ${msg.alertsTriggered} new deal alert(s) triggered!`);
-          }
-        } else if (msg.type === 'alert_created' && msg.alert) {
-          void fetchBootstrap();
-          if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-            try { new Notification(msg.alert.title, { body: msg.alert.message, icon: '/black-friday/icon.svg' }); } catch {}
-          }
         }
       } catch {}
     };
   } catch {}
-}
-
-/* ==================== GLOBAL EVENT BINDINGS ==================== */
-function bindEvents() {
-  // Sidebar navigation
-  $('nav-list').addEventListener('click', (e) => {
-    const btn = e.target.closest('.nav-btn[data-view]');
-    if (btn) switchView(btn.dataset.view);
-  });
-
-  // Mobile menu drawer
-  $('mobile-menu-btn').addEventListener('click', () => {
-    $('sidebar').classList.toggle('is-open');
-    $('sidebar-scrim').classList.toggle('is-open');
-  });
-  $('sidebar-scrim').addEventListener('click', () => {
-    $('sidebar').classList.remove('is-open');
-    $('sidebar-scrim').classList.remove('is-open');
-  });
-
-  // Topbar actions
-  $('quick-add-btn').addEventListener('click', () => {
-    switchView('wishlists');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  });
-
-  $('theme-toggle-btn').addEventListener('click', () => {
-    const next = document.documentElement.dataset.theme === 'light' ? 'dark' : 'light';
-    applyTheme(next, true);
-  });
-
-  const triggerManualRefresh = async (btn) => {
-    if (btn) btn.disabled = true;
-    toast('Scanning authorized retail feeds & wish-list items…');
-    try {
-      const out = await api('/api/black-friday/refresh', { method: 'POST', body: {} });
-      if (out.dashboard) hydrateData(out.dashboard);
-      toast(`Verified ${out.dealsFetched} offers across ${out.okSources} active sources (${out.observationsAdded} new history points).`);
-    } catch (e) {
-      toast(e.message);
-    } finally {
-      if (btn) btn.disabled = false;
-    }
-  };
-  $('refresh-now-btn').addEventListener('click', (e) => triggerManualRefresh(e.currentTarget));
-  $('diag-refresh-btn').addEventListener('click', (e) => triggerManualRefresh(e.currentTarget));
-
-  // Modal close
-  $('deal-modal-close').addEventListener('click', () => { $('deal-modal').hidden = true; });
-  $('deal-modal').addEventListener('click', (e) => {
-    if (e.target === $('deal-modal')) $('deal-modal').hidden = true;
-  });
-
-  // Delegated click handler for cards, buttons, goto links, wishlist actions
-  document.addEventListener('click', async (e) => {
-    const gotoBtn = e.target.closest('[data-goto]');
-    if (gotoBtn) return switchView(gotoBtn.dataset.goto);
-
-    const actionEl = e.target.closest('[data-action]');
-    if (actionEl) {
-      const action = actionEl.dataset.action;
-      if (action === 'detail') return openDealModal(actionEl.dataset.dealId);
-      if (action === 'history') {
-        appState.historyKey = actionEl.dataset.key;
-        return switchView('price-history');
-      }
-      if (action === 'compare') {
-        const id = actionEl.dataset.dealId;
-        if (appState.compareDealIds.includes(id)) {
-          appState.compareDealIds = appState.compareDealIds.filter((x) => x !== id);
-          toast('Removed from comparison matrix.');
-        } else {
-          appState.compareDealIds = [...appState.compareDealIds.slice(-3), id];
-          toast('Added to Compare Products matrix.');
-        }
-        savePrefs();
-        return renderActiveView();
-      }
-      if (action === 'hunter-save' || action === 'hunter-reject') {
-        const dealId = actionEl.dataset.dealId;
-        try {
-          const out = await api('/api/black-friday/hunter/feedback', {
-            method: 'POST',
-            body: { dealId, action: action === 'hunter-save' ? 'save' : 'reject', brand: actionEl.dataset.brand || '' },
-          });
-          if (appState.data) appState.data.hunter = out.hunter;
-          toast(action === 'hunter-save' ? 'Saved! Deal Hunter will prioritize similar deals.' : 'Dismissed. Deal Hunter updated preferences.');
-          renderDealHunterView();
-        } catch (err) { toast(err.message); }
-        return;
-      }
-      if (action === 'hunter-add-wl') {
-        const deal = appState.data?.deals.find((x) => x.id === actionEl.dataset.dealId);
-        if (!deal) return;
-        try {
-          const res = await api('/api/black-friday/wishlist', {
-            method: 'POST',
-            body: {
-              name: deal.title,
-              brand: deal.brand,
-              modelNumber: deal.modelNumber,
-              sourceUrl: deal.retailerUrl,
-              imageUrl: deal.imageUrl,
-              preferredPrice: deal.currentPrice,
-              profileId: 'unassigned-ideas',
-              searchImmediately: false,
-            },
-          });
-          hydrateData(res.dashboard);
-          toast('Added to Family Wish Lists!');
-        } catch (err) { toast(err.message); }
-        return;
-      }
-    }
-
-    // Wish-list actions
-    const wlSearch = e.target.closest('[data-wl-search]');
-    if (wlSearch) {
-      wlSearch.disabled = true;
-      toast('Searching authorized live feeds for exact matches…');
-      try {
-        const out = await api(`/api/black-friday/wishlist/${encodeURIComponent(wlSearch.dataset.wlSearch)}/search`, { method: 'POST' });
-        hydrateData(out.dashboard);
-        toast(`Found ${out.matches.length} matching live offer(s) for "${out.item.name}".`);
-      } catch (err) { toast(err.message); }
-      finally { wlSearch.disabled = false; }
-      return;
-    }
-
-    const wlAlts = e.target.closest('[data-wl-alts]');
-    if (wlAlts) {
-      appState.altWishlistId = wlAlts.dataset.wlAlts;
-      return switchView('compare');
-    }
-
-    const wlDel = e.target.closest('[data-wl-delete]');
-    if (wlDel) {
-      try {
-        const out = await api(`/api/black-friday/wishlist/${encodeURIComponent(wlDel.dataset.wlDelete)}`, { method: 'DELETE' });
-        hydrateData(out.dashboard);
-        toast('Removed item from wish list.');
-      } catch (err) { toast(err.message); }
-      return;
-    }
-
-    // Sub-tabs
-    const intakeTab = e.target.closest('#intake-mode-tabs .pill-tab');
-    if (intakeTab) {
-      appState.intakeMode = intakeTab.dataset.intake;
-      document.querySelectorAll('#intake-mode-tabs .pill-tab').forEach((t) => t.classList.toggle('is-active', t === intakeTab));
-      renderIntakePanel();
-      return;
-    }
-
-    const profTab = e.target.closest('#profile-tabs .pill-tab');
-    if (profTab) {
-      appState.selectedProfileId = profTab.dataset.profile;
-      renderWishlistsView();
-      return;
-    }
-
-    const bfTab = e.target.closest('#bf-subtabs .pill-tab');
-    if (bfTab) {
-      appState.bfSubtab = bfTab.dataset.bf;
-      document.querySelectorAll('#bf-subtabs .pill-tab').forEach((t) => t.classList.toggle('is-active', t === bfTab));
-      renderBlackFridayLiveView();
-      return;
-    }
-
-    const hTab = e.target.closest('#hunter-filter-tabs .pill-tab');
-    if (hTab) {
-      appState.hunterTag = hTab.dataset.htag;
-      document.querySelectorAll('#hunter-filter-tabs .pill-tab').forEach((t) => t.classList.toggle('is-active', t === hTab));
-      renderDealHunterView();
-      return;
-    }
-
-    const locTab = e.target.closest('#local-filter-tabs .pill-tab');
-    if (locTab) {
-      appState.localTab = locTab.dataset.local;
-      document.querySelectorAll('#local-filter-tabs .pill-tab').forEach((t) => t.classList.toggle('is-active', t === locTab));
-      renderLocalDealsView();
-      return;
-    }
-
-    const rangeTab = e.target.closest('#history-range-tabs .pill-tab');
-    if (rangeTab) {
-      appState.historyRange = rangeTab.dataset.range;
-      document.querySelectorAll('#history-range-tabs .pill-tab').forEach((t) => t.classList.toggle('is-active', t === rangeTab));
-      void renderPriceHistoryView();
-      return;
-    }
-
-    // URL Preview & Gift Idea Preview
-    if (e.target.id === 'wl-url-preview-btn') {
-      const url = $('wl-url-input')?.value?.trim();
-      if (!url) return toast('Paste a product URL first.');
-      const box = $('wl-url-preview-box');
-      box.innerHTML = '<div class="small muted">Inspecting product URL politely…</div>';
-      try {
-        const res = await api('/api/black-friday/wishlist/inspect-url', { method: 'POST', body: { url } });
-        box.innerHTML = `<div class="deal-why">
-          <strong>${esc(res.name)}</strong> (${esc(res.retailerName)}) — Status: <span class="badge ${res.inspectionStatus === 'live_verified' ? 'badge-exceptional' : 'badge-good'}">${esc(res.inspectionStatus.replace(/_/g, ' '))}</span><br/>
-          ${res.currentPrice != null ? `Verified Price: <strong>${money(res.currentPrice)}</strong> · ` : ''}${esc(res.note || '')}
-        </div>`;
-      } catch (err) {
-        box.innerHTML = `<div class="small" style="color:var(--accent-rose);">${esc(err.message)}</div>`;
-      }
-      return;
-    }
-
-    if (e.target.id === 'wl-gift-match-btn') {
-      const prompt = $('wl-gift-prompt')?.value?.trim();
-      if (!prompt) return toast('Enter a gift idea first.');
-      const host = $('wl-gift-results');
-      try {
-        const res = await api('/api/black-friday/wishlist/gift-idea', { method: 'POST', body: { prompt } });
-        host.innerHTML = res.matches.length
-          ? `<div class="section-kicker" style="margin-bottom:8px;">Matching Live Verified Deals (${res.matches.length})${res.parsedBudget ? ` · Under ${money(res.parsedBudget)}` : ''}</div>
-             <div class="deals-grid">${res.matches.slice(0, 6).map((m) => renderDealCardHtml(m.deal)).join('')}</div>`
-          : '<div class="small muted">No immediate matches under that exact criteria — save the gift idea so Deal Hunter monitors upcoming drops automatically.</div>';
-      } catch (err) { toast(err.message); }
-    }
-  });
-
-  // Wish-list status inline change
-  document.addEventListener('change', async (e) => {
-    if (e.target.classList.contains('wl-status-select')) {
-      const id = e.target.dataset.wlId;
-      try {
-        const out = await api(`/api/black-friday/wishlist/${encodeURIComponent(id)}`, {
-          method: 'PATCH',
-          body: { status: e.target.value },
-        });
-        hydrateData(out.dashboard);
-        toast(`Status updated to "${e.target.value.replace(/_/g, ' ')}".`);
-      } catch (err) { toast(err.message); }
-    }
-    if (e.target.id === 'wl-ss-file' && e.target.files?.[0]) {
-      const reader = new FileReader();
-      reader.onload = () => {
-        const prev = $('wl-ss-preview');
-        if (prev) prev.innerHTML = `<img src="${reader.result}" alt="Screenshot preview" style="max-height:140px;border-radius:10px;border:1px solid var(--border-glass);" />`;
-      };
-      reader.readAsDataURL(e.target.files[0]);
-    }
-  });
-
-  // Intake form submissions
-  document.addEventListener('submit', async (e) => {
-    const form = e.target;
-    if (form.id === 'wl-manual-form') {
-      e.preventDefault();
-      try {
-        const res = await api('/api/black-friday/wishlist', {
-          method: 'POST',
-          body: {
-            name: $('wl-name').value.trim(),
-            profileId: $('wl-profile').value,
-            brand: $('wl-brand').value.trim() || null,
-            modelNumber: $('wl-model').value.trim() || null,
-            recipient: $('wl-recipient').value.trim(),
-            preferredPrice: $('wl-pref-price').value || null,
-            maxPrice: $('wl-max-price').value || null,
-            priority: $('wl-priority').value,
-            color: $('wl-color').value.trim() || null,
-            requiredFeatures: $('wl-features').value.trim(),
-            allowRefurbished: $('wl-allow-refurb').checked,
-            allowOpenBox: $('wl-allow-openbox').checked,
-            sourceType: 'manual',
-          },
-        });
-        hydrateData(res.dashboard);
-        form.reset();
-        toast(`Added "${res.item.name}" — found ${res.item.matchedOffersCount} live offer(s)!`);
-      } catch (err) { toast(err.message); }
-    } else if (form.id === 'wl-url-form') {
-      e.preventDefault();
-      try {
-        const res = await api('/api/black-friday/wishlist', {
-          method: 'POST',
-          body: {
-            sourceType: 'url',
-            sourceUrl: $('wl-url-input').value.trim(),
-            profileId: $('wl-url-profile').value,
-            recipient: $('wl-url-recipient').value.trim(),
-            preferredPrice: $('wl-url-pref').value || null,
-          },
-        });
-        hydrateData(res.dashboard);
-        form.reset();
-        toast(`Added "${res.item.name}" from retailer link!`);
-      } catch (err) { toast(err.message); }
-    } else if (form.id === 'wl-bulk-form') {
-      e.preventDefault();
-      try {
-        const res = await api('/api/black-friday/wishlist/import', {
-          method: 'POST',
-          body: { mode: 'bulk', text: $('wl-bulk-text').value, profileId: $('wl-bulk-profile').value },
-        });
-        hydrateData(res.dashboard);
-        form.reset();
-        toast(`Imported ${res.addedCount} item(s)${res.skippedDuplicatesCount ? ` (${res.skippedDuplicatesCount} duplicates skipped)` : ''}.`);
-      } catch (err) { toast(err.message); }
-    } else if (form.id === 'wl-gift-form') {
-      e.preventDefault();
-      try {
-        const res = await api('/api/black-friday/wishlist', {
-          method: 'POST',
-          body: {
-            name: $('wl-gift-prompt').value.trim(),
-            profileId: $('wl-gift-profile').value,
-            sourceType: 'gift_idea',
-            isGiftIdea: true,
-          },
-        });
-        hydrateData(res.dashboard);
-        form.reset();
-        toast(`Saved gift idea & matched ${res.giftMatches?.matches?.length || 0} live deals!`);
-      } catch (err) { toast(err.message); }
-    } else if (form.id === 'wl-screenshot-form') {
-      e.preventDefault();
-      const file = $('wl-ss-file')?.files?.[0];
-      if (!file) return;
-      const b64 = await fileToBase64(file);
-      try {
-        const res = await api('/api/black-friday/wishlist/import', {
-          method: 'POST',
-          body: {
-            mode: 'file',
-            filename: file.name,
-            mimeType: file.type,
-            contentBase64: b64,
-            extractedOcrText: $('wl-ss-text').value.trim(),
-            profileId: $('wl-ss-profile').value,
-          },
-        });
-        hydrateData(res.dashboard);
-        form.reset();
-        toast(`Uploaded screenshot and added ${res.addedCount} tracked item(s).`);
-      } catch (err) { toast(err.message); }
-    } else if (form.id === 'wl-file-form') {
-      e.preventDefault();
-      const file = $('wl-doc-file')?.files?.[0];
-      if (!file) return;
-      const b64 = await fileToBase64(file);
-      try {
-        const res = await api('/api/black-friday/wishlist/import', {
-          method: 'POST',
-          body: {
-            mode: 'file',
-            filename: file.name,
-            mimeType: file.type,
-            contentBase64: b64,
-            profileId: $('wl-doc-profile').value,
-            recipient: $('wl-doc-recipient').value.trim(),
-          },
-        });
-        hydrateData(res.dashboard);
-        form.reset();
-        toast(`Imported ${res.addedCount} item(s) from ${file.name}.`);
-      } catch (err) { toast(err.message); }
-    }
-  });
-
-  // Profile creation
-  $('new-profile-toggle').addEventListener('click', () => {
-    const w = $('new-profile-form-wrap');
-    w.style.display = w.style.display === 'none' ? 'block' : 'none';
-  });
-  $('np-cancel-btn').addEventListener('click', () => { $('new-profile-form-wrap').style.display = 'none'; });
-  $('np-save-btn').addEventListener('click', async () => {
-    const name = $('np-name').value.trim();
-    if (!name) return toast('Enter a profile name.');
-    try {
-      const out = await api('/api/black-friday/profiles', { method: 'POST', body: { name, budget: Number($('np-budget').value) || 300 } });
-      if (appState.data) appState.data.profiles = out.profiles;
-      $('np-name').value = '';
-      $('new-profile-form-wrap').style.display = 'none';
-      renderWishlistsView();
-      toast(`Created profile "${name}".`);
-    } catch (err) { toast(err.message); }
-  });
-
-  $('wl-status-filter').addEventListener('change', (e) => {
-    appState.wishlistStatusFilter = e.target.value;
-    renderWishlistsView();
-  });
-
-  // Best Deals Filters (persistent)
-  const syncDealFilters = () => {
-    appState.filters = {
-      q: $('filter-q').value,
-      tier: $('filter-tier').value,
-      retailer: $('filter-retailer').value,
-      category: $('filter-category').value,
-      sort: $('filter-sort').value,
-      maxPrice: $('filter-max-price').value,
-      freeShip: $('filter-free-ship').checked,
-      newOnly: $('filter-new-only').checked,
-      localOnly: $('filter-local-only').checked,
-    };
-    savePrefs();
-    renderBestDealsView();
-  };
-  for (const id of ['filter-q', 'filter-tier', 'filter-retailer', 'filter-category', 'filter-sort', 'filter-max-price', 'filter-free-ship', 'filter-new-only', 'filter-local-only']) {
-    $(id).addEventListener(id === 'filter-q' || id === 'filter-max-price' ? 'input' : 'change', syncDealFilters);
-  }
-  $('filter-reset-btn').addEventListener('click', () => {
-    appState.filters = { q: '', tier: 'all', retailer: 'all', category: 'all', sort: 'score', maxPrice: '', freeShip: false, newOnly: false, localOnly: false };
-    savePrefs();
-    renderBestDealsView();
-  });
-
-  // Hunter Reset
-  $('hunter-reset-btn').addEventListener('click', async () => {
-    const out = await api('/api/black-friday/hunter/feedback', { method: 'POST', body: { dealId: 'all', action: 'reset' } });
-    if (appState.data) appState.data.hunter = out.hunter;
-    renderDealHunterView();
-    toast('Reset dismissed Deal Hunter recommendations.');
-  });
-
-  // Compare selectors
-  $('alt-wishlist-select').addEventListener('change', (e) => {
-    appState.altWishlistId = e.target.value;
-    void renderCompareView();
-  });
-  $('compare-add-btn').addEventListener('click', () => {
-    const id = $('compare-add-select').value;
-    if (!id) return;
-    if (!appState.compareDealIds.includes(id)) appState.compareDealIds = [...appState.compareDealIds.slice(-3), id];
-    savePrefs();
-    void renderCompareView();
-  });
-  $('compare-clear-btn').addEventListener('click', () => {
-    appState.compareDealIds = [];
-    savePrefs();
-    void renderCompareView();
-  });
-
-  // History product selector
-  $('history-product-select').addEventListener('change', (e) => {
-    appState.historyKey = e.target.value;
-    void renderPriceHistoryView();
-  });
-
-  // Alerts controls
-  $('enable-browser-push-btn').addEventListener('click', async () => {
-    if (typeof Notification === 'undefined') return toast('Browser notifications are not supported in this browser.');
-    const perm = await Notification.requestPermission();
-    await api('/api/black-friday/settings', { method: 'PATCH', body: { alerts: { browserNotificationsEnabled: perm === 'granted' } } });
-    await fetchBootstrap();
-    toast(perm === 'granted' ? 'Browser notifications granted!' : `Browser notification status: ${perm}`);
-  });
-  $('send-test-alert-btn').addEventListener('click', async () => {
-    try {
-      const out = await api('/api/black-friday/alerts/test', { method: 'POST' });
-      await fetchBootstrap();
-      toast('Test alert delivered to dashboard!');
-      if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-        new Notification(out.alert.title, { body: out.alert.message, icon: '/black-friday/icon.svg' });
-      }
-    } catch (err) { toast(err.message); }
-  });
-  $('mark-alerts-read-btn').addEventListener('click', async () => {
-    await api('/api/black-friday/alerts/read', { method: 'POST', body: {} });
-    await fetchBootstrap();
-    toast('All alerts marked as read.');
-  });
-
-  // All Stores Filters
-  $('stores-search').addEventListener('input', (e) => { appState.storeFilters.q = e.target.value; renderAllStoresView(); });
-  $('stores-category-filter').addEventListener('change', (e) => { appState.storeFilters.category = e.target.value; renderAllStoresView(); });
-  $('stores-status-filter').addEventListener('change', (e) => { appState.storeFilters.status = e.target.value; renderAllStoresView(); });
-
-  // Settings Save
-  $('save-settings-btn').addEventListener('click', async () => {
-    try {
-      const body = {
-        location: {
-          zip: $('set-zip').value.trim() || '27545',
-          salesTaxRate: Math.max(0, Math.min(0.2, (Number($('set-tax').value) || 7.25) / 100)),
-        },
-        budgets: { totalHolidayBudget: Number($('set-budget').value) || 2500 },
-        thresholds: {
-          exceptionalPct: Number($('set-t-exc').value) || 40,
-          greatPct: Number($('set-t-great').value) || 25,
-          goodPct: Number($('set-t-good').value) || 15,
-        },
-        alerts: {
-          defaultDiscountTriggerPct: Number($('set-alert-pct').value) || 25,
-          quietHoursStart: $('set-quiet-start').value || '22:00',
-          quietHoursEnd: $('set-quiet-end').value || '07:00',
-          emailRecipient: $('set-email').value.trim(),
-          emailEnabled: Boolean($('set-email').value.trim()),
-        },
-        monitoring: {
-          highPriorityMinutes: Number($('set-cadence-hp').value) || 15,
-          standardMinutes: Number($('set-cadence-std').value) || 90,
-        },
-        decisionWeights: {
-          discount: Number($('w-discount').value) || 0,
-          history: Number($('w-history').value) || 0,
-          quality: Number($('w-quality').value) || 0,
-          relevance: Number($('w-relevance').value) || 0,
-          allInCost: Number($('w-allin').value) || 0,
-          availability: Number($('w-avail').value) || 0,
-          confidence: Number($('w-conf').value) || 0,
-        },
-      };
-      const out = await api('/api/black-friday/settings', { method: 'PATCH', body });
-      hydrateData(out.dashboard);
-      toast('Settings saved & deal scores recalculated.');
-    } catch (err) { toast(err.message); }
-  });
-
-  window.addEventListener('offline', () => { $('offline-banner').hidden = false; });
-  window.addEventListener('online', () => { $('offline-banner').hidden = true; void fetchBootstrap(); });
 }
 
 function fileToBase64(file) {
@@ -1734,28 +1201,452 @@ function fileToBase64(file) {
   });
 }
 
-/* ==================== BOOTSTRAP ==================== */
+/* ==================== GLOBAL EVENT WIRING ==================== */
+function bindEvents() {
+  $('nav-list').addEventListener('click', (e) => {
+    const btn = e.target.closest('.nav-btn[data-view]');
+    if (btn) switchView(btn.dataset.view);
+  });
+
+  $('mobile-menu-btn').addEventListener('click', () => {
+    $('sidebar').classList.toggle('is-open');
+    $('sidebar-scrim').classList.toggle('is-open');
+  });
+  $('sidebar-scrim').addEventListener('click', () => {
+    $('sidebar').classList.remove('is-open');
+    $('sidebar-scrim').classList.remove('is-open');
+  });
+
+  $('top-upload-btn').addEventListener('click', () => openUploadCenter('wishlist', 'file'));
+  $('top-stores-btn').addEventListener('click', () => switchView('all-stores'));
+  $('hero-upload-wishlist-btn').addEventListener('click', () => openUploadCenter('wishlist', 'file'));
+  $('hero-upload-deals-btn').addEventListener('click', () => openUploadCenter('deal', 'file'));
+  $('wl-open-upload-btn').addEventListener('click', () => openUploadCenter('wishlist', 'file'));
+  $('sd-open-upload-btn').addEventListener('click', () => openUploadCenter('deal', 'file'));
+
+  $('home-store-quick-search').addEventListener('input', (e) => {
+    appState.homeStoreQuery = e.target.value;
+    renderHomePage();
+  });
+
+  $('theme-toggle-btn').addEventListener('click', () => {
+    applyTheme(document.documentElement.dataset.theme === 'light' ? 'dark' : 'light', true);
+  });
+
+  const runManualRefresh = async (btn) => {
+    if (btn) btn.disabled = true;
+    toast('Scanning authorized retail feeds & your wish lists…');
+    try {
+      const out = await api('/api/black-friday/refresh', { method: 'POST', body: {} });
+      if (out.dashboard) hydrateData(out.dashboard);
+      toast(`Checked ${out.okSources} sources (${out.observationsAdded} new history observations).`);
+    } catch (e) { toast(e.message); }
+    finally { if (btn) btn.disabled = false; }
+  };
+  $('refresh-now-btn').addEventListener('click', (e) => runManualRefresh(e.currentTarget));
+  $('diag-refresh-btn').addEventListener('click', (e) => runManualRefresh(e.currentTarget));
+
+  $('deal-modal-close').addEventListener('click', () => { $('deal-modal').hidden = true; });
+  $('deal-modal').addEventListener('click', (e) => { if (e.target === $('deal-modal')) $('deal-modal').hidden = true; });
+
+  // Delegated click handler
+  document.addEventListener('click', async (e) => {
+    const gotoBtn = e.target.closest('[data-goto]');
+    if (gotoBtn) return switchView(gotoBtn.dataset.goto);
+
+    const openUp = e.target.closest('[data-open-upload]');
+    if (openUp) return openUploadCenter(openUp.dataset.openUpload, 'file');
+
+    if (e.target.id === 'home-recheck-now') return runManualRefresh(e.target);
+
+    // Store Favorite Star Toggle
+    const favBtn = e.target.closest('[data-toggle-fav]');
+    if (favBtn) {
+      try {
+        const out = await api('/api/black-friday/stores/favorite', { method: 'POST', body: { storeId: favBtn.dataset.toggleFav } });
+        hydrateData(out.dashboard);
+        toast(out.isFavorite ? 'Added store to your Home Page favorites bar!' : 'Removed from favorites.');
+      } catch (err) { toast(err.message); }
+      return;
+    }
+
+    // Recommendation Feedback Buttons (LOVE IT, NOT INTERESTED, ALREADY BOUGHT)
+    const fbBtn = e.target.closest('[data-fb]');
+    if (fbBtn) {
+      const action = fbBtn.dataset.fb;
+      const dealId = fbBtn.dataset.dealId;
+      try {
+        const out = await api('/api/black-friday/feedback', {
+          method: 'POST',
+          body: { dealId, action, title: fbBtn.dataset.title || '' },
+        });
+        hydrateData(out.dashboard);
+        toast(
+          action === 'love' ? 'Saved & marked LOVE IT — recommendations updated!' :
+          action === 'reject' ? 'Rejected permanently (only this exact product — category untouched).' :
+          'Marked ALREADY BOUGHT — removed from recommendations & logged.'
+        );
+      } catch (err) { toast(err.message); }
+      return;
+    }
+
+    // Card Actions (COMPARE PRICES, FIND SIMILAR, FIND CHEAPER, DETAILS, HISTORY)
+    const act = e.target.closest('[data-action]');
+    if (act) {
+      const a = act.dataset.action;
+      if (a === 'compare-prices') return openCompareModal(act.dataset.dealId, 'compare');
+      if (a === 'find-similar') return openCompareModal(act.dataset.dealId, 'similar');
+      if (a === 'find-cheaper') return openCompareModal(act.dataset.dealId, 'cheaper');
+      if (a === 'detail') return openDealDetailModal(act.dataset.dealId);
+      if (a === 'history') { appState.historyKey = act.dataset.key; return switchView('price-history'); }
+    }
+
+    // Upload Center Toggles
+    const utTab = e.target.closest('#upload-type-toggle .pill-tab');
+    if (utTab) { appState.uploadType = utTab.dataset.utype; renderUploadCenter(); return; }
+    const umTab = e.target.closest('#upload-mode-tabs .pill-tab');
+    if (umTab) { appState.uploadMode = umTab.dataset.umode; renderUploadCenter(); return; }
+
+    // Wish-list & Saved-deal actions
+    const wlSearch = e.target.closest('[data-wl-search]');
+    if (wlSearch) {
+      wlSearch.disabled = true;
+      toast('Searching live retail feeds for exact matches…');
+      try {
+        const out = await api(`/api/black-friday/wishlist/${encodeURIComponent(wlSearch.dataset.wlSearch)}/search`, { method: 'POST' });
+        hydrateData(out.dashboard);
+        toast(`Found ${out.matches.length} matching live offer(s)!`);
+      } catch (err) { toast(err.message); }
+      finally { wlSearch.disabled = false; }
+      return;
+    }
+    const wlAlts = e.target.closest('[data-wl-alts]');
+    if (wlAlts) { appState.altWishlistId = wlAlts.dataset.wlAlts; return switchView('compare'); }
+    const wlDel = e.target.closest('[data-wl-delete]');
+    if (wlDel) {
+      const out = await api(`/api/black-friday/wishlist/${encodeURIComponent(wlDel.dataset.wlDelete)}`, { method: 'DELETE' });
+      hydrateData(out.dashboard);
+      toast('Removed wish-list item.');
+      return;
+    }
+    const sdDel = e.target.closest('[data-sd-delete]');
+    if (sdDel) {
+      const out = await api(`/api/black-friday/saved-deals/${encodeURIComponent(sdDel.dataset.sdDelete)}`, { method: 'DELETE' });
+      hydrateData(out.dashboard);
+      toast('Deleted saved deal.');
+      return;
+    }
+
+    // Profile Save / Delete
+    const saveProf = e.target.closest('[data-save-profile]');
+    if (saveProf) {
+      const card = saveProf.closest('.profile-card');
+      try {
+        const out = await api(`/api/black-friday/profiles/${encodeURIComponent(saveProf.dataset.saveProfile)}`, {
+          method: 'PATCH',
+          body: {
+            favoriteBrands: card.querySelector('.pf-brands').value,
+            interests: card.querySelector('.pf-interests').value,
+            clothingSizes: card.querySelector('.pf-sizes').value,
+            preferredRetailers: card.querySelector('.pf-retailers').value,
+            budget: Number(card.querySelector('.pf-budget').value) || 300,
+            savedIdeas: card.querySelector('.pf-ideas').value,
+          },
+        });
+        hydrateData(out.dashboard);
+        toast('Family profile saved & recommendations updated!');
+      } catch (err) { toast(err.message); }
+      return;
+    }
+    const delProf = e.target.closest('[data-del-profile]');
+    if (delProf) {
+      const out = await api(`/api/black-friday/profiles/${encodeURIComponent(delProf.dataset.delProfile)}`, { method: 'DELETE' });
+      hydrateData(out.dashboard);
+      toast('Deleted family profile.');
+      return;
+    }
+
+    // Tabs
+    const profTab = e.target.closest('#profile-tabs .pill-tab');
+    if (profTab) { appState.selectedProfileId = profTab.dataset.profile; renderWishlistsView(); return; }
+    const bfTab = e.target.closest('#bf-subtabs .pill-tab');
+    if (bfTab) { appState.bfSubtab = bfTab.dataset.bf; document.querySelectorAll('#bf-subtabs .pill-tab').forEach((t) => t.classList.toggle('is-active', t === bfTab)); renderBlackFridayLiveView(); return; }
+    const locTab = e.target.closest('#local-filter-tabs .pill-tab');
+    if (locTab) { appState.localTab = locTab.dataset.local; document.querySelectorAll('#local-filter-tabs .pill-tab').forEach((t) => t.classList.toggle('is-active', t === locTab)); renderLocalDealsView(); return; }
+    const rngTab = e.target.closest('#history-range-tabs .pill-tab');
+    if (rngTab) { appState.historyRange = rngTab.dataset.range; document.querySelectorAll('#history-range-tabs .pill-tab').forEach((t) => t.classList.toggle('is-active', t === rngTab)); void renderPriceHistoryView(); return; }
+  });
+
+  // Upload Preview Buttons
+  $('upload-add-blank-row-btn').addEventListener('click', () => {
+    if (!appState.uploadPreview) return;
+    appState.uploadPreview.items = collectPreviewItemsFromDom();
+    appState.uploadPreview.items.push({
+      selected: true, name: '', brand: '', modelNumber: '', size: '', color: '',
+      price: null, retailerName: '', url: '', profileId: 'family-main', priority: 'standard', needsReview: false, isDuplicate: false,
+    });
+    renderUploadPreviewPanel();
+  });
+  $('upload-cancel-preview-btn').addEventListener('click', () => {
+    appState.uploadPreview = null;
+    renderUploadPreviewPanel();
+  });
+  $('upload-commit-btn').addEventListener('click', async (e) => {
+    const btn = e.currentTarget;
+    if (!appState.uploadPreview) return;
+    const approved = collectPreviewItemsFromDom().filter((i) => i.selected && (i.name || i.url));
+    if (!approved.length) return toast('Check at least one valid product row to save.');
+    btn.disabled = true;
+    toast(`Saving ${approved.length} approved item(s) & searching deals…`);
+    try {
+      const out = await api('/api/black-friday/uploads/commit', {
+        method: 'POST',
+        body: {
+          uploadType: appState.uploadPreview.uploadType,
+          uploadFileId: appState.uploadPreview.uploadFileId,
+          items: approved,
+        },
+      });
+      appState.uploadPreview = null;
+      hydrateData(out.dashboard);
+      toast(`Saved ${out.addedCount} item(s)${out.immediateMatches ? ` · Found ${out.immediateMatches} live deal match(es)!` : ''}`);
+      switchView(out.uploadType === 'deal' ? 'wishlists' : 'command-center');
+    } catch (err) { toast(err.message); }
+    finally { btn.disabled = false; }
+  });
+
+  // Delegated changes (status, move profile, file image preview)
+  document.addEventListener('change', async (e) => {
+    if (e.target.classList.contains('wl-status-select')) {
+      const out = await api(`/api/black-friday/wishlist/${encodeURIComponent(e.target.dataset.wlId)}`, { method: 'PATCH', body: { status: e.target.value } });
+      hydrateData(out.dashboard);
+      toast(`Updated status to ${e.target.value.replace(/_/g, ' ')}.`);
+    } else if (e.target.classList.contains('wl-move-select')) {
+      const out = await api(`/api/black-friday/wishlist/${encodeURIComponent(e.target.dataset.wlId)}/move`, { method: 'POST', body: { profileId: e.target.value } });
+      hydrateData(out.dashboard);
+      toast('Moved item to selected family member!');
+    } else if (e.target.id === 'uc-file-input' && e.target.files?.[0]) {
+      const f = e.target.files[0];
+      const isImg = f.type.startsWith('image/') || /\.(png|jpe?g|webp|gif)$/i.test(f.name);
+      const wrap = $('uc-screenshot-notes-wrap');
+      if (wrap) wrap.style.display = isImg ? 'block' : 'none';
+      if (isImg) {
+        const r = new FileReader();
+        r.onload = () => { $('uc-img-preview').innerHTML = `<img src="${r.result}" alt="Preview" style="max-height:140px;border-radius:10px;border:1px solid var(--border-glass);" />`; };
+        r.readAsDataURL(f);
+      }
+    }
+  });
+
+  // Upload Center & Profile Form Submissions
+  document.addEventListener('submit', async (e) => {
+    const form = e.target;
+    if (form.id === 'uc-file-form') {
+      e.preventDefault();
+      const file = $('uc-file-input')?.files?.[0];
+      if (!file) return;
+      toast(`Reading ${file.name}…`);
+      try {
+        const b64 = await fileToBase64(file);
+        const prev = await api('/api/black-friday/uploads/preview', {
+          method: 'POST',
+          body: {
+            uploadType: appState.uploadType, mode: 'file', filename: file.name, mimeType: file.type,
+            contentBase64: b64, extractedOcrText: $('uc-ocr-text')?.value?.trim() || '',
+            profileId: $('uc-profile').value, recipient: $('uc-recipient').value.trim(), priority: $('uc-priority').value,
+          },
+        });
+        appState.uploadPreview = prev;
+        if (appState.data && Array.isArray(prev.uploadedFiles)) appState.data.uploadedFiles = prev.uploadedFiles;
+        renderUploadCenter();
+        toast(`Extracted ${prev.extractedCount} product(s) — review & click Save Approved Items.`);
+      } catch (err) { toast(err.message); }
+    } else if (form.id === 'uc-bulk-form') {
+      e.preventDefault();
+      try {
+        const prev = await api('/api/black-friday/uploads/preview', {
+          method: 'POST',
+          body: {
+            uploadType: appState.uploadType, mode: 'bulk', filename: `pasted-${appState.uploadType}.txt`,
+            contentText: $('uc-bulk-text').value, profileId: $('uc-bulk-profile').value, recipient: $('uc-bulk-recipient').value.trim(),
+          },
+        });
+        appState.uploadPreview = prev;
+        if (appState.data && Array.isArray(prev.uploadedFiles)) appState.data.uploadedFiles = prev.uploadedFiles;
+        renderUploadCenter();
+        toast(`Extracted ${prev.extractedCount} product(s) — review & approve below.`);
+      } catch (err) { toast(err.message); }
+    } else if (form.id === 'uc-urls-form') {
+      e.preventDefault();
+      toast('Inspecting product URL(s) live…');
+      try {
+        const prev = await api('/api/black-friday/uploads/preview', {
+          method: 'POST',
+          body: {
+            uploadType: appState.uploadType, mode: 'urls', filename: `urls-${appState.uploadType}.txt`,
+            urlsText: $('uc-urls-text').value, profileId: $('uc-urls-profile').value, recipient: $('uc-urls-recipient').value.trim(),
+          },
+        });
+        appState.uploadPreview = prev;
+        if (appState.data && Array.isArray(prev.uploadedFiles)) appState.data.uploadedFiles = prev.uploadedFiles;
+        renderUploadCenter();
+        toast(`Inspected ${prev.extractedCount} URL(s) — review & approve below.`);
+      } catch (err) { toast(err.message); }
+    } else if (form.id === 'uc-manual-form') {
+      e.preventDefault();
+      appState.uploadPreview = {
+        uploadType: appState.uploadType,
+        uploadFileId: null,
+        parseWarning: null,
+        duplicatesCount: 0,
+        needsReviewCount: 0,
+        items: [{
+          selected: true,
+          name: $('uc-m-name').value.trim(),
+          brand: $('uc-m-brand').value.trim(),
+          modelNumber: $('uc-m-model').value.trim(),
+          size: $('uc-m-size').value.trim(),
+          color: $('uc-m-color').value.trim(),
+          price: $('uc-m-price').value ? Number($('uc-m-price').value) : null,
+          retailerName: $('uc-m-retailer').value.trim(),
+          url: $('uc-m-url').value.trim(),
+          profileId: $('uc-m-profile').value,
+          recipient: $('uc-m-recipient').value.trim(),
+          priority: 'high',
+          isDuplicate: false,
+          needsReview: false,
+        }],
+      };
+      renderUploadPreviewPanel();
+      toast('Preview ready — click Save Approved Items to add & track!');
+    } else if (form.id === 'create-member-form') {
+      e.preventDefault();
+      try {
+        const out = await api('/api/black-friday/profiles', {
+          method: 'POST',
+          body: {
+            name: $('cm-name').value.trim(),
+            budget: Number($('cm-budget').value) || 300,
+            clothingSizes: $('cm-sizes').value.trim(),
+            favoriteBrands: $('cm-brands').value.trim(),
+            interests: $('cm-interests').value.trim(),
+            preferredRetailers: $('cm-retailers').value.trim(),
+          },
+        });
+        form.reset();
+        $('create-member-panel').style.display = 'none';
+        hydrateData(out.dashboard);
+        toast(`Created profile for ${out.profile.name}!`);
+      } catch (err) { toast(err.message); }
+    }
+  });
+
+  // Profile modal toggle
+  $('create-member-toggle').addEventListener('click', () => {
+    const p = $('create-member-panel');
+    p.style.display = p.style.display === 'none' ? 'block' : 'none';
+  });
+  $('cm-cancel-btn').addEventListener('click', () => { $('create-member-panel').style.display = 'none'; });
+
+  // Store Directory filters & Verify Store Links
+  $('stores-search').addEventListener('input', (e) => { appState.storeFilters.q = e.target.value; renderAllStoresView(); });
+  $('stores-category-filter').addEventListener('change', (e) => { appState.storeFilters.category = e.target.value; renderAllStoresView(); });
+  $('stores-fav-only').addEventListener('change', (e) => { appState.storeFilters.favOnly = e.target.checked; renderAllStoresView(); });
+  $('verify-store-links-btn').addEventListener('click', async (e) => {
+    const btn = e.currentTarget;
+    btn.disabled = true;
+    toast('Verifying official URLs across all 96+ retailers…');
+    try {
+      const out = await api('/api/black-friday/stores/verify-links', { method: 'POST' });
+      hydrateData(out.dashboard);
+      toast(`Verified ${out.checkedCount} retailer links!`);
+    } catch (err) { toast(err.message); }
+    finally { btn.disabled = false; }
+  });
+
+  // Wish-list status filter, Compare controls, History selector, Alerts, Browse Filters, Settings Save
+  $('wl-status-filter').addEventListener('change', (e) => { appState.wishlistStatusFilter = e.target.value; renderWishlistsView(); });
+  $('alt-wishlist-select').addEventListener('change', (e) => { appState.altWishlistId = e.target.value; void renderCompareView(); });
+  $('compare-add-btn').addEventListener('click', () => {
+    const id = $('compare-add-select').value;
+    if (id && !appState.compareDealIds.includes(id)) appState.compareDealIds = [...appState.compareDealIds.slice(-3), id];
+    savePrefs();
+    void renderCompareView();
+  });
+  $('compare-clear-btn').addEventListener('click', () => { appState.compareDealIds = []; savePrefs(); void renderCompareView(); });
+  $('history-product-select').addEventListener('change', (e) => { appState.historyKey = e.target.value; void renderPriceHistoryView(); });
+
+  $('enable-browser-push-btn').addEventListener('click', async () => {
+    if (typeof Notification === 'undefined') return toast('Browser notifications unsupported.');
+    const perm = await Notification.requestPermission();
+    await api('/api/black-friday/settings', { method: 'PATCH', body: { alerts: { browserNotificationsEnabled: perm === 'granted' } } });
+    await fetchBootstrap();
+    toast(`Browser notification permission: ${perm}`);
+  });
+  $('send-test-alert-btn').addEventListener('click', async () => {
+    const out = await api('/api/black-friday/alerts/test', { method: 'POST' });
+    await fetchBootstrap();
+    toast('Test alert delivered to dashboard!');
+    if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+      try { new Notification(out.alert.title, { body: out.alert.message, icon: '/black-friday/icon.svg' }); } catch {}
+    }
+  });
+  $('mark-alerts-read-btn').addEventListener('click', async () => {
+    await api('/api/black-friday/alerts/read', { method: 'POST', body: {} });
+    await fetchBootstrap();
+  });
+
+  const syncFilters = () => {
+    appState.filters = {
+      q: $('filter-q').value, tier: $('filter-tier').value, retailer: $('filter-retailer').value,
+      category: $('filter-category').value, sort: $('filter-sort').value, maxPrice: $('filter-max-price').value,
+      freeShip: $('filter-free-ship').checked, newOnly: $('filter-new-only').checked, localOnly: $('filter-local-only').checked,
+    };
+    savePrefs();
+    renderBestDealsView();
+  };
+  for (const id of ['filter-q', 'filter-tier', 'filter-retailer', 'filter-category', 'filter-sort', 'filter-max-price', 'filter-free-ship', 'filter-new-only', 'filter-local-only']) {
+    $(id).addEventListener(id === 'filter-q' || id === 'filter-max-price' ? 'input' : 'change', syncFilters);
+  }
+  $('filter-reset-btn').addEventListener('click', () => {
+    appState.filters = { q: '', tier: 'all', retailer: 'all', category: 'all', sort: 'score', maxPrice: '', freeShip: false, newOnly: false, localOnly: false };
+    savePrefs();
+    renderBestDealsView();
+  });
+
+  $('reset-rejected-btn').addEventListener('click', async () => {
+    const out = await api('/api/black-friday/feedback', { method: 'POST', body: { action: 'reset_rejected' } });
+    hydrateData(out.dashboard);
+    toast('Restored all previously rejected products.');
+  });
+
+  $('save-settings-btn').addEventListener('click', async () => {
+    const out = await api('/api/black-friday/settings', {
+      method: 'PATCH',
+      body: {
+        location: { zip: $('set-zip').value.trim() || '27545', salesTaxRate: Math.max(0, Math.min(0.2, (Number($('set-tax').value) || 7.25) / 100)) },
+        budgets: { totalHolidayBudget: Number($('set-budget').value) || 2500 },
+        thresholds: { exceptionalPct: Number($('set-t-exc').value) || 40, greatPct: Number($('set-t-great').value) || 25, goodPct: Number($('set-t-good').value) || 15 },
+        alerts: { defaultDiscountTriggerPct: Number($('set-alert-pct').value) || 25, quietHoursStart: $('set-quiet-start').value, quietHoursEnd: $('set-quiet-end').value, emailRecipient: $('set-email').value.trim(), emailEnabled: Boolean($('set-email').value.trim()) },
+        monitoring: { highPriorityMinutes: Number($('set-cadence-hp').value) || 15, standardMinutes: Number($('set-cadence-std').value) || 90 },
+        decisionWeights: { discount: Number($('w-discount').value) || 0, history: Number($('w-history').value) || 0, quality: Number($('w-quality').value) || 0, relevance: Number($('w-relevance').value) || 0, allInCost: Number($('w-allin').value) || 0, availability: Number($('w-avail').value) || 0, confidence: Number($('w-conf').value) || 0 },
+      },
+    });
+    hydrateData(out.dashboard);
+    toast('Settings saved!');
+  });
+}
+
 function boot() {
   loadPrefs();
   bindEvents();
-
-  // Render cached snapshot immediately to eliminate loading screens
   try {
     const cached = JSON.parse(sessionStorage.getItem(STORAGE_CACHE_KEY) || 'null');
-    if (cached && cached.kpis) {
-      appState.data = cached;
-      switchView(appState.activeView);
-    }
+    if (cached && cached.storesDirectory) { appState.data = cached; renderActiveView(); }
   } catch {}
-
-  if (!appState.data) switchView(appState.activeView);
-
   void fetchBootstrap();
   connectSse();
-
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/black-friday/sw.js', { scope: '/black-friday/' }).catch(() => {});
-  }
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('/black-friday/sw.js', { scope: '/black-friday/' }).catch(() => {});
 }
 
 boot();

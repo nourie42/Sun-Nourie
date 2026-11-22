@@ -1029,6 +1029,42 @@ export function computeDecisionScore({
   };
 }
 
+const GENERIC_SIMILARITY_STOP = new Set([
+  'wireless', 'bluetooth', 'portable', 'smart', 'digital', 'electric', 'rechargeable', 'stainless', 'steel',
+  'compact', 'ultra', 'premium', 'professional', 'series', 'edition', 'model', 'generation', 'gen',
+  'black', 'white', 'silver', 'blue', 'red', 'gray', 'grey', 'green', 'pink', 'gold', 'navy', 'steam',
+  'pack', 'count', 'piece', 'combo', 'kit', 'bundle', 'home', 'mini', 'max', 'plus', 'lite', 'air', 'pro',
+  'all', 'one', 'new', 'sale', 'deal', 'best', 'good', 'very', 'ymmv', 'free', 'shipping', 'inch', 'oz', 'qt',
+  'mens', 'womens', 'kids', 'adult', 'large', 'medium', 'small', 'size', 'color', 'with', 'from',
+]);
+
+const PRODUCT_SUBTYPES = [
+  { group: 'headphones_audio', re: /\b(headphone|headphones|earbud|earbuds|airpods|headset|over[\s-]?ear|in[\s-]?ear|anc\b|noise[\s-]?cancel)/i },
+  { group: 'speaker_audio', re: /\b(speaker|speakers|soundbar|subwoofer|boombox)\b/i },
+  { group: 'printer_office', re: /\b(printer|scanner|inkjet|laserjet|ecotank|workforce|toner)\b/i },
+  { group: 'vacuum_floor', re: /\b(vacuum|vac\b|roomba|roborock|mop|carpet cleaner)\b/i },
+  { group: 'kitchen_blender', re: /\b(blender|juicer|food processor|smoothie)\b/i },
+  { group: 'kitchen_oven_fryer', re: /\b(oven|air fryer|toaster|microwave|roaster)\b/i },
+  { group: 'kitchen_mixer', re: /\b(stand mixer|hand mixer|mixer)\b/i },
+  { group: 'kitchen_coffee', re: /\b(espresso|coffee maker|keurig|nespresso|coffee grinder)\b/i },
+  { group: 'tv_display', re: /\b(\d{2}["”]?\s*(?:tv|oled|qled)|smart tv|monitor|projector)\b/i },
+  { group: 'laptop_pc', re: /\b(laptop|macbook|chromebook|thinkpad|notebook|desktop|mini pc|ipad|tablet)\b/i },
+  { group: 'footwear', re: /\b(shoe|shoes|sneaker|sneakers|running shoe|boot|boots|sandal|slipper|pegasus|ultraboost)\b/i },
+  { group: 'drinkware', re: /\b(tumbler|mug|water bottle|hydro flask|stanley|rambler|owala)\b/i },
+  { group: 'toys_lego', re: /\b(lego|duplo|playset|building set|action figure|nerf|barbie|puzzle)\b/i },
+  { group: 'gaming_console', re: /\b(nintendo switch|ps5|playstation|xbox|steam deck|controller|gaming)\b/i },
+  { group: 'watch_wearable', re: /\b(apple watch|smartwatch|garmin|fitbit|oura|watch)\b/i },
+  { group: 'power_tool', re: /\b(drill|impact driver|saw|sander|mower|blower|trimmer|tool kit)\b/i },
+];
+
+function detectProductSubtype(text = '') {
+  const s = String(text || '');
+  for (const entry of PRODUCT_SUBTYPES) {
+    if (entry.re.test(s)) return entry.group;
+  }
+  return null;
+}
+
 /**
  * Smarter Product Alternatives Engine for a single wish-list item.
  * Categorizes verified live deals into the 3 required recommendation buckets:
@@ -1037,12 +1073,14 @@ export function computeDecisionScore({
  * 3. Similar Product, Much Lower Price
  */
 export function discoverAlternatives(item, evaluatedDeals = []) {
+  const itemText = `${item.brand || ''} ${item.name || ''} ${item.modelNumber || ''}`;
   const itemIdentity = item.identity || normalizeProductIdentity({
-    title: `${item.brand || ''} ${item.name || ''} ${item.modelNumber || ''}`,
+    title: itemText,
     brand: item.brand,
     modelNumber: item.modelNumber,
     url: item.sourceUrl,
   });
+  const itemSubtype = detectProductSubtype(itemText);
 
   const exactMatches = [];
   const categoryCandidates = [];
@@ -1058,16 +1096,21 @@ export function discoverAlternatives(item, evaluatedDeals = []) {
       continue;
     }
 
-    // Check category + semantic similarity for alternatives (excluding accessories unless item is accessory)
+    // Check category + strict product-subtype similarity for alternatives (excluding accessories unless item is accessory)
     const dealIdentity = deal.identity || normalizeProductIdentity({ title: deal.title, brand: deal.brand, url: deal.retailerUrl });
     if (!itemIdentity.isAccessory && dealIdentity.isAccessory) continue;
 
+    const dealSubtype = detectProductSubtype(deal.title);
+    // Hard subtype compatibility guardrail: headphones never match printers, blenders never match vacuums!
+    if (itemSubtype && dealSubtype && itemSubtype !== dealSubtype) continue;
+    if (itemSubtype && !dealSubtype && dealIdentity.category === 'electronics') continue;
+
     if (dealIdentity.category === itemIdentity.category && itemIdentity.category !== 'other') {
-      const itemTokens = new Set(itemIdentity.tokens);
+      const itemTokens = new Set(itemIdentity.tokens.filter((t) => !GENERIC_SIMILARITY_STOP.has(t)));
       const shared = dealIdentity.tokens.filter((t) => itemTokens.has(t));
-      // Require meaningful product-type overlap or brand match
-      if (shared.length >= 1 || (itemIdentity.brand && dealIdentity.brand === itemIdentity.brand)) {
-        categoryCandidates.push({ deal, sharedTokens: shared });
+      const subtypeMatch = Boolean(itemSubtype && dealSubtype && itemSubtype === dealSubtype);
+      if (subtypeMatch || shared.length >= 1 || (itemIdentity.brand && dealIdentity.brand === itemIdentity.brand && (!itemSubtype || !dealSubtype))) {
+        categoryCandidates.push({ deal, sharedTokens: shared.length ? shared : (subtypeMatch ? [itemSubtype.replace(/_/g, ' ')] : []) });
       }
     }
   }
@@ -1417,3 +1460,338 @@ export function matchGiftIdeaDeals(promptText, evaluatedDeals = []) {
     matches: scored.slice(0, 15),
   };
 }
+
+/**
+ * Strict 4-Tier Wish-List & Family-Profile Personalized Recommendation Engine (Priority 3 & 4).
+ *
+ * Hierarchy:
+ * - Tier 1: Exact wish-list matches (always first)
+ * - Tier 2: Very close alternatives to wish-list items
+ * - Tier 3: Related / complementary products tied directly to wish-list items
+ * - Tier 4: New gift discoveries strictly tied to family profile brands, interests, preferred retailers, budgets, or LOVE IT signals
+ *
+ * Never fills the main dashboard with random deals when no wish lists or family profile preferences exist.
+ * Rejecting a product suppresses ONLY that exact product (never its entire category).
+ */
+export function buildPersonalizedRecommendations({
+  evaluatedDeals = [],
+  wishlist = [],
+  savedDeals = [],
+  profiles = [],
+  feedback = {},
+} = {}) {
+  const rejectedIds = new Set(feedback.rejectedDealIds || []);
+  const rejectedKeys = new Set(feedback.rejectedCanonicalKeys || []);
+  const lovedIds = new Set([...(feedback.lovedDealIds || []), ...(feedback.savedDealIds || [])]);
+  const boughtIds = new Set(feedback.boughtDealIds || []);
+
+  // Also include per-profile disliked exact product names/IDs
+  const profileDisliked = new Set();
+  for (const p of profiles || []) {
+    for (const d of p.dislikedProducts || []) profileDisliked.add(String(d).toLowerCase());
+  }
+
+  const isRejected = (deal) =>
+    !deal ||
+    rejectedIds.has(deal.id) ||
+    (deal.canonicalKey && rejectedKeys.has(deal.canonicalKey)) ||
+    profileDisliked.has(deal.id.toLowerCase()) ||
+    profileDisliked.has(String(deal.title || '').toLowerCase());
+
+  const activeWish = (wishlist || []).filter((w) => !['purchased', 'no_longer_interested'].includes(w.status));
+  const profileSignals = [];
+  for (const p of profiles || []) {
+    if ((p.favoriteBrands?.length || 0) > 0 || (p.interests?.length || 0) > 0 || (p.preferredRetailers?.length || 0) > 0) {
+      profileSignals.push(p);
+    }
+  }
+
+  const hasPreferences = activeWish.length > 0 || savedDeals.length > 0 || profileSignals.length > 0 || lovedIds.size > 0;
+  if (!hasPreferences) {
+    return {
+      hasPreferences: false,
+      onboardingRequired: true,
+      tier1Exact: [],
+      tier2Alternatives: [],
+      tier3Related: [],
+      tier4Discoveries: [],
+      summary: {
+        activeWishlistCount: 0,
+        configuredProfilesCount: 0,
+        lovedCount: 0,
+        rejectedCount: rejectedIds.size,
+      },
+    };
+  }
+
+  const eligibleDeals = (evaluatedDeals || []).filter((d) => !d.archived && d.currentPrice !== null && !isRejected(d) && !boughtIds.has(d.id));
+  const usedIds = new Set();
+
+  // ---- TIER 1: Exact Wish-List Matches (round-robin across wish-list items so one item doesn't crowd out others) ----
+  const tier1Buckets = [];
+  const tier1AllExactIds = new Set();
+  const prioWeight = { high: 3, standard: 2, low: 1 };
+  const sortedWish = [...activeWish].sort((a, b) => (prioWeight[b.priority] || 2) - (prioWeight[a.priority] || 2));
+
+  for (const item of sortedWish) {
+    const matches = eligibleDeals
+      .filter((d) => matchWishlistToDeal(item, d).matched)
+      .sort((a, b) => (a.finalAllInTotal ?? a.currentPrice) - (b.finalAllInTotal ?? b.currentPrice));
+
+    for (const m of matches) tier1AllExactIds.add(m.id);
+
+    const pickedForItem = [];
+    for (const deal of matches) {
+      if (pickedForItem.length >= 2) break;
+      if (usedIds.has(deal.id)) continue;
+      usedIds.add(deal.id);
+      const profile = profiles.find((p) => p.id === item.profileId);
+      const savesVsTarget = item.preferredPrice && deal.currentPrice < item.preferredPrice ? roundMoney(item.preferredPrice - deal.currentPrice) : null;
+      const savesVsNormal = deal.estimatedSavings > 0 ? deal.estimatedSavings : null;
+      pickedForItem.push({
+        tier: 1,
+        tierLabel: 'Tier 1 · Exact Wish-List Match',
+        dealId: deal.id,
+        wishlistItemId: item.id,
+        triggeredBy: `${item.name}${item.recipient ? ` (${item.recipient})` : profile ? ` (${profile.name})` : ''}`,
+        whyRelevant: `Exact match for "${item.name}" on your wish list.`,
+        similarity: 'Exact product match',
+        betterOrWorse: item.preferredPrice
+          ? (deal.currentPrice <= item.preferredPrice ? `Beats your $${item.preferredPrice.toFixed(2)} target by $${(item.preferredPrice - deal.currentPrice).toFixed(2)}.` : `$${(deal.currentPrice - item.preferredPrice).toFixed(2)} above your $${item.preferredPrice.toFixed(2)} target.`)
+          : (deal.verifiedDiscountPct ? `${deal.verifiedDiscountPct}% below verified baseline.` : 'Live price verified; baseline still building.'),
+        savesMoney: Boolean(savesVsTarget > 0 || savesVsNormal > 0),
+        estimatedSavings: savesVsNormal ?? savesVsTarget ?? 0,
+        whereToBuy: deal.retailerName,
+        loved: lovedIds.has(deal.id),
+        deal,
+      });
+    }
+    if (pickedForItem.length) tier1Buckets.push(pickedForItem);
+  }
+
+  const tier1Exact = [];
+  for (let round = 0; round < 2; round += 1) {
+    for (const bucket of tier1Buckets) {
+      if (bucket[round]) tier1Exact.push(bucket[round]);
+    }
+  }
+
+  // ---- TIER 2: Very Close Alternatives to Wish-List Items (genuinely different comparable products first!) ----
+  const tier2Alternatives = [];
+  for (const item of sortedWish) {
+    const alts = discoverAlternatives(item, eligibleDeals);
+    // Prioritize genuinely different comparable products (better_similar_price, similar_lower_price) and never repeat exact Tier 1 items here
+    const allBuckets = [
+      ...(alts.better_similar_price || []),
+      ...(alts.similar_lower_price || []),
+      ...(alts.same_better_price || []).filter((a) => !tier1AllExactIds.has(a.dealId)),
+    ];
+    for (const alt of allBuckets) {
+      if (usedIds.has(alt.dealId) || tier1AllExactIds.has(alt.dealId)) continue;
+      const fullDeal = eligibleDeals.find((d) => d.id === alt.dealId);
+      if (!fullDeal) continue;
+      usedIds.add(alt.dealId);
+      tier2Alternatives.push({
+        tier: 2,
+        tierLabel: `Tier 2 · ${alt.bucketLabel}`,
+        dealId: fullDeal.id,
+        wishlistItemId: item.id,
+        triggeredBy: item.name,
+        whyRelevant: alt.reason,
+        similarity: alt.bucketLabel,
+        betterOrWorse: `Better: ${(alt.advantages || []).join('; ') || 'Verified price'}. Trade-off: ${(alt.disadvantages || []).join('; ') || 'Confirm exact configuration'}.`,
+        savesMoney: alt.savings > 0,
+        estimatedSavings: alt.savings || 0,
+        whereToBuy: fullDeal.retailerName,
+        loved: lovedIds.has(fullDeal.id),
+        deal: fullDeal,
+      });
+    }
+  }
+
+  // ---- TIER 3: Related / Complementary Products to Wish Lists ----
+  const tier3Related = [];
+  for (const item of sortedWish) {
+    const itemTokens = new Set((item.identity?.tokens || tokenizeProduct(item.name)).filter((t) => t.length >= 3 && !GENERIC_SIMILARITY_STOP.has(t)));
+    const itemBrand = (item.brand || item.identity?.brand || '').toLowerCase();
+    const itemCat = item.category || item.identity?.category || 'other';
+    const itemSubtype = detectProductSubtype(`${item.brand || ''} ${item.name || ''}`);
+
+    for (const deal of eligibleDeals) {
+      if (usedIds.has(deal.id) || tier1AllExactIds.has(deal.id)) continue;
+      const dTokens = (deal.identity?.tokens || tokenizeProduct(deal.title)).filter((t) => !GENERIC_SIMILARITY_STOP.has(t));
+      const shared = dTokens.filter((t) => itemTokens.has(t));
+      const sameBrand = itemBrand && (deal.brand || '').toLowerCase() === itemBrand;
+      const sameCat = itemCat !== 'other' && deal.category === itemCat;
+      const dealSubtype = detectProductSubtype(deal.title);
+      if (itemSubtype && dealSubtype && itemSubtype !== dealSubtype && !sameBrand) continue;
+
+      // Require clear relation to this specific wish-list item (same brand + same category, OR same subtype, OR >=2 meaningful product tokens, OR direct accessory complement)
+      const isComplement = Boolean(sameBrand && deal.isAccessory && shared.length >= 1);
+      const isRelated = Boolean((sameBrand && sameCat) || (itemSubtype && dealSubtype === itemSubtype) || shared.length >= 2 || isComplement);
+      if (!isRelated) continue;
+
+      usedIds.add(deal.id);
+      tier3Related.push({
+        tier: 3,
+        tierLabel: isComplement ? 'Tier 3 · Complementary Accessory' : 'Tier 3 · Related Product',
+        dealId: deal.id,
+        wishlistItemId: item.id,
+        triggeredBy: item.name,
+        whyRelevant: isComplement
+          ? `Accessory / complement for your "${item.name}" (${deal.brand}).`
+          : sameBrand
+            ? `Same brand (${deal.brand}) in the ${deal.category} category as "${item.name}".`
+            : `Closely related to "${item.name}" (matching ${shared.slice(0, 3).join(', ')}).`,
+        similarity: isComplement ? 'Complementary item' : 'Related category/brand',
+        betterOrWorse: deal.verifiedDiscountPct
+          ? `Verified ${deal.verifiedDiscountPct}% off (${deal.baselineLabel}); compare specs against "${item.name}".`
+          : `Live price $${deal.currentPrice.toFixed(2)} at ${deal.retailerName}.`,
+        savesMoney: Boolean(deal.estimatedSavings > 0),
+        estimatedSavings: deal.estimatedSavings || 0,
+        whereToBuy: deal.retailerName,
+        loved: lovedIds.has(deal.id),
+        deal,
+      });
+      if (tier3Related.length >= 18) break;
+    }
+    if (tier3Related.length >= 18) break;
+  }
+
+  // ---- TIER 4: Personalized New Gift Discoveries (strictly tied to Family Profiles & LOVE IT signals) ----
+  const tier4Discoveries = [];
+  const lovedDeals = eligibleDeals.filter((d) => lovedIds.has(d.id));
+  const lovedBrands = new Set(lovedDeals.map((d) => (d.brand || '').toLowerCase()).filter(Boolean));
+  const lovedCategories = new Set(lovedDeals.map((d) => d.category).filter((c) => c && c !== 'other'));
+
+  for (const deal of eligibleDeals) {
+    if (usedIds.has(deal.id)) continue;
+    const hay = `${deal.title} ${deal.brand || ''} ${deal.description || ''} ${deal.category || ''}`.toLowerCase();
+    const dBrand = (deal.brand || '').toLowerCase();
+
+    let bestTrigger = null;
+    let score = 0;
+
+    for (const prof of profiles || []) {
+      const budgetCap = Number(prof.budget) > 0 ? Number(prof.budget) : null;
+      if (budgetCap && deal.currentPrice > budgetCap) continue;
+
+      const brandHit = (prof.favoriteBrands || []).find((b) => b && (dBrand === b.toLowerCase() || hay.includes(b.toLowerCase())));
+      const interestHit = (prof.interests || []).find((int) => int && int.trim().length >= 3 && hay.includes(int.trim().toLowerCase()));
+      const retailerHit = (prof.preferredRetailers || []).includes(deal.retailerId);
+
+      if (brandHit || interestHit || (retailerHit && deal.verifiedDiscountPct >= 25)) {
+        const pts = (brandHit ? 35 : 0) + (interestHit ? 30 : 0) + (retailerHit ? 15 : 0) + (deal.verifiedDiscountPct >= 25 ? 15 : 0);
+        if (pts > score) {
+          score = pts;
+          const reasons = [];
+          if (brandHit) reasons.push(`favorite brand "${brandHit}"`);
+          if (interestHit) reasons.push(`interest "${interestHit}"`);
+          if (retailerHit) reasons.push(`preferred store ${deal.retailerName}`);
+          bestTrigger = {
+            profileName: prof.name,
+            reasonText: `Matches ${prof.name}'s profile (${reasons.join(' + ')}) within $${budgetCap || 'set'} budget.`,
+          };
+        }
+      }
+    }
+
+    // Or matches a brand + category from items the family clicked LOVE IT on
+    if (!bestTrigger && dBrand && lovedBrands.has(dBrand) && lovedCategories.has(deal.category)) {
+      score = 28 + (deal.verifiedDiscountPct >= 20 ? 12 : 0);
+      bestTrigger = {
+        profileName: 'Saved Favorites',
+        reasonText: `Matches brand (${deal.brand}) and category (${deal.category}) from deals you marked LOVE IT.`,
+      };
+    }
+
+    if (!bestTrigger) continue;
+
+    usedIds.add(deal.id);
+    tier4Discoveries.push({
+      tier: 4,
+      tierLabel: 'Tier 4 · Personalized Discovery',
+      dealId: deal.id,
+      wishlistItemId: null,
+      triggeredBy: bestTrigger.profileName,
+      whyRelevant: bestTrigger.reasonText,
+      similarity: 'Matches family profile preference',
+      betterOrWorse: deal.verifiedDiscountPct
+        ? `Verified ${deal.verifiedDiscountPct}% discount (-$${deal.estimatedSavings?.toFixed(2)}); new gift idea not yet on your wish lists.`
+        : `Live price $${deal.currentPrice.toFixed(2)} at ${deal.retailerName}; baseline still building.`,
+      savesMoney: Boolean(deal.estimatedSavings > 0),
+      estimatedSavings: deal.estimatedSavings || 0,
+      whereToBuy: deal.retailerName,
+      loved: lovedIds.has(deal.id),
+      score,
+      deal,
+    });
+  }
+
+  tier4Discoveries.sort((a, b) => (b.score || 0) - (a.score || 0) || (b.deal.verifiedDiscountPct || 0) - (a.deal.verifiedDiscountPct || 0));
+
+  return {
+    hasPreferences: true,
+    onboardingRequired: false,
+    tier1Exact,
+    tier2Alternatives: tier2Alternatives.slice(0, 24),
+    tier3Related: tier3Related.slice(0, 18),
+    tier4Discoveries: tier4Discoveries.slice(0, 20),
+    summary: {
+      activeWishlistCount: activeWish.length,
+      configuredProfilesCount: profileSignals.length,
+      lovedCount: lovedIds.size,
+      rejectedCount: rejectedIds.size,
+    },
+  };
+}
+
+/**
+ * Powers the actionable FIND SIMILAR and FIND CHEAPER buttons on any deal or wish-list card.
+ */
+export function findSimilarOrCheaper(anchorDeal, evaluatedDeals = [], mode = 'similar') {
+  if (!anchorDeal) return [];
+  const anchorTokens = new Set((anchorDeal.identity?.tokens || tokenizeProduct(anchorDeal.title || anchorDeal.name)).filter((t) => !GENERIC_SIMILARITY_STOP.has(t)));
+  const anchorBrand = (anchorDeal.brand || '').toLowerCase();
+  const anchorCat = anchorDeal.category || 'other';
+  const anchorPrice = anchorDeal.currentPrice ?? anchorDeal.preferredPrice ?? null;
+  const anchorSubtype = detectProductSubtype(anchorDeal.title || anchorDeal.name);
+
+  const out = [];
+  for (const d of evaluatedDeals) {
+    if (d.archived || d.id === anchorDeal.id || d.currentPrice === null) continue;
+    if (!anchorDeal.isAccessory && d.isAccessory) continue;
+
+    const dealSubtype = detectProductSubtype(d.title);
+    if (anchorSubtype && dealSubtype && anchorSubtype !== dealSubtype) continue;
+
+    const dTokens = (d.identity?.tokens || tokenizeProduct(d.title)).filter((t) => !GENERIC_SIMILARITY_STOP.has(t));
+    const shared = dTokens.filter((t) => anchorTokens.has(t));
+    const sameBrand = anchorBrand && (d.brand || '').toLowerCase() === anchorBrand;
+    const sameCat = anchorCat !== 'other' && d.category === anchorCat;
+    const sameSubtype = Boolean(anchorSubtype && dealSubtype === anchorSubtype);
+
+    if (!sameSubtype && !sameCat && !sameBrand && shared.length < 2) continue;
+    if (mode === 'cheaper' && anchorPrice !== null && d.currentPrice >= anchorPrice) continue;
+
+    const relevance = (sameSubtype ? 25 : 0) + shared.length * 12 + (sameBrand ? 18 : 0) + (sameCat ? 12 : 0) + (d.verifiedDiscountPct >= 20 ? 10 : 0);
+    if (relevance < 12) continue;
+
+    out.push({
+      deal: d,
+      relevance,
+      savings: anchorPrice !== null && d.currentPrice < anchorPrice ? roundMoney(anchorPrice - d.currentPrice) : 0,
+      reason: mode === 'cheaper'
+        ? `$${(anchorPrice - d.currentPrice).toFixed(2)} cheaper ($${d.currentPrice.toFixed(2)} vs $${anchorPrice.toFixed(2)}) in ${d.category}`
+        : `${sameBrand ? `Same brand (${d.brand})` : `Same category (${d.category})`}${shared.length ? ` · shared: ${shared.slice(0, 3).join(', ')}` : ''}`,
+    });
+  }
+
+  if (mode === 'cheaper') {
+    out.sort((a, b) => a.deal.currentPrice - b.deal.currentPrice);
+  } else {
+    out.sort((a, b) => b.relevance - a.relevance || (b.deal.decision?.score || 0) - (a.deal.decision?.score || 0));
+  }
+  return out.slice(0, 12);
+}
+

@@ -1,11 +1,13 @@
 /**
- * Persistent Database Store with Atomic Writes, Rolling Backups,
- * Real Price History Ledger, and GitHub Worker / Supabase Sync.
+ * Persistent Database Store with Atomic Writes, Uploaded File Preservation,
+ * Rolling Backups, Real Price History Ledger, Render Persistent Disk auto-detection,
+ * and Bidirectional Supabase / GitHub Worker Sync.
  */
 
 import fs from 'node:fs/promises';
 import fsSync from 'node:fs';
 import path from 'node:path';
+import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import {
   BLACK_FRIDAY_VERSION,
@@ -19,12 +21,44 @@ const DEFAULT_DATA_DIR = path.join(ROOT_DIR, 'data', 'black-friday');
 const GITHUB_SNAPSHOT_URL = 'https://raw.githubusercontent.com/nourie42/Sun-Nourie/black-friday-data/snapshot.json';
 const MAX_BACKUPS = 10;
 const MAX_ALERTS = 250;
-const MAX_DEALS = 450;
+const MAX_DEALS = 500;
 const MAX_HISTORY_PER_PRODUCT = 365;
 const MAX_SCHEDULER_HISTORY = 40;
+const MAX_UPLOADED_FILES = 120;
 
 function deepClone(obj) {
   return JSON.parse(JSON.stringify(obj));
+}
+
+function resolveDefaultDataDir(env = process.env) {
+  if (env.BLACK_FRIDAY_DATA_DIR) return env.BLACK_FRIDAY_DATA_DIR;
+  // Auto-detect Render Persistent Disk standard mount (/var/data) when available
+  if (process.platform !== 'win32') {
+    try {
+      if (fsSync.existsSync('/var/data')) {
+        fsSync.accessSync('/var/data', fsSync.constants.W_OK);
+        return '/var/data/black-friday';
+      }
+    } catch {}
+  }
+  return DEFAULT_DATA_DIR;
+}
+
+function normalizeProfile(p = {}) {
+  return {
+    id: p.id || `prof_${crypto.randomBytes(4).toString('hex')}`,
+    name: String(p.name || 'Family Member').slice(0, 60),
+    type: String(p.type || 'member'),
+    icon: String(p.icon || '🎁').slice(0, 4),
+    budget: Number(p.budget) > 0 ? Number(p.budget) : 300,
+    description: String(p.description || '').slice(0, 200),
+    favoriteBrands: Array.isArray(p.favoriteBrands) ? p.favoriteBrands : [],
+    clothingSizes: String(p.clothingSizes || '').slice(0, 160),
+    interests: Array.isArray(p.interests) ? p.interests : [],
+    preferredRetailers: Array.isArray(p.preferredRetailers) ? p.preferredRetailers : [],
+    dislikedProducts: Array.isArray(p.dislikedProducts) ? p.dislikedProducts : [],
+    savedIdeas: Array.isArray(p.savedIdeas) ? p.savedIdeas : [],
+  };
 }
 
 export function createInitialState() {
@@ -33,18 +67,22 @@ export function createInitialState() {
     appVersion: BLACK_FRIDAY_VERSION,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
-    profiles: deepClone(DEFAULT_PROFILES),
+    profiles: deepClone(DEFAULT_PROFILES).map(normalizeProfile),
     wishlist: [],
+    savedDeals: [],
+    uploadedFiles: [],
     deals: {},
     priceHistory: {},
     sourceHealth: {},
+    retailerLinkStatus: {},
     cashbackRates: {},
     alerts: [],
     feedback: {
       savedDealIds: [],
+      lovedDealIds: [],
       rejectedDealIds: [],
-      rejectedBrands: [],
-      rejectedCategories: [],
+      rejectedCanonicalKeys: [],
+      boughtDealIds: [],
     },
     scheduler: {
       lastRunAt: null,
@@ -64,6 +102,9 @@ function mergeSettings(saved = {}) {
   return {
     ...base,
     ...saved,
+    favoriteStores: Array.isArray(saved.favoriteStores) && saved.favoriteStores.length
+      ? saved.favoriteStores
+      : base.favoriteStores,
     location: { ...base.location, ...(saved.location || {}) },
     thresholds: { ...base.thresholds, ...(saved.thresholds || {}) },
     decisionWeights: { ...base.decisionWeights, ...(saved.decisionWeights || {}) },
@@ -75,38 +116,54 @@ function mergeSettings(saved = {}) {
 }
 
 export function createBlackFridayStore({
-  dataDir = process.env.BLACK_FRIDAY_DATA_DIR || DEFAULT_DATA_DIR,
+  dataDir = null,
   env = process.env,
   fetchImpl = globalThis.fetch,
 } = {}) {
-  const statePath = path.join(dataDir, 'state.json');
-  const backupDir = path.join(dataDir, 'backups');
+  const resolvedDir = dataDir || resolveDefaultDataDir(env);
+  const statePath = path.join(resolvedDir, 'state.json');
+  const backupDir = path.join(resolvedDir, 'backups');
+  const uploadsDir = path.join(resolvedDir, 'uploads');
   let state = loadSync();
   let writeChain = Promise.resolve();
   let lastBackupAt = 0;
+
+  function hydrateRawObject(raw) {
+    const init = createInitialState();
+    return {
+      ...init,
+      ...raw,
+      schemaVersion: SCHEMA_VERSION,
+      appVersion: BLACK_FRIDAY_VERSION,
+      profiles: Array.isArray(raw.profiles) && raw.profiles.length
+        ? raw.profiles.map(normalizeProfile)
+        : init.profiles,
+      wishlist: Array.isArray(raw.wishlist) ? raw.wishlist : [],
+      savedDeals: Array.isArray(raw.savedDeals) ? raw.savedDeals : [],
+      uploadedFiles: Array.isArray(raw.uploadedFiles) ? raw.uploadedFiles : [],
+      deals: raw.deals && typeof raw.deals === 'object' ? raw.deals : {},
+      priceHistory: raw.priceHistory && typeof raw.priceHistory === 'object' ? raw.priceHistory : {},
+      sourceHealth: raw.sourceHealth && typeof raw.sourceHealth === 'object' ? raw.sourceHealth : {},
+      retailerLinkStatus: raw.retailerLinkStatus && typeof raw.retailerLinkStatus === 'object' ? raw.retailerLinkStatus : {},
+      cashbackRates: raw.cashbackRates && typeof raw.cashbackRates === 'object' ? raw.cashbackRates : {},
+      alerts: Array.isArray(raw.alerts) ? raw.alerts : [],
+      feedback: {
+        ...init.feedback,
+        ...(raw.feedback || {}),
+        lovedDealIds: Array.isArray(raw.feedback?.lovedDealIds) ? raw.feedback.lovedDealIds : (Array.isArray(raw.feedback?.savedDealIds) ? raw.feedback.savedDealIds : []),
+        rejectedCanonicalKeys: Array.isArray(raw.feedback?.rejectedCanonicalKeys) ? raw.feedback.rejectedCanonicalKeys : [],
+        boughtDealIds: Array.isArray(raw.feedback?.boughtDealIds) ? raw.feedback.boughtDealIds : [],
+      },
+      scheduler: { ...init.scheduler, ...(raw.scheduler || {}), running: false },
+      settings: mergeSettings(raw.settings),
+    };
+  }
 
   function loadSync() {
     try {
       if (fsSync.existsSync(statePath)) {
         const raw = JSON.parse(fsSync.readFileSync(statePath, 'utf8'));
-        if (raw && typeof raw === 'object') {
-          const init = createInitialState();
-          return {
-            ...init,
-            ...raw,
-            appVersion: BLACK_FRIDAY_VERSION,
-            profiles: Array.isArray(raw.profiles) && raw.profiles.length ? raw.profiles : init.profiles,
-            wishlist: Array.isArray(raw.wishlist) ? raw.wishlist : [],
-            deals: raw.deals && typeof raw.deals === 'object' ? raw.deals : {},
-            priceHistory: raw.priceHistory && typeof raw.priceHistory === 'object' ? raw.priceHistory : {},
-            sourceHealth: raw.sourceHealth && typeof raw.sourceHealth === 'object' ? raw.sourceHealth : {},
-            cashbackRates: raw.cashbackRates && typeof raw.cashbackRates === 'object' ? raw.cashbackRates : {},
-            alerts: Array.isArray(raw.alerts) ? raw.alerts : [],
-            feedback: { ...init.feedback, ...(raw.feedback || {}) },
-            scheduler: { ...init.scheduler, ...(raw.scheduler || {}), running: false },
-            settings: mergeSettings(raw.settings),
-          };
-        }
+        if (raw && typeof raw === 'object') return hydrateRawObject(raw);
       }
     } catch (error) {
       console.error('[black-friday/store] Could not read persisted state, starting fresh:', error?.message || error);
@@ -114,18 +171,47 @@ export function createBlackFridayStore({
     return createInitialState();
   }
 
-  async function persist({ createBackup = false } = {}) {
+  /**
+   * Hydrate persisted state from Supabase PostgreSQL on startup if configured and newer than local disk.
+   */
+  async function hydrateFromSupabase() {
+    if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) return { synced: false, reason: 'not_configured' };
+    try {
+      const res = await fetchImpl(`${env.SUPABASE_URL.replace(/\/$/, '')}/rest/v1/black_friday_state?id=eq.primary&select=payload,updated_at`, {
+        headers: {
+          apikey: env.SUPABASE_SERVICE_ROLE_KEY,
+          Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+        },
+        signal: AbortSignal.timeout(7000),
+      });
+      if (!res.ok) return { synced: false, reason: `HTTP ${res.status}` };
+      const rows = await res.json();
+      const row = Array.isArray(rows) ? rows[0] : null;
+      if (!row?.payload) return { synced: false, reason: 'empty' };
+      const remoteTs = Date.parse(row.updated_at || row.payload.updatedAt || 0) || 0;
+      const localTs = Date.parse(state.updatedAt || 0) || 0;
+      if (remoteTs > localTs || (!state.wishlist.length && row.payload.wishlist?.length)) {
+        state = hydrateRawObject(row.payload);
+        await persist({ skipSupabase: true });
+        return { synced: true, updatedAt: state.updatedAt };
+      }
+      return { synced: false, reason: 'local_is_newer' };
+    } catch (e) {
+      return { synced: false, reason: String(e?.message || e) };
+    }
+  }
+
+  async function persist({ createBackup = false, skipSupabase = false } = {}) {
     state.updatedAt = new Date().toISOString();
     state.appVersion = BLACK_FRIDAY_VERSION;
     const payload = JSON.stringify(state, null, 2);
 
     const op = writeChain.catch(() => {}).then(async () => {
-      await fs.mkdir(dataDir, { recursive: true });
+      await fs.mkdir(resolvedDir, { recursive: true });
       const tmp = `${statePath}.${process.pid}.${Date.now()}.tmp`;
       await fs.writeFile(tmp, payload, 'utf8');
       await fs.rename(tmp, statePath);
 
-      // Periodic rolling backups (at least once every 30 min or when explicitly requested)
       const nowMs = Date.now();
       if (createBackup || nowMs - lastBackupAt > 30 * 60 * 1000) {
         lastBackupAt = nowMs;
@@ -141,8 +227,7 @@ export function createBlackFridayStore({
         }
       }
 
-      // Optional Supabase REST sync if user configured SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY
-      if (env.SUPABASE_URL && env.SUPABASE_SERVICE_ROLE_KEY) {
+      if (!skipSupabase && env.SUPABASE_URL && env.SUPABASE_SERVICE_ROLE_KEY) {
         try {
           await fetchImpl(`${env.SUPABASE_URL.replace(/\/$/, '')}/rest/v1/black_friday_state`, {
             method: 'POST',
@@ -153,11 +238,9 @@ export function createBlackFridayStore({
               Prefer: 'resolution=merge-duplicates',
             },
             body: JSON.stringify({ id: 'primary', payload: state, updated_at: state.updatedAt }),
-            signal: AbortSignal.timeout(6000),
+            signal: AbortSignal.timeout(7000),
           });
-        } catch {
-          // Non-fatal; local atomic file remains authoritative
-        }
+        } catch {}
       }
     });
 
@@ -166,16 +249,55 @@ export function createBlackFridayStore({
   }
 
   /**
-   * Append real timestamped price observations to priceHistory.
-   * Never synthesizes past points. Deduplicates unchanged prices within 20 min for same retailer.
+   * Preserve original uploaded file on disk (even if parsing failed or needed correction).
    */
+  async function saveUploadedFile({ filename = 'upload.txt', mimeType = 'application/octet-stream', contentBase64 = '', contentText = '', uploadType = 'wishlist', extractedCount = 0, parseWarning = null } = {}) {
+    const id = `uf_${crypto.randomBytes(6).toString('hex')}`;
+    const safeName = String(filename || 'upload.txt').replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 80);
+    const storedName = `${id}-${safeName}`;
+    await fs.mkdir(uploadsDir, { recursive: true });
+
+    const buf = contentBase64
+      ? Buffer.from(contentBase64.replace(/^data:[^;]+;base64,/, ''), 'base64')
+      : Buffer.from(String(contentText || ''), 'utf8');
+    await fs.writeFile(path.join(uploadsDir, storedName), buf);
+
+    const record = {
+      id,
+      filename: filename || safeName,
+      storedName,
+      mimeType: mimeType || 'application/octet-stream',
+      sizeBytes: buf.length,
+      uploadType,
+      extractedCount,
+      parseWarning,
+      uploadedAt: new Date().toISOString(),
+    };
+    state.uploadedFiles.unshift(record);
+    if (state.uploadedFiles.length > MAX_UPLOADED_FILES) {
+      state.uploadedFiles = state.uploadedFiles.slice(0, MAX_UPLOADED_FILES);
+    }
+    await persist();
+    return record;
+  }
+
+  async function readUploadedFile(fileId) {
+    const meta = (state.uploadedFiles || []).find((f) => f.id === fileId);
+    if (!meta) return null;
+    const filePath = path.join(uploadsDir, meta.storedName);
+    try {
+      const data = await fs.readFile(filePath);
+      return { meta, data };
+    } catch {
+      return null;
+    }
+  }
+
   function recordPriceObservations(dealsList = [], nowMs = Date.now()) {
     let added = 0;
     for (const deal of dealsList) {
       if (!deal?.canonicalKey || deal.currentPrice === null || !Number.isFinite(deal.currentPrice)) continue;
-      if (!state.priceHistory[deal.canonicalKey]) {
-        state.priceHistory[deal.canonicalKey] = [];
-      }
+      if (!state.priceHistory[deal.canonicalKey]) state.priceHistory[deal.canonicalKey] = [];
       const series = state.priceHistory[deal.canonicalKey];
       const latestSameRetailer = [...series].reverse().find((p) => p.retailerId === deal.retailerId);
       const isDuplicateRecent =
@@ -206,9 +328,6 @@ export function createBlackFridayStore({
     return added;
   }
 
-  /**
-   * Merge newly fetched deals into state, archiving expired or stale unseen deals cleanly.
-   */
   function mergeDeals(incomingDeals = [], nowIso = new Date().toISOString()) {
     const nowMs = Date.parse(nowIso);
     const previousDealsById = {};
@@ -216,7 +335,6 @@ export function createBlackFridayStore({
       previousDealsById[id] = { currentPrice: d.currentPrice, availabilityStatus: d.availabilityStatus };
     }
 
-    // Deduplicate incoming deals by id, keeping richest image/regularPrice/reviewData
     for (const deal of incomingDeals) {
       const existing = state.deals[deal.id];
       if (existing) {
@@ -240,7 +358,6 @@ export function createBlackFridayStore({
       }
     }
 
-    // Archive deals whose confirmed expiration date has passed or that haven't been seen in 72h
     for (const deal of Object.values(state.deals)) {
       if (deal.expiresAt && Date.parse(deal.expiresAt) < nowMs) {
         deal.archived = true;
@@ -251,7 +368,6 @@ export function createBlackFridayStore({
       }
     }
 
-    // Prune oldest archived deals if map grows beyond MAX_DEALS
     const allIds = Object.keys(state.deals);
     if (allIds.length > MAX_DEALS) {
       const sorted = Object.values(state.deals).sort((a, b) => {
@@ -267,15 +383,11 @@ export function createBlackFridayStore({
     return previousDealsById;
   }
 
-  /**
-   * Hydrate newer verified snapshot published by GitHub Actions background worker (black-friday-data branch).
-   * Never overwrites local family wish lists or user settings.
-   */
   async function syncFromGitHubWorker({ snapshotUrl = env.BLACK_FRIDAY_SNAPSHOT_URL || GITHUB_SNAPSHOT_URL } = {}) {
     if (!snapshotUrl || env.BLACK_FRIDAY_DISABLE_GITHUB_SYNC === '1') return { synced: false, reason: 'disabled' };
     try {
       const res = await fetchImpl(snapshotUrl, {
-        headers: { 'User-Agent': 'BlackFridayCommandCenter/1.0' },
+        headers: { 'User-Agent': 'BlackFridayCommandCenter/2.0' },
         signal: AbortSignal.timeout(7000),
       });
       if (!res.ok) return { synced: false, reason: `HTTP ${res.status}` };
@@ -310,28 +422,48 @@ export function createBlackFridayStore({
 
   async function listBackups() {
     try {
-      const files = (await fs.readdir(backupDir)).filter((f) => f.startsWith('state-') && f.endsWith('.json')).sort().reverse();
-      return files;
+      return (await fs.readdir(backupDir)).filter((f) => f.startsWith('state-') && f.endsWith('.json')).sort().reverse();
     } catch {
       return [];
     }
   }
 
+  function getPersistenceInfo() {
+    const usesSupabase = Boolean(env.SUPABASE_URL && env.SUPABASE_SERVICE_ROLE_KEY);
+    const usesRenderDisk = resolvedDir.startsWith('/var/data');
+    return {
+      mode: usesSupabase ? 'supabase_postgres_plus_disk' : usesRenderDisk ? 'render_persistent_disk' : 'local_atomic_disk',
+      survivesRedeploys: usesSupabase || usesRenderDisk,
+      dataDir: resolvedDir,
+      note: usesSupabase
+        ? 'Persisted to Supabase PostgreSQL + local atomic backups (survives redeploys and device switches).'
+        : usesRenderDisk
+          ? 'Persisted to Render Persistent Disk (/var/data/black-friday).'
+          : 'Persisted to local server disk (survives refreshes, browser restarts & device switches; attach a Render Persistent Disk at /var/data or set SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY to survive git redeploys).',
+    };
+  }
+
   return {
     getState: () => state,
     setState: (next) => { state = next; },
+    normalizeProfile,
+    hydrateFromSupabase,
     persist,
+    saveUploadedFile,
+    readUploadedFile,
     recordPriceObservations,
     mergeDeals,
     syncFromGitHubWorker,
     listBackups,
+    getPersistenceInfo,
     trimAlerts: () => {
       if (state.alerts.length > MAX_ALERTS) state.alerts = state.alerts.slice(0, MAX_ALERTS);
     },
     pushSchedulerLog: (entry) => {
       state.scheduler.history = [entry, ...(state.scheduler.history || [])].slice(0, MAX_SCHEDULER_HISTORY);
     },
-    dataDir,
+    dataDir: resolvedDir,
     statePath,
+    uploadsDir,
   };
 }

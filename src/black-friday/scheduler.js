@@ -1,9 +1,9 @@
 /**
- * Autonomous Background Price Monitoring Scheduler & Dashboard Computation Engine.
+ * Autonomous Background Price Monitoring Scheduler & Personalized Dashboard Engine (v2.0).
  *
- * Continues monitoring server-side even when all browser tabs are closed.
- * Pairs with GitHub Actions scheduled workflow (.github/workflows/black-friday-monitor.yml)
- * for uninterrupted monitoring even across hosting sleep/restarts.
+ * Monitors family wish lists AND user-uploaded saved deals continuously server-side.
+ * Preserves original uploaded prices as historical records whenever prices change.
+ * Enforces the strict 4-tier wish-list & family-profile recommendation hierarchy.
  */
 
 import { EventEmitter } from 'node:events';
@@ -13,13 +13,22 @@ import {
   LOCAL_STORES_KNIGHTDALE,
   SHOPPING_EVENTS_2026,
   PRIMARY_LOCATION,
+  DEFAULT_FAVORITE_STORES,
 } from './constants.js';
-import { runAllAdapters, searchLiveSourcesForItem, SOURCE_CATALOG } from './adapters.js';
+import {
+  runAllAdapters,
+  searchLiveSourcesForItem,
+  inspectRetailerUrl,
+  verifyRetailerDirectoryLinks,
+  SOURCE_CATALOG,
+} from './adapters.js';
 import {
   evaluateDeal,
   matchWishlistToDeal,
   discoverAlternatives,
   runDealHunter,
+  buildPersonalizedRecommendations,
+  findSimilarOrCheaper,
   roundMoney,
 } from './intelligence.js';
 import {
@@ -41,7 +50,7 @@ export function createBlackFridayEngine({
   let lastManualRefreshMs = 0;
 
   function isBlackFridayPeakWindow(date = now()) {
-    const m = date.getUTCMonth(); // 10 = Nov, 11 = Dec
+    const m = date.getUTCMonth();
     const d = date.getUTCDate();
     return (m === 10 && d >= 15) || (m === 11 && d <= 5);
   }
@@ -49,7 +58,7 @@ export function createBlackFridayEngine({
   function nextCadenceMinutes() {
     const state = store.getState();
     const cfg = state.settings?.monitoring || {};
-    const hasHighPriority = state.wishlist.some((w) => w.priority === 'high' && !['purchased', 'no_longer_interested'].includes(w.status));
+    const hasHighPriority = (state.wishlist || []).some((w) => w.priority === 'high' && !['purchased', 'no_longer_interested'].includes(w.status));
     if (hasHighPriority) return Math.max(10, Number(cfg.highPriorityMinutes) || 15);
     if (isBlackFridayPeakWindow()) return Math.max(10, Number(cfg.blackFridayEventMinutes) || 15);
     return Math.max(15, Number(cfg.standardMinutes) || 90);
@@ -66,17 +75,12 @@ export function createBlackFridayEngine({
     if (typeof timer.unref === 'function') timer.unref();
   }
 
-  /**
-   * Evaluate all stored deals against current price history, competitor listings, cashback rates,
-   * and family wish lists.
-   */
   function evaluateAllDeals() {
     const state = store.getState();
     const nowMs = now().getTime();
     const rawDeals = Object.values(state.deals || {});
     const activeWish = (state.wishlist || []).filter((w) => !['purchased', 'no_longer_interested'].includes(w.status));
 
-    // Group active deals by canonicalKey for cross-retailer competitor pricing
     const byCanonical = new Map();
     for (const d of rawDeals) {
       if (d.archived) continue;
@@ -111,15 +115,6 @@ export function createBlackFridayEngine({
     return evaluated;
   }
 
-  /**
-   * Run a complete autonomous monitoring sweep:
-   * 1. Fetch all enabled feeds + cashback rates + optional official APIs
-   * 2. Run targeted live searches for tracked wish-list items
-   * 3. Merge deals & append real price history observations
-   * 4. Update wish-list deal_found states
-   * 5. Evaluate & deduplicate Smart Alerts (+ deliver external channels if configured)
-   * 6. Persist atomically & broadcast SSE update
-   */
   async function runMonitoringSweep({
     reason = 'scheduled',
     workerSource = 'server',
@@ -145,12 +140,13 @@ export function createBlackFridayEngine({
           now,
         });
 
-        // 2. Targeted live search for active wish-list items (up to 6 per sweep to respect rate limits)
+        // 2. Targeted live search for active wish-list items (prioritizing High priority first!)
+        const prioOrder = { high: 0, standard: 1, low: 2 };
         const wishTargets = (state.wishlist || [])
           .filter((w) => !['purchased', 'no_longer_interested'].includes(w.status))
           .filter((w) => !targetedWishlistIds || targetedWishlistIds.includes(w.id))
-          .sort((a, b) => (a.priority === 'high' ? -1 : 1) - (b.priority === 'high' ? -1 : 1))
-          .slice(0, 6);
+          .sort((a, b) => (prioOrder[a.priority] ?? 1) - (prioOrder[b.priority] ?? 1))
+          .slice(0, 8);
 
         const targetedDeals = [];
         for (const item of wishTargets) {
@@ -159,6 +155,46 @@ export function createBlackFridayEngine({
           item.lastCheckedAt = searchOut.checkedAt;
           for (const h of searchOut.sourcesChecked) {
             adapterOut.healthById[h.sourceId] = h;
+          }
+          // If the wish-list item has a direct retailer URL, also politely check it for fresh JSON-LD price
+          if (item.sourceUrl && /^https?:\/\//i.test(item.sourceUrl)) {
+            const inspected = await inspectRetailerUrl(item.sourceUrl, { fetchImpl, now }).catch(() => null);
+            if (inspected?.ok && inspected.currentPrice != null) {
+              targetedDeals.push({
+                id: `url_${item.id}`,
+                canonicalKey: item.canonicalKey,
+                title: inspected.name || item.name,
+                brand: inspected.brand || item.brand,
+                modelNumber: inspected.modelNumber || item.modelNumber,
+                identifiers: inspected.identifiers || {},
+                specs: inspected.specs || {},
+                category: item.category,
+                condition: 'new',
+                isAccessory: false,
+                retailerId: inspected.retailerId,
+                retailerName: inspected.retailerName,
+                currentPrice: inspected.currentPrice,
+                reportedRegularPrice: item.originalPrice ?? null,
+                baselineSource: item.originalPrice ? 'editorial_regular' : null,
+                shippingCost: null,
+                shippingFree: false,
+                currency: 'USD',
+                imageUrl: inspected.imageUrl || item.imageUrl || null,
+                retailerUrl: inspected.url,
+                dealPageUrl: inspected.url,
+                isDirectProductUrl: true,
+                availabilityStatus: inspected.availabilityStatus || 'unverified',
+                localPickupKnightdale: 'unverified',
+                sourceId: 'direct_url_inspector',
+                sourceName: `${inspected.retailerName} Direct URL`,
+                publishedAt: startedIso,
+                verifiedAt: startedIso,
+                lastSeenAt: startedIso,
+                archived: false,
+                reviewData: inspected.reviewData || null,
+                description: inspected.description || '',
+              });
+            }
           }
         }
 
@@ -182,13 +218,14 @@ export function createBlackFridayEngine({
         const previousDealsById = store.mergeDeals(allFetchedDeals, startedIso);
         const observationsAdded = store.recordPriceObservations(allFetchedDeals, startedAt.getTime());
 
-        // 5. Evaluate deals & update wish-list statuses
+        // 5. Evaluate deals & update wish-list statuses + saved-deal price tracking (preserving original uploaded price!)
         const evaluatedDeals = evaluateAllDeals();
         const activeEvaluated = evaluatedDeals.filter((d) => !d.archived);
 
-        for (const item of state.wishlist) {
+        for (const item of state.wishlist || []) {
           if (['purchased', 'no_longer_interested'].includes(item.status)) continue;
           const matches = activeEvaluated.filter((d) => d.matchedWishlistIds.includes(item.id));
+          if (matches.length) item.lastCheckedAt = startedIso;
           const hasQualifyingDeal = matches.some(
             (m) =>
               (m.verifiedDiscountPct !== null && m.verifiedDiscountPct >= (state.settings.thresholds?.goodPct ?? 15)) ||
@@ -197,6 +234,40 @@ export function createBlackFridayEngine({
           if (hasQualifyingDeal && item.status !== 'deal_found') {
             item.status = 'deal_found';
             item.updatedAt = startedIso;
+          }
+        }
+
+        // Check user-uploaded savedDeals against latest live prices & preserve originalUploadedPrice forever
+        for (const sd of state.savedDeals || []) {
+          let observedPrice = null;
+          let observedSource = null;
+          if (sd.url && /^https?:\/\//i.test(sd.url)) {
+            const insp = await inspectRetailerUrl(sd.url, { fetchImpl, now }).catch(() => null);
+            if (insp?.ok && insp.currentPrice != null) {
+              observedPrice = insp.currentPrice;
+              observedSource = 'direct_url_recheck';
+            }
+          }
+          if (observedPrice === null) {
+            const matchedLive = activeEvaluated.find((d) => matchWishlistToDeal(sd, d).matched);
+            if (matchedLive?.currentPrice != null) {
+              observedPrice = matchedLive.currentPrice;
+              observedSource = matchedLive.sourceName;
+            }
+          }
+          sd.lastCheckedAt = startedIso;
+          if (observedPrice !== null && observedPrice !== sd.currentPrice) {
+            sd.currentPrice = observedPrice;
+            sd.updatedAt = startedIso;
+            if (!Array.isArray(sd.priceHistory)) sd.priceHistory = [];
+            sd.priceHistory.push({
+              observedAt: startedIso,
+              price: observedPrice,
+              source: observedSource || 'background_monitor',
+              note: sd.originalUploadedPrice != null
+                ? `Updated from original uploaded $${sd.originalUploadedPrice.toFixed(2)}`
+                : 'Observed by background monitor',
+            });
           }
         }
 
@@ -222,9 +293,7 @@ export function createBlackFridayEngine({
         const failedSources = Object.values(adapterOut.healthById).filter((h) => ['error', 'blocked', 'rate_limited'].includes(h.status)).length;
         const durationMs = Date.now() - startedAt.getTime();
 
-        if (okSources > 0) {
-          state.scheduler.lastSuccessfulRunAt = startedIso;
-        }
+        if (okSources > 0) state.scheduler.lastSuccessfulRunAt = startedIso;
         state.scheduler.runsCount = (state.scheduler.runsCount || 0) + 1;
         state.scheduler.lastWorkerSource = workerSource;
         state.scheduler.running = false;
@@ -263,12 +332,7 @@ export function createBlackFridayEngine({
         };
       } catch (error) {
         state.scheduler.running = false;
-        store.pushSchedulerLog({
-          at: startedIso,
-          reason,
-          workerSource,
-          error: String(error?.message || error),
-        });
+        store.pushSchedulerLog({ at: startedIso, reason, workerSource, error: String(error?.message || error) });
         await store.persist();
         events.emit('update', { type: 'sweep_error', at: startedIso, error: String(error?.message || error) });
         return { ok: false, at: startedIso, error: String(error?.message || error) };
@@ -282,9 +346,6 @@ export function createBlackFridayEngine({
     return run;
   }
 
-  /**
-   * Targeted live search for one specific wish-list item (triggered immediately on add or user click).
-   */
   async function searchForWishlistItem(itemId) {
     const state = store.getState();
     const item = state.wishlist.find((w) => w.id === itemId);
@@ -334,23 +395,35 @@ export function createBlackFridayEngine({
     };
   }
 
-  /**
-   * Build the rich verified dashboard payload immediately from persisted cache (no loading stalls).
-   */
+  async function verifyStores() {
+    const state = store.getState();
+    const statuses = await verifyRetailerDirectoryLinks(RETAILER_DIRECTORY, { fetchImpl, now });
+    state.retailerLinkStatus = { ...(state.retailerLinkStatus || {}), ...statuses };
+    await store.persist();
+    return statuses;
+  }
+
   function buildDashboardPayload() {
     const state = store.getState();
     const evaluatedAll = evaluateAllDeals();
     const activeDeals = evaluatedAll.filter((d) => !d.archived);
     const archivedDeals = evaluatedAll.filter((d) => d.archived);
+    const rejectedIds = new Set(state.feedback?.rejectedDealIds || []);
+    const rejectedKeys = new Set(state.feedback?.rejectedCanonicalKeys || []);
+    const lovedIds = new Set([...(state.feedback?.lovedDealIds || []), ...(state.feedback?.savedDealIds || [])]);
+    const boughtIds = new Set(state.feedback?.boughtDealIds || []);
 
-    const verified25Plus = activeDeals.filter((d) => d.verifiedDiscountPct !== null && d.verifiedDiscountPct >= 25);
-    const largestDiscountDeal = activeDeals
-      .filter((d) => d.verifiedDiscountPct !== null)
-      .sort((a, b) => b.verifiedDiscountPct - a.verifiedDiscountPct)[0] || null;
+    const enrichedActiveDeals = activeDeals.map((d) => ({
+      ...d,
+      isLoved: lovedIds.has(d.id),
+      isRejected: rejectedIds.has(d.id) || (d.canonicalKey && rejectedKeys.has(d.canonicalKey)),
+      isBought: boughtIds.has(d.id),
+    }));
 
-    // Enrich wish-list items with their matched live offers & best all-in offer
+    const visibleDeals = enrichedActiveDeals.filter((d) => !d.isRejected);
+
     const enrichedWishlist = (state.wishlist || []).map((item) => {
-      const matchedOffers = activeDeals
+      const matchedOffers = visibleDeals
         .filter((d) => d.matchedWishlistIds.includes(item.id))
         .sort((a, b) => (a.finalAllInTotal ?? a.currentPrice ?? 1e9) - (b.finalAllInTotal ?? b.currentPrice ?? 1e9));
       const bestOffer = matchedOffers[0] || null;
@@ -365,28 +438,22 @@ export function createBlackFridayEngine({
       };
     });
 
-    const wishlistDiscountedCount = enrichedWishlist.filter(
-      (w) =>
-        !['purchased', 'no_longer_interested'].includes(w.status) &&
-        w.bestOffer &&
-        ((w.bestOffer.verifiedDiscountPct !== null && w.bestOffer.verifiedDiscountPct >= 15) ||
-          (w.preferredPrice && w.bestOffer.currentPrice !== null && w.bestOffer.currentPrice <= w.preferredPrice))
-    ).length;
-
-    // Estimated savings across wish-list items (or top verified deals if wish list empty)
-    const wishSavings = enrichedWishlist.reduce((sum, w) => sum + (w.bestOffer?.estimatedSavings || 0), 0);
-    const topDealsSavings = verified25Plus.slice(0, 10).reduce((sum, d) => sum + (d.estimatedSavings || 0), 0);
-    const estimatedSavingsVsNormal = roundMoney(wishSavings > 0 ? wishSavings : topDealsSavings);
+    const personalized = buildPersonalizedRecommendations({
+      evaluatedDeals: visibleDeals,
+      wishlist: state.wishlist,
+      savedDeals: state.savedDeals || [],
+      profiles: state.profiles || [],
+      feedback: state.feedback || {},
+    });
 
     const hunter = runDealHunter({
-      evaluatedDeals: activeDeals,
+      evaluatedDeals: visibleDeals,
       wishlist: state.wishlist,
       profiles: state.profiles,
       feedback: state.feedback,
       settings: state.settings,
     });
 
-    // Source health list merged with full SOURCE_CATALOG so every source is visibly reported
     const sourceHealthList = SOURCE_CATALOG.map((src) => {
       const recorded = state.sourceHealth[src.id];
       if (recorded) return recorded;
@@ -406,26 +473,20 @@ export function createBlackFridayEngine({
       };
     });
 
-    const healthySources = sourceHealthList.filter((s) => s.status === 'ok').length;
-    const failedSources = sourceHealthList.filter((s) => ['error', 'blocked', 'rate_limited'].includes(s.status)).length;
-    const keyRequiredSources = sourceHealthList.filter((s) => s.status === 'api_key_required').length;
-
-    // Enrich All Stores Directory with live deal counts & wishlist counts
+    const favSet = new Set(state.settings?.favoriteStores || DEFAULT_FAVORITE_STORES);
     const storesDirectory = RETAILER_DIRECTORY.map((r) => {
-      const storeDeals = activeDeals.filter((d) => d.retailerId === r.id);
+      const storeDeals = visibleDeals.filter((d) => d.retailerId === r.id);
       const matchingWishCount = new Set(storeDeals.flatMap((d) => d.matchedWishlistIds || [])).size;
-      const latestVerified = storeDeals
-        .map((d) => d.verifiedAt)
-        .filter(Boolean)
-        .sort()
-        .reverse()[0] || state.scheduler.lastSuccessfulRunAt || null;
-
+      const latestVerified = storeDeals.map((d) => d.verifiedAt).filter(Boolean).sort().reverse()[0] || state.scheduler.lastSuccessfulRunAt || null;
       let liveMonitoringStatus = r.monitoringMode;
       if (r.id === 'bestbuy' && env.BESTBUY_API_KEY) liveMonitoringStatus = 'direct_api_active';
       if (r.id === 'ebay' && env.EBAY_CLIENT_ID && env.EBAY_CLIENT_SECRET) liveMonitoringStatus = 'direct_api_active';
+      const linkCheck = state.retailerLinkStatus?.[r.id] || { status: 'unverified', checkedAt: null };
 
       return {
         ...r,
+        isFavorite: favSet.has(r.id),
+        linkVerification: linkCheck,
         liveMonitoringStatus,
         verifiedDealsCount: storeDeals.length,
         matchingWishlistCount: matchingWishCount,
@@ -434,23 +495,39 @@ export function createBlackFridayEngine({
       };
     });
 
+    const favoriteStoresList = storesDirectory.filter((s) => s.isFavorite);
     const unreadAlertsCount = (state.alerts || []).filter((a) => !a.read).length;
+
+    const verified25Plus = visibleDeals.filter((d) => d.verifiedDiscountPct !== null && d.verifiedDiscountPct >= 25);
+    const largestDiscountDeal = visibleDeals
+      .filter((d) => d.verifiedDiscountPct !== null)
+      .sort((a, b) => b.verifiedDiscountPct - a.verifiedDiscountPct)[0] || null;
+    const wishlistDiscountedCount = enrichedWishlist.filter(
+      (w) => !['purchased', 'no_longer_interested'].includes(w.status) && w.bestOffer &&
+        ((w.bestOffer.verifiedDiscountPct !== null && w.bestOffer.verifiedDiscountPct >= 15) || (w.preferredPrice && w.bestOffer.currentPrice <= w.preferredPrice))
+    ).length;
+
+    const healthySources = sourceHealthList.filter((s) => s.status === 'ok').length;
+    const failedSources = sourceHealthList.filter((s) => ['error', 'blocked', 'rate_limited'].includes(s.status)).length;
+    const keyRequiredSources = sourceHealthList.filter((s) => s.status === 'api_key_required').length;
 
     return {
       version: BLACK_FRIDAY_VERSION,
       generatedAt: now().toISOString(),
       location: state.settings.location || PRIMARY_LOCATION,
+      persistence: store.getPersistenceInfo(),
       kpis: {
-        totalActiveDeals: activeDeals.length,
+        totalActiveDeals: visibleDeals.length,
         archivedDealsCount: archivedDeals.length,
         wishlistTotalCount: state.wishlist.length,
+        savedDealsCount: (state.savedDeals || []).length,
+        uploadedFilesCount: (state.uploadedFiles || []).length,
         wishlistDiscountedCount,
         verified25PlusCount: verified25Plus.length,
         largestVerifiedDiscountPct: largestDiscountDeal?.verifiedDiscountPct ?? null,
         largestDiscountTitle: largestDiscountDeal?.title ?? null,
-        estimatedSavingsVsNormal,
-        savingsBasis: wishSavings > 0 ? 'Matched family wish-list items' : 'Top 10 verified 25%+ live deals',
-        newGiftRecommendationsCount: hunter.recommendations.length,
+        estimatedSavingsVsNormal: roundMoney(enrichedWishlist.reduce((s, w) => s + (w.bestOffer?.estimatedSavings || 0), 0)),
+        newGiftRecommendationsCount: personalized.tier3Related.length + personalized.tier4Discoveries.length,
         lastSuccessfulUpdate: state.scheduler.lastSuccessfulRunAt,
         nextScheduledUpdate: state.scheduler.nextScheduledRunAt,
         monitoringStatus: {
@@ -463,17 +540,18 @@ export function createBlackFridayEngine({
         },
         unreadAlertsCount,
       },
-      bestDealsRightNow: activeDeals
-        .filter((d) => d.currentPrice !== null)
-        .sort((a, b) => (b.decision?.score || 0) - (a.decision?.score || 0) || (b.verifiedDiscountPct || -1) - (a.verifiedDiscountPct || -1))
-        .slice(0, 12),
-      deals: activeDeals,
+      personalized,
+      bestDealsRightNow: visibleDeals.filter((d) => d.currentPrice !== null).slice(0, 12),
+      deals: visibleDeals,
       archivedDeals: archivedDeals.slice(0, 60),
       wishlist: enrichedWishlist,
+      savedDeals: state.savedDeals || [],
+      uploadedFiles: state.uploadedFiles || [],
       profiles: state.profiles,
       hunter,
       events: SHOPPING_EVENTS_2026,
       localStores: LOCAL_STORES_KNIGHTDALE,
+      favoriteStores: favoriteStoresList,
       storesDirectory,
       sourceHealth: sourceHealthList,
       alerts: state.alerts.slice(0, 100),
@@ -493,8 +571,8 @@ export function createBlackFridayEngine({
 
   function start() {
     if (!autoStart) return;
-    // Hydrate from GitHub Actions worker snapshot if newer, then kick off background sweep if cache empty or stale (>20 min)
     void (async () => {
+      await store.hydrateFromSupabase().catch(() => {});
       await store.syncFromGitHubWorker().catch(() => {});
       const state = store.getState();
       const lastOk = Date.parse(state.scheduler.lastSuccessfulRunAt || 0) || 0;
@@ -508,18 +586,7 @@ export function createBlackFridayEngine({
   }
 
   function stop() {
-    if (timer) {
-      clearTimeout(timer);
-      timer = null;
-    }
-  }
-
-  function canManualRefresh() {
-    return Date.now() - lastManualRefreshMs >= 8000;
-  }
-
-  function markManualRefresh() {
-    lastManualRefreshMs = Date.now();
+    if (timer) { clearTimeout(timer); timer = null; }
   }
 
   return {
@@ -528,16 +595,31 @@ export function createBlackFridayEngine({
     stop,
     runMonitoringSweep,
     searchForWishlistItem,
+    verifyStores,
     evaluateAllDeals,
     buildDashboardPayload,
-    canManualRefresh,
-    markManualRefresh,
+    canManualRefresh: () => Date.now() - lastManualRefreshMs >= 6000,
+    markManualRefresh: () => { lastManualRefreshMs = Date.now(); },
     discoverAlternativesForItem: (itemId) => {
       const state = store.getState();
       const item = state.wishlist.find((w) => w.id === itemId);
       if (!item) return null;
       const active = evaluateAllDeals().filter((d) => !d.archived);
       return discoverAlternatives(item, active);
+    },
+    compareDealOffers: (dealId) => {
+      const dash = buildDashboardPayload();
+      const deal = dash.deals.find((d) => d.id === dealId) || dash.archivedDeals.find((d) => d.id === dealId);
+      if (!deal) return null;
+      const exactMatches = dash.deals.filter(
+        (d) => d.id !== deal.id && (d.canonicalKey === deal.canonicalKey || matchWishlistToDeal(deal, d).matched)
+      );
+      return {
+        deal,
+        exactMatches,
+        similar: findSimilarOrCheaper(deal, dash.deals, 'similar'),
+        cheaper: findSimilarOrCheaper(deal, dash.deals, 'cheaper'),
+      };
     },
   };
 }

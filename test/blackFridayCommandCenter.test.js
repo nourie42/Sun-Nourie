@@ -15,6 +15,8 @@ import {
   runDealHunter,
   matchGiftIdeaDeals,
   parseDealPricingFromText,
+  buildPersonalizedRecommendations,
+  findSimilarOrCheaper,
 } from '../src/black-friday/intelligence.js';
 import {
   parseBulkTextToDrafts,
@@ -22,6 +24,8 @@ import {
   rowsToWishlistDrafts,
   createWishlistItemObject,
   findDuplicateWishlistItem,
+  parseXlsxBuffer,
+  extractTextFromPdfBuffer,
 } from '../src/black-friday/wishlistParser.js';
 import { evaluateSmartAlerts, isWithinQuietHours } from '../src/black-friday/notifications.js';
 import { registerBlackFridayRoutes } from '../src/black-friday/routes.js';
@@ -504,4 +508,80 @@ test('full Express API + auth gate + failed source reporting + persistence lifec
   const alertJson = await alertRes.json();
   assert.equal(alertJson.ok, true);
   assert.ok(alertJson.alert.channelsDelivered.includes('in_dashboard'));
+});
+
+test('v2.0: 96+ required retailers, zero-filler personalized 4-tier hierarchy, exact rejection, and Upload Center preview/commit', () => {
+  // Verify every user-named retailer is present across all 9 categories
+  const names = new Set(RETAILER_DIRECTORY.map((r) => r.name));
+  for (const required of [
+    'Amazon', 'Walmart', 'Target', 'Costco', "Sam's Club", 'eBay', 'QVC', 'HSN',
+    "Macy's", "Kohl's", 'Belk', "Dillard's", 'JCPenney', 'Nordstrom', 'Nordstrom Rack', "Bloomingdale's", "Boscov's", 'Saks OFF 5TH',
+    'Nike', 'Adidas', 'Under Armour', 'Lululemon', 'Athleta', 'Old Navy', 'Gap', 'American Eagle', 'Aerie', 'Abercrombie & Fitch', 'Hollister', 'H&M', 'Zara', 'Uniqlo', 'Free People', 'Anthropologie', 'Madewell', 'ASOS', 'T.J. Maxx', 'Marshalls', 'Ross Dress for Less', 'Burlington',
+    'Sephora', 'Ulta Beauty', 'Bath & Body Works', "Victoria's Secret",
+    'Best Buy', 'Apple', 'Samsung', 'Dell', 'HP', 'Lenovo', 'Newegg', 'GameStop', 'Google Store', 'Microsoft Store',
+    'Home Depot', "Lowe's", 'Wayfair', 'IKEA', 'Pottery Barn', 'West Elm', 'Crate & Barrel', 'Williams Sonoma', 'At Home', 'HomeGoods', 'Ace Hardware',
+    "Dick's Sporting Goods", 'Academy Sports', 'REI', 'Bass Pro Shops', "Cabela's", 'Scheels', 'Golf Galaxy',
+    'Etsy', 'LEGO', 'Disney Store', 'Uncommon Goods', 'Five Below', 'Michaels', 'Hobby Lobby', 'Tractor Supply', 'Harbor Freight', 'Chewy', 'PetSmart', 'Petco',
+    'Slickdeals', 'DealNews', "Brad's Deals", 'RetailMeNot', 'Rakuten', 'Woot!', 'Meh', 'CamelCamelCamel', 'Keepa', 'Cashback Monitor',
+  ]) {
+    assert.ok(names.has(required), `Missing required retailer: ${required}`);
+  }
+
+  // Zero random deals when user has no wish lists or configured profile interests
+  const sampleDeal = evaluateDeal({
+    id: 'rnd-1', canonicalKey: 'norm:random:1', title: 'Random Blender $49', brand: 'Ninja',
+    category: 'home', retailerId: 'amazon', retailerName: 'Amazon', currentPrice: 49,
+    reportedRegularPrice: 99, baselineSource: 'editorial_regular', shippingFree: true,
+    retailerUrl: 'https://www.amazon.com/dp/B0RANDOM01', isDirectProductUrl: true,
+    sourceId: 'dealnews_main', sourceName: 'DealNews', verifiedAt: new Date().toISOString(), condition: 'new',
+  });
+  const emptyRecs = buildPersonalizedRecommendations({ evaluatedDeals: [sampleDeal], wishlist: [], profiles: [{ id: 'p1', name: 'Family', favoriteBrands: [], interests: [], preferredRetailers: [] }], feedback: {} });
+  assert.equal(emptyRecs.hasPreferences, false);
+  assert.equal(emptyRecs.tier1Exact.length, 0);
+  assert.equal(emptyRecs.tier4Discoveries.length, 0);
+
+  // Rejecting ONE exact item does NOT suppress another item in the same category
+  const otherHomeDeal = evaluateDeal({
+    id: 'home-2', canonicalKey: 'norm:other-home:2', title: 'Ninja Air Fryer Pro $79', brand: 'Ninja',
+    category: 'home', retailerId: 'target', retailerName: 'Target', currentPrice: 79,
+    reportedRegularPrice: 129, baselineSource: 'editorial_regular', shippingFree: true,
+    retailerUrl: 'https://www.target.com/p/ninja-air-fryer', isDirectProductUrl: true,
+    sourceId: 'dealnews_home', sourceName: 'DealNews', verifiedAt: new Date().toISOString(), condition: 'new',
+  });
+  const withReject = buildPersonalizedRecommendations({
+    evaluatedDeals: [sampleDeal, otherHomeDeal],
+    wishlist: [],
+    profiles: [{ id: 'p1', name: 'Mom', budget: 200, favoriteBrands: ['Ninja'], interests: ['kitchen'], preferredRetailers: [] }],
+    feedback: { rejectedDealIds: ['rnd-1'], rejectedCanonicalKeys: ['norm:random:1'] },
+  });
+  assert.equal(withReject.hasPreferences, true);
+  assert.equal(withReject.tier4Discoveries.some((r) => r.dealId === 'rnd-1'), false, 'exact rejected item is suppressed');
+  assert.equal(withReject.tier4Discoveries.some((r) => r.dealId === 'home-2'), true, 'other item in same brand/category still recommended');
+
+  // Product subtype guardrail: a "Wireless Printer" must NEVER be suggested as an alternative to "Wireless Headphones"
+  const wirelessPrinter = evaluateDeal({
+    id: 'printer-1', canonicalKey: 'norm:epson-wf:1', title: 'Epson Workforce Pro WF-3823 Wireless All-in-One Printer',
+    brand: 'Epson', category: 'electronics', retailerId: 'amazon', retailerName: 'Amazon', currentPrice: 79.99,
+    reportedRegularPrice: 149.99, baselineSource: 'editorial_regular', shippingFree: true,
+    retailerUrl: 'https://www.amazon.com/dp/B0PRINTER1', isDirectProductUrl: true,
+    sourceId: 'dealnews_electronics', sourceName: 'DealNews', verifiedAt: new Date().toISOString(), condition: 'new',
+  });
+  const ancEarbuds = evaluateDeal({
+    id: 'earbuds-1', canonicalKey: 'norm:jlab-anc:1', title: 'JLab JBuds Sport ANC 4 True Wireless Earbuds',
+    brand: 'JLab', category: 'electronics', retailerId: 'amazon', retailerName: 'Amazon', currentPrice: 79.99,
+    reportedRegularPrice: 129.99, baselineSource: 'editorial_regular', shippingFree: true,
+    retailerUrl: 'https://www.amazon.com/dp/B0EARBUDS1', isDirectProductUrl: true,
+    sourceId: 'dealnews_electronics', sourceName: 'DealNews', verifiedAt: new Date().toISOString(), condition: 'new',
+  });
+  const hpItem = createWishlistItemObject({ name: 'Sony WH-1000XM5 Wireless Noise Canceling Headphones', brand: 'Sony', modelNumber: 'WH-1000XM5', preferredPrice: 250 });
+  const altCheck = discoverAlternatives(hpItem, [wirelessPrinter, ancEarbuds]);
+  const allAltIds = [...altCheck.same_better_price, ...altCheck.better_similar_price, ...altCheck.similar_lower_price].map((a) => a.dealId);
+  assert.equal(allAltIds.includes('printer-1'), false, 'wireless printer must NEVER match wireless headphones');
+  assert.equal(allAltIds.includes('earbuds-1'), true, 'genuine ANC earbuds should match headphones alternative');
+
+  // PDF text extractor works on plain PDF text stream
+  const miniPdf = Buffer.from('%PDF-1.4\n1 0 obj\n<< /Length 64 >>\nstream\nBT (Sony WH-1000XM5 Headphones $249) Tj ET\nendstream\nendobj\n/URI (https://www.amazon.com/dp/B09XS7JWHH)\n%%EOF', 'latin1');
+  const pdfOut = extractTextFromPdfBuffer(miniPdf);
+  assert.match(pdfOut.text, /Sony WH-1000XM5/);
+  assert.ok(pdfOut.urls.includes('https://www.amazon.com/dp/B09XS7JWHH'));
 });
