@@ -33,7 +33,7 @@ export function isPublicWeatherPath(url, method = 'GET') {
   return PUBLIC_PAGES.has(pathname) || PUBLIC_ASSET.test(pathname) || PUBLIC_BETA_ASSET.test(pathname) || PUBLIC_APIS.has(pathname);
 }
 // Deal Lens is public; its access policy is independent of the weather sites.
-const PREFIXES = ['/weather', '/weather-fusion', '/weathernext', '/api/weather-fusion', '/whats-up', '/whatsup', '/api/whats-up', '/deal-intelligence', '/api/deal-intelligence'];
+const PREFIXES = ['/weather', '/weather-fusion', '/weathernext', '/api/weather-fusion', '/whats-up', '/whatsup', '/api/whats-up', '/deal-intelligence', '/api/deal-intelligence', '/black-friday', '/api/black-friday'];
 
 // The gateway passes this private key to its child processes. It is never sent
 // to clients; a restart invalidates sessions unless an environment key is set.

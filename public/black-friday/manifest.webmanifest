@@ -1,0 +1,18 @@
+{
+  "name": "Black Friday Command Center",
+  "short_name": "BF Command",
+  "description": "Autonomous Family Shopping & Deal Discovery Command Center for Knightdale, NC 27545",
+  "start_url": "/black-friday/",
+  "scope": "/black-friday/",
+  "display": "standalone",
+  "background_color": "#060a13",
+  "theme_color": "#060a13",
+  "icons": [
+    {
+      "src": "/black-friday/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
