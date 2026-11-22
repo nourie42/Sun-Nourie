@@ -701,12 +701,16 @@ const COUPON_STOPWORDS = new Set(['FREE', 'SHIPPING', 'CODE', 'CODES', 'PROMO', 
 // console") and board games are NOT matched.
 export function isVideoGameDeal(deal) {
   if (!deal) return false;
+  // A game that is ON the family's wish list is a gift Daniel chose — keep it.
+  if (Array.isArray(deal.matchedWishlistIds) && deal.matchedWishlistIds.length) return false;
   const cat = String(deal.category || '').toLowerCase();
   if (cat.includes('pc & gaming') || cat.includes('video game')) return true;
   const t = String(deal.title || deal.name || '');
-  if (/\((?:PS5|PS4|PlayStation|Xbox(?: Series [XS]| One)?|PC Digital|Nintendo Switch|Steam)\)/i.test(t)) return true;
+  if (/\((?:PS5|PS4|PlayStation(?: 5| 4)?|Xbox(?: Series [XS]| One)?|PC Digital|Nintendo Switch(?: 2)?|Switch(?: 2)?|NSW|Steam)\)/i.test(t)) return true;
   if (/\bfor (?:PS5|PS4|PlayStation|Xbox|Nintendo Switch)\b/i.test(t)) return true;
-  if (/\b(?:PC Digital|Steam Key|Epic Games Store|GOG)\b/i.test(t)) return true;
+  if (/\b(?:PC Digital|Steam Key|Steam Edition|Online Game Code|Game Code|Epic Games Store|GOG)\b/i.test(t)) return true;
+  if (/\[Steam\b/i.test(t) || /@ Steam\b/i.test(t)) return true;
+  if (/\bPlayStation \d Game\b/i.test(t) || /- PlayStation \d\s*$/i.test(t)) return true;
   return false;
 }
 

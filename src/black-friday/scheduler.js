@@ -782,7 +782,7 @@ export function createBlackFridayEngine({
           if (!prev || (PRIO[a.type] ?? 9) < (PRIO[prev.type] ?? 9)) byKey.set(key, a);
         }
         return [...byKey.values()]
-          .filter((a) => !isVideoGameDeal({ title: a.title || a.message || '', category: '' }))
+          .filter((a) => a.wishlistItemId || !isVideoGameDeal({ title: a.title || a.message || '', category: '' }))
           .sort((x, y) => String(y.triggeredAt || '').localeCompare(String(x.triggeredAt || '')))
           .slice(0, 100);
       })(),
