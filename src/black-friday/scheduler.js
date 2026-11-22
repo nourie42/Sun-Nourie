@@ -306,7 +306,8 @@ export function createBlackFridayEngine({
         }
 
         // 3.5 Optional AI cleanup of feed titles (no-op without GEMINI_API_KEY)
-        await cleanDealsWithAi(allFetchedDeals, { fetchImpl }).catch(() => null);
+        const aiReport = await cleanDealsWithAi(allFetchedDeals, { fetchImpl }).catch(() => null);
+        if (aiReport) state.aiCleanup = { at: startedIso, ...aiReport };
 
         // 4. Merge deals & record real price history
         const previousDealsById = store.mergeDeals(allFetchedDeals, startedIso);
@@ -650,6 +651,7 @@ export function createBlackFridayEngine({
 
     return {
       version: BLACK_FRIDAY_VERSION,
+      aiCleanup: state.aiCleanup || null,
       generatedAt: now().toISOString(),
       location: state.settings.location || PRIMARY_LOCATION,
       persistence: store.getPersistenceInfo(),

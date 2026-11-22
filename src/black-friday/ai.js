@@ -92,6 +92,9 @@ export async function cleanDealsWithAi(deals, { fetchImpl = fetch } = {}) {
 
   const started = Date.now();
   let cleaned = 0;
+  let lastError = null;
+  let batchesOk = 0;
+  let batchesFailed = 0;
   try {
     const wanted = new Map(); // cacheKey -> raw title
     for (const deal of deals) {
@@ -117,20 +120,24 @@ export async function cleanDealsWithAi(deals, { fetchImpl = fetch } = {}) {
       let results = null;
       try {
         results = await cleanBatch(batch, fetchImpl);
-      } catch {
+      } catch (err) {
         // A slow or throttled batch must not end the run (the first live
         // sweeps stopped after one batch). Wait, retry once, then move on.
+        lastError = String(err?.message || err);
         await sleep(4000);
         try {
           results = await cleanBatch(batch, fetchImpl);
-        } catch {
+        } catch (err2) {
+          lastError = String(err2?.message || err2);
           results = null;
         }
       }
       if (results) {
+        batchesOk++;
         consecutiveFailures = 0;
         for (const [key, value] of results) cache.set(key, value);
       } else {
+        batchesFailed++;
         consecutiveFailures++;
       }
       await sleep(800); // Light pacing between batches.
@@ -145,8 +152,11 @@ export async function cleanDealsWithAi(deals, { fetchImpl = fetch } = {}) {
         cleaned++;
       }
     }
-  } catch {
+  } catch (err) {
     // AI is decoration here; the sweep must never fail because of it.
+    lastError = String(err?.message || err);
   }
-  return { cleaned, enabled: true };
+  const report = { cleaned, enabled: true, batchesOk, batchesFailed, lastError, elapsedMs: Date.now() - started };
+  console.log('[bf-ai]', JSON.stringify(report));
+  return report;
 }
