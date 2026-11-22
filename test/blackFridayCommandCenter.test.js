@@ -57,6 +57,19 @@ test('experimental website shows Black Friday link while main/v3 apps and Fuel I
   assert.equal(isPublicWeatherPath('/api/black-friday/bootstrap'), false);
 });
 
+test('mobile sidebar stays above its scrim and retailer cards lead to official deal pages', () => {
+  const html = fs.readFileSync(path.join(REPO_ROOT, 'public', 'black-friday', 'index.html'), 'utf8');
+  const css = fs.readFileSync(path.join(REPO_ROOT, 'public', 'black-friday', 'styles.css'), 'utf8');
+  const app = fs.readFileSync(path.join(REPO_ROOT, 'public', 'black-friday', 'app.js'), 'utf8');
+
+  assert.match(html, /data-view="all-stores"[\s\S]*Retailer Deal Pages/);
+  assert.match(css, /\.app-shell\s*\{[\s\S]*?z-index:\s*auto;/);
+  assert.match(css, /\.sidebar\s*\{[\s\S]*?z-index:\s*30;/);
+  assert.match(css, /\.sidebar-scrim\s*\{[\s\S]*?z-index:\s*25;/);
+  assert.match(app, /href="\$\{esc\(s\.blackFridayUrl \|\| s\.dealsUrl \|\| s\.url\)\}"/);
+  assert.match(app, /Open \$\{esc\(s\.name\)\} Black Friday Deals/);
+});
+
 test('product matching identifies identical models and blocks generation/size/accessory/refurb confusion', () => {
   const wish = createWishlistItemObject({
     name: 'Sony WH-1000XM5 Wireless Noise Canceling Headphones',

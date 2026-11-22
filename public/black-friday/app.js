@@ -10,7 +10,7 @@ const STORAGE_CACHE_KEY = 'bf_command_cache_v2';
 
 const VIEW_META = {
   'command-center': ['Family Shopping HQ', 'Favorite stores, upload center, wish-list matches & personalized deals · Knightdale, NC 27545'],
-  'all-stores': ['Shop All Stores', 'Tap any store logo to open the official website directly in a new tab'],
+  'all-stores': ['Retailer Deal Pages', 'Tap a retailer to leave this app and open its official deals page'],
   'upload-center': ['Upload Center', 'Upload Excel (.xlsx/.xls), CSV, PDF, Word, screenshots, emails, or URLs — preview & edit before saving'],
   wishlists: ['Wish Lists & Saved Deals', 'Monitored family wish lists & user-uploaded deals with original price history preserved'],
   profiles: ['Family Shopping Profiles', 'Editable member brands, sizes, hobbies, preferred stores & gift budgets'],
@@ -803,7 +803,7 @@ function renderAllStoresView() {
       <div class="stores-grid">${stores.map((s) => `
         <div class="store-card" data-store-id="${esc(s.id)}">
           <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
-            <a href="${esc(s.url)}" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;gap:10px;text-decoration:none;color:var(--text-primary);min-width:0;">
+            <a href="${esc(s.blackFridayUrl || s.dealsUrl || s.url)}" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;gap:10px;text-decoration:none;color:var(--text-primary);min-width:0;" aria-label="Open ${esc(s.name)} deals on the retailer website">
               ${renderStoreAvatar(s, false)}
               <div style="min-width:0;">
                 <strong style="display:block;font-size:14.5px;">${esc(s.name)}</strong>
@@ -819,9 +819,9 @@ function renderAllStoresView() {
             ${s.localPresence ? '<span class="badge badge-local">📍 NC Local</span>' : ''}
           </div>
           <div class="store-links">
-            <a class="btn btn-sm btn-primary" href="${esc(s.url)}" target="_blank" rel="noopener noreferrer">Official Site ↗</a>
-            <a class="btn btn-sm" href="${esc(s.dealsUrl)}" target="_blank" rel="noopener noreferrer">Deals ↗</a>
-            <a class="btn btn-sm" href="${esc(s.blackFridayUrl)}" target="_blank" rel="noopener noreferrer">${s.hasDedicatedBlackFridayUrl ? 'Black Friday ↗' : 'Sales ↗'}</a>
+            <a class="btn btn-sm btn-primary" href="${esc(s.blackFridayUrl || s.dealsUrl || s.url)}" target="_blank" rel="noopener noreferrer">${s.hasDedicatedBlackFridayUrl ? `Open ${esc(s.name)} Black Friday Deals ↗` : `Open ${esc(s.name)} Deals ↗`}</a>
+            ${s.blackFridayUrl !== s.dealsUrl ? `<a class="btn btn-sm" href="${esc(s.dealsUrl)}" target="_blank" rel="noopener noreferrer">All Sales ↗</a>` : ''}
+            <a class="btn btn-sm" href="${esc(s.url)}" target="_blank" rel="noopener noreferrer">Store Home ↗</a>
             ${s.storeFinderUrl ? `<a class="btn btn-sm" href="${esc(s.storeFinderUrl)}" target="_blank" rel="noopener noreferrer">27545 Stores ↗</a>` : ''}
           </div>
         </div>`).join('')}

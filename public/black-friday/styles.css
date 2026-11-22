@@ -87,7 +87,9 @@ html[data-theme="light"] .ambient-bg {
 /* App Shell */
 .app-shell {
   position: relative;
-  z-index: 1;
+  /* Do not create a page-wide stacking context: on mobile it traps the
+     sidebar underneath the scrim even though the sidebar has a higher z-index. */
+  z-index: auto;
   display: grid;
   grid-template-columns: var(--sidebar-w) minmax(0, 1fr);
   min-height: 100vh;
