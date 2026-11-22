@@ -10,7 +10,7 @@
 // With no key, or on any AI error, this is a no-op and deals pass through
 // untouched. Added 2026-11-22 at Daniel's direction (his paid Google AI key).
 
-const MODEL = process.env.GEMINI_MODEL || 'gemini-3-flash-preview';
+const MODEL = process.env.GEMINI_MODEL || 'gemini-3.1-flash-lite-preview'; // Benchmarked 2026-11-22: ~3s per batch vs ~15-45s (and quota 429s) on gemini-3-flash-preview
 const API_BASE = 'https://generativelanguage.googleapis.com/v1beta';
 const BATCH_SIZE = 10;
 const MAX_TITLES_PER_SWEEP = 240;
