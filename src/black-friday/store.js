@@ -103,7 +103,9 @@ function mergeSettings(saved = {}) {
   return {
     ...base,
     ...saved,
-    favoriteStores: Array.isArray(saved.favoriteStores) && saved.favoriteStores.length
+    // An empty array is a real saved preference. Falling back to defaults here
+    // made favorites reappear after the user removed the final store.
+    favoriteStores: Array.isArray(saved.favoriteStores)
       ? saved.favoriteStores
       : base.favoriteStores,
     location: { ...base.location, ...(saved.location || {}) },

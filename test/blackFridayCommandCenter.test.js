@@ -6,7 +6,7 @@ import path from 'node:path';
 import zlib from 'node:zlib';
 import express from 'express';
 
-import { BLACK_FRIDAY_VERSION, RETAILER_DIRECTORY, LOCAL_STORES_KNIGHTDALE } from '../src/black-friday/constants.js';
+import { BLACK_FRIDAY_VERSION, RETAILER_DIRECTORY, LOCAL_STORES_KNIGHTDALE, MAIN_STORE_IDS } from '../src/black-friday/constants.js';
 import { parseFeedXml, extractProductMetadataFromHtml } from '../src/black-friday/xmlParser.js';
 import {
   normalizeProductIdentity,
@@ -72,6 +72,28 @@ test('mobile sidebar stays above its scrim and retailer cards lead to official d
   assert.match(css, /\.sidebar-scrim\s*\{[\s\S]*?z-index:\s*25;/);
   assert.match(app, /href="\$\{esc\(s\.blackFridayUrl \|\| s\.dealsUrl \|\| s\.url\)\}"/);
   assert.match(app, /Open \$\{esc\(s\.name\)\} Black Friday Deals/);
+  assert.match(app, /if \(appState\.data\) \{/);
+  assert.doesNotMatch(app, /if \(state\.data\) \{/);
+  assert.match(app, /function secureImageUrl\(value\)/);
+  assert.match(app, /return url\.replace\(\/\^http:/);
+});
+
+test('priority retailers expose deal timing and the seeded wish list includes real product images', () => {
+  assert.deepEqual(MAIN_STORE_IDS, [
+    'target', 'bestbuy', 'academy', 'walmart', 'homedepot',
+    'lowes', 'amazon', 'cabelas', 'barnesnoble', 'kohls',
+  ]);
+  for (const id of MAIN_STORE_IDS) {
+    const store = RETAILER_DIRECTORY.find((entry) => entry.id === id);
+    assert.ok(store, `Missing priority retailer ${id}`);
+    assert.ok(store.dealTiming?.length > 20, `Missing useful deal timing for ${store.name}`);
+  }
+
+  const seed = JSON.parse(fs.readFileSync(path.join(REPO_ROOT, 'src', 'black-friday', 'wishlist-seed.json'), 'utf8'));
+  const withImages = seed.items.filter((item) => item.imageUrl);
+  assert.ok(withImages.length >= 2300, `Expected at least 2300 product images, found ${withImages.length}`);
+  assert.ok(withImages.some((item) => /FLUX Beambox II/i.test(item.name)));
+  assert.ok(withImages.some((item) => /Celestron StarSense Explorer/i.test(item.name)));
 });
 
 test('product matching identifies identical models and blocks generation/size/accessory/refurb confusion', () => {

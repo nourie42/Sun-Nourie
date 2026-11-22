@@ -81,6 +81,15 @@ function esc(val) {
   return String(val ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
+// Some retailer feeds publish otherwise-valid product images as HTTP. Because
+// this app is HTTPS, browsers block those URLs as mixed content unless upgraded.
+function secureImageUrl(value) {
+  const url = String(value || '').trim();
+  if (/^http:\/\//i.test(url)) return url.replace(/^http:\/\//i, 'https://');
+  if (/^(?:https:|data:image\/|blob:)/i.test(url)) return url;
+  return '';
+}
+
 function money(val) {
   return typeof val === 'number' && Number.isFinite(val) ? `$${val.toFixed(2)}` : '—';
 }
@@ -243,8 +252,9 @@ function renderProductCardHtml(deal, recMeta = null) {
     : (deal.normalPrice !== null && deal.currentPrice >= deal.normalPrice
       ? 'At Typical Price'
       : (deal.verifiedDiscountPct !== null && deal.verifiedDiscountPct > 0 ? 'Near Typical' : 'Baseline Unknown'));
-  const imgHtml = deal.imageUrl
-    ? `<img src="${esc(deal.imageUrl)}" alt="${esc(deal.title)}" loading="lazy" decoding="async" data-fallback-icon="${CAT_ICONS[deal.category] || '🛍️'}" />`
+  const imageUrl = secureImageUrl(deal.imageUrl);
+  const imgHtml = imageUrl
+    ? `<img src="${esc(imageUrl)}" alt="${esc(deal.title)}" loading="lazy" decoding="async" data-fallback-icon="${CAT_ICONS[deal.category] || '🛍️'}" />`
     : `<div class="deal-media-fallback" aria-hidden="true">${CAT_ICONS[deal.category] || '🛍️'}</div>`;
 
   // Priority 6: Honest SHOP NOW label — direct merchant links & merchant jump links vs aggregator thread
@@ -342,7 +352,7 @@ function renderUploadedItemCardHtml(item) {
   const tierClass = discPct >= 40 ? 'tier-exceptional' : discPct >= 25 ? 'tier-great' : discPct >= 15 ? 'tier-good' : 'tier-watch';
   const badgeClass = discPct >= 40 ? 'badge-exceptional' : discPct >= 25 ? 'badge-great' : discPct >= 15 ? 'badge-good' : 'badge-watch';
 
-  const thumb = item.imageUrl || item.screenshotThumbnail || item.bestOffer?.imageUrl || null;
+  const thumb = secureImageUrl(item.imageUrl || item.screenshotThumbnail || item.bestOffer?.imageUrl);
   const imgHtml = thumb
     ? `<img src="${esc(thumb)}" alt="${esc(item.name)}" loading="lazy" decoding="async" data-fallback-icon="${CAT_ICONS[item.category] || '🎁'}" />`
     : `<div class="deal-media-fallback" style="flex-direction:column;gap:8px;">${renderStoreAvatar(store, false)}<span class="small muted">${esc(item.retailerName || 'Saved Item')}</span></div>`;
@@ -649,7 +659,7 @@ function renderHomePage() {
       ${renderStoreAvatar(st, false)}
       <span class="store-tile-name">${esc(st.name)}</span>
       <span class="small muted" style="font-size:10px;">${st.verifiedDealsCount > 0 ? `${st.verifiedDealsCount} ${st.verifiedDealsCount === 1 ? 'deal' : 'deals'}` : 'Shop ↗'}</span>
-    </a>`).join('') || '<div class="small muted" style="padding:12px;">No favorite stores match that search — click Browse All 96 Stores above.</div>';
+    </a>`).join('') || '<div class="small muted" style="padding:12px;">No favorite stores match that search — use Browse All Retailers above.</div>';
 
   const bfHighlightIds = ['target', 'bestbuy', 'academy', 'walmart', 'homedepot', 'lowes', 'amazon', 'cabelas', 'barnesnoble', 'kohls'];
   const bfStores = bfHighlightIds.map((id) => d.storesDirectory.find((s) => s.id === id)).filter(Boolean);
@@ -663,6 +673,7 @@ function renderHomePage() {
         <span class="badge badge-bf">${s.hasDedicatedBlackFridayUrl ? 'Black Friday' : 'Deals Page'}</span>
       </div>
       <div class="small muted">${s.verifiedDealsCount > 0 ? `${s.verifiedDealsCount} live deals tracked` : 'Direct official retailer sale page'}${s.cashback ? ` · Up to ${s.cashback.percent}% CB` : ''}</div>
+      ${s.dealTiming ? `<div class="small" style="color:var(--text-secondary);line-height:1.5;">🕒 <strong>Best deal days &amp; times:</strong> ${esc(s.dealTiming)}</div>` : ''}
       <div class="store-links">
         <a class="btn btn-sm btn-primary" href="${esc(s.blackFridayUrl)}" target="_blank" rel="noopener noreferrer">${s.hasDedicatedBlackFridayUrl ? 'Black Friday Sale ↗' : 'Shop Deals ↗'}</a>
         <a class="btn btn-sm" href="${esc(s.dealsUrl)}" target="_blank" rel="noopener noreferrer">Clearance / Deals ↗</a>
@@ -999,7 +1010,7 @@ function renderWishlistsView() {
     container.innerHTML = `<div class="onboarding-box"><h3>No wish-list products here yet</h3><p>Click "+ Upload Wish List" to import Excel, CSV, PDF, Word, screenshots, URLs, or type products.</p><button class="btn btn-primary" data-open-upload="wishlist" type="button">+ Add Wish List</button></div>`;
   } else {
     container.innerHTML = items.map((item) => {
-      const thumb = item.bestOffer?.imageUrl || item.imageUrl || item.screenshotThumbnail;
+      const thumb = secureImageUrl(item.bestOffer?.imageUrl || item.imageUrl || item.screenshotThumbnail);
       const best = item.bestOffer;
       return `
         <article class="wishlist-card" data-wl-id="${esc(item.id)}">
@@ -1056,10 +1067,11 @@ function renderWishlistsView() {
     sdHost.innerHTML = savedDeals.map((sd) => {
       const changed = sd.originalUploadedPrice != null && sd.currentPrice != null && sd.currentPrice !== sd.originalUploadedPrice;
       const storeMeta = getStoreMeta(sd.retailerId);
+      const savedThumb = secureImageUrl(sd.imageUrl || sd.screenshotThumbnail);
       return `
         <article class="wishlist-card">
           <div class="wishlist-thumb">
-            ${sd.imageUrl || sd.screenshotThumbnail ? `<img src="${esc(sd.imageUrl || sd.screenshotThumbnail)}" alt="${esc(sd.name)}" loading="lazy" />` : `<span style="font-size:26px;">🏷️</span>`}
+            ${savedThumb ? `<img src="${esc(savedThumb)}" alt="${esc(sd.name)}" loading="lazy" />` : `<span style="font-size:26px;">🏷️</span>`}
           </div>
           <div>
             <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px;">
@@ -1696,21 +1708,36 @@ function bindEvents() {
     const favBtn = e.target.closest('[data-toggle-fav]');
     if (favBtn) {
       const storeId = favBtn.dataset.toggleFav;
+      const store = appState.data?.storesDirectory?.find((s) => s.id === storeId);
+      const wasFavorite = Boolean(store?.isFavorite);
+      document.querySelectorAll(`[data-toggle-fav="${storeId}"]`).forEach((b) => {
+        b.disabled = true;
+        b.classList.toggle('is-fav', !wasFavorite);
+        b.textContent = wasFavorite ? '☆' : '★';
+      });
       try {
         const out = await api('/api/black-friday/stores/favorite', { method: 'POST', body: { storeId } });
         const favIds = new Set(out.favoriteStoreIds || []);
-        if (state.data) {
-          if (state.data.settings) state.data.settings.favoriteStores = [...favIds];
-          for (const s of state.data.storesDirectory || []) s.isFavorite = favIds.has(s.id);
-          state.data.favoriteStores = (state.data.storesDirectory || []).filter((s) => favIds.has(s.id));
+        if (appState.data) {
+          if (appState.data.settings) appState.data.settings.favoriteStores = [...favIds];
+          for (const s of appState.data.storesDirectory || []) s.isFavorite = favIds.has(s.id);
+          appState.data.favoriteStores = (appState.data.storesDirectory || []).filter((s) => favIds.has(s.id));
         }
         document.querySelectorAll(`[data-toggle-fav="${storeId}"]`).forEach((b) => {
+          b.disabled = false;
           b.classList.toggle('is-fav', Boolean(out.isFavorite));
           b.textContent = out.isFavorite ? '★' : '☆';
         });
         renderHomePage();
         toast(out.isFavorite ? 'Added to your favorites — it is on the Home Page favorites bar now.' : 'Removed from favorites.');
-      } catch (err) { toast(err.message); }
+      } catch (err) {
+        document.querySelectorAll(`[data-toggle-fav="${storeId}"]`).forEach((b) => {
+          b.disabled = false;
+          b.classList.toggle('is-fav', wasFavorite);
+          b.textContent = wasFavorite ? '★' : '☆';
+        });
+        toast(`Could not save favorite: ${err.message}`);
+      }
       return;
     }
 
@@ -2075,7 +2102,7 @@ function bindEvents() {
   $('verify-store-links-btn').addEventListener('click', async (e) => {
     const btn = e.currentTarget;
     btn.disabled = true;
-    toast('Verifying official URLs across all 96+ retailers…');
+    toast('Verifying official URLs across all 97 retailers…');
     try {
       const out = await api('/api/black-friday/stores/verify-links', { method: 'POST' });
       hydrateData(out.dashboard);
