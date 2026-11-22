@@ -15,6 +15,7 @@ import {
   DEFAULT_SETTINGS,
   DEFAULT_PROFILES,
 } from './constants.js';
+import { createWishlistItemObject } from './wishlistParser.js';
 
 const ROOT_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const DEFAULT_DATA_DIR = path.join(ROOT_DIR, 'data', 'black-friday');
@@ -125,6 +126,76 @@ export function createBlackFridayStore({
   const backupDir = path.join(resolvedDir, 'backups');
   const uploadsDir = path.join(resolvedDir, 'uploads');
   let state = loadSync();
+  seedWishlistFromRepoFile();
+
+  // Durability: local disk state does not survive git redeploys on Render
+  // (no persistent disk / Supabase configured). The family's wish list is
+  // therefore also kept as a seed file in the repo; whenever the loaded
+  // state has an empty wish list (fresh deploy), restore from the seed.
+  // In-app changes still persist to disk and win while the instance lives;
+  // the seed only fills an empty list.
+  function seedWishlistFromRepoFile() {
+    try {
+      if (Array.isArray(state.wishlist) && state.wishlist.length) return;
+      const seedPath = path.join(path.dirname(fileURLToPath(import.meta.url)), 'wishlist-seed.json');
+      if (!fsSync.existsSync(seedPath)) return;
+      const seed = JSON.parse(fsSync.readFileSync(seedPath, 'utf8'));
+      const items = Array.isArray(seed?.items) ? seed.items : [];
+      if (!items.length) return;
+
+      const profileByLower = new Map((state.profiles || []).map((p) => [String(p.name || '').toLowerCase(), p]));
+      const ensureRecipientProfile = (recipientName) => {
+        const clean = String(recipientName || '').trim();
+        if (!clean || clean.toLowerCase() === 'family' || clean.toLowerCase() === 'household') return 'family-main';
+        const existing = profileByLower.get(clean.toLowerCase());
+        if (existing) return existing.id;
+        const profId = `prof_${clean.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 24) || crypto.randomBytes(3).toString('hex')}`;
+        const existingById = (state.profiles || []).find((p) => p.id === profId);
+        if (existingById) {
+          profileByLower.set(clean.toLowerCase(), existingById);
+          return existingById.id;
+        }
+        const newProf = {
+          id: profId,
+          name: clean.slice(0, 60),
+          type: 'member',
+          icon: '🎁',
+          budget: 300,
+          description: 'Created from uploaded family list',
+          favoriteBrands: [],
+          clothingSizes: '',
+          interests: [],
+          preferredRetailers: [],
+          dislikedProducts: [],
+          savedIdeas: [],
+        };
+        state.profiles.push(newProf);
+        profileByLower.set(clean.toLowerCase(), newProf);
+        return profId;
+      };
+
+      const seen = new Set();
+      for (const raw of items) {
+        if (!raw || (!String(raw.name || '').trim() && !String(raw.url || '').trim())) continue;
+        const wlObj = createWishlistItemObject({
+          ...raw,
+          profileId: ensureRecipientProfile(raw.recipient),
+          sourceUrl: raw.url || raw.sourceUrl || null,
+          preferredPrice: raw.price ?? raw.preferredPrice,
+          originalPrice: raw.originalPrice,
+        });
+        const dupKey = `${String(wlObj.name || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()}|${String(wlObj.recipient || '').toLowerCase().trim()}|${String(wlObj.retailerId || wlObj.retailerName || '').toLowerCase().trim()}`;
+        if (seen.has(dupKey)) continue;
+        seen.add(dupKey);
+        state.wishlist.push(wlObj);
+      }
+      if (state.wishlist.length) {
+        console.log(`[black-friday/store] Seeded ${state.wishlist.length} wish-list items from repo seed file.`);
+      }
+    } catch (error) {
+      console.error('[black-friday/store] Wish-list seed failed:', error?.message || error);
+    }
+  }
   let writeChain = Promise.resolve();
   let lastBackupAt = 0;
 
