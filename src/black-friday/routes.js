@@ -513,7 +513,11 @@ export function registerBlackFridayRoutes(app, {
     state.feedback.rejectedCanonicalKeys = [...rejectedKeys];
     state.feedback.boughtDealIds = [...bought];
     await store.persist();
-    res.json({ ok: true, dashboard: engine.buildDashboardPayload() });
+    // Light response on purpose: returning the full dashboard made every
+    // feedback tap take ~13s on Daniel's phone, so taps looked broken and
+    // a second tap could undo the first. The client updates the card in
+    // place from these fields.
+    res.json({ ok: true, action, dealId: dealId || null });
   });
 
   // Back-compat alias for Deal Hunter feedback

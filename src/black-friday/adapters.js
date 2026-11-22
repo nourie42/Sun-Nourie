@@ -548,11 +548,15 @@ async function runCashbackMonitorSource(source, { fetchImpl, nowIso }) {
         r.name.toLowerCase().replace(/[^a-z0-9]/g, '') === slug.replace(/[^a-z0-9]/g, '') ||
         r.aliases?.some((a) => a.replace(/[^a-z0-9]/g, '') === slug.replace(/[^a-z0-9]/g, ''))
     );
+    // Name the portal behind the best rate when the row shows one (Rakuten
+    // is in this comparison) instead of a generic "up to rate" label.
+    const portalMatch = rowHtml.match(/(rakuten|topcashback|befrugal|mr\.?\s*rebates|swagbucks|ibotta|retailmenot|capital\s*one\s*shopping)/i);
+    const portalName = portalMatch ? portalMatch[1].replace(/\s+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) : null;
     if (retailer && (!cashbackRates[retailer.id] || percent > cashbackRates[retailer.id].percent)) {
       cashbackRates[retailer.id] = {
         retailerId: retailer.id,
         percent,
-        portal: 'Up to rate · Cashback Monitor (verify category terms)',
+        portal: portalName ? `${portalName} · best portal rate via Cashback Monitor (verify category terms)` : 'Up to rate · Cashback Monitor (verify category terms)',
         sourceUrl: `https://www.cashbackmonitor.com/cashback-store/${slug}/`,
         verifiedAt: nowIso,
       };

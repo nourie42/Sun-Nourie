@@ -38,7 +38,7 @@ import {
   deliverAlertExternally,
   getChannelStatus,
 } from './notifications.js';
-import { cleanDealsWithAi } from './ai.js';
+import { cleanDealsWithAi, judgeWishlistMatches } from './ai.js';
 
 export function createBlackFridayEngine({
   store,
@@ -332,6 +332,32 @@ export function createBlackFridayEngine({
           }
         }
 
+        // 5.5 AI check of wish-list matches: the token matcher over-matches
+        // (accessories, wrong models). Pairs the AI judges "not the same
+        // product" are stored and filtered out of wish-list best offers in
+        // the dashboard payload. Verdicts persist in state across sweeps.
+        try {
+          const pairs = [];
+          const seenPair = new Set();
+          for (const d of activeEvaluated) {
+            for (const wid of d.matchedWishlistIds || []) {
+              const item = (state.wishlist || []).find((w) => w.id === wid);
+              if (!item?.canonicalKey || !d.canonicalKey) continue;
+              const key = `${item.canonicalKey}|${d.canonicalKey}`;
+              if (seenPair.has(key) || state.aiMatchVerdicts?.[key]) continue;
+              seenPair.add(key);
+              pairs.push({ key, wishName: item.name, dealTitle: d.displayTitle || d.title });
+            }
+          }
+          if (pairs.length) {
+            const judged = await judgeWishlistMatches(pairs.slice(0, 48), { fetchImpl });
+            if (judged.size) {
+              state.aiMatchVerdicts = { ...(state.aiMatchVerdicts || {}) };
+              for (const [k, v] of judged) state.aiMatchVerdicts[k] = v;
+            }
+          }
+        } catch { /* AI match check is optional; never fail the sweep over it */ }
+
         // Check user-uploaded savedDeals against latest live prices & preserve originalUploadedPrice forever
         for (const sd of state.savedDeals || []) {
           let observedPrice = null;
@@ -538,8 +564,9 @@ export function createBlackFridayEngine({
     const visibleDeals = enrichedActiveDeals.filter((d) => !d.isRejected);
 
     const enrichedWishlist = (state.wishlist || []).map((item) => {
+      const aiVerdicts = state.aiMatchVerdicts || {};
       const matchedOffers = visibleDeals
-        .filter((d) => d.matchedWishlistIds.includes(item.id))
+        .filter((d) => d.matchedWishlistIds.includes(item.id) && aiVerdicts[`${item.canonicalKey}|${d.canonicalKey}`] !== 'mismatch')
         .sort((a, b) => (a.finalAllInTotal ?? a.currentPrice ?? 1e9) - (b.finalAllInTotal ?? b.currentPrice ?? 1e9));
       const bestOffer = matchedOffers[0] || null;
       const historyCount = (state.priceHistory[item.canonicalKey] || []).length +
@@ -627,12 +654,13 @@ export function createBlackFridayEngine({
       };
     });
 
-    const mainStoreSet = new Set(MAIN_STORE_IDS);
+    // "Main stores" means Daniel's chosen stores ONLY (set 2026-11-22). The old
+    // rule also admitted any store with 3+ deals, which flooded the home page
+    // with stores he never picked (Nike, Newegg, Ulta...). Other stores' deals
+    // still exist under Retailer Deals.
     const mainStoreStats = storesDirectory
-      .filter((s) => mainStoreSet.has(s.id) || s.verifiedDealsCount >= 3)
-      .filter((s) => !['slickdeals', 'dealnews', 'bradsdeals', 'retailmenot', 'rakuten', 'camelcamelcamel', 'keepa', 'cashbackmonitor'].includes(s.id))
-      .sort((a, b) => b.verifiedDealsCount - a.verifiedDealsCount || (MAIN_STORE_IDS.indexOf(a.id) - MAIN_STORE_IDS.indexOf(b.id)))
-      .slice(0, 26);
+      .filter((s) => MAIN_STORE_IDS.includes(s.id))
+      .sort((a, b) => MAIN_STORE_IDS.indexOf(a.id) - MAIN_STORE_IDS.indexOf(b.id));
 
     const unreadAlertsCount = (state.alerts || []).filter((a) => !a.read).length;
 

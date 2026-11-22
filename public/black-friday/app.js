@@ -68,7 +68,7 @@ const appState = {
   compareDealIds: [],
   filters: {
     q: '', tier: 'all', retailer: 'all', category: 'all', sort: 'score',
-    maxPrice: '', freeShip: false, newOnly: false, localOnly: false,
+    maxPrice: '', freeShip: false, newOnly: false, localOnly: false, favOnly: true,
   },
   storeFilters: { q: '', category: 'all', favOnly: false },
   sse: null,
@@ -291,6 +291,7 @@ function renderProductCardHtml(deal, recMeta = null) {
           </span>
           <span class="badge ${deal.decision?.action === 'BUY NOW' ? 'badge-buy' : 'badge-wait'}">${esc(deal.decision?.action || 'WAIT')}</span>
         </div>
+        ${deal.decision?.reasons?.length ? `<div class="deal-verdict-reason"><strong>${deal.decision.action === 'BUY NOW' ? 'Buy now — ' : deal.decision.action === 'WAIT' ? 'Wait — ' : 'Look elsewhere — '}</strong>${esc(deal.decision.reasons[0])}</div>` : ''}
 
         <h3 class="deal-title" title="${esc(deal.title)}">${esc(deal.displayTitle || deal.title)}</h3>
         ${deal.aiSummary ? `<div class="deal-summary">${esc(deal.aiSummary)}</div>` : ''}
@@ -309,14 +310,17 @@ function renderProductCardHtml(deal, recMeta = null) {
             <span>Ship: <strong>${deal.shippingFree ? 'Free' : deal.shippingCost != null ? money(deal.shippingCost) : 'Verify'}</strong></span>
             <span>NC Tax (${esc(deal.taxRatePct ?? 7.25)}%): <strong>${money(deal.estimatedTax)}</strong></span>
             <span>All-In: <strong>${money(deal.finalAllInTotal)}</strong></span>
+            ${deal.estimatedCashback > 0 ? `<span>Cash back: <strong>−${money(deal.estimatedCashback)} (~${esc(deal.cashbackPercent)}%)</strong> → ${money(deal.effectiveAfterCashback)} after cash back</span>` : ''}
           </div>
+          ${deal.storeCash ? `<span class="deal-chip">Earns ${money(deal.storeCash.amount)} ${esc(deal.storeCash.label)}</span>` : ''}
+          ${deal.couponCode ? `<span class="deal-chip">Coupon: ${esc(deal.couponCode)}</span>` : ''}
         </div>
 
         ${recExplanationHtml}
 
         <div class="deal-verify-line tabular">
-          <span>Verified ${esc(timeAgo(deal.verifiedAt))} via ${esc(deal.sourceName)}</span>
-          <span>${deal.isDirectProductUrl ? 'Direct Product Link' : 'Verified Deal Page'}</span>
+          <span>${deal.isDirectProductUrl ? 'Price checked' : 'Price from deal post'} ${esc(timeAgo(deal.verifiedAt))} · ${esc(deal.sourceName)}</span>
+          <span>${deal.isDirectProductUrl ? 'Direct Product Link' : 'Deal Post Page'}</span>
         </div>
 
         <div class="deal-actions">
@@ -419,11 +423,13 @@ function renderHomePage() {
 
   // ---- SECTION 1: MAIN STORES LIVE DEALS WITH STORE PICKER ----
   const mainStats = d.mainStoreStats || [];
+  const mainStoreIdSet = new Set(mainStats.map((s) => s.id));
   const allLiveWithPrice = (d.deals || []).filter((x) => x.currentPrice !== null);
+  const mainLiveWithPrice = mainStoreIdSet.size ? allLiveWithPrice.filter((x) => mainStoreIdSet.has(x.retailerId)) : allLiveWithPrice;
   const storePickerEl = $('home-store-picker');
   if (storePickerEl) {
     const pickerHtml = [
-      `<button class="store-pick-pill ${appState.homeSelectedStore === 'all' ? 'is-active' : ''}" data-pick-store="all" type="button">🛍️ All Main Stores <span class="store-pick-count tabular">${allLiveWithPrice.length}</span></button>`,
+      `<button class="store-pick-pill ${appState.homeSelectedStore === 'all' ? 'is-active' : ''}" data-pick-store="all" type="button">🛍️ All Main Stores <span class="store-pick-count tabular">${mainLiveWithPrice.length}</span></button>`,
       ...mainStats.map((st) => `
         <button class="store-pick-pill ${appState.homeSelectedStore === st.id ? 'is-active' : ''}" data-pick-store="${esc(st.id)}" type="button">
           ${renderStoreAvatar(st, true)}
@@ -434,7 +440,8 @@ function renderHomePage() {
     storePickerEl.innerHTML = pickerHtml;
   }
 
-  let liveFiltered = [...allLiveWithPrice];
+  // The home grid is main stores ONLY — other stores live under Retailer Deals.
+  let liveFiltered = [...mainLiveWithPrice];
   if (appState.homeSelectedStore !== 'all') {
     liveFiltered = liveFiltered.filter((x) => x.retailerId === appState.homeSelectedStore);
   }
@@ -1371,6 +1378,8 @@ function renderBestDealsView() {
 
   let list = [...d.deals];
   const f = appState.filters;
+  const favStoreIds = new Set((d.favoriteStores || []).map((s) => s.id));
+  if (f.favOnly !== false && favStoreIds.size) list = list.filter((x) => favStoreIds.has(x.retailerId));
   if (f.q.trim()) { const q = f.q.trim().toLowerCase(); list = list.filter((x) => `${x.title} ${x.brand || ''} ${x.retailerName}`.toLowerCase().includes(q)); }
   if (f.tier !== 'all') list = list.filter((x) => x.tier === f.tier);
   if (f.retailer !== 'all') list = list.filter((x) => x.retailerId === f.retailer);
@@ -1384,7 +1393,7 @@ function renderBestDealsView() {
   else if (f.sort === 'price_desc') list.sort((a, b) => (b.finalAllInTotal ?? -1) - (a.finalAllInTotal ?? -1));
   else if (f.sort === 'newest') list.sort((a, b) => Date.parse(b.publishedAt || 0) - Date.parse(a.publishedAt || 0));
 
-  $('deals-count-label').textContent = `${list.length} verified live-feed deals`;
+  $('deals-count-label').textContent = f.favOnly !== false && favStoreIds.size ? `${list.length} deals from your main stores` : `${list.length} deals from all stores`;
   $('best-deals-grid').innerHTML = list.length ? list.slice(0, 60).map((x) => renderProductCardHtml(x)).join('') : '<div class="small muted">No deals match your filters.</div>';
   attachLogoFallbacks($('best-deals-grid'));
 }
@@ -1743,19 +1752,29 @@ function bindEvents() {
     }
 
     // Recommendation Feedback Buttons (LOVE IT, NOT INTERESTED, ALREADY BOUGHT)
+    // The endpoint now answers light, so update the card in place — no full
+    // page reload, no 13-second wait, and the item disappears immediately.
     const fbBtn = e.target.closest('[data-fb]');
     if (fbBtn) {
       const action = fbBtn.dataset.fb;
       const dealId = fbBtn.dataset.dealId;
       try {
-        const out = await api('/api/black-friday/feedback', {
+        await api('/api/black-friday/feedback', {
           method: 'POST',
           body: { dealId, action, title: fbBtn.dataset.title || '' },
         });
-        hydrateData(out.dashboard);
+        if (action === 'reject' || action === 'bought') {
+          fbBtn.closest('article')?.remove();
+          if (appState.data?.deals) appState.data.deals = appState.data.deals.filter((x) => x.id !== dealId);
+        } else if (action === 'love') {
+          fbBtn.classList.add('is-loved');
+          fbBtn.textContent = '♥ SAVED / LOVED';
+          const deal = appState.data?.deals?.find((x) => x.id === dealId);
+          if (deal) deal.isLoved = true;
+        }
         toast(
           action === 'love' ? 'Saved & marked LOVE IT — recommendations updated!' :
-          action === 'reject' ? 'Rejected permanently (only this exact product — category untouched).' :
+          action === 'reject' ? 'Removed — this exact product will not be shown again.' :
           'Marked ALREADY BOUGHT — removed from recommendations & logged.'
         );
       } catch (err) { toast(err.message); }
@@ -2149,22 +2168,24 @@ function bindEvents() {
       q: $('filter-q').value, tier: $('filter-tier').value, retailer: $('filter-retailer').value,
       category: $('filter-category').value, sort: $('filter-sort').value, maxPrice: $('filter-max-price').value,
       freeShip: $('filter-free-ship').checked, newOnly: $('filter-new-only').checked, localOnly: $('filter-local-only').checked,
+      favOnly: $('filter-fav-only') ? $('filter-fav-only').checked : true,
     };
     savePrefs();
     renderBestDealsView();
   };
-  for (const id of ['filter-q', 'filter-tier', 'filter-retailer', 'filter-category', 'filter-sort', 'filter-max-price', 'filter-free-ship', 'filter-new-only', 'filter-local-only']) {
-    $(id).addEventListener(id === 'filter-q' || id === 'filter-max-price' ? 'input' : 'change', syncFilters);
+  for (const id of ['filter-q', 'filter-tier', 'filter-retailer', 'filter-category', 'filter-sort', 'filter-max-price', 'filter-free-ship', 'filter-new-only', 'filter-local-only', 'filter-fav-only']) {
+    const el = $(id);
+    if (el) el.addEventListener(id === 'filter-q' || id === 'filter-max-price' ? 'input' : 'change', syncFilters);
   }
   $('filter-reset-btn').addEventListener('click', () => {
-    appState.filters = { q: '', tier: 'all', retailer: 'all', category: 'all', sort: 'score', maxPrice: '', freeShip: false, newOnly: false, localOnly: false };
+    appState.filters = { q: '', tier: 'all', retailer: 'all', category: 'all', sort: 'score', maxPrice: '', freeShip: false, newOnly: false, localOnly: false, favOnly: true };
     savePrefs();
     renderBestDealsView();
   });
 
   $('reset-rejected-btn').addEventListener('click', async () => {
-    const out = await api('/api/black-friday/feedback', { method: 'POST', body: { action: 'reset_rejected' } });
-    hydrateData(out.dashboard);
+    await api('/api/black-friday/feedback', { method: 'POST', body: { action: 'reset_rejected' } });
+    await fetchBootstrap();
     toast('Restored all previously rejected products.');
   });
 

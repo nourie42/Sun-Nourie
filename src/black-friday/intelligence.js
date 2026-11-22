@@ -687,6 +687,52 @@ export function matchWishlistToDeal(item, deal) {
  * Evaluate a single deal: true discount, all-in cost, historical comparison,
  * deal classification, and 0-100 shopping decision score.
  */
+// ---- Text facts mined from the deal post itself (title + description) ----
+// Deal posts usually state the regular price, the coupon codes and any
+// store-cash earnings in plain text ("$199.99 - $64 when you enter promo
+// codes KITCHEN20 and CATCH15OFF = $135.99", "+ $20 Kohl's Cash"). Mining
+// them makes the discount math real instead of leaning on medians of other
+// sale prices, and keeps store-cash earnings visible instead of cleaned away.
+const COUPON_STOPWORDS = new Set(['FREE', 'SHIPPING', 'CODE', 'CODES', 'PROMO', 'COUPON', 'EXTRA', 'WITH', 'WHEN', 'ENTER', 'APPLY', 'CART', 'STORE', 'PICKUP', 'SALE', 'DEAL', 'SAVE', 'TODAY', 'ONLY']);
+export function extractDealTextFacts(deal) {
+  const title = String(deal?.title || '');
+  const text = `${title} ${String(deal?.description || '')}`;
+
+  let statedRegularPrice = null;
+  const regularPatterns = [
+    /\$([\d,]+\.\d{2})\s*[-–]\s*\$[\d,]+(?:\.\d{2})?\s*(?:when|with|after|using|in cart)/i,
+    /(?:was|reg(?:ular)?(?:\s*price)?|list(?:\s*price)?|msrp|originally|retails?(?:\s*for)?)\s*:?\s*\$([\d,]+\.\d{2})/i,
+  ];
+  for (const re of regularPatterns) {
+    const m = text.match(re);
+    if (m) { statedRegularPrice = Number(m[1].replace(/,/g, '')); break; }
+  }
+  if (!Number.isFinite(statedRegularPrice) || statedRegularPrice <= 0) statedRegularPrice = null;
+
+  const codes = new Set();
+  if (deal?.couponCode) {
+    for (const c of String(deal.couponCode).split(/[+,]/)) { const t = c.trim().toUpperCase(); if (t) codes.add(t); }
+  }
+  const codeListRe = /(?:promo\s*codes?|coupon\s*codes?|codes?|coupons?)\s*:?\s*([A-Z][A-Z0-9]{3,}(?:\s*(?:and|&|,)\s*[A-Z][A-Z0-9]{3,})*)/gi;
+  for (const m of text.matchAll(codeListRe)) {
+    for (const raw of m[1].split(/\s*(?:and|&|,)\s*/)) {
+      const code = raw.trim().toUpperCase();
+      if (code.length >= 4 && code.length <= 20 && !COUPON_STOPWORDS.has(code) && /[A-Z]/.test(code) && /\d/.test(code)) codes.add(code);
+    }
+  }
+
+  let storeCash = null;
+  const kohlCash = text.match(/\$(\d+(?:\.\d{2})?)\s*(?:in\s+)?Kohl'?s Cash/i);
+  if (kohlCash) {
+    storeCash = { amount: Number(kohlCash[1]), label: "Kohl's Cash" };
+  } else {
+    const generic = text.match(/(?:earn|earns|get|gets|receive|receives)\s+\$(\d+(?:\.\d{2})?)\s+(?:in\s+)?([A-Za-z][A-Za-z' ]{2,24}?)\s*(?:cash|rewards)\b/i);
+    if (generic) storeCash = { amount: Number(generic[1]), label: `${generic[2].trim()} cash` };
+  }
+
+  return { statedRegularPrice, couponCodes: [...codes], storeCash };
+}
+
 export function evaluateDeal(deal, {
   historyEntries = [],
   competitorDeals = [],
@@ -702,6 +748,10 @@ export function evaluateDeal(deal, {
   };
 
   const currentPrice = roundMoney(deal.currentPrice);
+  const textFacts = extractDealTextFacts(deal);
+  const statedRegularPrice = deal.reportedRegularPrice > 0 ? deal.reportedRegularPrice : textFacts.statedRegularPrice;
+  const couponCode = textFacts.couponCodes.length ? textFacts.couponCodes.join(' + ') : (deal.couponCode || null);
+  const storeCash = textFacts.storeCash;
   const shippingCost = deal.shippingFree ? 0 : roundMoney(deal.shippingCost);
   const estimatedTax = currentPrice !== null ? roundMoney(currentPrice * taxRate) : null;
 
@@ -747,28 +797,34 @@ export function evaluateDeal(deal, {
   let baselineLabel = 'Historical baseline unknown — recording observations';
   let inflatedListWarning = false;
 
-  if (histPrices.length >= 2 && observedMedian !== null) {
-    normalPrice = observedMedian;
-    baselineType = 'observed_history';
-    baselineLabel = `Observed median across ${histPrices.length} recorded snapshots`;
-  } else if (deal.baselineSource === 'camel_average' && deal.reportedRegularPrice > 0) {
-    normalPrice = deal.reportedRegularPrice;
+  // Baseline priority (fixed 2026-11-22): a STATED regular price beats a
+  // median of other sale prices. The old order used the observed median
+  // first, which priced a $136 Kohl's CREAMi against a $133 "normal" made
+  // from other stores' sale prices — nonsense on the card. Observed and
+  // competitor medians now count only when they are genuinely above the
+  // current price; otherwise there is no verified discount to claim.
+  if (deal.baselineSource === 'camel_average' && statedRegularPrice > 0) {
+    normalPrice = statedRegularPrice;
     baselineType = 'camel_average';
     baselineLabel = 'CamelCamelCamel historical Amazon average';
-  } else if (compPrices.length >= 2 && competitorMedian > 0) {
+  } else if (statedRegularPrice > 0 && currentPrice !== null && statedRegularPrice > currentPrice) {
+    normalPrice = statedRegularPrice;
+    baselineType = 'editorial_regular';
+    baselineLabel = `Regular price stated in the deal post (${deal.sourceName || 'source'})`;
+  } else if (compPrices.length >= 2 && competitorMedian > 0 && currentPrice !== null && competitorMedian > currentPrice) {
     normalPrice = competitorMedian;
     baselineType = 'cross_retailer_median';
     baselineLabel = `Median across ${compPrices.length} competing listings`;
-  } else if (deal.reportedRegularPrice > 0) {
-    normalPrice = deal.reportedRegularPrice;
-    baselineType = 'editorial_regular';
-    baselineLabel = `Editorial / retailer regular price reported by ${deal.sourceName || 'source'}`;
+  } else if (histPrices.length >= 2 && observedMedian !== null && currentPrice !== null && observedMedian > currentPrice * 1.05) {
+    normalPrice = observedMedian;
+    baselineType = 'observed_history';
+    baselineLabel = `Observed median across ${histPrices.length} recorded snapshots`;
   }
 
   // Inflated-MSRP check: if a retailer's claimed regular price is >35% higher than observed median or competitor median
-  if (deal.reportedRegularPrice > 0 && observedMedian > 0 && deal.reportedRegularPrice > observedMedian * 1.35) {
+  if (statedRegularPrice > 0 && observedMedian > 0 && statedRegularPrice > observedMedian * 1.35) {
     inflatedListWarning = true;
-  } else if (deal.reportedRegularPrice > 0 && competitorMedian > 0 && deal.reportedRegularPrice > competitorMedian * 1.35) {
+  } else if (statedRegularPrice > 0 && competitorMedian > 0 && statedRegularPrice > competitorMedian * 1.35) {
     inflatedListWarning = true;
   }
 
@@ -869,7 +925,8 @@ export function evaluateDeal(deal, {
   if (deal.mentionsAllTimeLow || (observedMin !== null && currentPrice !== null && currentPrice <= observedMin && histPrices.length >= 2)) {
     whyParts.push('Matches or beats lowest observed price');
   }
-  if (deal.couponCode) whyParts.push(`Extra savings with promo code ${deal.couponCode}`);
+  if (couponCode) whyParts.push(`Extra savings with promo code ${couponCode}`);
+  if (storeCash) whyParts.push(`Earns $${storeCash.amount} ${storeCash.label}`);
   if (deal.shippingFree) whyParts.push('Free shipping included');
   if (cashbackPercent) whyParts.push(`Stackable with ~${cashbackPercent}% cashback (${cashbackPortal})`);
   if (wishlistMatches.length) whyParts.push(`Matches family wish-list item: ${wishlistMatches[0].name}`);
@@ -894,6 +951,9 @@ export function evaluateDeal(deal, {
     cashbackPercent,
     cashbackPortal,
     estimatedCashback,
+    couponCode,
+    storeCash,
+    statedRegularPrice,
     finalAllInTotal,
     effectiveAfterCashback,
     freshness,
@@ -1068,26 +1128,29 @@ export function computeDecisionScore({
 
   if (deal.availabilityStatus === 'out_of_stock') {
     action = 'WAIT';
-    reasons.push('Currently reported out of stock.');
+    reasons.push('It is reported out of stock right now.');
   } else if (competitorMin !== null && currentPrice !== null && currentPrice > competitorMin * 1.08) {
     action = 'CONSIDER ALTERNATIVE';
-    reasons.push(`Another verified listing is cheaper ($${competitorMin.toFixed(2)} vs $${currentPrice.toFixed(2)}).`);
+    reasons.push(`Another store has it cheaper: $${competitorMin.toFixed(2)} vs $${currentPrice.toFixed(2)} here.`);
   } else if (
-    (verifiedDiscountPct !== null && verifiedDiscountPct >= 25 && confidenceScore >= 60) ||
+    (verifiedDiscountPct !== null && verifiedDiscountPct >= 25 && confidenceScore >= 50) ||
+    (wishlistMatches.length > 0 && verifiedDiscountPct !== null && verifiedDiscountPct >= 20) ||
     (wishTarget !== null && currentPrice !== null && currentPrice <= wishTarget) ||
     (totalScore >= 65 && verifiedDiscountPct !== null && verifiedDiscountPct >= 20)
   ) {
     action = 'BUY NOW';
-    if (verifiedDiscountPct >= 25) reasons.push(`Strong verified discount of ${verifiedDiscountPct}% below ${baselineType.replace(/_/g, ' ')}.`);
-    if (wishTarget !== null && currentPrice <= wishTarget) reasons.push(`Meets or beats your target price of $${wishTarget.toFixed(2)}.`);
-    if (deal.mentionsAllTimeLow) reasons.push('Matches reported all-time low.');
+    if (verifiedDiscountPct >= 25) reasons.push(`${verifiedDiscountPct}% off the regular price — that clears your 25% bar.`);
+    else if (verifiedDiscountPct !== null && verifiedDiscountPct >= 20 && wishlistMatches.length > 0) reasons.push(`${verifiedDiscountPct}% off, and it is on your wish list.`);
+    if (wishTarget !== null && currentPrice <= wishTarget) reasons.push(`At or under your target price of $${wishTarget.toFixed(2)}.`);
+    if (deal.mentionsAllTimeLow) reasons.push('This matches the lowest price ever reported for it.');
   } else if (wishMax !== null && currentPrice !== null && currentPrice > wishMax) {
     action = 'CONSIDER ALTERNATIVE';
-    reasons.push(`Current price ($${currentPrice.toFixed(2)}) exceeds your maximum budget ($${wishMax.toFixed(2)}).`);
+    reasons.push(`It costs $${currentPrice.toFixed(2)}, which is over your max of $${wishMax.toFixed(2)} for this item.`);
   } else {
     action = 'WAIT';
-    if (verifiedDiscountPct === null) reasons.push('Historical baseline is not yet established; continue automated tracking.');
-    else reasons.push(`Current discount (${verifiedDiscountPct}%) is below strong Black Friday target thresholds.`);
+    if (verifiedDiscountPct === null) reasons.push('No regular price found yet, so the discount cannot be verified. Waiting is safer.');
+    else if (verifiedDiscountPct <= 0) reasons.push('It is at (or above) the typical price right now — no real discount yet.');
+    else reasons.push(`Only ${verifiedDiscountPct}% off — your bar is 25%, so wait for a bigger drop.`);
   }
 
   return {

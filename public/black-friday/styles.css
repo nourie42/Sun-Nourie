@@ -655,6 +655,27 @@ html[data-theme="light"] .deal-media {
   overflow: hidden;
 }
 
+.deal-verdict-reason {
+  font-size: 12.5px;
+  line-height: 1.4;
+  padding: 6px 9px;
+  margin: 6px 0 2px;
+  border-left: 3px solid var(--hatch-widget-accent, #2563eb);
+  background: rgba(127, 127, 127, 0.10);
+  border-radius: 0 8px 8px 0;
+}
+
+.deal-chip {
+  display: inline-block;
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 3px 8px;
+  margin: 6px 6px 0 0;
+  border-radius: 999px;
+  border: 1px solid rgba(127, 127, 127, 0.35);
+  background: rgba(127, 127, 127, 0.10);
+}
+
 .deal-price-box {
   display: grid;
   grid-template-columns: auto 1fr;

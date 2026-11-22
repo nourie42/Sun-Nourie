@@ -45,7 +45,7 @@ async function cleanBatch(titles, fetchImpl) {
   const prompt = [
     'You clean up shopping deal post titles. For each numbered title, return the clean product name and a one-line summary.',
     'Rules for the product name: keep the brand, product line, model number and size/count when present. Remove prices, percent-off, shipping notes, store-cash or rewards mentions, coupon codes and hype words.',
-    'Rules for the summary: one plain sentence, at most 18 words, saying what the item is and any useful included extra (for example "Earns $20 Kohl\'s Cash"). Never state a price or a percent off. If nothing extra is known, just describe the item plainly.',
+    'Rules for the summary: one plain sentence, at most 18 words, saying what the item is and any useful included extra. If the raw title mentions earning store cash or rewards (for example Kohl\'s Cash), the summary MUST say what is earned, like "Earns $20 Kohl\'s Cash". Never state a price or a percent off. If nothing extra is known, just describe the item plainly.',
     'Answer with a JSON array only, one object per title: [{"i":0,"title":"...","summary":"..."}]',
     '',
     list,
@@ -87,6 +87,53 @@ async function cleanBatch(titles, fetchImpl) {
  * Fill displayTitle / aiSummary on deals that lack them. Mutates the deals.
  * Never throws: any failure leaves the deals exactly as they were.
  */
+async function geminiJson(prompt, fetchImpl) {
+  const res = await fetchImpl(`${API_BASE}/models/${MODEL}:generateContent`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': process.env.GEMINI_API_KEY },
+    body: JSON.stringify({
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: { responseMimeType: 'application/json', temperature: 0.1 },
+    }),
+    signal: AbortSignal.timeout(45_000),
+  });
+  if (!res.ok) throw new Error(`gemini http ${res.status}`);
+  const data = await res.json();
+  const text = data?.candidates?.[0]?.content?.parts?.map((p) => p.text || '').join('') || '';
+  return JSON.parse(text);
+}
+
+// Judge whether each wish-list ↔ deal pairing is really the same product.
+// The token matcher over-matches (a CREAMi also "matches" CREAMi cups and
+// accessories); a wrong best offer is worse than none, so pairs the AI
+// calls a mismatch get filtered out of the wish-list cards.
+export async function judgeWishlistMatches(pairs, { fetchImpl = fetch } = {}) {
+  const verdicts = new Map();
+  if (!aiEnabled() || !Array.isArray(pairs) || pairs.length === 0) return verdicts;
+  const BATCH = 12;
+  for (let i = 0; i < pairs.length; i += BATCH) {
+    const batch = pairs.slice(i, i + BATCH);
+    const list = batch.map((p, j) => `${j}. WISH: ${p.wishName}\n   DEAL: ${p.dealTitle}`).join('\n');
+    const prompt = [
+      'For each pair, decide whether the DEAL is the same product the WISH asks for.',
+      'Same means: the same kind of item, and the same brand/model/size when the wish names them. Accessories, parts, refills, bundles of supplies, or a different model are NOT the same.',
+      'Answer with a JSON array only, one object per pair: [{"i":0,"same":true}]',
+      '',
+      list,
+    ].join('\n');
+    try {
+      const arr = await geminiJson(prompt, fetchImpl);
+      if (Array.isArray(arr)) {
+        for (const row of arr) {
+          const pair = batch[Number(row?.i)];
+          if (pair && typeof row?.same === 'boolean') verdicts.set(pair.key, row.same ? 'match' : 'mismatch');
+        }
+      }
+    } catch { /* leave these pairs unjudged */ }
+  }
+  return verdicts;
+}
+
 export async function cleanDealsWithAi(deals, { fetchImpl = fetch } = {}) {
   if (!aiEnabled() || !Array.isArray(deals) || deals.length === 0) return { cleaned: 0, enabled: aiEnabled() };
 
