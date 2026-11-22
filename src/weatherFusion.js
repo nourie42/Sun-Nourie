@@ -45,7 +45,6 @@ import {COMFORT_SCENE_ASSETS,PET_WALKER_FILES} from '../public/weather-fusion/ex
 import {PORTRAIT_FILES} from '../public/weather-fusion/weather-portraits.js';
 import {recoverForecastHours,recoverDailyConditions} from './weatherFusionFallback.js';
 import {addConditionConfidence} from './weatherFusionConditionConfidence.js';
-import {createWeatherViewAnalytics} from './weatherViewAnalytics.js';
 
 export const PRESETS = [
   { id: 'knightdale', name: 'Knightdale / Raleigh', latitude: 35.787, longitude: -78.4806 },
@@ -769,18 +768,9 @@ export function registerWeatherFusionRoutes(app, options = {}) {
   registerGlobeRoutes(app,{fetchImpl:options.fetchImpl,now:options.now,parseRadarTimes});
   const service = createWeatherService({env:{...process.env,WEATHER_NOURIE_BLEND_V2:process.env.WEATHER_NOURIE_BLEND_V2||'true'},...options});
   const accuracy = createAccuracyService({fetchImpl: options.fetchImpl || fetch, now: options.now || Date.now});
-  const viewAnalytics = createWeatherViewAnalytics({now: options.now || Date.now});
   const getForecastRecorded = async (query) => {
     const forecast = await service.getForecast(query);
     try { accuracy.recordRuntimeForecast(forecast); } catch {}
-    try {
-      viewAnalytics.recordLocationLookup({
-        name: forecast?.location?.name,
-        latitude: forecast?.location?.latitude,
-        longitude: forecast?.location?.longitude,
-        timeZone: forecast?.location?.timeZone,
-      });
-    } catch {}
     return forecast;
   };
   const counters = new Map();
@@ -796,7 +786,6 @@ export function registerWeatherFusionRoutes(app, options = {}) {
     catch (e) { return res.status(e.status || 503).json({ error: e.status === 400 || e.status === 409 ? e.message : 'Weather data is temporarily unavailable. Please retry.' }); }
   };
   app.get(['/weather', '/weather-fusion', '/weather-fusion/', '/weather-fusion/experimental-weather.html', '/weather-fusion/outlooks'], (req, res) => {
-    try { viewAnalytics.recordPageView(req, { page: req.path || '/weather-fusion/' }); } catch {}
     res.setHeader('Cache-Control', 'no-store, no-cache, max-age=0, must-revalidate');
     res.setHeader('Pragma', 'no-cache');
     res.setHeader('Expires', '0');
@@ -805,29 +794,18 @@ export function registerWeatherFusionRoutes(app, options = {}) {
     res.sendFile(path.join(PUBLIC_DIR, 'index.html'));
   });
   app.get('/weather-fusion/ai-rankings.html', (req, res) => {
-    try { viewAnalytics.recordPageView(req, { page: '/weather-fusion/ai-rankings.html' }); } catch {}
     res.setHeader('Cache-Control', 'no-store, no-cache, max-age=0, must-revalidate');
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
     res.sendFile(path.join(PUBLIC_DIR, 'ai-rankings.html'));
   });
   app.get(['/weather-fusion/v3', '/weather-fusion/v3/', '/weather-fusion/v3/index.html', '/weather-fusion/v3/experimental-weather.html'], (req, res) => {
-    try { viewAnalytics.recordPageView(req, { page: '/weather-fusion/v3/' }); } catch {}
     res.setHeader('Cache-Control', 'no-store, no-cache, max-age=0, must-revalidate');
     res.setHeader('Pragma', 'no-cache');
     res.setHeader('Expires', '0');
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
     res.sendFile(path.join(PUBLIC_DIR, 'v3', 'index.html'));
-  });
-  app.get(['/weather-fusion/analytics', '/weather-fusion/analytics/', '/weather-fusion/analytics.html'], (req, res) => {
-    try { viewAnalytics.recordPageView(req, { page: '/weather-fusion/analytics.html' }); } catch {}
-    res.setHeader('Cache-Control', 'no-store, no-cache, max-age=0, must-revalidate');
-    res.setHeader('Pragma', 'no-cache');
-    res.setHeader('Expires', '0');
-    res.setHeader('X-Content-Type-Options', 'nosniff');
-    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-    res.sendFile(path.join(PUBLIC_DIR, 'analytics.html'));
   });
   for (const v3Asset of [
     'v3/css/styles.css',
@@ -845,7 +823,7 @@ export function registerWeatherFusionRoutes(app, options = {}) {
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.sendFile(path.join(PUBLIC_DIR, v3Asset));
   });
-  app.get(['/weather-fusion/halo', '/weather-fusion/halo/', '/weather-fusion/halo.html'], (_req, res) => res.redirect(302, '/weather-fusion/analytics.html'));
+  app.get(['/weather-fusion/halo', '/weather-fusion/halo/'], (_req, res) => res.redirect(302, '/weather-fusion/halo.html'));
   app.get('/weather-fusion/weathernext-site.html', (req,res) => {
     // The standalone data explorer lives at its explicit file route. The public
     // /weathernext dashboard is owned by weatherComparison.js so it can reuse
@@ -889,7 +867,7 @@ export function registerWeatherFusionRoutes(app, options = {}) {
     'comfort-integrated-rain-night.webp','comfort-integrated-snow-play-dawn.webp','comfort-integrated-snow-play.webp',
     'model-explanation.js','model-explanation.css','weathernext-site.html','weathernext-site.css','weathernext-site.js','weathernext-data.js','weathernext-catalog.json',
     'glance.html','glance.css','glance.js',
-    'halo.css','halo.js',
+    'halo.html','halo.css','halo.js',
     'blend.html','blend.css','blend.js',
     'today.html','today.css','today.js',
     'wn.html','wn.css','wn.js',
@@ -931,20 +909,6 @@ export function registerWeatherFusionRoutes(app, options = {}) {
     }
     return accuracy.getAccuracy({ latitude: lat, longitude: lon, days: q.days, horizon: q.horizon });
   }));
-  app.get('/api/weather-fusion/analytics', (_req, res) => {
-    res.setHeader('Cache-Control', 'no-store');
-    res.setHeader('X-Content-Type-Options', 'nosniff');
-    res.json(viewAnalytics.getSnapshot());
-  });
-  const handleAnalyticsView = (req, res) => {
-    res.setHeader('Cache-Control', 'no-store');
-    res.setHeader('X-Content-Type-Options', 'nosniff');
-    const body = req.body && typeof req.body === 'object' ? req.body : (req.query || {});
-    viewAnalytics.recordPageView(req, body);
-    res.json({ ok: true });
-  };
-  app.get('/api/weather-fusion/analytics/view', handleAnalyticsView);
-  if (typeof app.post === 'function') app.post('/api/weather-fusion/analytics/view', handleAnalyticsView);
   return service;
 }
 
