@@ -10,13 +10,14 @@
   <link rel="stylesheet" href="/weather-fusion/car-wash.css?v=center-answer-v43" />
   <link rel="stylesheet" href="/weather-fusion/risk-outlooks.css?v=risk-outlooks-v5" />
   <link rel="stylesheet" href="/weather-fusion/forecast-window-banners.css?v=current-rain-20261017-v3" />
-  <link rel="stylesheet" href="/weather-fusion/forecast-cards.css?v=beta-glass-today-v1" />
+  <link rel="stylesheet" href="/weather-fusion/forecast-cards.css?v=beta-glass-today-v2" />
+  <link rel="stylesheet" href="/weather-fusion/hourly-feels.css?v=rain-chance-v12" />
   <link rel="stylesheet" href="/weather-fusion/main-hourly-trend.css?v=beta-glass-48h-v1" />
   <link rel="stylesheet" href="/weather-fusion/dewpoint-meter.css?v=feel-chart-v3" />
-  <link rel="stylesheet" href="/weather-fusion/weather-glass.css?v=ice-v3" />
+  <link rel="stylesheet" href="/weather-fusion/weather-glass.css?v=ice-v4" />
   <link rel="stylesheet" href="/weather-fusion/outlook-panel.css?v=compact-v3" />
-  <link rel="stylesheet" href="/weather-fusion/v3/css/styles.css?v=v3-all-13" />
-  <link rel="stylesheet" href="/weather-fusion/v3/css/people-globe.css?v=v3-all-13" />
+  <link rel="stylesheet" href="/weather-fusion/v3/css/styles.css?v=v3-all-14" />
+  <link rel="stylesheet" href="/weather-fusion/v3/css/people-globe.css?v=v3-all-14" />
 </head>
 <body data-sky="cloudy">
   <!-- Full-Viewport Fixed Dynamic Living Sky Backdrop (Flows Behind Every Glass Tile) -->
@@ -202,14 +203,14 @@
       <div id="next24-spline-stage" style="margin-top:10px;"></div>
     </section>
 
-    <!-- 7-Day Outlook Dual-Curve High & Low Spline + Full Selected-Day Details -->
+    <!-- 7-Day Outlook High, Low & Dew Point Spline + Collapsible Selected-Day Details (Expands Only When a Day Is Selected) -->
     <section id="daily-panel" class="glass section-panel card-compact">
       <div class="n24-header">
         <h2 class="card-title-clean">7-Day Outlook</h2>
-        <span id="d7-selected-chip" class="d7-mode-chip">Today</span>
+        <button id="d7-selected-chip" class="d7-mode-chip" type="button" aria-expanded="false">Tap a day for details ▾</button>
       </div>
       <div id="seven-day-dual-stage"></div>
-      <div id="seven-day-selected-detail" class="d7-detail-card"></div>
+      <div id="seven-day-selected-detail" class="d7-detail-card" hidden></div>
     </section>
 
     <!-- 2-Column Dew Point (Feel Meter) & Wind (Animated Compass) Glass Row -->
@@ -477,6 +478,6 @@
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
   <script type="module" src="/weather-fusion/main-hourly-trend.js?v=beta-glass-48h-v1"></script>
-  <script type="module" src="/weather-fusion/v3/js/app.js?v=v3-all-13"></script>
+  <script type="module" src="/weather-fusion/v3/js/app.js?v=v3-all-14"></script>
 </body>
 </html>

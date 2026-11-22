@@ -415,22 +415,45 @@ export function renderModelCompareChart({
   // Tight bounds so real model differences stand out clearly, while clamping percentages 0..100%
   let minV = allNums.length ? Math.min(...allNums) : 40;
   let maxV = allNums.length ? Math.max(...allNums) : 80;
-  if (maxV - minV < (variable.decimals ? 0.35 : 4)) {
-    minV = minV - (variable.decimals ? 0.15 : 2);
-    maxV = maxV + (variable.decimals ? 0.2 : 3);
+  const rawSpan = maxV - minV;
+  if (variable.decimals) {
+    const pad = Math.max(0.05, rawSpan * 0.14);
+    minV = Math.max(0, Number((minV - pad * 0.5).toFixed(variable.decimals)));
+    maxV = Number((maxV + pad).toFixed(variable.decimals));
+    if (maxV - minV < 0.25) maxV = Number((minV + 0.25).toFixed(variable.decimals));
+  } else if (rawSpan < 4) {
+    minV = Math.floor(minV - 2);
+    maxV = Math.ceil(maxV + 2);
   } else {
-    const span = maxV - minV;
-    minV = Math.floor(minV - span * 0.08);
-    maxV = Math.ceil(maxV + span * 0.12);
+    const pad = Math.max(1, rawSpan * 0.10);
+    minV = Math.floor(minV - pad);
+    maxV = Math.ceil(maxV + pad * 1.15);
   }
   if (variable.min !== undefined) minV = Math.max(variable.min, minV);
   if (variable.max !== undefined) {
     maxV = Math.min(variable.max, maxV);
-    if (maxV - minV < 10) minV = Math.max(variable.min ?? 0, maxV - 10);
+    if (!variable.decimals && maxV - minV < 8) minV = Math.max(variable.min ?? 0, maxV - 8);
   }
 
   const xForDay = (i) => padL + (i / Math.max(1, visibleDays.length - 1)) * plotW;
   const yForVal = (v) => padT + plotH - clamp((v - minV) / (maxV - minV || 1), 0, 1) * plotH;
+
+  // Per-day min/max across active models to draw a shaded model-spread envelope
+  const dayBounds = visibleDays.map((d, idx) => {
+    const dayVals = [];
+    COMPARE_MODELS.forEach((m) => {
+      if (!enabledModels.has(m.id) && !m.alwaysOn) return;
+      const v = getDayModelValue(d, m.id);
+      if (typeof v === 'number' && !Number.isNaN(v)) dayVals.push(v);
+    });
+    const dMin = dayVals.length ? Math.min(...dayVals) : minV;
+    const dMax = dayVals.length ? Math.max(...dayVals) : maxV;
+    return { x: xForDay(idx), minV: dMin, maxV: dMax, minY: yForVal(dMin), maxY: yForVal(dMax) };
+  });
+  const spreadPolygonPts = [
+    ...dayBounds.map((b) => `${b.x.toFixed(1)},${b.maxY.toFixed(1)}`),
+    ...[...dayBounds].reverse().map((b) => `${b.x.toFixed(1)},${b.minY.toFixed(1)}`)
+  ].join(' ');
 
   // Individual models first, Weather Nourie Blend cleanly on top with crisp contrast halo
   const orderedModels = [
@@ -462,7 +485,7 @@ export function renderModelCompareChart({
         }
         ${
           pathD
-            ? `<path d="${pathD}" fill="none" stroke="${m.color}" stroke-width="${isBlend ? 2.8 : 1.5}" stroke-dasharray="${isBlend ? '' : (m.dash ? '4 3' : '')}" stroke-linecap="round" stroke-linejoin="round" opacity="${isBlend ? '1' : '0.82'}"/>`
+            ? `<path d="${pathD}" fill="none" stroke="${m.color}" stroke-width="${isBlend ? 3.1 : 2.1}" stroke-dasharray="${isBlend ? '' : (m.dash ? '4 3' : '')}" stroke-linecap="round" stroke-linejoin="round" opacity="${isBlend ? '1' : '0.92'}"/>`
             : ''
         }
         ${pts
@@ -471,14 +494,14 @@ export function renderModelCompareChart({
             const showValue = isBlend && (isSel || visibleDays.length <= 5 || idx % 2 === 0);
             const lblY = p.y - 12 < 14 ? p.y + 18 : p.y - 11;
             const lblX = clamp(p.x, padL + 12, W - 18);
-            const dotR = isBlend ? (isSel ? '4.2' : '2.8') : (isSel ? '3.0' : '1.8');
+            const dotR = isBlend ? (isSel ? '4.5' : '3.0') : (isSel ? '3.6' : '2.3');
             return `
-              <circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="${dotR}" fill="${m.color}" stroke="${isSel ? 'rgba(6,16,34,0.8)' : 'none'}" stroke-width="${isSel ? '1.2' : '0'}" opacity="${isBlend || isSel ? '1' : '0.82'}"/>
+              <circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="${dotR}" fill="${m.color}" stroke="${isSel ? 'rgba(6,16,34,0.88)' : 'none'}" stroke-width="${isSel ? '1.3' : '0'}" opacity="${isBlend || isSel ? '1' : '0.9'}"/>
               ${
                 showValue
                   ? isSel
                     ? `<g transform="translate(${lblX.toFixed(1)}, ${(lblY - 3).toFixed(1)})">
-                        <rect x="-19" y="-12" width="38" height="17" rx="6" fill="rgba(14, 165, 233, 0.88)" stroke="rgba(255, 255, 255, 0.55)" stroke-width="0.9"/>
+                        <rect x="-20" y="-12" width="40" height="17" rx="6" fill="rgba(14, 165, 233, 0.92)" stroke="rgba(255, 255, 255, 0.65)" stroke-width="0.9"/>
                         <text text-anchor="middle" y="0" fill="#ffffff" font-size="11.5" font-weight="700">${
                           variable.decimals ? p.val.toFixed(variable.decimals) : Math.round(p.val)
                         }${variable.unit}</text>
@@ -516,6 +539,7 @@ export function renderModelCompareChart({
         )
         .join('')}
 
+      <polygon points="${spreadPolygonPts}" fill="rgba(125, 211, 252, 0.13)" />
       <line x1="${selX.toFixed(1)}" y1="${padT}" x2="${selX.toFixed(1)}" y2="${padT + plotH}" stroke="rgba(125, 211, 252, 0.55)" stroke-width="1.2" stroke-dasharray="3 3"/>
 
       ${modelPathsSvg}
@@ -893,14 +917,14 @@ export function renderNext24HoursSplineChart({
 }
 
 /**
- * Renders the "7-Day Outlook" unified Dual-Curve High & Low Spline Card.
- * Warm amber-orange High curve + cool cyan-blue Low curve + shaded thermal band +
- * aligned weather icon, Day/Date, and rain probability columns underneath.
+ * Renders the "7-Day Outlook" unified High, Low & Dew Point Spline Card.
+ * Warm amber-orange High curve + cool cyan-blue Low curve + mint-teal Dew Point curve +
+ * shaded thermal band + aligned weather icon, Day/Date, and rain probability columns underneath.
  */
 export function renderSevenDayDualSplineChart({
   containerEl,
   days7,
-  selectedDayIdx = 0,
+  selectedDayIdx = null,
   useCelsius = false,
   renderIconFn,
   onSelectDay
@@ -911,9 +935,17 @@ export function renderSevenDayDualSplineChart({
   const convT = (f) => (useCelsius ? Math.round(((f - 32) * 5) / 9) : Math.round(f));
   const highs = days.map((d) => convT(d.highF));
   const lows = days.map((d) => convT(d.lowF));
+  const dewPoints = days.map((d) => {
+    const rawDp = Number.isFinite(d.maxDewPointF)
+      ? d.maxDewPointF
+      : Number.isFinite(d.dewPointF)
+      ? d.dewPointF
+      : (d.lowF ?? 50) - 2;
+    return convT(rawDp);
+  });
 
-  let minVal = Math.floor(Math.min(...lows) - 3);
-  let maxVal = Math.ceil(Math.max(...highs) + 3);
+  let minVal = Math.floor(Math.min(...lows, ...dewPoints) - 3);
+  let maxVal = Math.ceil(Math.max(...highs, ...dewPoints) + 3);
   if (maxVal - minVal < 12) {
     minVal -= 3;
     maxVal += 3;
@@ -921,7 +953,7 @@ export function renderSevenDayDualSplineChart({
 
   // Native 350px coordinate space renders at ~1:1 scale on phones for ~2x larger, ultra-legible labels
   const W = 350;
-  const H = 192;
+  const H = 204;
   const padL = 34;
   const padR = 10;
   const padT = 28;
@@ -935,9 +967,11 @@ export function renderSevenDayDualSplineChart({
 
   const hiPts = highs.map((v, i) => ({ x: xForIdx(i), y: yForVal(v), val: v }));
   const loPts = lows.map((v, i) => ({ x: xForIdx(i), y: yForVal(v), val: v }));
+  const dpPts = dewPoints.map((v, i) => ({ x: xForIdx(i), y: yForVal(v), val: v }));
 
   const hiPath = buildSmoothSvgPath(hiPts, 0.22);
   const loPath = buildSmoothSvgPath(loPts, 0.22);
+  const dpPath = buildSmoothSvgPath(dpPts, 0.22);
 
   // Shaded band between High and Low curves
   const bandPts = [
@@ -953,11 +987,17 @@ export function renderSevenDayDualSplineChart({
     yTicks.push({ y: yForVal(v), label: `${v}°` });
   }
 
-  const activeIdx = clamp(selectedDayIdx, 0, days.length - 1);
+  const hasActive = typeof selectedDayIdx === 'number' && selectedDayIdx >= 0;
+  const activeIdx = hasActive ? clamp(selectedDayIdx, 0, days.length - 1) : -1;
 
   containerEl.innerHTML = `
     <div class="d7-dual-shell">
-      <svg class="d7-dual-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="7-day high and low temperature dual spline chart">
+      <div class="d7-legend-row" style="display:flex;align-items:center;justify-content:flex-end;gap:12px;margin:2px 4px 4px;font-size:11.5px;color:rgba(225,238,252,0.88);flex-wrap:wrap;">
+        <span style="display:inline-flex;align-items:center;gap:5px;"><i style="width:12px;height:3px;border-radius:2px;background:#e39c74;display:inline-block;"></i>High</span>
+        <span style="display:inline-flex;align-items:center;gap:5px;"><i style="width:12px;height:3px;border-radius:2px;background:#7eb8e6;display:inline-block;"></i>Low</span>
+        <span style="display:inline-flex;align-items:center;gap:5px;"><i style="width:12px;height:3px;border-radius:2px;background:#5eead4;display:inline-block;"></i>Dew Point</span>
+      </div>
+      <svg class="d7-dual-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="7-day high, low, and dew point temperature spline chart">
         <defs>
           <linearGradient id="d7-hi-stroke" x1="0%" y1="0%" x2="100%" y2="0%">
             <stop offset="0%" stop-color="#eab38c"/>
@@ -1001,17 +1041,28 @@ export function renderSevenDayDualSplineChart({
         <path d="${loAreaPath}" fill="url(#d7-lo-fill)"/>
         <path d="${hiPath}" fill="none" stroke="url(#d7-hi-stroke)" stroke-width="2.5" stroke-linecap="round"/>
         <path d="${loPath}" fill="none" stroke="url(#d7-lo-stroke)" stroke-width="2.3" stroke-linecap="round"/>
+        <path d="${dpPath}" fill="none" stroke="#5eead4" stroke-width="2.0" stroke-dasharray="4 3" stroke-linecap="round"/>
 
         ${hiPts
           .map((hp, idx) => {
             const lp = loPts[idx];
+            const dp = dpPts[idx];
             const isSel = idx === activeIdx;
+            const dpBelowLow = dp.y >= lp.y;
+            const loLblY = dpBelowLow && Math.abs(dp.y - lp.y) < 14
+              ? Math.max(hp.y + 13, lp.y - 7)
+              : Math.min(H - 6, lp.y + 15);
+            const dpLblY = dpBelowLow
+              ? Math.min(H - 4, Math.max(dp.y + 14, loLblY + 11))
+              : Math.max(hp.y + 13, Math.min(dp.y - 7, lp.y - 10));
             return `
               <g data-d7-idx="${idx}" style="cursor:pointer;">
                 <circle cx="${hp.x.toFixed(1)}" cy="${hp.y.toFixed(1)}" r="${isSel ? '4.0' : '3.0'}" fill="#ffffff" stroke="#e39c74" stroke-width="1.4"/>
-                <text x="${hp.x.toFixed(1)}" y="${Math.max(15, hp.y - 9).toFixed(1)}" text-anchor="middle" fill="#ffffff" font-size="12.5" font-weight="700">${hp.val}°</text>
-                <circle cx="${lp.x.toFixed(1)}" cy="${lp.y.toFixed(1)}" r="${isSel ? '4.0' : '3.0'}" fill="#ffffff" stroke="#7eb8e6" stroke-width="1.4"/>
-                <text x="${lp.x.toFixed(1)}" y="${Math.min(H - 6, lp.y + 17).toFixed(1)}" text-anchor="middle" fill="#d0e5f8" font-size="12" font-weight="600">${lp.val}°</text>
+                <text x="${hp.x.toFixed(1)}" y="${Math.max(15, hp.y - 9).toFixed(1)}" text-anchor="middle" fill="#ffffff" font-size="12" font-weight="700">${hp.val}°</text>
+                <circle cx="${lp.x.toFixed(1)}" cy="${lp.y.toFixed(1)}" r="${isSel ? '3.8' : '2.8'}" fill="#ffffff" stroke="#7eb8e6" stroke-width="1.4"/>
+                <text x="${lp.x.toFixed(1)}" y="${loLblY.toFixed(1)}" text-anchor="middle" fill="#d0e5f8" font-size="11.5" font-weight="600">${lp.val}°</text>
+                <circle cx="${dp.x.toFixed(1)}" cy="${dp.y.toFixed(1)}" r="${isSel ? '3.4' : '2.4'}" fill="#0b2038" stroke="#5eead4" stroke-width="1.5"/>
+                <text x="${dp.x.toFixed(1)}" y="${dpLblY.toFixed(1)}" text-anchor="middle" fill="#7ef4df" font-size="10.5" font-weight="700">${dp.val}°</text>
               </g>
             `;
           })
@@ -1022,7 +1073,7 @@ export function renderSevenDayDualSplineChart({
         ${days
           .map(
             (d, idx) => `
-          <button type="button" class="d7-col-btn ${idx === activeIdx ? 'active' : ''}" data-d7-idx="${idx}">
+          <button type="button" class="d7-col-btn ${idx === activeIdx ? 'active' : ''}" data-d7-idx="${idx}" aria-expanded="${idx === activeIdx}">
             <span class="d7-col-icon">${typeof renderIconFn === 'function' ? renderIconFn(d.icon, 26) : ''}</span>
             <span class="d7-col-day">${d.shortWeekday}</span>
             <span class="d7-col-date">${d.dateLabel}</span>

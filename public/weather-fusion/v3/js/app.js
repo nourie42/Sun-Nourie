@@ -21,7 +21,7 @@ import {
   renderModelCompareChart,
   renderNext24HoursSplineChart,
   renderSevenDayDualSplineChart
-} from './charts.js?v=v3-all-13';
+} from './charts.js?v=v3-all-14';
 import {
   WeatherMapController
 } from './map.js?v=v3-all-13';
@@ -32,7 +32,7 @@ import { forecastWindowDetailHTML } from '../../forecast-window-banners.js?v=cur
 import {GlobePanel} from './globe-panel.js?v=tiled-v3';
 import {outlookItems,renderOutlookPanel,openOutlookNote} from '../../outlook-panel.js?v=compact-v1';
 import { todayForecastHTML } from '../../today-card.js?v=glass-today-v2';
-import { dayGraphHTML, installDayGraph } from '../../day-graph.js?v=hourly-rain-v2';
+import { dayGraphHTML, installDayGraph } from '../../day-graph.js?v=hourly-rain-v3';
 import { dewpointFeelLevel, renderDewpointMeter } from '../../dewpoint-meter.js?v=air-moisture-v1';
 import { TREND_METRICS, mainTrendSeries, trendReading } from '../../main-hourly-trend.js?v=beta-glass-48h-v1';
 import { mountChart, solarDays, nightBands, fmt as haloFmt, H as HALO_H } from '../../halo.js?v=shared-chart-v2';
@@ -108,8 +108,10 @@ const state = {
   feelsHourIdx: 0,
   expandedExposureIds: new Set(),
   n24MetricId: 'temp',
+  n24StripExpanded: false,
   selectedMetricId: 'temp',
   selectedDayIdx: 0,
+  sevenDayDetailExpanded: false,
   explanationPeriod: 'all',
   compareExpanded: false,
   compareVariableId: 'highTemp',
@@ -271,6 +273,7 @@ async function loadLocationForecast(loc, { forceRefresh = false } = {}) {
   state.selectedHourIdx = 0;
   state.feelsHourIdx = 0;
   state.selectedDayIdx = 0;
+  state.sevenDayDetailExpanded = false;
   state.selectedDewPointIdx = 0;
   renderAll();
 
@@ -1035,29 +1038,40 @@ function renderNext24QuickCard(f) {
   const hrs = (f.hours48 || []).slice(0, 24);
   const tz = f.timeZone || f.location?.timeZone || 'America/New_York';
   stage.innerHTML = `
-    <div class="hourly-strip-scroll" aria-label="Next 24 hours hourly cards with rain chance and rainfall amount">
-      ${hrs
-        .map((h, idx) => {
-          const dayShort = idx === 0 ? '' : new Intl.DateTimeFormat('en-US', { timeZone: tz, weekday: 'short' }).format(h.dateObj);
-          const timeLbl = idx === 0 ? 'Now' : `${dayShort} ${h.hourLabel}`;
-          const amtStr = (h.precipIn || 0) > 0 ? `${Number(h.precipIn).toFixed(2)}"` : '0.00"';
-          return `
-            <button type="button" class="hour-tile ${idx === state.selectedHourIdx ? 'active' : ''}" data-n24-card="${idx}" title="${escapeAttr(h.rainLedger?.tooltip || '')}">
-              <span class="hour-tile-time">${escapeAttr(timeLbl)}</span>
-              <div>${renderWeatherIconSvg(h.icon, 28)}</div>
-              <span class="hour-tile-temp">${fmtTemp(h.tempF)}</span>
-              <span class="hour-tile-feels">Feels ${fmtTemp(h.feelsLikeF)}</span>
-              <span class="hour-pop-pill" title="${escapeAttr(h.rainLedger?.tooltip || '')}">💧 ${h.rainChance}%</span>
-              <span class="hour-qpf-sub" style="font-size:10.5px;color:var(--blue);font-weight:600;">${amtStr}</span>
-            </button>
-          `;
-        })
-        .join('')}
-    </div>
+    <details id="n24-strip-disclosure" class="n24-hourly-strip-disclosure" ${state.n24StripExpanded ? 'open' : ''}>
+      <summary class="n24-strip-summary" style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;padding:8px 12px;border-radius:12px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.20);font-size:13px;font-weight:700;color:#e8f3ff;list-style:none;">
+        <span>Hourly Cards &amp; Rain Amounts (Next 24h)</span>
+        <span class="bar-chevron" aria-hidden="true">›</span>
+      </summary>
+      <div class="hourly-strip-scroll" style="margin-top:8px;" aria-label="Next 24 hours hourly cards with rain chance and rainfall amount">
+        ${hrs
+          .map((h, idx) => {
+            const dayShort = idx === 0 ? '' : new Intl.DateTimeFormat('en-US', { timeZone: tz, weekday: 'short' }).format(h.dateObj);
+            const timeLbl = idx === 0 ? 'Now' : `${dayShort} ${h.hourLabel}`;
+            const amtStr = (h.precipIn || 0) > 0 ? `${Number(h.precipIn).toFixed(2)}"` : '0.00"';
+            return `
+              <button type="button" class="hour-tile ${idx === state.selectedHourIdx ? 'active' : ''}" data-n24-card="${idx}" title="${escapeAttr(h.rainLedger?.tooltip || '')}">
+                <span class="hour-tile-time">${escapeAttr(timeLbl)}</span>
+                <div>${renderWeatherIconSvg(h.icon, 28)}</div>
+                <span class="hour-tile-temp">${fmtTemp(h.tempF)}</span>
+                <span class="hour-tile-feels">Feels ${fmtTemp(h.feelsLikeF)}</span>
+                <span class="hour-pop-pill" title="${escapeAttr(h.rainLedger?.tooltip || '')}">💧 ${h.rainChance}%</span>
+                <span class="hour-qpf-sub" style="font-size:10.5px;color:var(--blue);font-weight:600;">${amtStr}</span>
+              </button>
+            `;
+          })
+          .join('')}
+      </div>
+    </details>
   `;
+  const disc = stage.querySelector('#n24-strip-disclosure');
+  disc?.addEventListener('toggle', () => {
+    state.n24StripExpanded = Boolean(disc.open);
+  });
   stage.querySelectorAll('[data-n24-card]').forEach((btn) => {
     btn.addEventListener('click', () => {
       state.selectedHourIdx = Number(btn.dataset.n24Card) || 0;
+      state.n24StripExpanded = true;
       renderNext24QuickCard(f);
     });
   });
@@ -1129,21 +1143,33 @@ function renderSevenDayForecast(f) {
   const days7 = f.days.slice(0, 7);
   const selIdx = clamp(state.selectedDayIdx, 0, Math.max(0, days7.length - 1));
   const d = days7[selIdx] || days7[0];
+  const isExpanded = Boolean(state.sevenDayDetailExpanded);
 
   const chipEl = document.getElementById('d7-selected-chip');
   if (chipEl && d) {
-    chipEl.textContent = `${d.dayName} · ${d.condition}`;
+    chipEl.textContent = isExpanded ? `${d.dayName} · Hide details ▴` : 'Tap a day for details ▾';
+    chipEl.setAttribute('aria-expanded', String(isExpanded));
+    chipEl.style.cursor = 'pointer';
+    chipEl.onclick = () => {
+      state.sevenDayDetailExpanded = !state.sevenDayDetailExpanded;
+      renderSevenDayForecast(f);
+    };
   }
 
   if (dualStage) {
     renderSevenDayDualSplineChart({
       containerEl: dualStage,
       days7,
-      selectedDayIdx: selIdx,
+      selectedDayIdx: isExpanded ? selIdx : null,
       useCelsius: state.useCelsius,
       renderIconFn: renderWeatherIconSvg,
       onSelectDay: (idx) => {
-        state.selectedDayIdx = idx;
+        if (state.sevenDayDetailExpanded && state.selectedDayIdx === idx) {
+          state.sevenDayDetailExpanded = false;
+        } else {
+          state.selectedDayIdx = idx;
+          state.sevenDayDetailExpanded = true;
+        }
         renderSevenDayForecast(f);
         renderModelExplanationSection(f);
         renderCompareModelsSection(f);
@@ -1153,6 +1179,11 @@ function renderSevenDayForecast(f) {
 
   const detailEl = document.getElementById('seven-day-selected-detail');
   if (detailEl && d) {
+    detailEl.hidden = !isExpanded;
+    if (!isExpanded) {
+      detailEl.innerHTML = '';
+      return;
+    }
     const dpLabel = getDewPointVerdict(d.maxDewPointF ?? 50);
     const windDir = d.hours?.[Math.floor((d.hours?.length || 1) / 2)]?.windCardinal || '';
     const rainLine = d.totalSnowIn > 0
@@ -1164,10 +1195,13 @@ function renderSevenDayForecast(f) {
           <strong>${d.dayName}, ${d.dateLabel}</strong>
           <span class="d7-detail-cond">· ${d.condition}</span>
         </div>
-        <button id="d7-hourly-btn" class="d7-hourly-link" type="button">
-          <span>Hourly Breakdown</span>
-          <span class="bar-chevron" aria-hidden="true">›</span>
-        </button>
+        <div style="display:flex;align-items:center;gap:6px;">
+          <button id="d7-hourly-btn" class="d7-hourly-link" type="button">
+            <span>Hourly Breakdown</span>
+            <span class="bar-chevron" aria-hidden="true">›</span>
+          </button>
+          <button id="d7-detail-close-btn" class="icon-btn compact-btn" type="button" aria-label="Collapse day details" style="width:28px;height:28px;font-size:13px;">✕</button>
+        </div>
       </div>
       <div class="d7-detail-grid">
         <div class="d7-stat-cell">
@@ -1216,6 +1250,10 @@ function renderSevenDayForecast(f) {
       </div>
     `;
     document.getElementById('d7-hourly-btn')?.addEventListener('click', () => openDayHourlyModal(d, f));
+    document.getElementById('d7-detail-close-btn')?.addEventListener('click', () => {
+      state.sevenDayDetailExpanded = false;
+      renderSevenDayForecast(f);
+    });
   }
 }
 
@@ -1907,7 +1945,6 @@ function openCompareDayModelsModal(dayIdx, f) {
       state.selectedDayIdx = dIdx;
       renderSevenDayForecast(f);
       renderCompareModelsSection(f);
-      openCompareDayModelsModal(dIdx, f);
     }
   });
 
@@ -1919,8 +1956,51 @@ function openCompareDayModelsModal(dayIdx, f) {
     };
     const activeModels = availableModels.filter((m) => state.enabledCompareModels.has(m.id) || m.alwaysOn);
     const selDayIdx = clamp(state.selectedDayIdx, 0, visibleDays.length - 1);
+    const selDay = visibleDays[selDayIdx] || visibleDays[0];
+    const wnVal = extractDayModelCompareValue(selDay, 'blend', state.compareVariableId, state.useCelsius);
+
+    const inlineDiffChips = activeModels
+      .map((m) => {
+        const val = extractDayModelCompareValue(selDay, m.id, state.compareVariableId, state.useCelsius);
+        if (val === null || val === undefined || Number.isNaN(val)) return '';
+        const diff =
+          m.id !== 'blend' && typeof wnVal === 'number' && !Number.isNaN(wnVal)
+            ? val - wnVal
+            : null;
+        const diffBadge =
+          m.id === 'blend'
+            ? 'Consensus'
+            : diff === null
+            ? ''
+            : Math.abs(diff) < (variable.decimals ? 0.01 : 0.5)
+            ? 'Matches'
+            : `${diff > 0 ? '+' : ''}${variable.decimals ? diff.toFixed(variable.decimals) : Math.round(diff)}${variable.unit}`;
+        return `
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 10px;border-radius:11px;background:${m.id === 'blend' ? 'rgba(56,189,248,0.18)' : 'rgba(255,255,255,0.07)'};border:1px solid ${m.id === 'blend' ? 'rgba(125,211,252,0.52)' : 'rgba(255,255,255,0.16)'};">
+            <span style="display:inline-flex;align-items:center;gap:6px;min-width:0;">
+              <i style="width:10px;height:3px;border-radius:2px;background:${m.color};display:inline-block;flex-shrink:0;"></i>
+              <strong style="font-size:12.5px;color:${m.id === 'blend' ? '#ffffff' : m.color};white-space:nowrap;">${m.id === 'blend' ? 'Weather Nourie' : m.label}</strong>
+            </span>
+            <span style="display:inline-flex;align-items:baseline;gap:6px;flex-shrink:0;">
+              <small style="font-size:11px;color:var(--muted);">${diffBadge}</small>
+              <strong style="font-size:13.5px;color:#ffffff;font-variant-numeric:tabular-nums;">${fmtCmp(val)}</strong>
+            </span>
+          </div>
+        `;
+      })
+      .filter(Boolean)
+      .join('');
 
     breakdownEl.innerHTML = `
+      <div class="compare-inline-day-diff" style="margin-bottom:10px;padding:10px 12px;border-radius:14px;background:rgba(12,26,48,0.32);border:1px solid rgba(210,235,255,0.24);">
+        <div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:8px;flex-wrap:wrap;">
+          <strong style="font-size:13.5px;color:#ffffff;">${selDay.dayName} (${selDay.dateLabel}) · ${variable.label} Differences</strong>
+          <span style="font-size:11.5px;color:var(--muted);">Tap any day on the graph or table to compare</span>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(165px,1fr));gap:6px;">
+          ${inlineDiffChips}
+        </div>
+      </div>
       <div class="compare-table-wrap">
         <table class="compare-days-table" aria-label="Day by day forecast comparison table">
           <thead>
@@ -1961,7 +2041,6 @@ function openCompareDayModelsModal(dayIdx, f) {
         state.selectedDayIdx = nextIdx;
         renderSevenDayForecast(f);
         renderCompareModelsSection(f);
-        openCompareDayModelsModal(nextIdx, f);
       });
     });
   }

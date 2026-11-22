@@ -6,7 +6,7 @@ import {fetchJsonWithDeadline} from './request-deadline.js?v=loading-recovery-v1
 import {dailyUvHTML} from './daily-uv.js?v=weather-art-labels-v10';
 import {currentReadingFreshness} from './weather-freshness.js?v=accuracy-20261019-v1';
 import {weatherIcon,renderHourlyWeather,currentSample} from './weather-display.js?v=rain-reconcile-v2';
-import {dayGraphHTML,dayGraphPoints,installDayGraph} from './day-graph.js?v=hourly-rain-v2';
+import {dayGraphHTML,dayGraphPoints,installDayGraph} from './day-graph.js?v=hourly-rain-v3';
 import {degrees,feelsAt,GUSTY_FEELS_DISPLAY_MPH} from './hourly-feels.js?v=current-rain-20261017-v3';
 import {createFramePlayer} from './frame-player.js';
 import {dailyConfidenceNoticeHTML,renderComfort,selectComfortHour,renderDailyRows,renderMetricTiles,resetExperience,installExperience} from './experience.js?v=comparison-chart-v3';

@@ -2,26 +2,72 @@
 :root{--weather-tile-fill:rgba(15,25,45,.18) linear-gradient(180deg,rgba(255,255,255,.10),rgba(255,255,255,0) 42%);--weather-tile-border:rgba(255,255,255,.34);--weather-tile-radius:20px;--weather-tile-shadow:inset 0 1px 0 rgba(255,255,255,.42),inset 0 0 0 1px rgba(210,235,255,.14),0 8px 24px rgba(0,0,0,.18);--weather-tile-blur:blur(22px) saturate(155%);--weather-tile-text-shadow:0 1px 4px rgba(0,0,0,.55),0 0 1px rgba(0,0,0,.45);--weather-tile-gap:16px}
 body[data-sky=night]{--weather-tile-fill:rgba(255,255,255,.07) linear-gradient(180deg,rgba(255,255,255,.09),rgba(255,255,255,0) 42%);--weather-tile-border:rgba(255,255,255,.30);--weather-tile-blur:blur(18px) saturate(155%);--weather-tile-text-shadow:0 1px 3px rgba(0,0,0,.55)}
 
-/* Translucent frosted glass Remainder of Today / Today card across Main and Beta */
+/* Translucent frosted glass Remainder of Today / Today card across Main and Beta with balanced, smaller typography */
 html body #today-forecast .today-weather-card.today-weather-card{
   background:var(--weather-tile-fill)!important;
   backdrop-filter:var(--weather-tile-blur)!important;
   -webkit-backdrop-filter:var(--weather-tile-blur)!important;
   border:1px solid var(--weather-tile-border)!important;
   box-shadow:var(--weather-tile-shadow)!important;
+  grid-template-rows:minmax(168px,1fr) 62px 32px!important;
+  min-height:262px!important;
 }
-html body #today-forecast .today-sky{opacity:.28}
-html body #today-forecast .today-scene-shade{background:linear-gradient(180deg,rgba(8,22,42,.18),rgba(8,22,42,.32))}
+html body #today-forecast .today-sky{opacity:.28;inset:0 0 94px!important;height:calc(100% - 94px)!important}
+html body #today-forecast .today-scene-shade{background:linear-gradient(180deg,rgba(8,22,42,.18),rgba(8,22,42,.32));inset:0 0 94px!important}
+html body #today-forecast .today-copy{padding:16px 0 12px 18px!important;width:54%!important}
+html body #today-forecast .day-name{font-size:clamp(22px,3vw,30px)!important;line-height:1.04!important}
+html body #today-forecast .today-remainder .day-name{font-size:clamp(20px,2.7vw,26px)!important;line-height:1.06!important;max-width:13ch!important}
+html body #today-forecast .today-condition{font-size:clamp(13.5px,1.7vw,17px)!important;margin-top:6px!important}
+html body #today-forecast .today-temperatures{gap:9px!important;margin-top:10px!important}
+html body #today-forecast .today-low>strong,
+html body #today-forecast .today-high>strong{font-size:clamp(26px,3.6vw,35px)!important;line-height:1!important}
+html body #today-forecast .today-low>small,
+html body #today-forecast .today-high>small{font-size:11.5px!important;margin-top:4px!important}
+html body #today-forecast .today-temperatures>i{font-size:20px!important}
+html body #today-forecast .today-feels{font-size:12.5px!important;margin-top:8px!important}
+html body #today-forecast .today-feels b{font-size:18.5px!important}
+html body #today-forecast .today-symbol{top:14px!important;right:10px!important;grid-template-columns:auto 50px!important}
+html body #today-forecast .today-symbol>svg{width:48px!important;height:48px!important}
+html body #today-forecast .today-symbol>strong{font-size:clamp(22px,3vw,27px)!important}
+html body #today-forecast .today-symbol>small{font-size:11px!important}
 html body #today-forecast .today-metrics.today-metrics{
   background:rgba(14,28,50,.24)!important;
   backdrop-filter:blur(16px) saturate(150%)!important;
-  -webkit-backdrop-filter:blur(16px) saturate(150%)!important;
+  -webkit-backdrop-filter:blur(16px) saturate(160%)!important;
   border:1px solid rgba(255,255,255,.28)!important;
   grid-template-columns:repeat(3,minmax(0,1fr))!important;
+  padding:5px 0!important;
 }
+html body #today-forecast .today-metric strong{font-size:15px!important}
+html body #today-forecast .today-metric small{font-size:11px!important}
 html body #today-forecast .today-more{
   background:rgba(255,255,255,.12)!important;
   border:1px solid rgba(255,255,255,.28)!important;
+  font-size:12.5px!important;
+}
+@media(max-width:540px){
+  html body #today-forecast .today-weather-card.today-weather-card,
+  html body #today-forecast .today-weather-card.today-remainder{
+    grid-template-rows:minmax(148px,auto) 52px 26px!important;
+    min-height:226px!important;
+  }
+  html body #today-forecast .today-sky,
+  html body #today-forecast .today-scene-shade{inset:0 0 78px!important;height:calc(100% - 78px)!important}
+  html body #today-forecast .today-copy{width:58%!important;padding:11px 0 10px 13px!important}
+  html body #today-forecast .day-name{font-size:21px!important}
+  html body #today-forecast .today-remainder .day-name{font-size:18.5px!important;line-height:1.06!important}
+  html body #today-forecast .today-condition{font-size:12.5px!important;margin-top:4px!important}
+  html body #today-forecast .today-low>strong,
+  html body #today-forecast .today-high>strong{font-size:25px!important}
+  html body #today-forecast .today-low>small,
+  html body #today-forecast .today-high>small{font-size:9.5px!important;margin-top:2px!important}
+  html body #today-forecast .today-feels{font-size:11px!important;margin-top:4px!important}
+  html body #today-forecast .today-feels b{font-size:16px!important}
+  html body #today-forecast .today-symbol{top:10px!important;right:6px!important;grid-template-columns:64px 34px!important}
+  html body #today-forecast .today-symbol>svg{width:34px!important;height:34px!important}
+  html body #today-forecast .today-symbol>strong{font-size:21px!important}
+  html body #today-forecast .today-metric strong{font-size:13px!important}
+  html body #today-forecast .today-metric small{font-size:9.5px!important}
 }
 
 /* Offset readable radar place label so city names like Raleigh are never hidden behind the marker */
@@ -46,7 +92,7 @@ html body #today-forecast .today-more{
   pointer-events:none;
 }
 
-/* Hourly rain amounts breakdown inside Day Detail on Main and Beta */
+/* Hourly rain amounts breakdown inside Day Detail on Main and Beta — responsive wrapping grid so zero cells are cut off */
 .day-hourly-rain-breakdown{
   margin-top:12px;
   padding:10px 12px;
@@ -59,6 +105,7 @@ html body #today-forecast .today-more{
   align-items:baseline;
   justify-content:space-between;
   gap:8px;
+  flex-wrap:wrap;
   font-size:12.5px;
   margin-bottom:8px;
   color:#e8f3ff;
@@ -68,15 +115,14 @@ html body #today-forecast .today-more{
   font-weight:600;
 }
 .day-hourly-rain-grid{
-  display:flex;
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(56px,1fr));
   gap:6px;
-  overflow-x:auto;
-  padding-bottom:4px;
+  overflow:visible;
 }
 .day-hour-rain-cell{
-  flex:0 0 auto;
-  min-width:58px;
-  padding:6px 7px;
+  min-width:0;
+  padding:6px 5px;
   border-radius:10px;
   background:rgba(255,255,255,.08);
   border:1px solid rgba(255,255,255,.18);
@@ -86,6 +132,21 @@ html body #today-forecast .today-more{
   gap:2px;
   text-align:center;
 }
-.day-hour-rain-cell .dhr-time{font-size:10.5px;color:#cfe2f6}
-.day-hour-rain-cell .dhr-amt{font-size:12.5px;color:#ffffff;font-variant-numeric:tabular-nums}
-.day-hour-rain-cell .dhr-pop{font-size:10px;color:#8ad0ff}
+.day-hour-rain-cell .dhr-time{font-size:10.5px;color:#cfe2f6;white-space:nowrap}
+.day-hour-rain-cell .dhr-amt{font-size:12px;color:#ffffff;font-variant-numeric:tabular-nums;white-space:nowrap}
+.day-hour-rain-cell .dhr-pop{font-size:10px;color:#8ad0ff;white-space:nowrap}
+
+/* Ensure .day-graph and .day-graph-readout render cleanly inside Beta V3 modals as well as Main */
+.day-graph{margin:12px 0;padding:12px;border:1px solid rgba(255,255,255,.20);border-radius:16px;background:rgba(14,28,50,.28)}
+.day-graph h3{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin:0 0 10px;font-size:15.5px;color:#ffffff}
+.day-graph h3 small{font-size:11.5px;font-weight:500;color:#bed3e2}
+.day-graph svg{display:block;width:100%;touch-action:pan-y;color:#d9e9f4;margin:8px 0}
+.day-graph svg text{fill:currentColor;font-size:11.5px}
+.day-graph-readout{display:grid;grid-template-columns:repeat(auto-fit,minmax(88px,1fr));gap:8px 10px;margin-bottom:8px}
+.day-graph-readout>div{border-top:3px solid var(--line-color,#7dd3fc);padding-top:5px;min-width:0}
+.day-graph-readout span,.day-graph-readout small{display:block;font-size:11px;line-height:1.3;overflow-wrap:anywhere}
+.day-graph-readout span{color:#cfe2f6;font-weight:600}
+.day-graph-readout strong{display:block;font-size:20px;font-weight:800;color:#ffffff;margin:2px 0}
+.day-graph-readout small{color:#bed3e2}
+.day-graph-time{display:block;text-align:center;font-size:12.5px;font-weight:700;color:#ffffff;margin:4px 0}
+.day-graph input[type="range"]{width:100%;accent-color:#7dd3fc;min-height:28px}
