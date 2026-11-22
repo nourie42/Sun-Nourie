@@ -1,0 +1,41 @@
+name: Validate Black Friday Command Center
+
+on:
+  push:
+    branches:
+      - main
+      - black-friday-command-center
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  validate-black-friday:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund || npm install --no-audit --no-fund
+      - name: Syntax check Black Friday modules and client scripts
+        run: |
+          node --check server.js
+          node --check src/weatherSiteAccess.js
+          node --check src/black-friday/constants.js
+          node --check src/black-friday/xmlParser.js
+          node --check src/black-friday/intelligence.js
+          node --check src/black-friday/adapters.js
+          node --check src/black-friday/wishlistParser.js
+          node --check src/black-friday/notifications.js
+          node --check src/black-friday/store.js
+          node --check src/black-friday/scheduler.js
+          node --check src/black-friday/routes.js
+          node --check scripts/black-friday-worker.mjs
+          node --check public/black-friday/charts.js
+          node --check public/black-friday/app.js
+          node --check public/black-friday/sw.js
+      - name: Run Black Friday Command Center and Access Isolation Tests
+        run: node --test test/blackFridayCommandCenter.test.js test/weatherSiteAccess.test.js test/weatherFusionExperimentalLayout.test.js

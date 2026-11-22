@@ -1,0 +1,61 @@
+name: Black Friday Command Center Autonomous Monitor
+
+on:
+  schedule:
+    # Runs continuously every 30 minutes even when browser tabs & hosting are idle
+    - cron: '10,40 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: black-friday-monitor
+  cancel-in-progress: false
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      BESTBUY_API_KEY: ${{ secrets.BESTBUY_API_KEY }}
+      EBAY_CLIENT_ID: ${{ secrets.EBAY_CLIENT_ID }}
+      EBAY_CLIENT_SECRET: ${{ secrets.EBAY_CLIENT_SECRET }}
+      RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+      BLACK_FRIDAY_ALERT_EMAIL: ${{ secrets.BLACK_FRIDAY_ALERT_EMAIL }}
+      BLACK_FRIDAY_ALERT_WEBHOOK_URL: ${{ secrets.BLACK_FRIDAY_ALERT_WEBHOOK_URL }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund || npm install --no-audit --no-fund
+      - name: Open isolated black-friday-data worktree
+        shell: bash
+        run: |
+          DATA="$RUNNER_TEMP/black-friday-publish"
+          if git ls-remote --exit-code --heads origin black-friday-data > /dev/null; then
+            git fetch --depth=1 origin black-friday-data
+            git worktree add --detach "$DATA" FETCH_HEAD
+          else
+            git worktree add --detach "$DATA" HEAD
+            git -C "$DATA" switch --orphan black-friday-data
+          fi
+          git -C "$DATA" config user.name 'github-actions[bot]'
+          git -C "$DATA" config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          echo "BF_DATA_DIR=$DATA" >> "$GITHUB_ENV"
+      - name: Run autonomous price and deal sweep
+        run: node scripts/black-friday-worker.mjs --data-dir "$BF_DATA_DIR/state" --output "$BF_DATA_DIR"
+      - name: Publish verified snapshot without redeploying the website
+        shell: bash
+        run: |
+          cd "$BF_DATA_DIR"
+          test -f snapshot.json
+          git add -- snapshot.json source-health.json worker-status.json state/state.json
+          if ! git diff --cached --quiet; then
+            git commit -m "Publish verified Black Friday Command Center sweep ($(date -u +%Y-%m-%dT%H:%MZ))"
+            git push origin HEAD:black-friday-data
+          fi
+          cat worker-status.json >> "$GITHUB_STEP_SUMMARY"

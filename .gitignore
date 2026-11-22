@@ -33,4 +33,5 @@ jspm_packages/
 .vscode/
 .idea/
 *.swp
+data/black-friday/
 

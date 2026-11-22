@@ -28,6 +28,8 @@ import { registerHouseholdPLRoutes } from "./src/householdPLRoutes.js";
 import { registerDealLensRoutes } from "./src/dealLensRoutes.js";
 import { isModelConfigured } from "./src/dealLensModelAssets.js";
 import { registerDealIntelligenceRoutes } from "./src/dealIntelligenceRoutes.js";
+import { registerBlackFridayRoutes } from "./src/black-friday/routes.js";
+import { BLACK_FRIDAY_VERSION } from "./src/black-friday/constants.js";
 import { clientIp } from "./src/clientIp.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -102,6 +104,7 @@ registerDealDeskRoutes(app);
 registerHouseholdPLRoutes(app);
 registerDealIntelligenceRoutes(app);
 registerDealLensRoutes(app);
+registerBlackFridayRoutes(app);
 
 app.get("/fuel-atlas", (_req, res) => res.redirect(302, "/fuel-atlas.html"));
 app.get("/fuel-atlas.html", (_req, res) => {
@@ -236,6 +239,8 @@ app.get("/health", (_req, res) => {
     dealIntelligenceAiConfigured: Boolean(process.env.OPENAI_API_KEY),
     dealDeskAiConfigured: Boolean(process.env.ANTHROPIC_API_KEY),
     dealDeskPasscodeRequired: Boolean(process.env.DEAL_DESK_PASSWORD || process.env.AI_COUNCIL_ACCESS_CODE),
+    blackFridayCommandCenter: true,
+    blackFridayVersion: BLACK_FRIDAY_VERSION,
     legacyServerReady: legacyReady,
   });
 });
