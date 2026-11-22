@@ -8,7 +8,7 @@ import {
   fetchCompleteFusionForecast,
   reverseGeocodeLocation,
   searchLocations
-} from './fusion-engine.js?v=v3-all-13';
+} from './fusion-engine.js?v=v3-all-16';
 import { getLunarPhaseFraction, renderWeatherIconSvg } from './icons.js?v=v3-sky-8';
 import {
   COMPARE_MODELS,
@@ -21,7 +21,7 @@ import {
   renderModelCompareChart,
   renderNext24HoursSplineChart,
   renderSevenDayDualSplineChart
-} from './charts.js?v=v3-all-15';
+} from './charts.js?v=v3-all-16';
 import {
   WeatherMapController
 } from './map.js?v=v3-all-13';
@@ -32,10 +32,10 @@ import { forecastWindowDetailHTML } from '../../forecast-window-banners.js?v=cur
 import {GlobePanel} from './globe-panel.js?v=tiled-v3';
 import {outlookItems,renderOutlookPanel,openOutlookNote} from '../../outlook-panel.js?v=compact-v1';
 import { todayForecastHTML } from '../../today-card.js?v=glass-today-v2';
-import { dayGraphHTML, installDayGraph } from '../../day-graph.js?v=hourly-rain-v4';
-import { dewpointFeelLevel, renderDewpointMeter } from '../../dewpoint-meter.js?v=air-moisture-v1';
+import { dayGraphHTML, installDayGraph } from '../../day-graph.js?v=hourly-rain-v5';
+import { dewpointFeelLevel, renderDewpointMeter } from '../../dewpoint-meter.js?v=air-moisture-v2';
 import { TREND_METRICS, mainTrendSeries, trendReading } from '../../main-hourly-trend.js?v=beta-glass-48h-v2';
-import { mountChart, solarDays, nightBands, fmt as haloFmt, H as HALO_H } from '../../halo.js?v=shared-chart-v2';
+import { mountChart, solarDays, nightBands, fmt as haloFmt, H as HALO_H } from '../../halo.js?v=shared-chart-v3';
 
 const LEGACY_LOC_KEY = 'weather-nourie-v3-location';
 const SAVED_LOC_KEY = 'weather-nourie-v3-gps-location';
@@ -1184,7 +1184,8 @@ function renderSevenDayForecast(f) {
       detailEl.innerHTML = '';
       return;
     }
-    const dpLabel = getDewPointVerdict(d.maxDewPointF ?? 50);
+    const dayDp = Math.min(d.lowF, d.dewPointF ?? d.maxDewPointF ?? d.lowF);
+    const dpLabel = getDewPointVerdict(dayDp);
     const windDir = d.hours?.[Math.floor((d.hours?.length || 1) / 2)]?.windCardinal || '';
     const rainLine = d.totalSnowIn > 0
       ? `${d.rainChance}% · ${d.totalQpfIn.toFixed(2)}" · ❄ ${d.totalSnowIn}"`
@@ -1241,7 +1242,7 @@ function renderSevenDayForecast(f) {
         </div>
         <div class="d7-stat-cell">
           <span class="d7-stat-lbl">Dew Point &amp; RH</span>
-          <strong class="d7-stat-val">${fmtTemp(d.maxDewPointF)} · ${dpLabel} · ${d.avgHumidity}%</strong>
+          <strong class="d7-stat-val">${fmtTemp(dayDp)} · ${dpLabel} · ${d.avgHumidity}%</strong>
         </div>
         <div class="d7-stat-cell">
           <span class="d7-stat-lbl">Clouds &amp; UV</span>

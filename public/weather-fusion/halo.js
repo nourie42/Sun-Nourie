@@ -91,14 +91,21 @@ export function buildSeries(data) {
   const val = (r) => r.value;
   const rows = (data?.rainTimeline || []).length ? data.rainTimeline : hours;
   const rain = rows.map((r) => ({ t: Date.parse(r.time), v: rainChanceValue(r.rainLikelihood, r.officialPop ?? r.pop), amt: finite(r.precipitation) ? r.precipitation : null }));
+  const temperature = merge(points(hours, (h) => h.temperature), points(s.temperature, val));
+  const tempByT = new Map(temperature.filter((p) => finite(p.v)).map((p) => [p.t, p.v]));
+  const rawDewpoint = merge(points(hours, (h) => h.dewpoint), points(s.dewpoint, val));
+  const dewpoint = rawDewpoint.map((p) => {
+    const tVal = tempByT.get(p.t);
+    return finite(p.v) && finite(tVal) ? { ...p, v: Math.min(tVal, p.v) } : p;
+  });
   return {
-    temperature: merge(points(hours, (h) => h.temperature), points(s.temperature, val)),
+    temperature,
     feels: s.feels?.length ? points(s.feels,val) : points(hours,h=>h.feelsLike),
     precip: rain.filter((p) => Number.isFinite(p.t)).map((p) => ({ ...p, v: finite(p.v) ? p.v : null })).sort((a, b) => a.t - b.t),
     wind: merge(points(hours, (h) => windMph(h.wind)), points(s.wind, val)),
     gust: merge(points(hours, (h) => windMph(h.gust)), points(s.gust, val)),
     humidity: merge(points(hours, (h) => h.humidity), points(s.humidity, val)),
-    dewpoint: merge(points(hours, (h) => h.dewpoint), points(s.dewpoint, val)),
+    dewpoint,
     uv: points(data?.uv?.hourly, val),
   };
 }

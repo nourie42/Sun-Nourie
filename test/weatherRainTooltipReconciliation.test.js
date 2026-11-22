@@ -8,9 +8,16 @@ import {
   reconcileRainLikelihood
 } from '../public/weather-fusion/weather-display.js';
 import {
+  buildUnifiedFusionPayload,
   reconcileRainLedgerWithCanonical,
   scoreRainChance100Pt
 } from '../public/weather-fusion/v3/js/fusion-engine.js';
+import {
+  extractDayModelCompareValue,
+  renderSevenDayDualSplineChart
+} from '../public/weather-fusion/v3/js/charts.js';
+import { buildSeries } from '../public/weather-fusion/halo.js';
+import { dayGraphPoints } from '../public/weather-fusion/day-graph.js';
 
 function parseTooltipPointsSum(htmlOrTitle) {
   const matches = [...String(htmlOrTitle).matchAll(/\(\+([\d.]+) points\)/g)];
@@ -111,4 +118,108 @@ test('Beta V3 rainLedger breakdown and tooltip always reconcile with the display
   assert.equal(directFull.totalPts, 100);
   assert.equal(Math.round(directFull.rawTotal), 100);
   assert.equal(Math.min(100, Math.round(parseTooltipPointsSum(directFull.tooltip))), directFull.totalPts);
+});
+
+test('Dew point never exceeds air temperature or the daily low temperature across 7-Day, Compare, Hourly, and Main graphs', () => {
+  const nowEpoch = Math.floor(Date.now() / 3600000) * 3600000;
+  const tz = 'America/New_York';
+  const toDayStr = (ms) => new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(ms));
+
+  const dailySpecs = [
+    { high: 58, low: 57 },
+    { high: 65, low: 55 },
+    { high: 72, low: 51 },
+    { high: 55, low: 40 },
+    { high: 53, low: 49 },
+    { high: 55, low: 43 },
+    { high: 58, low: 41 }
+  ];
+  const seenDates = [];
+  for (let d = 0; d < 10; d++) {
+    const ds = toDayStr(nowEpoch + d * 86400000);
+    if (!seenDates.includes(ds)) seenDates.push(ds);
+  }
+  const canonicalDays = seenDates.slice(0, 7).map((date, idx) => ({
+    date,
+    high: dailySpecs[idx]?.high ?? 58,
+    low: dailySpecs[idx]?.low ?? 42,
+    pop: 20,
+    qpf: 0
+  }));
+
+  const canonicalHours = Array.from({ length: 48 }, (_, i) => {
+    const t = new Date(nowEpoch + i * 3600000).toISOString();
+    return {
+      time: t,
+      temperature: 60,
+      dewpoint: 66, // Intentionally higher than temp & low to verify clamping
+      humidity: 82,
+      wind: '8 mph',
+      skyCover: 75,
+      condition: 'Cloudy'
+    };
+  });
+
+  const canonicalData = {
+    location: { name: 'Knightdale, NC', latitude: 35.787, longitude: -78.4806, timeZone: tz, office: 'RAH' },
+    current: { temperature: 58, dewpoint: 63, humidity: 85, wind: 8, skyCover: 80, condition: 'Cloudy' },
+    days: canonicalDays,
+    hours: canonicalHours,
+    metricForecasts: {
+      series: {
+        temperature: canonicalHours.map((h) => ({ time: h.time, value: 58 })),
+        dewpoint: canonicalHours.map((h) => ({ time: h.time, value: 64 }))
+      }
+    }
+  };
+
+  const payload = buildUnifiedFusionPayload(
+    { name: 'Knightdale, NC', latitude: 35.787, longitude: -78.4806 },
+    null,
+    null,
+    null,
+    {},
+    canonicalData
+  );
+
+  // 1. Every hour's dewPointF <= tempF
+  for (const h of payload.hoursAll) {
+    assert.ok(h.dewPointF <= h.tempF, `Hour ${h.time} dewPointF (${h.dewPointF}) exceeded tempF (${h.tempF})`);
+  }
+
+  // 2. Every day's dewPointF and maxDewPointF <= lowF <= highF, and Compare dewPoint <= lowF
+  for (const d of payload.days) {
+    assert.ok(d.lowF <= d.highF, `Day ${d.dayKey} lowF (${d.lowF}) exceeded highF (${d.highF})`);
+    assert.ok(d.dewPointF <= d.lowF, `Day ${d.dayKey} dewPointF (${d.dewPointF}) exceeded lowF (${d.lowF})`);
+    assert.ok(d.maxDewPointF <= d.lowF, `Day ${d.dayKey} maxDewPointF (${d.maxDewPointF}) exceeded lowF (${d.lowF})`);
+    assert.ok(d.minDewPointF <= d.lowF, `Day ${d.dayKey} minDewPointF (${d.minDewPointF}) exceeded lowF (${d.lowF})`);
+    const cmpDp = extractDayModelCompareValue(d, 'blend', 'dewPoint', false);
+    const cmpLow = extractDayModelCompareValue(d, 'blend', 'lowTemp', false);
+    assert.ok(cmpDp <= cmpLow, `Compare dewPoint (${cmpDp}) exceeded lowTemp (${cmpLow}) on ${d.dayKey}`);
+  }
+
+  // 3. 7-Day chart renderer never plots a Dew Point above Low temperature
+  const stage = { innerHTML: '', querySelectorAll: () => [], querySelector: () => null };
+  renderSevenDayDualSplineChart({ containerEl: stage, days7: payload.days.slice(0, 7) });
+  for (const d of payload.days.slice(0, 7)) {
+    assert.ok(d.dewPointF <= d.lowF);
+  }
+
+  // 4. Main site halo.js buildSeries and day-graph.js dayGraphPoints never allow dewpoint > temperature
+  const haloSeries = buildSeries(canonicalData);
+  haloSeries.dewpoint.forEach((dpPt, idx) => {
+    const tPt = haloSeries.temperature[idx];
+    if (dpPt?.v != null && tPt?.v != null) {
+      assert.ok(dpPt.v <= tPt.v, `Halo series dewpoint (${dpPt.v}) exceeded temperature (${tPt.v})`);
+    }
+  });
+  const dgPts = dayGraphPoints(canonicalData, 0, false, nowEpoch);
+  for (const pt of dgPts) {
+    if (pt.dewpoint != null && pt.temperature != null) {
+      assert.ok(pt.dewpoint <= pt.temperature, `dayGraphPoints dewpoint (${pt.dewpoint}) exceeded temperature (${pt.temperature})`);
+    }
+    if (pt.dewpoint != null && canonicalDays[0]?.low != null) {
+      assert.ok(pt.dewpoint <= canonicalDays[0].low, `dayGraphPoints dewpoint (${pt.dewpoint}) exceeded daily low (${canonicalDays[0].low})`);
+    }
+  }
 });

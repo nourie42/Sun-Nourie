@@ -890,6 +890,8 @@ export function buildUnifiedFusionPayload(loc, baseData, multiModelData, aqiData
     ? Math.min(currentHourEpoch, ...canonHours.keys())
     : currentHourEpoch;
 
+  const canonDaysByDate = new Map((canonicalData?.days || []).map((d) => [d.date, d]));
+
   const hours = [];
   const seedBaseTemp = lat < 30 ? 78 : lat > 45 ? 51 : lat > 39 && lon < -100 ? 44 : 58;
 
@@ -898,6 +900,8 @@ export function buildUnifiedFusionPayload(loc, baseData, multiModelData, aqiData
     const dt = new Date(hourEpoch);
     const isoTime = dt.toISOString();
     const hourOfDay = toZonedHour(dt, timeZone);
+    const dayKey = toZonedDayKey(dt, timeZone);
+    const cdForHour = canonDaysByDate.get(dayKey);
     const bIdx = baseIdxByEpoch.get(hourEpoch);
     const mmIdx = mmIdxByEpoch.get(hourEpoch);
     const ch = canonHours.get(hourEpoch);
@@ -925,26 +929,41 @@ export function buildUnifiedFusionPayload(loc, baseData, multiModelData, aqiData
         ? Boolean(baseData.hourly.is_day[bIdx])
         : hourOfDay >= 6 && hourOfDay <= 18;
 
-    const diurnalWave = Math.sin(((hourOfDay - 9) / 24) * 2 * Math.PI) * 7.5;
+    const diurnalUnit = Math.sin(((hourOfDay - 9) / 24) * 2 * Math.PI); // -1 at 3 AM, +1 at 3 PM
+    const diurnalWave = diurnalUnit * 7.5;
     const synopticWave = Math.sin((i / 36) * Math.PI) * 4.2;
+    const canonDayAnchoredTemp =
+      typeof cdForHour?.high === 'number' && typeof cdForHour?.low === 'number'
+        ? (cdForHour.high + cdForHour.low) / 2 + ((cdForHour.high - cdForHour.low) / 2) * diurnalUnit
+        : undefined;
     const rawBaseTemp =
       csTemp?.value ??
       ch?.temperature ??
       (bIdx !== undefined ? baseData?.hourly?.temperature_2m?.[bIdx] : undefined) ??
+      canonDayAnchoredTemp ??
       (seedBaseTemp + diurnalWave + synopticWave);
 
-    const rh = Math.round(
-      csHum?.value ??
-      ch?.humidity ??
-      (bIdx !== undefined ? baseData?.hourly?.relative_humidity_2m?.[bIdx] : undefined) ??
-      clamp(68 - diurnalWave * 1.8, 28, 96)
+    const rh = clamp(
+      Math.round(
+        csHum?.value ??
+        ch?.humidity ??
+        (bIdx !== undefined ? baseData?.hourly?.relative_humidity_2m?.[bIdx] : undefined) ??
+        clamp(68 - diurnalWave * 1.8, 28, 96)
+      ),
+      1,
+      100
     );
-    const dewPointF = Math.round(
+    const rawDewPointF = Math.round(
       csDp?.value ??
       ch?.dewpoint ??
       (bIdx !== undefined ? baseData?.hourly?.dew_point_2m?.[bIdx] : undefined) ??
       calcDewPointF(rawBaseTemp, rh)
     );
+    const dayLowBoundForHour =
+      typeof cdForHour?.low === 'number' && Number.isFinite(cdForHour.low)
+        ? Math.round(cdForHour.low)
+        : Math.round(rawBaseTemp);
+    let dewPointF = Math.min(Math.round(rawBaseTemp), dayLowBoundForHour, rawDewPointF);
     const windMph = Math.round(
       csWind?.value ??
       ch?.windMph ??
@@ -1056,6 +1075,8 @@ export function buildUnifiedFusionPayload(loc, baseData, multiModelData, aqiData
       tempFusion.blendedF = Math.round(canonicalTempF);
       tempFusion.rawBlendedF = Number(canonicalTempF.toFixed(2));
     }
+    // Thermodynamic invariant: dew point can never exceed air temperature or the day's low temperature
+    dewPointF = Math.min(tempFusion.blendedF, dayLowBoundForHour, dewPointF);
 
     const canonWindMap = extractCanonModelMap(csWind);
     const canonDpMap = extractCanonModelMap(csDp);
@@ -1072,14 +1093,20 @@ export function buildUnifiedFusionPayload(loc, baseData, multiModelData, aqiData
         }
       : { nws: windMph, hrrr: i < 48 ? windMph : null, nbm: windMph, ecmwf: windMph, gefs: windMph, weathernext: windMph };
 
+    const clampModelDp = (val, mk) => {
+      const r = roundFinite(val, 0);
+      if (r === null) return null;
+      const tBound = typeof modelTemps[mk] === 'number' ? Math.round(modelTemps[mk]) : tempFusion.blendedF;
+      return Math.min(tBound, dayLowBoundForHour, r);
+    };
     const modelDewPoint = isLiveApi
       ? {
-          nws: roundFinite(canonDpMap.get('nws'), 0),
-          hrrr: roundFinite(canonDpMap.get('hrrr'), 0),
-          nbm: roundFinite(canonDpMap.get('nbm') ?? pickMm('dew_point_2m', 'gfs_seamless') ?? pickMm('dew_point_2m', 'best_match'), 0),
-          ecmwf: roundFinite(canonDpMap.get('ecmwf') ?? pickMm('dew_point_2m', 'ecmwf_ifs025'), 0),
-          gefs: roundFinite(canonDpMap.get('gefs') ?? pickMm('dew_point_2m', 'icon_seamless'), 0),
-          weathernext: roundFinite(canonDpMap.get('weathernext'), 0)
+          nws: clampModelDp(canonDpMap.get('nws'), 'nws'),
+          hrrr: clampModelDp(canonDpMap.get('hrrr'), 'hrrr'),
+          nbm: clampModelDp(canonDpMap.get('nbm') ?? pickMm('dew_point_2m', 'gfs_seamless') ?? pickMm('dew_point_2m', 'best_match'), 'nbm'),
+          ecmwf: clampModelDp(canonDpMap.get('ecmwf') ?? pickMm('dew_point_2m', 'ecmwf_ifs025'), 'ecmwf'),
+          gefs: clampModelDp(canonDpMap.get('gefs') ?? pickMm('dew_point_2m', 'icon_seamless'), 'gefs'),
+          weathernext: clampModelDp(canonDpMap.get('weathernext'), 'weathernext')
         }
       : { nws: dewPointF, hrrr: i < 48 ? dewPointF : null, nbm: dewPointF, ecmwf: dewPointF, gefs: dewPointF, weathernext: dewPointF };
 
@@ -1338,7 +1365,11 @@ export function buildUnifiedFusionPayload(loc, baseData, multiModelData, aqiData
       hours[0].cloudCover = clamp(Math.round(cc.skyCover), 0, 100);
     }
     if (typeof cc.dewpoint === 'number' && Number.isFinite(cc.dewpoint)) hours[0].dewPointF = Math.round(cc.dewpoint);
-    if (typeof cc.humidity === 'number' && Number.isFinite(cc.humidity)) hours[0].humidity = Math.round(cc.humidity);
+    const todayLowBound = typeof canonicalData?.days?.[0]?.low === 'number' && Number.isFinite(canonicalData.days[0].low)
+      ? Math.round(canonicalData.days[0].low)
+      : hours[0].tempF;
+    hours[0].dewPointF = Math.min(hours[0].tempF, todayLowBound, hours[0].dewPointF);
+    if (typeof cc.humidity === 'number' && Number.isFinite(cc.humidity)) hours[0].humidity = clamp(Math.round(cc.humidity), 1, 100);
     if (typeof cc.wind === 'number' && Number.isFinite(cc.wind)) hours[0].windMph = Math.round(cc.wind);
     if (typeof cc.gust === 'number' && Number.isFinite(cc.gust)) hours[0].windGustMph = Math.round(cc.gust);
     if (typeof cc.windDirection === 'number' && Number.isFinite(cc.windDirection)) {
@@ -1516,8 +1547,16 @@ function buildDailySummaries(hours, dailyApi, canonicalData = null, timeZone = '
     if (days.length >= 10) break;
     const cd = canonDaysByDate.get(dayKey);
     const temps = dayHours.map((h) => h.tempF);
-    const highF = typeof cd?.high === 'number' && Number.isFinite(cd.high) ? Math.round(cd.high) : Math.max(...temps);
-    const lowF = typeof cd?.low === 'number' && Number.isFinite(cd.low) ? Math.round(cd.low) : Math.min(...temps);
+    const rawHighF = typeof cd?.high === 'number' && Number.isFinite(cd.high) ? Math.round(cd.high) : Math.max(...temps);
+    const rawLowF = typeof cd?.low === 'number' && Number.isFinite(cd.low) ? Math.round(cd.low) : Math.min(...temps);
+    const highF = Math.max(rawHighF, rawLowF);
+    const lowF = Math.min(rawHighF, rawLowF);
+
+    // Ensure every hour in this day has dewPointF <= min(tempF, lowF)
+    dayHours.forEach((h) => {
+      h.dewPointF = Math.min(h.tempF, lowF, h.dewPointF);
+    });
+
     const peakHour = dayHours.reduce((best, h) => (h.tempF > best.tempF ? h : best), dayHours[0]);
     const wettestHour = dayHours.reduce((best, h) => (h.rainChance > best.rainChance ? h : best), dayHours[0]);
 
@@ -1536,8 +1575,9 @@ function buildDailySummaries(hours, dailyApi, canonicalData = null, timeZone = '
     const avgHumidity = Math.round(
       dayHours.reduce((s, h) => s + h.humidity, 0) / dayHours.length
     );
-    const maxDewPointF = Math.max(...dayHours.map((h) => h.dewPointF));
-    const minDewPointF = Math.min(...dayHours.map((h) => h.dewPointF));
+    const maxDewPointF = Math.min(lowF, Math.max(...dayHours.map((h) => h.dewPointF)));
+    const minDewPointF = Math.min(maxDewPointF, Math.min(...dayHours.map((h) => h.dewPointF)));
+    const dewPointF = Math.min(lowF, Math.round(dayHours.reduce((s, h) => s + h.dewPointF, 0) / dayHours.length));
     const avgCloudCover = Math.round(
       dayHours.reduce((s, h) => s + h.cloudCover, 0) / dayHours.length
     );
@@ -1569,7 +1609,8 @@ function buildDailySummaries(hours, dailyApi, canonicalData = null, timeZone = '
       const mDps = dayHours
         .map((h) => h.modelDewPoint?.[mk])
         .filter((v) => typeof v === 'number' && Number.isFinite(v));
-      modelDewPoint[mk] = mDps.length >= 4 ? Math.round(Math.max(...mDps)) : null;
+      const modelLowBound = typeof modelLows[mk] === 'number' ? modelLows[mk] : lowF;
+      modelDewPoint[mk] = mDps.length >= 4 ? Math.min(modelLowBound, Math.round(Math.max(...mDps))) : null;
 
       const mClouds = dayHours
         .map((h) => h.modelCloudCover?.[mk])
@@ -1581,6 +1622,14 @@ function buildDailySummaries(hours, dailyApi, canonicalData = null, timeZone = '
       if (mk === 'nws') {
         if (typeof cd?.official?.high === 'number') modelHighs.nws = Math.round(cd.official.high);
         if (typeof cd?.official?.low === 'number') modelLows.nws = Math.round(cd.official.low);
+        if (typeof modelHighs.nws === 'number' && typeof modelLows.nws === 'number' && modelLows.nws > modelHighs.nws) {
+          const tmp = modelHighs.nws;
+          modelHighs.nws = modelLows.nws;
+          modelLows.nws = tmp;
+        }
+        if (typeof modelDewPoint.nws === 'number') {
+          modelDewPoint.nws = Math.min(modelLows.nws ?? lowF, modelDewPoint.nws);
+        }
         const validNwsPops = dayHours.map((h) => h.nwsPopReal).filter((v) => typeof v === 'number' && Number.isFinite(v));
         modelRainChance.nws = typeof cd?.officialPop === 'number'
           ? Math.round(cd.officialPop)
@@ -1596,6 +1645,14 @@ function buildDailySummaries(hours, dailyApi, canonicalData = null, timeZone = '
         if (g) {
           if (typeof g.high === 'number') modelHighs[mk] = Math.round(g.high);
           if (typeof g.low === 'number') modelLows[mk] = Math.round(g.low);
+          if (typeof modelHighs[mk] === 'number' && typeof modelLows[mk] === 'number' && modelLows[mk] > modelHighs[mk]) {
+            const tmp = modelHighs[mk];
+            modelHighs[mk] = modelLows[mk];
+            modelLows[mk] = tmp;
+          }
+          if (typeof modelDewPoint[mk] === 'number') {
+            modelDewPoint[mk] = Math.min(modelLows[mk] ?? lowF, modelDewPoint[mk]);
+          }
         }
         const mQpfs = dayHours
           .map((h) => h.modelQpfHour?.[mk])
@@ -1676,6 +1733,7 @@ function buildDailySummaries(hours, dailyApi, canonicalData = null, timeZone = '
       maxWindMph,
       maxGustMph,
       avgHumidity,
+      dewPointF,
       maxDewPointF,
       minDewPointF,
       avgCloudCover,

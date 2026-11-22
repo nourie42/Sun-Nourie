@@ -59,20 +59,24 @@ export function dryForecastSummary(forecast,now=Date.now(),hours=48){
 }
 export function dewpointPoints(forecast,now,hours=240){
  const unique=new Map(),start=Math.ceil(now/HOUR)*HOUR,end=start+hours*HOUR;
+ const tempByEpoch=new Map((forecast?.metricForecasts?.series?.temperature||[]).map(p=>[Date.parse(p.time),p.value]));
  for(const p of forecast?.metricForecasts?.series?.dewpoint||[]){
   const t=Date.parse(p.time);if(!finite(t)||t<start||t>=end)continue;
-  if(!unique.has(t)||(!finite(unique.get(t).value)&&finite(p.value)))unique.set(t,{...p,time:new Date(t).toISOString(),epoch:t});
+  const tempAtT=tempByEpoch.get(t);
+  const clampedVal=finite(p.value)&&finite(tempAtT)?Math.min(tempAtT,p.value):p.value;
+  if(!unique.has(t)||(!finite(unique.get(t).value)&&finite(clampedVal)))unique.set(t,{...p,value:clampedVal,time:new Date(t).toISOString(),epoch:t});
  }
  return [...unique.values()].sort((a,b)=>a.epoch-b.epoch);
 }
 export function currentDewpointValue(forecast,now=Date.now()){
  if(currentReadingFreshness(forecast,now).expired||forecast?.current?.type==='unavailable')return null;
  const observed=forecast?.current?.dewpoint;
- if(finite(observed))return observed;
+ const obsTemp=forecast?.current?.temperature;
+ if(finite(observed))return finite(obsTemp)?Math.min(obsTemp,observed):observed;
  const currentHour=(forecast?.metricForecasts?.series?.dewpoint||[]).find(point=>{
   const start=Date.parse(point.time);return finite(point.value)&&finite(start)&&start<=now&&now<start+HOUR;
  });
- return finite(currentHour?.value)?currentHour.value:null;
+ return finite(currentHour?.value)?(finite(obsTemp)?Math.min(obsTemp,currentHour.value):currentHour.value):null;
 }
 /** Current facts share the hero's freshness gate and custom feels-like model.
  * A cached comfort object must never revive expired current measurements. */

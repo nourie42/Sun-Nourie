@@ -22,7 +22,8 @@ function rainAt(f,time){
 export function dayGraphPoints(f,index,tonight=false,now=Date.now()){
  const d=f?.days?.[index];if(!d?.date)return [];
  const rain=dailyRainPeriod(d,'overall'),window=calendarDayWindow(d,index,now,f.location?.timeZone),start=window.start,end=window.end,points=[];
- for(let t=(rain.canonical?Math.floor(start/H):Math.ceil(start/H))*H;t<end&&points.length<30;t+=H){const time=new Date(t).toISOString(),rain=rainAt(f,time);points.push({time,temperature:forecastValue(f,'temperature',time),feels:displayedFeelsAt(f,time),dewpoint:forecastValue(f,'dewpoint',time),wind:forecastValue(f,'wind',time),uv:hourlyUvValue(f,t),rainChance:rain.value,rainChanceSource:rain.source,precipitation:rain.precipitation});}
+ const dayLow=finite(d?.low)?d.low:null;
+ for(let t=(rain.canonical?Math.floor(start/H):Math.ceil(start/H))*H;t<end&&points.length<30;t+=H){const time=new Date(t).toISOString(),rain=rainAt(f,time),temperature=forecastValue(f,'temperature',time),rawDp=forecastValue(f,'dewpoint',time),dpBound=finite(temperature)&&finite(dayLow)?Math.min(temperature,dayLow):finite(temperature)?temperature:dayLow,dewpoint=finite(rawDp)&&finite(dpBound)?Math.min(dpBound,rawDp):rawDp;points.push({time,temperature,feels:displayedFeelsAt(f,time),dewpoint,wind:forecastValue(f,'wind',time),uv:hourlyUvValue(f,t),rainChance:rain.value,rainChanceSource:rain.source,precipitation:rain.precipitation});}
  return points;
 }
 const fields=[['temperature','Temp','#ffcd79'],['feels','Feels','#ff9caf'],['dewpoint','Feel · dew point','#83e3cc'],['uv','UV','#c8adff'],['rainChance','Chance of rain','#73d8ff']];

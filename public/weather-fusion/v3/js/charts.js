@@ -368,8 +368,13 @@ export function extractDayModelCompareValue(day, modelId, variableId = 'highTemp
       return modelId === 'blend' ? day.rainChance : (day.modelRainChance?.[modelId] ?? null);
     case 'wind':
       return modelId === 'blend' ? day.maxWindMph : (day.modelWind?.[modelId] ?? null);
-    case 'dewPoint':
-      return convT(modelId === 'blend' ? day.maxDewPointF : (day.modelDewPoint?.[modelId] ?? null));
+    case 'dewPoint': {
+      const rawDp = modelId === 'blend' ? (day.dewPointF ?? day.maxDewPointF) : (day.modelDewPoint?.[modelId] ?? null);
+      const lowBound = modelId === 'blend' ? day.lowF : (day.modelLows?.[modelId] ?? day.lowF);
+      if (rawDp === null || rawDp === undefined || Number.isNaN(rawDp)) return null;
+      const clamped = typeof lowBound === 'number' && !Number.isNaN(lowBound) ? Math.min(lowBound, rawDp) : rawDp;
+      return convT(clamped);
+    }
     case 'cloudCover':
       return modelId === 'blend' ? day.avgCloudCover : (day.modelCloudCover?.[modelId] ?? null);
     default:
@@ -997,15 +1002,15 @@ export function renderSevenDayDualSplineChart({
 
   const days = days7.slice(0, 7);
   const convT = (f) => (useCelsius ? Math.round(((f - 32) * 5) / 9) : Math.round(f));
-  const highs = days.map((d) => convT(d.highF));
-  const lows = days.map((d) => convT(d.lowF));
-  const dewPoints = days.map((d) => {
-    const rawDp = Number.isFinite(d.maxDewPointF)
-      ? d.maxDewPointF
-      : Number.isFinite(d.dewPointF)
+  const highs = days.map((d) => convT(Math.max(d.highF, d.lowF)));
+  const lows = days.map((d) => convT(Math.min(d.highF, d.lowF)));
+  const dewPoints = days.map((d, i) => {
+    const rawDp = Number.isFinite(d.dewPointF)
       ? d.dewPointF
+      : Number.isFinite(d.maxDewPointF)
+      ? d.maxDewPointF
       : (d.lowF ?? 50) - 2;
-    return convT(rawDp);
+    return Math.min(lows[i], convT(rawDp));
   });
 
   let minVal = Math.floor(Math.min(...lows, ...dewPoints) - 3);
