@@ -17,9 +17,9 @@
   <link rel="stylesheet" href="/weather-fusion/weather-glass.css?v=ice-v5" />
   <link rel="stylesheet" href="/weather-fusion/outlook-panel.css?v=compact-v3" />
   <link rel="stylesheet" href="/weather-fusion/v3/css/styles.css?v=v3-all-15" />
-  <link rel="stylesheet" href="/weather-fusion/v3/css/people-globe.css?v=local-hourly-v1" />
+  <link rel="stylesheet" href="/weather-fusion/v3/css/people-globe.css?v=today-graph-v1" />
 </head>
-<body data-sky="cloudy">
+<body class="beta-weather-app" data-sky="cloudy">
   <!-- Full-Viewport Fixed Dynamic Living Sky Backdrop (Flows Behind Every Glass Tile) -->
   <div class="atmosphere" aria-hidden="true"></div>
   <div class="live-sky-backdrop" aria-hidden="true">
@@ -152,17 +152,7 @@
     <section id="weather-outlook-summary" class="weather-outlook-panel glass" hidden aria-label="Nourie Take and applicable weather outlooks"></section>
     <div id="top-compact-pills" class="top-compact-pills" aria-label="Forecast highlights"></div>
 
-    <section id="next-24-panel" class="glass section-panel card-compact beta-hourly-preview" aria-labelledby="beta-hourly-title">
-      <div class="n24-header">
-        <h2 id="beta-hourly-title" class="card-title-clean">Hourly forecast</h2>
-        <button id="beta-hourly-more" class="mode-pill" type="button" aria-haspopup="dialog">48 hours ›</button>
-      </div>
-      <div id="next24-spline-stage" class="hourly-strip-scroll" aria-label="Next 24 hours"></div>
-      <div id="main-hourly-trend"></div>
-    </section>
-
-    <!-- Remainder of Today / Today Card from Main App (Placed Just Below Nourie Take & Other Alerts) -->
-    <section id="today-forecast" class="glass today-panel beta-today-panel" aria-label="Today's forecast"></section>
+    <section id="today-forecast" class="today-panel beta-today-panel" aria-label="Today and hourly forecast"></section>
 
     <!-- 4-Column Quick Stats Glass Strip (Rain | Precip | AQI Clickable | Weather Meter Clickable) -->
     <section id="quick-stats-strip" class="glass quick-stats-strip" aria-label="Quick Weather Summary">
@@ -415,7 +405,7 @@
       <svg class="bnav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 10v10h14V10"/></svg>
       <span>Today</span>
     </a>
-    <a class="bnav-item" href="#next-24-panel" data-bnav="hourly">
+    <a class="bnav-item" href="#today-forecast" data-bnav="hourly">
       <svg class="bnav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
       <span>Hourly</span>
     </a>
@@ -461,7 +451,6 @@
   </footer>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
-  <script type="module" src="/weather-fusion/main-hourly-trend.js?v=local-hourly-v1"></script>
-  <script type="module" src="/weather-fusion/v3/js/app.js?v=local-hourly-v1"></script>
+  <script type="module" src="/weather-fusion/v3/js/app.js?v=today-graph-v1"></script>
 </body>
 </html>

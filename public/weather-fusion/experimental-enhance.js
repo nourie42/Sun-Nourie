@@ -50,7 +50,7 @@ async function bootExperimentalEnhancements() {
   ensureExperimentalStylesheet();
   injectExperimentalNavShortcuts();
   try {
-    await import('./wn-blend.js?v=exp-compare-v1');
+    await import('./wn-blend.js?v=published-model-points-v1');
   } catch {
     // Non-fatal if lazy compare falls back to click
   }

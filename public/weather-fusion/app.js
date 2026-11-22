@@ -825,7 +825,7 @@ if(compare && !document.querySelector('script[src*="/wn-blend.js"]')) {
     if(document.getElementById('wn-compare-section')){compare.removeEventListener('click',openCompare);return;}
     compare.disabled=true;
     try {
-      await import('./wn-blend.js?v=shared-model-comparison-v1');
+      await import('./wn-blend.js?v=published-model-points-v1');
       compare.removeEventListener('click',openCompare);
       compare.disabled=false; compare.click();
     } catch {

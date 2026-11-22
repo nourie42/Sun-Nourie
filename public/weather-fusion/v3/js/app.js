@@ -7,6 +7,7 @@ import {
   fetchCompleteFusionForecast,
   searchLocations
 } from './fusion-engine.js?v=local-hourly-v1';
+import {todayHourlyPreview} from './today-preview.js?v=1';
 import {hourlyRainInputsHTML, rainPercent} from './hourly-rain.js?v=local-hourly-v1';
 import { getLunarPhaseFraction, renderWeatherIconSvg } from './icons.js?v=v3-sky-8';
 import {
@@ -14,7 +15,6 @@ import {
   extractHourMetricValue,
   renderDewPointFeelChart,
   renderHourlyExplorerChart,
-  renderNext24HoursSplineChart,
   renderSevenDayDualSplineChart
 } from './charts.js?v=smooth-trend-v4';
 import {
@@ -99,8 +99,6 @@ const state = {
   selectedHourIdx: 0,
   feelsHourIdx: 0,
   expandedExposureIds: new Set(),
-  n24MetricId: 'temp',
-  n24StripExpanded: false,
   selectedMetricId: 'temp',
   selectedDayIdx: 0,
   sevenDayDetailExpanded: false,
@@ -357,9 +355,6 @@ function renderBetaTodayCard(f) {
   if (f?.canonical?.days?.length) {
     host.hidden = false;
     host.innerHTML = todayForecastHTML(f.canonical, Date.now());
-    host.querySelectorAll('[data-today-forecast]').forEach((btn) => {
-      btn.addEventListener('click', () => openMainDayDetailModal(f, 0));
-    });
   } else if (f?.days?.length) {
     const d = f.days[0];
     const cur = f.current;
@@ -388,16 +383,30 @@ function renderBetaTodayCard(f) {
         <span class="today-more">Tap for more details</span>
       </button>
     `;
-    host.querySelectorAll('[data-today-forecast]').forEach((btn) => {
-      btn.addEventListener('click', () => openDayHourlyModal(d, f));
-    });
   } else {
     host.hidden = true;
+  }
+
+  const button = host.querySelector('.today-weather-card');
+  if (button) {
+    button.classList.add('beta-today-graph');
+    const dayKey = f.days[0]?.dayKey;
+    const hours = f.hours48.filter(hour => hour.dayKey === dayKey);
+    button.querySelector('.today-metrics').insertAdjacentHTML(
+      'beforebegin', todayHourlyPreview(hours, f.timeZone, state.useCelsius)
+    );
+    button.querySelector('.today-more').textContent = 'View 48-hour forecast ›';
+    const summary = button.getAttribute('aria-label')?.replace(/ Open details\.$/, '') || 'Today.';
+    button.setAttribute('aria-label', summary + ' View the 48-hour hourly forecast.');
+  }
+  for (const control of host.querySelectorAll('[data-today-forecast]')) {
+    control.onclick = () => openMainDayDetailModal(f, 0);
   }
 }
 
 function openMainDayDetailModal(f, dayIndex = 0) {
   if (dayIndex === 0) {
+    state.selectedHourIdx = 0;
     state.selectedMetricId = 'temp';
     open48hExplorerModal(f);
     return;
@@ -426,7 +435,6 @@ function renderAll() {
   renderTopCompactPills(f);
   renderBetaTodayCard(f);
   renderFeelsTimeAndTrio(f);
-  renderNext24QuickCard(f);
   renderSevenDayForecast(f);
   renderOutdoorExposureCards(f);
   renderAqiAndGlanceTiles(f);
@@ -1050,37 +1058,6 @@ function renderFeelsTimeAndTrio(f) {
   if (trioCompass) trioCompass.innerHTML = renderCompassSvg(h.windDirDeg ?? 45);
 }
 
-function renderNext24QuickCard(f) {
-  const stage = document.getElementById('next24-spline-stage');
-  if (!stage) return;
-  const time = new Intl.DateTimeFormat('en-US',{timeZone:f.timeZone,weekday:'short',hour:'numeric'});
-  const hours = f.hours48.slice(0,24);
-  stage.innerHTML = hours.map((hour,index) => `
-    <button type="button" class="hour-tile" data-n24-card="${index}" aria-haspopup="dialog"
-      title="${escapeAttr(hour.rainLedger.tooltip)}">
-      <span class="hour-tile-time">${index === 0 ? 'This hour' : escapeAttr(time.format(hour.dateObj))}</span>
-      ${renderWeatherIconSvg(hour.icon,27)}
-      <span class="hour-tile-temp">${fmtTemp(hour.tempF)}</span>
-      <span class="hour-tile-feels">Feels ${fmtTemp(hour.feelsLikeF)}</span>
-      <span class="hour-pop-pill">💧 ${rainPercent(hour.rainChance)}</span>
-      ${hour.precipIn >= .01 ? `<span class="hour-qpf-sub">${hour.precipIn.toFixed(2)}″</span>` : ''}
-    </button>`).join('');
-  stage.onclick = event => {
-    const card = event.target.closest('[data-n24-card]');
-    if (card) {
-      state.selectedHourIdx = Number(card.dataset.n24Card);
-      state.selectedMetricId = 'rainChance';
-      open48hExplorerModal(f);
-    }
-  };
-  const more = document.getElementById('beta-hourly-more');
-  more.onclick = () => {
-    state.selectedHourIdx = 0;
-    state.selectedMetricId = 'temp';
-    open48hExplorerModal(f);
-  };
-}
-
 function formatHHMMTo12h(hhmm) {
   if (!hhmm || !String(hhmm).includes(':')) return hhmm || '—';
   const [hStr, mStr] = String(hhmm).split(':');
@@ -1104,7 +1081,7 @@ function openDayHourlyModal(day, f) {
         <td><strong>${fmtTemp(h.tempF)}</strong></td>
         <td>${fmtTemp(h.feelsLikeF)}</td>
         <td title="${escapeAttr(h.rainLedger?.tooltip || '')}">💧 ${rainPercent(h.rainChance)}</td>
-        <td><strong>${Number(h.precipIn || 0).toFixed(2)}"</strong></td>
+        <td><strong>${Number.isFinite(h.precipIn) ? h.precipIn.toFixed(2)+'″' : '—'}</strong></td>
         <td>${h.windMph} mph ${h.windCardinal || ''}</td>
         <td>${h.cloudCover ?? '—'}%</td>
       </tr>
@@ -1207,29 +1184,6 @@ function renderSevenDayForecast(f) {
     const rainLine = d.totalSnowIn > 0
       ? `${rainPercent(d.rainChance)} · ${d.totalQpfIn.toFixed(2)}" · ❄ ${d.totalSnowIn}"`
       : `${rainPercent(d.rainChance)} · ${d.totalQpfIn.toFixed(2)}"`;
-    const wetHours = (d.hours || []).filter((h) => Number(h.precipIn || 0) >= 0.01);
-    const wetHoursBlock = wetHours.length
-      ? `
-      <div class="day-hourly-rain-breakdown" style="margin-top:10px;" aria-label="Rain hours for ${escapeAttr(d.dayName)}">
-        <div class="day-hourly-rain-head">
-          <strong>Rain Hours · ${escapeAttr(d.dayName)}</strong>
-          <span>Day total: ${d.totalQpfIn.toFixed(2)} in</span>
-        </div>
-        <div class="day-hourly-rain-grid">
-          ${wetHours
-            .map(
-              (h) => `
-            <div class="day-hour-rain-cell" title="${escapeAttr(h.rainLedger?.tooltip || '')}">
-              <span class="dhr-time">${escapeAttr(h.hourLabel)}</span>
-              <strong class="dhr-amt">${Number(h.precipIn).toFixed(2)}"</strong>
-              <small class="dhr-pop">💧 ${rainPercent(h.rainChance)}</small>
-            </div>
-          `
-            )
-            .join('')}
-        </div>
-      </div>`
-      : '';
     detailEl.innerHTML = `
       <div class="d7-detail-head">
         <div>
@@ -1270,7 +1224,6 @@ function renderSevenDayForecast(f) {
           <strong class="d7-stat-val">${formatHHMMTo12h(d.sunrise)} / ${formatHHMMTo12h(d.sunset)}</strong>
         </div>
       </div>
-      ${wetHoursBlock}
     `;
     document.getElementById('d7-hourly-btn')?.addEventListener('click', () => openDayHourlyModal(d, f));
     document.getElementById('d7-detail-close-btn')?.addEventListener('click', () => {
@@ -1752,7 +1705,7 @@ async function renderCompareModelsSection(f) {
   if (!state.compareExpanded || !f) return;
   const host = document.getElementById('beta-model-comparison');
   if (!host) return;
-  betaComparison ??= import('../../wn-blend.js?v=shared-model-comparison-v1')
+  betaComparison ??= import('../../wn-blend.js?v=published-model-points-v1')
     .then(({mountModelComparison}) => mountModelComparison(host))
     .catch(() => {
       betaComparison = null;
@@ -2400,21 +2353,8 @@ function initHeaderControls() {
     if (state.forecast) openWardrobeModal(state.forecast);
   });
 
-  // Next 24 Hours Quick Spline Metric Pills (Temp | Feels Like | Rain | Wind)
-  document.querySelectorAll('[data-n24-metric]').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('[data-n24-metric]').forEach((b) => b.classList.remove('active'));
-      btn.classList.add('active');
-      state.n24MetricId = btn.dataset.n24Metric || 'temp';
-      if (state.forecast) renderNext24QuickCard(state.forecast);
-    });
-  });
-
-  // Sky Audio Button
   const audioBtn = document.getElementById('sky-audio-btn');
-  audioBtn?.addEventListener('click', () => {
-    toggleProceduralSkyAudio(audioBtn);
-  });
+  audioBtn?.addEventListener('click', () => toggleProceduralSkyAudio(audioBtn));
 }
 
 function initBottomNavDock() {
@@ -2424,6 +2364,10 @@ function initBottomNavDock() {
     item.addEventListener('click', (e) => {
       items.forEach((i) => i.classList.remove('active'));
       item.classList.add('active');
+      if (item.dataset.bnav === 'hourly' && state.forecast) {
+        e.preventDefault();
+        openMainDayDetailModal(state.forecast);
+      }
       if (item.dataset.bnav === 'compare') {
         e.preventDefault();
         setCompareExpanded(true, { scroll: true });
@@ -2976,7 +2920,10 @@ function open48hExplorerModal(f) {
         <summary id="modal-rain-input-title">Rain chance inputs</summary>
         <div id="modal-rain-input-rows"></div>
       </details>
-      <div id="modal-hourly-strip" class="hourly-strip-scroll" style="margin-top:12px;"></div>
+      <details class="beta-all-hours">
+        <summary>All 48 hours</summary>
+        <div id="modal-hourly-strip" class="beta-hourly-table-wrap"></div>
+      </details>
       </section>
     `
   );
@@ -3001,7 +2948,7 @@ function open48hExplorerModal(f) {
     inputRows.innerHTML = hourlyRainInputsHTML(hour.rainLedger);
     for (const tile of stripWrap.querySelectorAll('[data-m-h]')) {
       const selected = Number(tile.dataset.mH) === index;
-      tile.classList.toggle('active',selected);
+      tile.closest('tr')?.classList.toggle('active',selected);
       tile.setAttribute('aria-pressed',String(selected));
     }
   };
@@ -3085,15 +3032,21 @@ function open48hExplorerModal(f) {
     }
 
     if (stripWrap && !stripWrap.children.length) {
-      stripWrap.innerHTML = (f.hours48 || []).map((hr, idx) => `
-        <button type="button" class="hour-tile ${idx === state.selectedHourIdx ? 'active' : ''}" data-m-h="${idx}" data-time="${Date.parse(hr.time)}" aria-pressed="${idx === state.selectedHourIdx}" title="${escapeAttr(hr.rainLedger?.tooltip || '')}">
-          <span class="hour-tile-time">${hr.hourLabel}</span>
-          <div>${renderWeatherIconSvg(hr.icon, 28)}</div>
-          <span class="hour-tile-temp">${fmtTemp(hr.tempF)}</span>
-          <span class="hour-pop-pill" title="${escapeAttr(hr.rainLedger?.tooltip || '')}">💧 ${rainPercent(hr.rainChance)}</span>
-          ${hr.precipIn>=.01 ? `<span style="font-size:10.5px;color:var(--blue);font-weight:600;">${hr.precipIn.toFixed(2)}"</span>` : ''}
-        </button>
-      `).join('');
+      const time = new Intl.DateTimeFormat('en-US',{timeZone:f.timeZone,weekday:'short',hour:'numeric'});
+      const rows = f.hours48.map((hour, index) => {
+        const selected = index === state.selectedHourIdx;
+        return `<tr class="${selected ? 'active' : ''}">
+          <th scope="row"><button type="button" data-m-h="${index}" data-time="${Date.parse(hour.time)}" aria-pressed="${selected}" aria-label="${escapeAttr(time.format(hour.dateObj))} · ${escapeAttr(hour.condition || 'Conditions unavailable')}">${renderWeatherIconSvg(hour.icon, 15)}${escapeAttr(time.format(hour.dateObj))}</button></th>
+          <td>${fmtTemp(hour.tempF)}</td>
+          <td>${fmtTemp(hour.feelsLikeF)}</td>
+          <td title="${escapeAttr(hour.rainLedger.tooltip)}">${rainPercent(hour.rainChance)}</td>
+          <td>${Number.isFinite(hour.precipIn) ? hour.precipIn.toFixed(2)+'″' : '—'}</td>
+        </tr>`;
+      }).join('');
+      stripWrap.innerHTML = `<table class="beta-hourly-table" aria-label="Hourly forecast">
+        <thead><tr><th scope="col">Time</th><th scope="col">Temp</th><th scope="col">Feels</th><th scope="col">Rain</th><th scope="col">Amount</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>`;
       stripWrap.querySelectorAll('[data-m-h]').forEach((el) => {
         el.addEventListener('click', () => {
           const index = Number(el.dataset.mH);

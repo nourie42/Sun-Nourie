@@ -38,7 +38,7 @@ button:focus-visible,a:focus-visible{outline:2px solid #d6efff;outline-offset:3p
 #skin-exposure .person-card-description{display:block;min-height:0;height:auto;padding:3px 4px;margin:0;font-size:10px;line-height:1.3}
 #skin-exposure .person-card-detail-hint{display:block;margin:auto 0 0;padding:5px 2px 8px;font-size:10px;line-height:1;color:#d7e9f4;opacity:1}
 .comfort-trio-grid.comfort-duo-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}
-.beta-today-panel{padding:0!important;overflow:hidden}
+.beta-today-panel{padding:0!important;overflow:visible}
 .beta-today-panel .today-weather-card{margin:0!important;width:100%}
 .map-pin-point-anchor{position:relative;width:14px;height:14px}
 .map-pin-point-anchor .map-pin-dot{display:block;width:12px;height:12px;border-radius:50%;background:#62cce7;border:2px solid #fff;box-shadow:0 0 0 3px rgba(8,22,42,.55)}
@@ -61,14 +61,86 @@ button:focus-visible,a:focus-visible{outline:2px solid #d6efff;outline-offset:3p
 .beta-location-actions.main-app-return {justify-content:space-between;gap:8px}
 .beta-location-actions [aria-busy="true"] {opacity:.7}
 .beta-location-status {min-height:20px;margin-top:3px;margin-bottom:6px;text-align:center;color:#e0edf7;font-size:13px}
-.beta-hourly-preview .n24-header {margin:0 0 12px}
-.beta-hourly-preview .mode-pill {min-height:36px}
-.beta-hourly-preview .hourly-strip-scroll {margin:0;scroll-snap-type:x proximity;padding-bottom:7px}
-.beta-hourly-preview .hour-tile {flex:0 0 87px;min-width:0;padding:8px 5px;gap:5px;scroll-snap-align:start;font:inherit;color:inherit;cursor:pointer}
-.beta-hourly-preview .hour-tile-time {white-space:nowrap;font-size:12px}
-.beta-hourly-preview .hour-tile-feels,.beta-hourly-preview .hour-qpf-sub {font-size:11px}
-.beta-hourly-preview #main-hourly-trend {margin-top:6px}
 .beta-hour-rain-details {margin:8px 0 12px;padding:8px 10px;border:1px solid #adcde638;border-radius:12px}
 .beta-hour-rain-details summary {cursor:pointer;font-size:13px;font-weight:650;padding:5px 0}
 .rain-inputs-table th[scope="row"] {text-align:left}
 .rain-inputs-table tfoot :is(th,td) {border-top:1px solid #adcde64a;padding-block:8px}
+
+
+/* The logo's cool rim and warmer glass highlight carry through every Beta tile. */
+body.beta-weather-app[data-sky] {
+  --weather-tile-fill: rgba(12, 31, 53, .37) linear-gradient(145deg, #b0dafa20, #548aae0c 38%, #10263f20 76%, #4bb5e213);
+  --weather-tile-border: #83c8ec64;
+  --weather-tile-shadow: inset 0 1px 1px #d8f2ff66, inset 1px 0 0 #87d0f645, inset -1px -1px 0 #48a7df45, 0 8px 20px #061b3730;
+}
+body.beta-weather-app[data-sky="night"] {
+  --weather-tile-fill: rgba(13, 29, 50, .50) linear-gradient(145deg, #a9d5f520, #4c8aa80a 44%, #08182d1a 76%, #42b7e112);
+}
+.beta-weather-app :is(.v3-main-stack .glass, .d7-detail-card, .d7-stat-cell, .more-tile-btn,
+  .urgent-alert-banner, .weather-outlook-panel, .today-confidence-banner, .air-assessment-card, .d7-modal-summary) {
+  border-color: var(--weather-tile-border) !important;
+  box-shadow: var(--weather-tile-shadow) !important;
+}
+.beta-weather-app :is(.d7-detail-card, .d7-stat-cell, .more-tile-btn, .d7-modal-summary) {
+  background: var(--weather-tile-fill);
+}
+.beta-weather-app .d7-detail-grid {gap: var(--tile-gap)}
+html body.beta-weather-app #today-forecast .today-weather-card.beta-today-graph {
+  grid-template-rows: minmax(134px,auto) auto minmax(44px,auto) auto !important;
+  padding-bottom: 12px;
+  border-radius: var(--weather-tile-radius);
+}
+.beta-today-hourly {
+  display:block;
+  grid-column:1/-1;
+  grid-row:2;
+  z-index:2;
+  position:relative;
+  margin:0 12px 6px;
+  padding:9px 2px 0;
+  border-top:1px solid #b9e4ff3a;
+  color:#e9f6ff;
+}
+.beta-hourly-preview-head {display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:4px 10px;padding:0 2px 3px}
+.beta-hourly-preview-heading {color:#f4fbff;font-size:15px;font-weight:700}
+.beta-hourly-preview-legend {display:flex;gap:10px;color:#d0e9fa;font-size:10px;white-space:nowrap}
+.beta-hourly-preview-legend span::before {content:"";display:inline-block;width:8px;height:3px;border-radius:2px;background:#ffd394;vertical-align:2px;margin-right:4px}
+.beta-hourly-preview-legend span+span::before {background:#79d1ef}
+.beta-today-hourly-svg {display:block;width:100%;height:auto;max-height:196px}
+.beta-today-hourly-svg text {fill:#dceffc;font-size:10.5px;font-family:inherit;font-weight:550}
+.beta-today-hourly-svg line {stroke:#c9e8fd45;stroke-width:1}
+html body.beta-weather-app #today-forecast .beta-today-graph .today-metrics.today-metrics {
+  grid-row:3;
+  border:0 !important;
+  background:transparent !important;
+  box-shadow:none !important;
+  backdrop-filter:none !important;
+}
+html body.beta-weather-app #today-forecast .beta-today-graph .today-more {
+  grid-row:4;
+  margin:0 12px;
+  border:0 !important;
+  border-top:1px solid #b9e4ff3a !important;
+  border-radius:0;
+  background:none !important;
+  padding:9px 0 0;
+  color:#d6edff;
+  font-weight:700;
+}
+html body.beta-weather-app #today-forecast .beta-today-graph :is(.today-sky,.today-scene-shade) {
+  inset:0 !important;
+  height:100% !important;
+}
+.beta-all-hours summary {cursor:pointer;padding:8px 0;font-weight:650}
+.beta-hourly-table-wrap {overflow:auto;max-height:300px;border-radius:9px}
+.beta-hourly-table {width:100%;border-collapse:collapse;font-size:12px;font-variant-numeric:tabular-nums;text-align:right}
+.beta-hourly-table th:first-child {text-align:left;white-space:nowrap}
+.beta-hourly-table :is(th,td) {padding:4px 6px;border-bottom:1px solid #b9e4ff26}
+.beta-hourly-table thead {position:sticky;top:0;background:#132941;z-index:1}
+.beta-hourly-table tr.active {background:#4898c139}
+.beta-hourly-table button {display:inline-flex;align-items:center;gap:4px;font:inherit;color:#c7ecff;background:none;border:0;min-height:34px;padding:0 2px;text-align:left;cursor:pointer}
+@media (max-width:370px) {
+  .beta-hourly-table {font-size:11px}
+  .beta-hourly-table :is(th,td) {padding-inline:3px}
+  .beta-hourly-table button {gap:3px}
+}
