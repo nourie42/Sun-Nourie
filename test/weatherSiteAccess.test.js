@@ -35,10 +35,22 @@ test('all weather pages, assets and API methods require a password', async t => 
         const body = await response.text();
         assert.ok(!body.includes('allowed'));
         assert.ok(!body.includes('care'));
-        assert.match(body, route.startsWith('/api/') ? /password required/ : /Public access is paused/);
+        assert.match(body, route.startsWith('/api/') ? /password required/ : /PRIVATE WEATHER TOOLS/);
       }
     }
   }
+});
+
+test('Black Friday routes use a dedicated private shopping sign-in and preserve the destination', async t => {
+  const {request} = await fixture(t);
+  const response = await request('/black-friday/?view=wishlists');
+  assert.equal(response.status, 401);
+  const body = await response.text();
+  assert.match(body, /Black Friday Command Center/);
+  assert.match(body, /PRIVATE FAMILY SHOPPING HQ/);
+  assert.match(body, /wish lists, saved deals, price tracking/);
+  assert.match(body, /name="returnTo" value="\/black-friday\/\?view=wishlists"/);
+  assert.doesNotMatch(body, /Public access is paused/);
 });
 
 test('wrong passwords do not grant access', async t => {
