@@ -9,7 +9,7 @@
  * - urlStatus tracks verified browser/HTTP verification ('verified' | 'bot_protected' | 'unverified').
  */
 
-export const BLACK_FRIDAY_VERSION = '2.2.4-bf2026.8';
+export const BLACK_FRIDAY_VERSION = '2.2.5-bf2026.9';
 export const SCHEMA_VERSION = 2;
 
 export const PRIMARY_LOCATION = Object.freeze({
@@ -25,17 +25,13 @@ export const PRIMARY_LOCATION = Object.freeze({
 });
 
 export const DEFAULT_FAVORITE_STORES = Object.freeze([
-  'amazon', 'target', 'walmart', 'bestbuy', 'costco', 'samsclub',
-  'homedepot', 'lowes', 'macys', 'kohls', 'nordstrom', 'nordstromrack',
-  'nike', 'lululemon', 'oldnavy', 'tjmaxx', 'sephora', 'ulta',
-  'apple', 'wayfair', 'dicks', 'lego', 'etsy', 'slickdeals', 'dealnews', 'rakuten',
+  'target', 'bestbuy', 'academy', 'walmart', 'homedepot',
+  'lowes', 'amazon', 'cabelas', 'barnesnoble', 'kohls',
 ]);
 
 export const MAIN_STORE_IDS = Object.freeze([
-  'amazon', 'walmart', 'target', 'bestbuy', 'homedepot', 'lowes',
-  'costco', 'samsclub', 'macys', 'kohls', 'apple', 'nike',
-  'adidas', 'lego', 'sephora', 'ulta', 'wayfair', 'nordstrom',
-  'newegg', 'dicks', 'rei', 'oldnavy', 'chewy',
+  'target', 'bestbuy', 'academy', 'walmart', 'homedepot',
+  'lowes', 'amazon', 'cabelas', 'barnesnoble', 'kohls',
 ]);
 
 export const RETAILER_SEARCH_URLS = Object.freeze({
@@ -342,6 +338,7 @@ function mkStore(id, name, category, domain, {
   monogram = null,
   aliases = [],
   domainHints = null,
+  dealTiming = null,
 } = {}) {
   return {
     id,
@@ -362,6 +359,7 @@ function mkStore(id, name, category, domain, {
     monitoringMode,
     aliases: [domain, ...aliases],
     domainHints: domainHints || [domain],
+    dealTiming,
   };
 }
 
@@ -370,9 +368,9 @@ function mkStore(id, name, category, domain, {
  */
 export const RETAILER_DIRECTORY = Object.freeze([
   // 1. General Shopping (8)
-  mkStore('amazon', 'Amazon', 'General Shopping', 'amazon.com', { dealsUrl: 'https://www.amazon.com/gp/goldbox', blackFridayUrl: 'https://www.amazon.com/blackfriday', storeFinderUrl: 'https://www.amazon.com/ulp', accent: '#ff9900', monogram: 'AZ', aliases: ['amzn'], domainHints: ['amazon.com', 'amzn.to'] }),
-  mkStore('walmart', 'Walmart', 'General Shopping', 'walmart.com', { dealsUrl: 'https://www.walmart.com/shop/deals', blackFridayUrl: 'https://www.walmart.com/shop/deals/black-friday', storeFinderUrl: 'https://www.walmart.com/store-finder?location=27545', localPresence: true, accent: '#0071dc', monogram: 'WM' }),
-  mkStore('target', 'Target', 'General Shopping', 'target.com', { dealsUrl: 'https://www.target.com/c/top-deals/-/N-4xw74', blackFridayUrl: 'https://www.target.com/c/target-black-friday/-/N-5q0f2', storeFinderUrl: 'https://www.target.com/sl/knightdale/2111', localPresence: true, accent: '#cc0000', monogram: 'TG' }),
+  mkStore('amazon', 'Amazon', 'General Shopping', 'amazon.com', { dealsUrl: 'https://www.amazon.com/gp/goldbox', blackFridayUrl: 'https://www.amazon.com/blackfriday', storeFinderUrl: 'https://www.amazon.com/ulp', accent: '#ff9900', monogram: 'AZ', aliases: ['amzn'], domainHints: ['amazon.com', 'amzn.to'], dealTiming: "Black Friday Week Nov 19–30 · Biggest new drops Fri Nov 27 and Cyber Mon Nov 30 at 3 AM and 11 AM ET" }),
+  mkStore('walmart', 'Walmart', 'General Shopping', 'walmart.com', { dealsUrl: 'https://www.walmart.com/shop/deals', blackFridayUrl: 'https://www.walmart.com/shop/deals/black-friday', storeFinderUrl: 'https://www.walmart.com/store-finder?location=27545', localPresence: true, accent: '#0071dc', monogram: 'WM', dealTiming: "Deals online Mon Nov 23, 12:01 AM ET (Walmart+ members get hot drops first; everyone else Tue) · Stores join Fri 6 AM · Cyber Monday Nov 30–Dec 2" }),
+  mkStore('target', 'Target', 'General Shopping', 'target.com', { dealsUrl: 'https://www.target.com/c/top-deals/-/N-4xw74', blackFridayUrl: 'https://www.target.com/c/target-black-friday/-/N-5q0f2', storeFinderUrl: 'https://www.target.com/sl/knightdale/2111', localPresence: true, accent: '#cc0000', monogram: 'TG', dealTiming: "Sale Nov 22–29 · Deal of the Day daily · Circle 360 early access Wed Nov 25, 3 AM ET · Stores open Fri 6 AM — gift cards for the first 100 in line" }),
   mkStore('costco', 'Costco', 'General Shopping', 'costco.com', { dealsUrl: 'https://www.costco.com/warehouse-savings.html', storeFinderUrl: 'https://www.costco.com/warehouse-locations', localPresence: true, warehouseClub: true, accent: '#e31837', monogram: 'CO', aliases: ['costco wholesale'] }),
   mkStore('samsclub', "Sam's Club", 'General Shopping', 'samsclub.com', { dealsUrl: 'https://www.samsclub.com/b/instant-savings-book/19240107', storeFinderUrl: 'https://www.samsclub.com/locator', localPresence: true, warehouseClub: true, accent: '#0067a0', monogram: 'SC', aliases: ['sams club'] }),
   mkStore('ebay', 'eBay', 'General Shopping', 'ebay.com', { dealsUrl: 'https://www.ebay.com/deals', monitoringMode: 'direct_api_ready', accent: '#e53238', monogram: 'eB' }),
@@ -381,7 +379,7 @@ export const RETAILER_DIRECTORY = Object.freeze([
 
   // 2. Department Stores (10)
   mkStore('macys', "Macy's", 'Department Stores', 'macys.com', { dealsUrl: 'https://www.macys.com/shop/sale/clearance-closeout', blackFridayUrl: 'https://www.macys.com/s/black-friday/', storeFinderUrl: 'https://www.macys.com/stores/', localPresence: true, accent: '#e21a2c', monogram: 'M★', aliases: ['macys'] }),
-  mkStore('kohls', "Kohl's", 'Department Stores', 'kohls.com', { dealsUrl: 'https://www.kohls.com/sale-event/clearance.jsp', blackFridayUrl: 'https://www.kohls.com/sale-event/black-friday-deals.jsp', storeFinderUrl: 'https://www.kohls.com/stores.shtml', localPresence: true, accent: '#7c3aed', monogram: 'KH', aliases: ['kohls'] }),
+  mkStore('kohls', "Kohl's", 'Department Stores', 'kohls.com', { dealsUrl: 'https://www.kohls.com/sale-event/clearance.jsp', blackFridayUrl: 'https://www.kohls.com/sale-event/black-friday-deals.jsp', storeFinderUrl: 'https://www.kohls.com/stores.shtml', localPresence: true, accent: '#7c3aed', monogram: 'KH', aliases: ['kohls'], dealTiming: "Black Friday Week Nov 22–28 · Extra 20% off + $15 Kohl’s Cash per $50 · Online doorbusters Thu 1:01 AM ET · Stores Fri 5 AM — the earliest opener" }),
   mkStore('belk', 'Belk', 'Department Stores', 'belk.com', { dealsUrl: 'https://www.belk.com/clearance/', storeFinderUrl: 'https://www.belk.com/stores/', localPresence: true, accent: '#0076be', monogram: 'BK' }),
   mkStore('dillards', "Dillard's", 'Department Stores', 'dillards.com', { dealsUrl: 'https://www.dillards.com/c/sale-clearance', storeFinderUrl: 'https://www.dillards.com/stores', localPresence: true, monitoringMode: 'directory_only', accent: '#94a3b8', monogram: 'DL', aliases: ['dillards'] }),
   mkStore('jcpenney', 'JCPenney', 'Department Stores', 'jcpenney.com', { dealsUrl: 'https://www.jcpenney.com/m/jcpenney-deals', blackFridayUrl: 'https://www.jcpenney.com/m/black-friday-deals', storeFinderUrl: 'https://www.jcpenney.com/locations/nc/raleigh', localPresence: true, accent: '#cc0000', monogram: 'JC', aliases: ['jcp'] }),
@@ -422,7 +420,7 @@ export const RETAILER_DIRECTORY = Object.freeze([
   mkStore('victoriassecret', "Victoria's Secret", 'Beauty', 'victoriassecret.com', { url: 'https://www.victoriassecret.com/us/', dealsUrl: 'https://www.victoriassecret.com/us/vs/sale', storeFinderUrl: 'https://www.victoriassecret.com/us/store-locator', localPresence: true, accent: '#ec4899', monogram: 'VS' }),
 
   // 5. Electronics (11)
-  mkStore('bestbuy', 'Best Buy', 'Electronics', 'bestbuy.com', { dealsUrl: 'https://www.bestbuy.com/site/misc/deal-of-the-day/pcmcat248000050016.c', blackFridayUrl: 'https://www.bestbuy.com/site/black-friday/sale-ad/pcmcat1568908420641.c', storeFinderUrl: 'https://www.bestbuy.com/site/store-locator/27545', localPresence: true, monitoringMode: 'direct_api_ready', accent: '#facc15', monogram: 'BB', aliases: ['best buy'] }),
+  mkStore('bestbuy', 'Best Buy', 'Electronics', 'bestbuy.com', { dealsUrl: 'https://www.bestbuy.com/site/misc/deal-of-the-day/pcmcat248000050016.c', blackFridayUrl: 'https://www.bestbuy.com/site/black-friday/sale-ad/pcmcat1568908420641.c', storeFinderUrl: 'https://www.bestbuy.com/site/store-locator/27545', localPresence: true, monitoringMode: 'direct_api_ready', accent: '#facc15', monogram: 'BB', aliases: ['best buy'], dealTiming: "Sale Nov 19–28 · New doorbusters on Fridays + a Thanksgiving Day online flash sale · Stores Fri 6 AM–10 PM" }),
   mkStore('apple', 'Apple', 'Electronics', 'apple.com', { dealsUrl: 'https://www.apple.com/shop/refurbished', blackFridayUrl: 'https://www.apple.com/shop/gifts/shopping-event', storeFinderUrl: 'https://www.apple.com/retail/crabtreevalleymall/', localPresence: true, accent: '#e2e8f0', monogram: 'AP', aliases: ['apple store'] }),
   mkStore('samsung', 'Samsung', 'Electronics', 'samsung.com', { url: 'https://www.samsung.com/us/', dealsUrl: 'https://www.samsung.com/us/shop/all-deals/', blackFridayUrl: 'https://www.samsung.com/us/shop/black-friday/', accent: '#1d4ed8', monogram: 'SM' }),
   mkStore('dell', 'Dell', 'Electronics', 'dell.com', { url: 'https://www.dell.com/en-us', dealsUrl: 'https://www.dell.com/en-us/shop/deals', blackFridayUrl: 'https://www.dell.com/en-us/lp/black-friday-deals', accent: '#0284c7', monogram: 'DL', aliases: ['dell outlet'] }),
@@ -435,8 +433,8 @@ export const RETAILER_DIRECTORY = Object.freeze([
   mkStore('bhphoto', 'B&H Photo Video', 'Electronics', 'bhphotovideo.com', { dealsUrl: 'https://www.bhphotovideo.com/c/buy/rebates-promotions/ci/22144', accent: '#a855f7', monogram: 'BH', aliases: ['b&h', 'b&h photo'] }),
 
   // 6. Home & Furniture (12)
-  mkStore('homedepot', 'Home Depot', 'Home & Furniture', 'homedepot.com', { dealsUrl: 'https://www.homedepot.com/SpecialBuy/SpecialBuyOfTheDay', blackFridayUrl: 'https://www.homedepot.com/c/black-friday', storeFinderUrl: 'https://www.homedepot.com/l/search/27545/full/', localPresence: true, accent: '#f96302', monogram: 'HD', aliases: ['the home depot'] }),
-  mkStore('lowes', "Lowe's", 'Home & Furniture', 'lowes.com', { dealsUrl: 'https://www.lowes.com/l/savings', blackFridayUrl: 'https://www.lowes.com/l/savings/black-friday-deals', storeFinderUrl: 'https://www.lowes.com/store/NC-Knightdale/2483', localPresence: true, accent: '#004990', monogram: 'LW', aliases: ['lowes'] }),
+  mkStore('homedepot', 'Home Depot', 'Home & Furniture', 'homedepot.com', { dealsUrl: 'https://www.homedepot.com/SpecialBuy/SpecialBuyOfTheDay', blackFridayUrl: 'https://www.homedepot.com/c/black-friday', storeFinderUrl: 'https://www.homedepot.com/l/search/27545/full/', localPresence: true, accent: '#f96302', monogram: 'HD', aliases: ['the home depot'], dealTiming: "Black Friday Savings Nov 5–25 · Appliance deals Thu Nov 26 · Doorbusters Fri Nov 27, stores 6 AM · A new Special Buy every day" }),
+  mkStore('lowes', "Lowe's", 'Home & Furniture', 'lowes.com', { dealsUrl: 'https://www.lowes.com/l/savings', blackFridayUrl: 'https://www.lowes.com/l/savings/black-friday-deals', storeFinderUrl: 'https://www.lowes.com/store/NC-Knightdale/2483', localPresence: true, accent: '#004990', monogram: 'LW', aliases: ['lowes'], dealTiming: "12 Days of Deals from Nov 16 — a new drop every day · Doorbusters Fri Nov 27 (MyLowe’s members get them online a day early, Nov 26)" }),
   mkStore('wayfair', 'Wayfair', 'Home & Furniture', 'wayfair.com', { dealsUrl: 'https://www.wayfair.com/daily-sales/closeout', accent: '#7f187f', monogram: 'WF' }),
   mkStore('ikea', 'IKEA', 'Home & Furniture', 'ikea.com', { url: 'https://www.ikea.com/us/en/', dealsUrl: 'https://www.ikea.com/us/en/offers/', storeFinderUrl: 'https://www.ikea.com/us/en/stores/', accent: '#facc15', monogram: 'IK' }),
   mkStore('potterybarn', 'Pottery Barn', 'Home & Furniture', 'potterybarn.com', { dealsUrl: 'https://www.potterybarn.com/shop/sale/', storeFinderUrl: 'https://www.potterybarn.com/customer-service/store-locator.html', localPresence: true, accent: '#cbd5e1', monogram: 'PB' }),
@@ -450,16 +448,17 @@ export const RETAILER_DIRECTORY = Object.freeze([
 
   // 7. Sporting Goods (7)
   mkStore('dicks', "Dick's Sporting Goods", 'Sporting Goods', 'dickssportinggoods.com', { dealsUrl: 'https://www.dickssportinggoods.com/f/clearance-deals', blackFridayUrl: 'https://www.dickssportinggoods.com/s/black-friday', storeFinderUrl: 'https://stores.dickssportinggoods.com/nc/raleigh/', localPresence: true, accent: '#10b981', monogram: 'DS', aliases: ['dicks sporting goods'] }),
-  mkStore('academy', 'Academy Sports', 'Sporting Goods', 'academy.com', { dealsUrl: 'https://www.academy.com/c/clearance', storeFinderUrl: 'https://www.academy.com/storelocator', localPresence: true, accent: '#0284c7', monogram: 'AS', aliases: ['academy sports + outdoors'] }),
+  mkStore('academy', 'Academy Sports', 'Sporting Goods', 'academy.com', { dealsUrl: 'https://www.academy.com/c/clearance', storeFinderUrl: 'https://www.academy.com/storelocator', localPresence: true, accent: '#0284c7', monogram: 'AS', aliases: ['academy sports + outdoors'], dealTiming: "Online sale Nov 20–29 · Stores Fri 5 AM–11 PM · Closed Thanksgiving" }),
   mkStore('rei', 'REI', 'Sporting Goods', 'rei.com', { dealsUrl: 'https://www.rei.com/rei-garage', storeFinderUrl: 'https://www.rei.com/stores/raleigh', localPresence: true, accent: '#22c55e', monogram: 'RI', aliases: ['rei co-op'] }),
   mkStore('basspro', 'Bass Pro Shops', 'Sporting Goods', 'basspro.com', { dealsUrl: 'https://www.basspro.com/shop/en/bargain-cave', storeFinderUrl: 'https://stores.basspro.com/', localPresence: true, accent: '#f59e0b', monogram: 'BP' }),
-  mkStore('cabelas', "Cabela's", 'Sporting Goods', 'cabelas.com', { dealsUrl: 'https://www.cabelas.com/shop/en/bargain-cave', storeFinderUrl: 'https://stores.basspro.com/us/nc/garner/201-cabela-drive.html', localPresence: true, accent: '#84cc16', monogram: 'CB', aliases: ['cabelas'] }),
+  mkStore('cabelas', "Cabela's", 'Sporting Goods', 'cabelas.com', { dealsUrl: 'https://www.cabelas.com/shop/en/bargain-cave', storeFinderUrl: 'https://stores.basspro.com/us/nc/garner/201-cabela-drive.html', localPresence: true, accent: '#84cc16', monogram: 'CB', aliases: ['cabelas'], dealTiming: "Online Nov 24–30 · Open Thanksgiving Day (short hours) · Black Friday doors 5 AM" }),
   mkStore('scheels', 'Scheels', 'Sporting Goods', 'scheels.com', { dealsUrl: 'https://www.scheels.com/c/sale', storeFinderUrl: 'https://www.scheels.com/stores', accent: '#ef4444', monogram: 'SH' }),
   mkStore('golfgalaxy', 'Golf Galaxy', 'Sporting Goods', 'golfgalaxy.com', { dealsUrl: 'https://www.golfgalaxy.com/f/golf-deals', storeFinderUrl: 'https://www.golfgalaxy.com/s/store-locator', localPresence: true, accent: '#38bdf8', monogram: 'GG' }),
 
   // 8. Gifts & Specialty (12)
   mkStore('etsy', 'Etsy', 'Gifts & Specialty', 'etsy.com', { dealsUrl: 'https://www.etsy.com/featured/deals', monitoringMode: 'directory_only', accent: '#f97316', monogram: 'ET' }),
   mkStore('lego', 'LEGO', 'Gifts & Specialty', 'lego.com', { url: 'https://www.lego.com/en-us', dealsUrl: 'https://www.lego.com/en-us/categories/sales-and-deals', blackFridayUrl: 'https://www.lego.com/en-us/black-friday-deals', storeFinderUrl: 'https://www.lego.com/en-us/stores/store/crabtree-valley-mall', localPresence: true, accent: '#ef4444', monogram: 'LG', aliases: ['lego store'] }),
+  mkStore('barnesnoble', 'Barnes & Noble', 'Gifts & Specialty', 'barnesandnoble.com', { dealsUrl: 'https://www.barnesandnoble.com/b/deals', storeFinderUrl: 'https://stores.barnesandnoble.com', localPresence: true, accent: '#366251', monogram: 'BN', aliases: ['barnes and noble', 'bn'], dealTiming: "Closed Thanksgiving · Black Friday from about 8 AM in stores (varies by store) · Online deals from 3 AM ET Fri" }),
   mkStore('disneystore', 'Disney Store', 'Gifts & Specialty', 'disneystore.com', { dealsUrl: 'https://www.disneystore.com/sale-content/', accent: '#3b82f6', monogram: 'DN', aliases: ['shopdisney', 'shopdisney.com'], domainHints: ['disneystore.com', 'shopdisney.com'] }),
   mkStore('uncommongoods', 'Uncommon Goods', 'Gifts & Specialty', 'uncommongoods.com', { dealsUrl: 'https://www.uncommongoods.com/gifts/sale', monitoringMode: 'directory_only', accent: '#14b8a6', monogram: 'UG' }),
   mkStore('fivebelow', 'Five Below', 'Gifts & Specialty', 'fivebelow.com', { dealsUrl: 'https://www.fivebelow.com/categories/new-and-now', storeFinderUrl: 'https://locations.fivebelow.com/', localPresence: true, monitoringMode: 'directory_only', accent: '#38bdf8', monogram: '5B' }),

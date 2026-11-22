@@ -651,7 +651,7 @@ function renderHomePage() {
       <span class="small muted" style="font-size:10px;">${st.verifiedDealsCount > 0 ? `${st.verifiedDealsCount} ${st.verifiedDealsCount === 1 ? 'deal' : 'deals'}` : 'Shop ↗'}</span>
     </a>`).join('') || '<div class="small muted" style="padding:12px;">No favorite stores match that search — click Browse All 96 Stores above.</div>';
 
-  const bfHighlightIds = ['amazon', 'target', 'walmart', 'bestbuy', 'homedepot', 'lowes', 'macys', 'kohls', 'nike', 'sephora', 'ulta', 'lego'];
+  const bfHighlightIds = ['target', 'bestbuy', 'academy', 'walmart', 'homedepot', 'lowes', 'amazon', 'cabelas', 'barnesnoble', 'kohls'];
   const bfStores = bfHighlightIds.map((id) => d.storesDirectory.find((s) => s.id === id)).filter(Boolean);
   $('home-bf-store-sales').innerHTML = bfStores.map((s) => `
     <div class="store-card">
@@ -1026,7 +1026,7 @@ function renderWishlistsView() {
                 <strong>Best Verified Match:</strong> ${money(best.currentPrice)} (Est. ${money(best.finalAllInTotal)} all-in) at <strong>${esc(best.retailerName)}</strong>
                 ${best.verifiedDiscountPct != null ? ` · <span class="badge badge-${esc(best.tier)}">${best.verifiedDiscountPct}% OFF</span>` : ''}
                 · <a href="${esc(best.retailerUrl)}" target="_blank" rel="noopener noreferrer" style="color:var(--accent-cyan);font-weight:800;">${best.isDirectProductUrl ? 'SHOP NOW ↗' : 'View Deal ↗'}</a>
-              </div>` : `<div class="small muted" style="margin-bottom:8px;">Monitoring continuously across authorized feeds${item.sourceUrl ? ` · <a href="${esc(item.sourceUrl)}" target="_blank" rel="noopener noreferrer" style="color:var(--accent-cyan);">Open Saved Product Link ↗</a>` : ''}</div>`}
+              </div>` : `<div class="small muted" style="margin-bottom:8px;">Prices update when you click Refresh (or Check Prices Now on an item)${item.sourceUrl ? ` · <a href="${esc(item.sourceUrl)}" target="_blank" rel="noopener noreferrer" style="color:var(--accent-cyan);">Open Saved Product Link ↗</a>` : ''}</div>`}
             <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px;">
               <label class="small muted">Move to profile:</label>
               <select class="wl-move-select" data-wl-id="${esc(item.id)}" style="width:auto;padding:4px 8px;font-size:12px;">
@@ -1173,6 +1173,7 @@ function renderAllStoresView() {
             ${s.cashback ? `<span class="badge badge-exceptional tabular">Up to ${s.cashback.percent}% CB</span>` : ''}
             ${s.localPresence ? '<span class="badge badge-local">📍 NC Local</span>' : ''}
           </div>
+          ${s.dealTiming ? `<div class="small" style="color:var(--text-secondary);line-height:1.45;">🕒 <strong>Best times:</strong> ${esc(s.dealTiming)}</div>` : ''}
           <div class="store-links">
             <a class="btn btn-sm btn-primary" href="${esc(s.blackFridayUrl || s.dealsUrl || s.url)}" target="_blank" rel="noopener noreferrer">${s.hasDedicatedBlackFridayUrl ? `Open ${esc(s.name)} Black Friday Deals ↗` : `Open ${esc(s.name)} Deals ↗`}</a>
             ${s.blackFridayUrl !== s.dealsUrl ? `<a class="btn btn-sm" href="${esc(s.dealsUrl)}" target="_blank" rel="noopener noreferrer">All Sales ↗</a>` : ''}
@@ -1689,13 +1690,26 @@ function bindEvents() {
 
     if (e.target.id === 'home-recheck-now') return runManualRefresh(e.target);
 
-    // Store Favorite Star Toggle
+    // Store Favorite Star Toggle — update instantly from local data; the
+    // server now answers with just the favorite ids (the old full-dashboard
+    // response took 10+ seconds, so taps looked dead and double-taps undid it).
     const favBtn = e.target.closest('[data-toggle-fav]');
     if (favBtn) {
+      const storeId = favBtn.dataset.toggleFav;
       try {
-        const out = await api('/api/black-friday/stores/favorite', { method: 'POST', body: { storeId: favBtn.dataset.toggleFav } });
-        hydrateData(out.dashboard);
-        toast(out.isFavorite ? 'Added store to your Home Page favorites bar!' : 'Removed from favorites.');
+        const out = await api('/api/black-friday/stores/favorite', { method: 'POST', body: { storeId } });
+        const favIds = new Set(out.favoriteStoreIds || []);
+        if (state.data) {
+          if (state.data.settings) state.data.settings.favoriteStores = [...favIds];
+          for (const s of state.data.storesDirectory || []) s.isFavorite = favIds.has(s.id);
+          state.data.favoriteStores = (state.data.storesDirectory || []).filter((s) => favIds.has(s.id));
+        }
+        document.querySelectorAll(`[data-toggle-fav="${storeId}"]`).forEach((b) => {
+          b.classList.toggle('is-fav', Boolean(out.isFavorite));
+          b.textContent = out.isFavorite ? '★' : '☆';
+        });
+        renderHomePage();
+        toast(out.isFavorite ? 'Added to your favorites — it is on the Home Page favorites bar now.' : 'Removed from favorites.');
       } catch (err) { toast(err.message); }
       return;
     }

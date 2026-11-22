@@ -169,7 +169,11 @@ export function registerBlackFridayRoutes(app, {
     else list.add(storeId);
     state.settings.favoriteStores = [...list];
     await store.persist();
-    res.json({ ok: true, isFavorite: list.has(storeId), dashboard: engine.buildDashboardPayload() });
+    // Light response on purpose: returning the full dashboard made the star
+    // tap take 10+ seconds on the phone, so it looked broken (and a second
+    // tap toggled it back). The client updates the star + favorites bar
+    // locally from favoriteStoreIds.
+    res.json({ ok: true, isFavorite: list.has(storeId), favoriteStoreIds: [...list] });
   });
 
   api.post('/stores/verify-links', async (_req, res) => {
