@@ -97,10 +97,6 @@ export function registerWeatherComparisonRoutes(app,{fetchImpl=globalThis.fetch,
   if(!point)throw Object.assign(Error('Choose an available forecast location.'),{status:404});
   return {source,point,explicitLocation:coords||q.explicit==='1'||Boolean(q.location)};
  };
- app.get(['/weather-fusion','/weather-fusion/'],async(_req,res,next)=>{
-  try{const html=await readFile(root+'index.html','utf8');res.set('Cache-Control','no-cache').type('html').send(html);
-  }catch(e){next(e);}
- });
  app.get(['/weathernext','/weathernext/'],async(req,res)=>{try{
   // Do not let a stale pre-repair WeatherNext dashboard survive a mobile
   // conditional GET. This is the first /weathernext route registered by server.js.

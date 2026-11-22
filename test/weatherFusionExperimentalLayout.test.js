@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {existsSync,readFileSync,statSync} from 'node:fs';
+import express from 'express';
+import {registerWeatherComparisonRoutes} from '../src/weatherComparison.js';
 import {registerWeatherFusionRoutes} from '../src/weatherFusion.js';
 
 const read = name => readFileSync(new URL(`../public/weather-fusion/${name}`,import.meta.url),'utf8');
@@ -27,24 +29,27 @@ test('main and experimental weather share five-day sun-based forecast windows',(
   assert.match(app,/resetForecastWindowBanners\(\)/);
 });
 
-test('main and old weather routes serve their respective app shells',()=>{
-  const routes = [];
-  registerWeatherFusionRoutes({get:(...args)=>routes.push(args)},{env:{},fetchImpl:async()=>{throw new Error('not called');}});
-  const serve = route => {
-    const [,handler] = routes.find(([paths]) => Array.isArray(paths) && paths.includes(route));
-    const headers = {};
-    let file;
-    handler({}, {setHeader:(name,value)=>{headers[name]=value;},sendFile:sent=>{file=sent;}});
-    assert.match(headers['Cache-Control'], /no-store/);
-    return readFileSync(file,'utf8');
+test('main and old weather routes serve their respective app shells',async t=>{
+  const app = express();
+  const options = {env:{},fetchImpl:async()=>{throw new Error('not called');}};
+  registerWeatherComparisonRoutes(app, options);
+  registerWeatherFusionRoutes(app, options);
+  const server = app.listen(0,'127.0.0.1');
+  await new Promise(resolve=>server.once('listening',resolve));
+  t.after(()=>{server.close();server.closeAllConnections();});
+  const serve = async route => {
+    const response = await fetch(`http://127.0.0.1:${server.address().port}${route}`);
+    assert.equal(response.status,200,route);
+    assert.match(response.headers.get('Cache-Control'),/no-store/);
+    return response.text();
   };
-  const main = serve('/weather-fusion/');
+  const main = await serve('/weather-fusion/');
   assert.match(main,/id="old-app-link"[^>]*href="\/weather-fusion\/old\/">Old App/);
   assert.match(main,/rel="manifest" href="\/weather-fusion\/manifest.webmanifest"/);
   assert.match(main,/href="\/weather-fusion\/apple-touch-icon.png\?v=ice-glass"/);
-  for (const alias of ['/weather-fusion','/weather-fusion/index.html','/weather-fusion/v3/']) assert.equal(serve(alias),main);
-  assert.match(serve('/weather-fusion/old/'),/id="main-app-link"[^>]*href="\/weather-fusion\/">Main App/);
-  for (const alias of ['/weather-fusion/experimental-weather.html','/weather-fusion/outlooks']) assert.equal(serve(alias),html);
+  for (const alias of ['/weather-fusion','/weather-fusion/index.html','/weather-fusion/v3/']) assert.equal(await serve(alias),main);
+  assert.match(await serve('/weather-fusion/old/'),/id="main-app-link"[^>]*href="\/weather-fusion\/">Main App/);
+  for (const alias of ['/weather-fusion/experimental-weather.html','/weather-fusion/outlooks']) assert.equal(await serve(alias),html);
   assert.match(html,/href="\/weather-fusion\/experimental-weather\.html" aria-label="Open Experimental Weather"/);
   const manifest=JSON.parse(read('manifest.webmanifest'));
   assert.equal(manifest.id,'/weather-fusion/');
