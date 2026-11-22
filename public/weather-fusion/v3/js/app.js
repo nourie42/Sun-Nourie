@@ -21,7 +21,7 @@ import {
   renderModelCompareChart,
   renderNext24HoursSplineChart,
   renderSevenDayDualSplineChart
-} from './charts.js?v=v3-all-14';
+} from './charts.js?v=v3-all-15';
 import {
   WeatherMapController
 } from './map.js?v=v3-all-13';
@@ -32,9 +32,9 @@ import { forecastWindowDetailHTML } from '../../forecast-window-banners.js?v=cur
 import {GlobePanel} from './globe-panel.js?v=tiled-v3';
 import {outlookItems,renderOutlookPanel,openOutlookNote} from '../../outlook-panel.js?v=compact-v1';
 import { todayForecastHTML } from '../../today-card.js?v=glass-today-v2';
-import { dayGraphHTML, installDayGraph } from '../../day-graph.js?v=hourly-rain-v3';
+import { dayGraphHTML, installDayGraph } from '../../day-graph.js?v=hourly-rain-v4';
 import { dewpointFeelLevel, renderDewpointMeter } from '../../dewpoint-meter.js?v=air-moisture-v1';
-import { TREND_METRICS, mainTrendSeries, trendReading } from '../../main-hourly-trend.js?v=beta-glass-48h-v1';
+import { TREND_METRICS, mainTrendSeries, trendReading } from '../../main-hourly-trend.js?v=beta-glass-48h-v2';
 import { mountChart, solarDays, nightBands, fmt as haloFmt, H as HALO_H } from '../../halo.js?v=shared-chart-v2';
 
 const LEGACY_LOC_KEY = 'weather-nourie-v3-location';
@@ -112,10 +112,12 @@ const state = {
   selectedMetricId: 'temp',
   selectedDayIdx: 0,
   sevenDayDetailExpanded: false,
+  sevenDayActiveCurve: null,
   explanationPeriod: 'all',
   compareExpanded: false,
   compareVariableId: 'highTemp',
   compareHorizonDays: 5,
+  highlightedCompareModelId: null,
   enabledCompareModels: new Set(['blend', 'nws', 'hrrr', 'nbm', 'ecmwf', 'gefs', 'weathernext']),
   accuracyCache: new Map(),
   dewPointRangeHours: 48,
@@ -379,24 +381,13 @@ function renderBetaTodayCard(f) {
 }
 
 function openMainDayDetailModal(f, dayIndex = 0) {
+  if (dayIndex === 0) {
+    state.selectedMetricId = 'temp';
+    open48hExplorerModal(f);
+    return;
+  }
   const d = f?.days?.[dayIndex] || f?.days?.[0];
-  if (f?.canonical?.days?.[dayIndex]) {
-    const graphHtml = dayGraphHTML(f.canonical, dayIndex, false, Date.now());
-    openModal(
-      `${d?.dayName || 'Today'} (${d?.dateLabel || ''}) · ${f.location.name}`,
-      `
-        <div class="d7-modal-summary" style="margin-bottom:10px;">
-          <div><strong>${escapeAttr(d?.condition || f.current.condition)}</strong> · High ${fmtTemp(d?.highF)} / Low ${fmtTemp(d?.lowF)}</div>
-          <div style="font-size:12.5px;color:var(--muted);margin-top:3px;">
-            Feels ${fmtTemp(d?.minFeelsF)}–${fmtTemp(d?.peakFeelsF)} · Rain ${d?.rainChance ?? 0}% (${(d?.totalQpfIn ?? 0).toFixed(2)}") · Wind up to ${d?.maxWindMph ?? 0} mph
-          </div>
-        </div>
-        <div id="beta-main-day-graph-host">${graphHtml}</div>
-      `
-    );
-    const host = document.getElementById('beta-main-day-graph-host');
-    if (host) installDayGraph(host, f.canonical, dayIndex, false, Date.now());
-  } else if (d) {
+  if (d) {
     openDayHourlyModal(d, f);
   }
 }
@@ -1161,6 +1152,7 @@ function renderSevenDayForecast(f) {
       containerEl: dualStage,
       days7,
       selectedDayIdx: isExpanded ? selIdx : null,
+      activeCurveId: state.sevenDayActiveCurve,
       useCelsius: state.useCelsius,
       renderIconFn: renderWeatherIconSvg,
       onSelectDay: (idx) => {
@@ -1173,6 +1165,14 @@ function renderSevenDayForecast(f) {
         renderSevenDayForecast(f);
         renderModelExplanationSection(f);
         renderCompareModelsSection(f);
+      },
+      onSelectCurve: (curveId, dayIdx) => {
+        state.sevenDayActiveCurve = curveId;
+        if (typeof dayIdx === 'number') {
+          state.selectedDayIdx = dayIdx;
+          state.sevenDayDetailExpanded = true;
+        }
+        renderSevenDayForecast(f);
       }
     });
   }
@@ -1189,6 +1189,29 @@ function renderSevenDayForecast(f) {
     const rainLine = d.totalSnowIn > 0
       ? `${d.rainChance}% · ${d.totalQpfIn.toFixed(2)}" · ❄ ${d.totalSnowIn}"`
       : `${d.rainChance}% · ${d.totalQpfIn.toFixed(2)}"`;
+    const wetHours = (d.hours || []).filter((h) => Number(h.precipIn || 0) >= 0.01);
+    const wetHoursBlock = wetHours.length
+      ? `
+      <div class="day-hourly-rain-breakdown" style="margin-top:10px;" aria-label="Rain hours for ${escapeAttr(d.dayName)}">
+        <div class="day-hourly-rain-head">
+          <strong>Rain Hours · ${escapeAttr(d.dayName)}</strong>
+          <span>Day total: ${d.totalQpfIn.toFixed(2)} in</span>
+        </div>
+        <div class="day-hourly-rain-grid">
+          ${wetHours
+            .map(
+              (h) => `
+            <div class="day-hour-rain-cell" title="${escapeAttr(h.rainLedger?.tooltip || '')}">
+              <span class="dhr-time">${escapeAttr(h.hourLabel)}</span>
+              <strong class="dhr-amt">${Number(h.precipIn).toFixed(2)}"</strong>
+              <small class="dhr-pop">💧 ${h.rainChance}%</small>
+            </div>
+          `
+            )
+            .join('')}
+        </div>
+      </div>`
+      : '';
     detailEl.innerHTML = `
       <div class="d7-detail-head">
         <div>
@@ -1229,25 +1252,7 @@ function renderSevenDayForecast(f) {
           <strong class="d7-stat-val">${formatHHMMTo12h(d.sunrise)} / ${formatHHMMTo12h(d.sunset)}</strong>
         </div>
       </div>
-      <div class="day-hourly-rain-breakdown" style="margin-top:10px;" aria-label="Hourly rain amounts for ${escapeAttr(d.dayName)}">
-        <div class="day-hourly-rain-head">
-          <strong>Hourly Rain Amounts · ${escapeAttr(d.dayName)}</strong>
-          <span>Day total: ${d.totalQpfIn.toFixed(2)} in</span>
-        </div>
-        <div class="day-hourly-rain-grid">
-          ${(d.hours || [])
-            .map(
-              (h) => `
-            <div class="day-hour-rain-cell" title="${escapeAttr(h.rainLedger?.tooltip || '')}">
-              <span class="dhr-time">${escapeAttr(h.hourLabel)}</span>
-              <strong class="dhr-amt">${Number(h.precipIn || 0).toFixed(2)}"</strong>
-              <small class="dhr-pop">💧 ${h.rainChance}%</small>
-            </div>
-          `
-            )
-            .join('')}
-        </div>
-      </div>
+      ${wetHoursBlock}
     `;
     document.getElementById('d7-hourly-btn')?.addEventListener('click', () => openDayHourlyModal(d, f));
     document.getElementById('d7-detail-close-btn')?.addEventListener('click', () => {
@@ -1940,9 +1945,16 @@ function openCompareDayModelsModal(dayIdx, f) {
     variableId: state.compareVariableId,
     enabledModels: state.enabledCompareModels,
     selectedDayIdx: state.selectedDayIdx,
+    highlightedModelId: state.highlightedCompareModelId,
     useCelsius: state.useCelsius,
     onSelectDay: (dIdx) => {
       state.selectedDayIdx = dIdx;
+      renderSevenDayForecast(f);
+      renderCompareModelsSection(f);
+    },
+    onSelectModel: (mId, dIdx) => {
+      if (typeof dIdx === 'number') state.selectedDayIdx = dIdx;
+      state.highlightedCompareModelId = state.highlightedCompareModelId === mId ? null : mId;
       renderSevenDayForecast(f);
       renderCompareModelsSection(f);
     }
@@ -1975,8 +1987,9 @@ function openCompareDayModelsModal(dayIdx, f) {
             : Math.abs(diff) < (variable.decimals ? 0.01 : 0.5)
             ? 'Matches'
             : `${diff > 0 ? '+' : ''}${variable.decimals ? diff.toFixed(variable.decimals) : Math.round(diff)}${variable.unit}`;
+        const isModelFocused = state.highlightedCompareModelId === m.id;
         return `
-          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 10px;border-radius:11px;background:${m.id === 'blend' ? 'rgba(56,189,248,0.18)' : 'rgba(255,255,255,0.07)'};border:1px solid ${m.id === 'blend' ? 'rgba(125,211,252,0.52)' : 'rgba(255,255,255,0.16)'};">
+          <button type="button" data-cmp-focus-model="${m.id}" style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 10px;border-radius:11px;background:${isModelFocused ? 'rgba(56,189,248,0.26)' : m.id === 'blend' ? 'rgba(56,189,248,0.18)' : 'rgba(255,255,255,0.07)'};border:1px solid ${isModelFocused ? m.color : m.id === 'blend' ? 'rgba(125,211,252,0.52)' : 'rgba(255,255,255,0.16)'};font-family:inherit;color:inherit;cursor:pointer;text-align:left;">
             <span style="display:inline-flex;align-items:center;gap:6px;min-width:0;">
               <i style="width:10px;height:3px;border-radius:2px;background:${m.color};display:inline-block;flex-shrink:0;"></i>
               <strong style="font-size:12.5px;color:${m.id === 'blend' ? '#ffffff' : m.color};white-space:nowrap;">${m.id === 'blend' ? 'Weather Nourie' : m.label}</strong>
@@ -1985,7 +1998,7 @@ function openCompareDayModelsModal(dayIdx, f) {
               <small style="font-size:11px;color:var(--muted);">${diffBadge}</small>
               <strong style="font-size:13.5px;color:#ffffff;font-variant-numeric:tabular-nums;">${fmtCmp(val)}</strong>
             </span>
-          </div>
+          </button>
         `;
       })
       .filter(Boolean)
@@ -2034,6 +2047,14 @@ function openCompareDayModelsModal(dayIdx, f) {
         </table>
       </div>
     `;
+
+    breakdownEl.querySelectorAll('[data-cmp-focus-model]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const mId = btn.dataset.cmpFocusModel;
+        state.highlightedCompareModelId = state.highlightedCompareModelId === mId ? null : mId;
+        renderCompareModelsSection(f);
+      });
+    });
 
     breakdownEl.querySelectorAll('[data-cmp-row]').forEach((row) => {
       row.addEventListener('click', () => {

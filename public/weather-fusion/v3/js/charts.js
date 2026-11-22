@@ -384,8 +384,10 @@ export function renderModelCompareChart({
   variableId = 'highTemp',
   enabledModels = new Set(['blend', 'nws', 'hrrr', 'nbm', 'ecmwf', 'gefs', 'weathernext']),
   selectedDayIdx = 0,
+  highlightedModelId = null,
   useCelsius = false,
-  onSelectDay
+  onSelectDay,
+  onSelectModel
 }) {
   if (!containerEl || !Array.isArray(days) || days.length === 0) return;
 
@@ -455,14 +457,17 @@ export function renderModelCompareChart({
     ...[...dayBounds].reverse().map((b) => `${b.x.toFixed(1)},${b.minY.toFixed(1)}`)
   ].join(' ');
 
-  // Individual models first, Weather Nourie Blend cleanly on top with crisp contrast halo
+  // Individual models first, Weather Nourie Blend and any user-clicked model cleanly on top
   const orderedModels = [
-    ...COMPARE_MODELS.filter((m) => m.id !== 'blend'),
-    ...COMPARE_MODELS.filter((m) => m.id === 'blend')
+    ...COMPARE_MODELS.filter((m) => m.id !== 'blend' && m.id !== highlightedModelId),
+    ...COMPARE_MODELS.filter((m) => m.id === 'blend' && m.id !== highlightedModelId),
+    ...COMPARE_MODELS.filter((m) => m.id === highlightedModelId)
   ];
 
   const selIdx = clamp(selectedDayIdx, 0, visibleDays.length - 1);
   const selX = xForDay(selIdx);
+  const selDay = visibleDays[selIdx] || visibleDays[0];
+  const fmtV = (v) => (v === null || v === undefined || Number.isNaN(v) ? '—' : `${variable.decimals ? Number(v).toFixed(variable.decimals) : Math.round(v)}${variable.unit}`);
 
   const modelPathsSvg = orderedModels.map((m) => {
     if (!enabledModels.has(m.id) && !m.alwaysOn) return '';
@@ -476,37 +481,46 @@ export function renderModelCompareChart({
     if (pts.length === 0) return '';
     const pathD = pts.length >= 2 ? buildSmoothSvgPath(pts, 0.22) : '';
     const isBlend = m.id === 'blend';
+    const isHighlighted = m.id === highlightedModelId;
+    const isProminent = isHighlighted || (!highlightedModelId && isBlend);
+    const strokeW = isHighlighted ? 3.5 : isBlend ? 3.0 : 2.1;
+    const strokeOp = isHighlighted ? '1' : highlightedModelId ? (isBlend ? '0.78' : '0.45') : (isBlend ? '1' : '0.92');
     return `
-      <g class="compare-model-series" data-model="${m.id}">
+      <g class="compare-model-series" data-model="${m.id}" style="cursor:pointer;">
         ${
-          pathD && isBlend
-            ? `<path d="${pathD}" fill="none" stroke="rgba(255, 255, 255, 0.22)" stroke-width="6" stroke-linecap="round"/>`
+          pathD
+            ? `<path d="${pathD}" fill="none" stroke="transparent" stroke-width="16" stroke-linecap="round"/>`
+            : ''
+        }
+        ${
+          pathD && isProminent
+            ? `<path d="${pathD}" fill="none" stroke="${m.color}" stroke-opacity="0.28" stroke-width="7" stroke-linecap="round"/>`
             : ''
         }
         ${
           pathD
-            ? `<path d="${pathD}" fill="none" stroke="${m.color}" stroke-width="${isBlend ? 3.1 : 2.1}" stroke-dasharray="${isBlend ? '' : (m.dash ? '4 3' : '')}" stroke-linecap="round" stroke-linejoin="round" opacity="${isBlend ? '1' : '0.92'}"/>`
+            ? `<path d="${pathD}" fill="none" stroke="${m.color}" stroke-width="${strokeW}" stroke-dasharray="${isBlend || isHighlighted ? '' : (m.dash ? '4 3' : '')}" stroke-linecap="round" stroke-linejoin="round" opacity="${strokeOp}"/>`
             : ''
         }
         ${pts
           .map((p, idx) => {
             const isSel = p.dayIdx === selIdx;
-            const showValue = isBlend && (isSel || visibleDays.length <= 5 || idx % 2 === 0);
+            const showValue = isProminent && (isSel || visibleDays.length <= 5 || idx % 2 === 0);
             const lblY = p.y - 12 < 14 ? p.y + 18 : p.y - 11;
             const lblX = clamp(p.x, padL + 12, W - 18);
-            const dotR = isBlend ? (isSel ? '4.5' : '3.0') : (isSel ? '3.6' : '2.3');
+            const dotR = isProminent ? (isSel ? '4.8' : '3.2') : (isSel ? '3.6' : '2.3');
             return `
-              <circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="${dotR}" fill="${m.color}" stroke="${isSel ? 'rgba(6,16,34,0.88)' : 'none'}" stroke-width="${isSel ? '1.3' : '0'}" opacity="${isBlend || isSel ? '1' : '0.9'}"/>
+              <circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="${dotR}" fill="${m.color}" stroke="${isSel ? 'rgba(6,16,34,0.9)' : 'none'}" stroke-width="${isSel ? '1.4' : '0'}" opacity="${isProminent || isSel ? '1' : strokeOp}"/>
               ${
                 showValue
                   ? isSel
                     ? `<g transform="translate(${lblX.toFixed(1)}, ${(lblY - 3).toFixed(1)})">
-                        <rect x="-20" y="-12" width="40" height="17" rx="6" fill="rgba(14, 165, 233, 0.92)" stroke="rgba(255, 255, 255, 0.65)" stroke-width="0.9"/>
-                        <text text-anchor="middle" y="0" fill="#ffffff" font-size="11.5" font-weight="700">${
+                        <rect x="-22" y="-12" width="44" height="17" rx="6" fill="rgba(8, 22, 44, 0.94)" stroke="${m.color}" stroke-width="1.2"/>
+                        <text text-anchor="middle" y="0" fill="#ffffff" font-size="11.5" font-weight="800">${
                           variable.decimals ? p.val.toFixed(variable.decimals) : Math.round(p.val)
                         }${variable.unit}</text>
                       </g>`
-                    : `<text x="${lblX.toFixed(1)}" y="${lblY.toFixed(1)}" text-anchor="middle" fill="#f8fbff" font-size="11.5" font-weight="700" style="paint-order:stroke;stroke:rgba(6,16,34,0.65);stroke-width:2.5px;">${
+                    : `<text x="${lblX.toFixed(1)}" y="${lblY.toFixed(1)}" text-anchor="middle" fill="#f8fbff" font-size="11.5" font-weight="700" style="paint-order:stroke;stroke:rgba(6,16,34,0.75);stroke-width:2.5px;">${
                         variable.decimals ? p.val.toFixed(variable.decimals) : Math.round(p.val)
                       }${variable.unit}</text>`
                   : ''
@@ -528,7 +542,30 @@ export function renderModelCompareChart({
     });
   }
 
+  const activeModelObj = COMPARE_MODELS.find((m) => m.id === (highlightedModelId || 'blend')) || COMPARE_MODELS[0];
+  const activeModelVal = getDayModelValue(selDay, activeModelObj.id);
+  const wnSelVal = getDayModelValue(selDay, 'blend');
+  const activeDiff =
+    activeModelObj.id !== 'blend' && typeof activeModelVal === 'number' && typeof wnSelVal === 'number'
+      ? activeModelVal - wnSelVal
+      : null;
+  const activeDiffText =
+    activeDiff === null
+      ? 'Consensus Blend'
+      : Math.abs(activeDiff) < (variable.decimals ? 0.01 : 0.5)
+      ? 'Matches Weather Nourie'
+      : `${activeDiff > 0 ? '+' : ''}${variable.decimals ? activeDiff.toFixed(variable.decimals) : Math.round(activeDiff)}${variable.unit} vs Weather Nourie (${fmtV(wnSelVal)})`;
+
   containerEl.innerHTML = `
+    <div class="compare-live-banner" style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;padding:7px 11px;margin-bottom:6px;border-radius:11px;background:rgba(12,26,48,0.45);border:1px solid ${activeModelObj.color};font-size:12.5px;">
+      <span style="display:inline-flex;align-items:center;gap:7px;">
+        <i style="width:12px;height:3.5px;border-radius:2px;background:${activeModelObj.color};display:inline-block;"></i>
+        <strong style="color:#ffffff;">${activeModelObj.id === 'blend' ? 'Weather Nourie' : activeModelObj.label}</strong>
+        <span style="color:#cfe2f6;">· ${selDay.shortWeekday} (${selDay.dateLabel}):</span>
+        <strong style="color:${activeModelObj.color};font-size:14px;">${fmtV(activeModelVal)}</strong>
+      </span>
+      <span style="font-size:11.5px;color:#9fd3ff;">${activeDiffText} · Tap any line or day</span>
+    </div>
     <svg class="compare-models-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" style="cursor:pointer;">
       ${yTicks
         .map(
@@ -563,12 +600,37 @@ export function renderModelCompareChart({
   `;
 
   const svg = containerEl.querySelector('svg');
-  if (svg && typeof onSelectDay === 'function') {
+  if (svg) {
     svg.addEventListener('pointerdown', (e) => {
       const rect = svg.getBoundingClientRect();
       const relX = ((e.clientX - rect.left) / Math.max(1, rect.width)) * W;
+      const relY = ((e.clientY - rect.top) / Math.max(1, rect.height)) * H;
       const ratio = clamp((relX - padL) / plotW, 0, 1);
-      onSelectDay(Math.round(ratio * (visibleDays.length - 1)));
+      const dayIdx = Math.round(ratio * (visibleDays.length - 1));
+      const d = visibleDays[dayIdx];
+
+      // Find which model curve is closest to the tap Y coordinate at this day
+      const seriesGroup = e.target?.closest?.('[data-model]');
+      let pickedModel = seriesGroup?.getAttribute('data-model') || null;
+      if (!pickedModel && d) {
+        let bestDist = 26;
+        COMPARE_MODELS.forEach((m) => {
+          if (!enabledModels.has(m.id) && !m.alwaysOn) return;
+          const v = getDayModelValue(d, m.id);
+          if (typeof v === 'number' && !Number.isNaN(v)) {
+            const dist = Math.abs(yForVal(v) - relY);
+            if (dist < bestDist) {
+              bestDist = dist;
+              pickedModel = m.id;
+            }
+          }
+        });
+      }
+      if (pickedModel && typeof onSelectModel === 'function') {
+        onSelectModel(pickedModel, dayIdx);
+      } else if (typeof onSelectDay === 'function') {
+        onSelectDay(dayIdx);
+      }
     });
   }
 }
@@ -925,9 +987,11 @@ export function renderSevenDayDualSplineChart({
   containerEl,
   days7,
   selectedDayIdx = null,
+  activeCurveId = null,
   useCelsius = false,
   renderIconFn,
-  onSelectDay
+  onSelectDay,
+  onSelectCurve
 }) {
   if (!containerEl || !Array.isArray(days7) || days7.length === 0) return;
 
@@ -989,15 +1053,36 @@ export function renderSevenDayDualSplineChart({
 
   const hasActive = typeof selectedDayIdx === 'number' && selectedDayIdx >= 0;
   const activeIdx = hasActive ? clamp(selectedDayIdx, 0, days.length - 1) : -1;
+  const readoutIdx = activeIdx >= 0 ? activeIdx : 0;
+  const rDay = days[readoutIdx] || days[0];
+  const dpFeeling = dewPoints[readoutIdx] < 50 ? 'Crisp & Dry' : dewPoints[readoutIdx] < 60 ? 'Comfortable' : dewPoints[readoutIdx] < 66 ? 'Humid' : 'Muggy';
+
+  const hiActive = !activeCurveId || activeCurveId === 'high';
+  const loActive = !activeCurveId || activeCurveId === 'low';
+  const dpActive = !activeCurveId || activeCurveId === 'dewPoint';
 
   containerEl.innerHTML = `
     <div class="d7-dual-shell">
-      <div class="d7-legend-row" style="display:flex;align-items:center;justify-content:flex-end;gap:12px;margin:2px 4px 4px;font-size:11.5px;color:rgba(225,238,252,0.88);flex-wrap:wrap;">
-        <span style="display:inline-flex;align-items:center;gap:5px;"><i style="width:12px;height:3px;border-radius:2px;background:#e39c74;display:inline-block;"></i>High</span>
-        <span style="display:inline-flex;align-items:center;gap:5px;"><i style="width:12px;height:3px;border-radius:2px;background:#7eb8e6;display:inline-block;"></i>Low</span>
-        <span style="display:inline-flex;align-items:center;gap:5px;"><i style="width:12px;height:3px;border-radius:2px;background:#5eead4;display:inline-block;"></i>Dew Point</span>
+      <div class="d7-legend-row" style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin:2px 2px 6px;font-size:11.5px;color:rgba(225,238,252,0.92);flex-wrap:wrap;">
+        <span id="d7-live-readout" style="font-size:12px;color:#e8f3ff;">
+          <strong>${rDay.shortWeekday} (${rDay.dateLabel}):</strong>
+          <span style="color:#eab38c;font-weight:700;">High ${highs[readoutIdx]}°</span> ·
+          <span style="color:#96c7ec;font-weight:700;">Low ${lows[readoutIdx]}°</span> ·
+          <span style="color:#5eead4;font-weight:700;">Dew Pt ${dewPoints[readoutIdx]}° (${dpFeeling})</span>
+        </span>
+        <span style="display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap;">
+          <button type="button" data-d7-curve="high" style="display:inline-flex;align-items:center;gap:5px;padding:3px 8px;border-radius:999px;border:1px solid ${activeCurveId === 'high' ? '#e39c74' : 'rgba(255,255,255,0.2)'};background:${activeCurveId === 'high' ? 'rgba(227,156,116,0.22)' : 'rgba(255,255,255,0.06)'};color:#ffffff;font:600 11px inherit;cursor:pointer;">
+            <i style="width:10px;height:3px;border-radius:2px;background:#e39c74;display:inline-block;"></i>High
+          </button>
+          <button type="button" data-d7-curve="low" style="display:inline-flex;align-items:center;gap:5px;padding:3px 8px;border-radius:999px;border:1px solid ${activeCurveId === 'low' ? '#7eb8e6' : 'rgba(255,255,255,0.2)'};background:${activeCurveId === 'low' ? 'rgba(126,184,230,0.22)' : 'rgba(255,255,255,0.06)'};color:#ffffff;font:600 11px inherit;cursor:pointer;">
+            <i style="width:10px;height:3px;border-radius:2px;background:#7eb8e6;display:inline-block;"></i>Low
+          </button>
+          <button type="button" data-d7-curve="dewPoint" style="display:inline-flex;align-items:center;gap:5px;padding:3px 8px;border-radius:999px;border:1px solid ${activeCurveId === 'dewPoint' ? '#5eead4' : 'rgba(255,255,255,0.2)'};background:${activeCurveId === 'dewPoint' ? 'rgba(94,234,212,0.22)' : 'rgba(255,255,255,0.06)'};color:#ffffff;font:600 11px inherit;cursor:pointer;">
+            <i style="width:10px;height:3px;border-radius:2px;background:#5eead4;display:inline-block;"></i>Dew Point
+          </button>
+        </span>
       </div>
-      <svg class="d7-dual-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="7-day high, low, and dew point temperature spline chart">
+      <svg class="d7-dual-svg" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" style="cursor:pointer;" role="img" aria-label="7-day high, low, and dew point temperature spline chart">
         <defs>
           <linearGradient id="d7-hi-stroke" x1="0%" y1="0%" x2="100%" y2="0%">
             <stop offset="0%" stop-color="#eab38c"/>
@@ -1032,16 +1117,19 @@ export function renderSevenDayDualSplineChart({
         ${hiPts
           .map(
             (hp, idx) => `
-          <line x1="${hp.x.toFixed(1)}" y1="${hp.y.toFixed(1)}" x2="${hp.x.toFixed(1)}" y2="${(padT + plotH).toFixed(1)}" stroke="${idx === activeIdx ? 'rgba(255,255,255,0.34)' : 'rgba(255,255,255,0.10)'}" stroke-width="${idx === activeIdx ? '1.3' : '1'}"/>
+          <line x1="${hp.x.toFixed(1)}" y1="${hp.y.toFixed(1)}" x2="${hp.x.toFixed(1)}" y2="${(padT + plotH).toFixed(1)}" stroke="${idx === activeIdx ? 'rgba(255,255,255,0.38)' : 'rgba(255,255,255,0.10)'}" stroke-width="${idx === activeIdx ? '1.5' : '1'}"/>
         `
           )
           .join('')}
 
         <polygon points="${bandPts}" fill="url(#d7-band-fill)"/>
         <path d="${loAreaPath}" fill="url(#d7-lo-fill)"/>
-        <path d="${hiPath}" fill="none" stroke="url(#d7-hi-stroke)" stroke-width="2.5" stroke-linecap="round"/>
-        <path d="${loPath}" fill="none" stroke="url(#d7-lo-stroke)" stroke-width="2.3" stroke-linecap="round"/>
-        <path d="${dpPath}" fill="none" stroke="#5eead4" stroke-width="2.0" stroke-dasharray="4 3" stroke-linecap="round"/>
+        ${activeCurveId === 'high' ? `<path d="${hiPath}" fill="none" stroke="#e39c74" stroke-opacity="0.32" stroke-width="7" stroke-linecap="round"/>` : ''}
+        <path d="${hiPath}" fill="none" stroke="url(#d7-hi-stroke)" stroke-width="${activeCurveId === 'high' ? '3.4' : '2.5'}" opacity="${hiActive ? '1' : '0.35'}" stroke-linecap="round"/>
+        ${activeCurveId === 'low' ? `<path d="${loPath}" fill="none" stroke="#7eb8e6" stroke-opacity="0.32" stroke-width="7" stroke-linecap="round"/>` : ''}
+        <path d="${loPath}" fill="none" stroke="url(#d7-lo-stroke)" stroke-width="${activeCurveId === 'low' ? '3.4' : '2.3'}" opacity="${loActive ? '1' : '0.35'}" stroke-linecap="round"/>
+        ${activeCurveId === 'dewPoint' ? `<path d="${dpPath}" fill="none" stroke="#5eead4" stroke-opacity="0.32" stroke-width="7" stroke-linecap="round"/>` : ''}
+        <path d="${dpPath}" fill="none" stroke="#5eead4" stroke-width="${activeCurveId === 'dewPoint' ? '3.2' : '2.1'}" stroke-dasharray="${activeCurveId === 'dewPoint' ? '' : '4 3'}" opacity="${dpActive ? '1' : '0.35'}" stroke-linecap="round"/>
 
         ${hiPts
           .map((hp, idx) => {
@@ -1057,12 +1145,12 @@ export function renderSevenDayDualSplineChart({
               : Math.max(hp.y + 13, Math.min(dp.y - 7, lp.y - 10));
             return `
               <g data-d7-idx="${idx}" style="cursor:pointer;">
-                <circle cx="${hp.x.toFixed(1)}" cy="${hp.y.toFixed(1)}" r="${isSel ? '4.0' : '3.0'}" fill="#ffffff" stroke="#e39c74" stroke-width="1.4"/>
-                <text x="${hp.x.toFixed(1)}" y="${Math.max(15, hp.y - 9).toFixed(1)}" text-anchor="middle" fill="#ffffff" font-size="12" font-weight="700">${hp.val}°</text>
-                <circle cx="${lp.x.toFixed(1)}" cy="${lp.y.toFixed(1)}" r="${isSel ? '3.8' : '2.8'}" fill="#ffffff" stroke="#7eb8e6" stroke-width="1.4"/>
-                <text x="${lp.x.toFixed(1)}" y="${loLblY.toFixed(1)}" text-anchor="middle" fill="#d0e5f8" font-size="11.5" font-weight="600">${lp.val}°</text>
-                <circle cx="${dp.x.toFixed(1)}" cy="${dp.y.toFixed(1)}" r="${isSel ? '3.4' : '2.4'}" fill="#0b2038" stroke="#5eead4" stroke-width="1.5"/>
-                <text x="${dp.x.toFixed(1)}" y="${dpLblY.toFixed(1)}" text-anchor="middle" fill="#7ef4df" font-size="10.5" font-weight="700">${dp.val}°</text>
+                <circle cx="${hp.x.toFixed(1)}" cy="${hp.y.toFixed(1)}" r="${isSel ? '4.2' : '3.0'}" fill="#ffffff" stroke="#e39c74" stroke-width="1.4" opacity="${hiActive ? '1' : '0.35'}"/>
+                <text x="${hp.x.toFixed(1)}" y="${Math.max(15, hp.y - 9).toFixed(1)}" text-anchor="middle" fill="#ffffff" font-size="12" font-weight="700" opacity="${hiActive ? '1' : '0.4'}">${hp.val}°</text>
+                <circle cx="${lp.x.toFixed(1)}" cy="${lp.y.toFixed(1)}" r="${isSel ? '4.0' : '2.8'}" fill="#ffffff" stroke="#7eb8e6" stroke-width="1.4" opacity="${loActive ? '1' : '0.35'}"/>
+                <text x="${lp.x.toFixed(1)}" y="${loLblY.toFixed(1)}" text-anchor="middle" fill="#d0e5f8" font-size="11.5" font-weight="600" opacity="${loActive ? '1' : '0.4'}">${lp.val}°</text>
+                <circle cx="${dp.x.toFixed(1)}" cy="${dp.y.toFixed(1)}" r="${isSel ? '3.8' : '2.5'}" fill="#0b2038" stroke="#5eead4" stroke-width="1.5" opacity="${dpActive ? '1' : '0.35'}"/>
+                <text x="${dp.x.toFixed(1)}" y="${dpLblY.toFixed(1)}" text-anchor="middle" fill="#7ef4df" font-size="10.5" font-weight="700" opacity="${dpActive ? '1' : '0.4'}">${dp.val}°</text>
               </g>
             `;
           })
@@ -1073,7 +1161,7 @@ export function renderSevenDayDualSplineChart({
         ${days
           .map(
             (d, idx) => `
-          <button type="button" class="d7-col-btn ${idx === activeIdx ? 'active' : ''}" data-d7-idx="${idx}" aria-expanded="${idx === activeIdx}">
+          <button type="button" class="d7-col-btn ${idx === activeIdx ? 'active' : ''}" data-d7-btn="${idx}" aria-expanded="${idx === activeIdx}">
             <span class="d7-col-icon">${typeof renderIconFn === 'function' ? renderIconFn(d.icon, 26) : ''}</span>
             <span class="d7-col-day">${d.shortWeekday}</span>
             <span class="d7-col-date">${d.dateLabel}</span>
@@ -1086,11 +1174,40 @@ export function renderSevenDayDualSplineChart({
     </div>
   `;
 
+  containerEl.querySelectorAll('[data-d7-curve]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const cId = btn.dataset.d7Curve;
+      if (typeof onSelectCurve === 'function') {
+        onSelectCurve(activeCurveId === cId ? null : cId);
+      }
+    });
+  });
+
   if (typeof onSelectDay === 'function') {
-    containerEl.querySelectorAll('[data-d7-idx]').forEach((el) => {
+    containerEl.querySelectorAll('[data-d7-btn]').forEach((el) => {
       el.addEventListener('click', () => {
-        onSelectDay(Number(el.dataset.d7Idx) || 0);
+        onSelectDay(Number(el.dataset.d7Btn) || 0);
       });
+    });
+    const svg = containerEl.querySelector('.d7-dual-svg');
+    svg?.addEventListener('pointerdown', (e) => {
+      const rect = svg.getBoundingClientRect();
+      const relX = ((e.clientX - rect.left) / Math.max(1, rect.width)) * W;
+      const relY = ((e.clientY - rect.top) / Math.max(1, rect.height)) * H;
+      const dayIdx = clamp(Math.floor((relX - padL) / colW), 0, days.length - 1);
+      const dHi = Math.abs(hiPts[dayIdx].y - relY);
+      const dLo = Math.abs(loPts[dayIdx].y - relY);
+      const dDp = Math.abs(dpPts[dayIdx].y - relY);
+      const minD = Math.min(dHi, dLo, dDp);
+      let curve = null;
+      if (minD < 26) {
+        curve = minD === dHi ? 'high' : minD === dLo ? 'low' : 'dewPoint';
+      }
+      if (curve && typeof onSelectCurve === 'function') {
+        onSelectCurve(curve, dayIdx);
+      } else {
+        onSelectDay(dayIdx);
+      }
     });
   }
 }

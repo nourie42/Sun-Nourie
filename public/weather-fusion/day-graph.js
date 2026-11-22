@@ -27,17 +27,16 @@ export function dayGraphPoints(f,index,tonight=false,now=Date.now()){
 }
 const fields=[['temperature','Temp','#ffcd79'],['feels','Feels','#ff9caf'],['dewpoint','Feel · dew point','#83e3cc'],['uv','UV','#c8adff'],['rainChance','Chance of rain','#73d8ff']];
 export function dayHourlyRainHTML(points=[],zone='America/New_York'){
- const withAmounts=points.filter(p=>finite(p.precipitation)||finite(p.rainChance));
- if(!withAmounts.length)return '';
+ const wetHours=points.filter(p=>finite(p.precipitation)&&p.precipitation>=0.01);
+ if(!wetHours.length)return '';
  const clock=time=>new Intl.DateTimeFormat('en-US',{timeZone:zone,hour:'numeric'}).format(new Date(time));
  const total=points.reduce((sum,p)=>sum+(finite(p.precipitation)?p.precipitation:0),0);
- const hasAnyPrecip=points.some(p=>finite(p.precipitation));
- const cells=points.map(p=>{
-  const amt=finite(p.precipitation)?`${p.precipitation.toFixed(2)}"`:'—';
+ const cells=wetHours.map(p=>{
+  const amt=`${p.precipitation.toFixed(2)}"`;
   const pop=finite(p.rainChance)&&!hideLowRainChance(p.rainChance)?`${Math.round(p.rainChance)}%`:'';
   return `<div class="day-hour-rain-cell" data-hour-rain="${esc(p.time)}"><span class="dhr-time">${esc(clock(p.time))}</span><strong class="dhr-amt">${amt}</strong>${pop?`<small class="dhr-pop">${pop}</small>`:''}</div>`;
  }).join('');
- return `<div class="day-hourly-rain-breakdown" aria-label="Hourly rain amounts for this day"><div class="day-hourly-rain-head"><strong>Hourly rain amounts</strong><span>${hasAnyPrecip?`Day total: ${total.toFixed(2)} in`:'Hourly amounts unavailable'}</span></div><div class="day-hourly-rain-grid">${cells}</div></div>`;
+ return `<div class="day-hourly-rain-breakdown" aria-label="Hourly rain amounts for this day"><div class="day-hourly-rain-head"><strong>Rain hours</strong><span>Day total: ${total.toFixed(2)} in</span></div><div class="day-hourly-rain-grid">${cells}</div></div>`;
 }
 export function dayGraphHTML(f,index,tonight=false,now=Date.now()){
  const points=dayGraphPoints(f,index,tonight,now),zone=f.location?.timeZone||'America/New_York';
