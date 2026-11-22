@@ -108,16 +108,25 @@ export async function cleanDealsWithAi(deals, { fetchImpl = fetch } = {}) {
     }
 
     const pending = [...wanted.values()].slice(0, MAX_TITLES_PER_SWEEP);
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     for (let i = 0; i < pending.length; i += BATCH_SIZE) {
       if (Date.now() - started > SWEEP_BUDGET_MS) break;
       const batch = pending.slice(i, i + BATCH_SIZE);
+      let results = null;
       try {
-        const results = await cleanBatch(batch, fetchImpl);
-        for (const [key, value] of results) cache.set(key, value);
+        results = await cleanBatch(batch, fetchImpl);
       } catch {
-        // One bad batch must not sink the sweep; remaining titles stay raw.
-        break;
+        // Rate limits bite when batches fire back to back (first live sweep
+        // cleaned exactly one batch, then stopped). Wait and retry once.
+        await sleep(4000);
+        try {
+          results = await cleanBatch(batch, fetchImpl);
+        } catch {
+          break; // Still failing: stop politely; the cache keeps progress.
+        }
       }
+      if (results) for (const [key, value] of results) cache.set(key, value);
+      await sleep(1200); // Pace requests under the key's per-minute limit.
     }
 
     for (const deal of deals) {
