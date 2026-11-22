@@ -39,48 +39,108 @@ export function roundMoney(val) {
   return Math.round((val + Number.EPSILON) * 100) / 100;
 }
 
+const AGGREGATOR_IDS = new Set([
+  'slickdeals', 'dealnews', 'bradsdeals', 'retailmenot', 'rakuten',
+  'camelcamelcamel', 'keepa', 'cashbackmonitor',
+]);
+
+function normalizeMerchantToken(str) {
+  return String(str || '')
+    .toLowerCase()
+    .replace(/\([^)]*\)/g, ' ')
+    .replace(/\b(?:official(?:\s+(?:us\s+)?(?:online\s+)?store)?|online|brand\s+store|us\s+store|usa\s+store|3rd[\s-]?party\s+seller)\b/g, ' ')
+    .replace(/\.(?:com|net|org)\b/g, ' ')
+    .replace(/['’.-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 export function detectRetailer({ vendorName = '', url = '', text = '' } = {}) {
   const combinedVendor = String(vendorName || '').toLowerCase().trim();
+  const normalizedVendor = normalizeMerchantToken(vendorName);
   const combinedUrl = String(url || '').toLowerCase();
   const combinedText = String(text || '').toLowerCase();
+  const nonAggStores = RETAILER_DIRECTORY.filter((r) => !AGGREGATOR_IDS.has(r.id));
 
-  // 1. Direct URL domain hint check (most reliable when direct retailer URL is present)
+  // 1. Direct URL domain hint check (skip deal-aggregator sites so slickdeals/dealnews URLs don't mask the real store)
   if (combinedUrl) {
-    for (const r of RETAILER_DIRECTORY) {
+    for (const r of nonAggStores) {
       if (r.domainHints?.some((d) => combinedUrl.includes(d))) {
         return { id: r.id, name: r.name, matchedBy: 'url_domain' };
       }
     }
+    // Check Slickdeals outbound &trd=Merchant parameter if present in URL or text
+    const trdMatch = `${combinedUrl} ${combinedText}`.match(/[?&]trd=([^&\s]+)/i);
+    if (trdMatch?.[1]) {
+      let trdDecoded = trdMatch[1];
+      try { trdDecoded = decodeURIComponent(trdDecoded).toLowerCase(); } catch {}
+      const normTrd = normalizeMerchantToken(trdDecoded);
+      for (const r of nonAggStores) {
+        const normStore = normalizeMerchantToken(r.name);
+        if (normTrd === normStore || normTrd === r.id || r.aliases?.some((a) => normalizeMerchantToken(a) === normTrd)) {
+          return { id: r.id, name: r.name, matchedBy: 'trd_param' };
+        }
+      }
+    }
   }
 
-  // 2. Explicit vendor name tag from RSS (e.g. TechBargains <vendorname>, DealNews merchant)
+  // 1b. Bracketed domain notation in feed copy ("Walmart [walmart.com] has...", "Target [target.com] offers...")
+  const bracketMatches = [...combinedText.matchAll(/\[([a-z0-9.-]+\.[a-z]{2,})\]/gi)];
+  for (const bm of bracketMatches) {
+    const dom = bm[1].toLowerCase().replace(/^www\./, '');
+    if (['slickdeals.net', 'dealnews.com', 'imgur.com', 'youtube.com'].some((ignore) => dom.includes(ignore))) continue;
+    for (const r of nonAggStores) {
+      if (r.domainHints?.some((d) => dom === d || dom.endsWith(`.${d}`) || d.includes(dom))) {
+        return { id: r.id, name: r.name, matchedBy: 'bracket_domain' };
+      }
+    }
+    const base = dom.split('.')[0].replace(/[^a-z0-9]+/g, ' ').trim();
+    if (base.length >= 2) {
+      const slug = dom.split('.')[0].replace(/[^a-z0-9]+/g, '-') || 'other';
+      const pretty = base.length <= 3 ? base.toUpperCase() : base.replace(/\b\w/g, (c) => c.toUpperCase());
+      return { id: slug, name: pretty, storeDomain: dom, matchedBy: 'bracket_domain_custom' };
+    }
+  }
+
+  // 2. Explicit vendor name tag from RSS or uploaded sheet ("Amazon (3rd-party seller)", "Walmart.com", "DICK'S Sporting Goods")
   if (combinedVendor) {
-    for (const r of RETAILER_DIRECTORY) {
+    for (const r of nonAggStores) {
+      const rNorm = normalizeMerchantToken(r.name);
       if (
         combinedVendor === r.name.toLowerCase() ||
         combinedVendor === r.id ||
-        r.aliases?.some((a) => combinedVendor === a || combinedVendor.includes(a))
+        normalizedVendor === rNorm ||
+        normalizedVendor === r.id ||
+        r.aliases?.some((a) => {
+          const aNorm = normalizeMerchantToken(a);
+          return (
+            combinedVendor === a ||
+            (aNorm.length >= 4 && (normalizedVendor === aNorm || normalizedVendor.startsWith(`${aNorm} `)))
+          );
+        })
       ) {
         return { id: r.id, name: r.name, matchedBy: 'vendor_tag' };
       }
     }
   }
 
-  // 3. Explicit text patterns ("Buy Now at Amazon", "at Target", "from Best Buy", "Walmart has")
+  // 3. Explicit text patterns ("Buy Now at Amazon", "at Target", "from Best Buy", "Walmart has...")
   const merchantPatterns = [
     /buy now at ([a-z0-9 '&.\-]{2,32})/i,
-    /\bat (amazon|walmart|target|best buy|costco|sam'?s club|home depot|lowe'?s|macy'?s|kohl'?s|newegg|ebay|nordstrom|nordstrom rack|sephora|ulta|nike|adidas|apple|samsung|dell|hp|lenovo|wayfair|chewy|lego|gamestop|rei|dick'?s sporting goods|academy sports|harbor freight|tractor supply|ace hardware|old navy|gap|jcpenney|belk|qvc|hsn|woot|b&h photo|bath & body works|lululemon)\b/i,
-    /\b(amazon|walmart|target|best buy|costco|sam'?s club|home depot|lowe'?s|macy'?s|kohl'?s|newegg|ebay|nordstrom|sephora|ulta|nike|adidas|apple|samsung|dell|hp|lenovo|wayfair|chewy|lego|gamestop|rei|harbor freight|tractor supply|ace hardware|old navy|gap|jcpenney|belk|woot)\s+(?:has|offers|is offering|black friday|sale|deals?)\b/i,
+    /\b(?:at|from|via)\s+(amazon|walmart|target|best buy|costco|sam'?s club|home depot|lowe'?s|macy'?s|kohl'?s|newegg|ebay|nordstrom rack|nordstrom|sephora|ulta beauty|ulta|nike|adidas|apple|samsung|dell|hp|lenovo|wayfair|chewy|lego|gamestop|rei|dick'?s sporting goods|academy sports|harbor freight|tractor supply|ace hardware|old navy|gap|jcpenney|belk|woot|b&h photo|bath & body works|lululemon)\b/i,
+    /\b(amazon|walmart|target|best buy|costco|sam'?s club|home depot|lowe'?s|macy'?s|kohl'?s|newegg|ebay|nordstrom rack|nordstrom|sephora|ulta|nike|adidas|apple|samsung|dell|hp|lenovo|wayfair|chewy|lego|gamestop|rei|harbor freight|tractor supply|ace hardware|old navy|gap|jcpenney|belk|woot)\s+(?:has|offers|is offering|black friday|cyber monday|sale|deals?|drops?)\b/i,
+    /^\s*(amazon|walmart|target|best buy|costco|sam'?s club|home depot|lowe'?s|macy'?s|kohl'?s|newegg|ebay|nordstrom rack|nordstrom|sephora|ulta|nike|adidas|apple|samsung|dell|hp|lenovo|wayfair|chewy|lego|gamestop|rei|harbor freight|tractor supply|ace hardware|old navy|gap|jcpenney|belk|woot)\b[:\s-]/i,
   ];
   for (const pat of merchantPatterns) {
     const m = combinedText.match(pat);
     if (m?.[1]) {
-      const candidate = m[1].toLowerCase().trim().replace(/\.$/, '');
-      for (const r of RETAILER_DIRECTORY) {
+      const candidate = normalizeMerchantToken(m[1]);
+      for (const r of nonAggStores) {
+        const rNorm = normalizeMerchantToken(r.name);
         if (
-          candidate === r.name.toLowerCase() ||
+          candidate === rNorm ||
           candidate === r.id ||
-          r.aliases?.some((a) => candidate.includes(a) || a.includes(candidate))
+          r.aliases?.some((a) => normalizeMerchantToken(a) === candidate)
         ) {
           return { id: r.id, name: r.name, matchedBy: 'text_pattern' };
         }
@@ -88,11 +148,12 @@ export function detectRetailer({ vendorName = '', url = '', text = '' } = {}) {
     }
   }
 
-  // 4. Fallback: clean explicit vendorName if provided even if not in top-60 directory
-  if (vendorName && vendorName.trim().length >= 2 && vendorName.trim().length <= 40) {
+  // 4. Fallback: clean explicit vendorName if provided (even for boutique stores like Sanrio, Good Smile US, Bambu Lab)
+  if (vendorName && vendorName.trim().length >= 2 && vendorName.trim().length <= 60) {
     const clean = vendorName.trim();
     const id = clean.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'other';
-    return { id, name: clean, matchedBy: 'vendor_other' };
+    const domainInVendor = clean.match(/([a-z0-9.-]+\.(?:com|net|org|co|io|us))/i)?.[1]?.toLowerCase() || null;
+    return { id, name: clean, storeDomain: domainInVendor, matchedBy: 'vendor_other' };
   }
 
   return { id: 'other', name: 'Online Retailer', matchedBy: 'unknown' };
@@ -1578,7 +1639,8 @@ export function buildPersonalizedRecommendations({
 
   // ---- TIER 2: Very Close Alternatives to Wish-List Items (genuinely different comparable products first!) ----
   const tier2Alternatives = [];
-  for (const item of sortedWish) {
+  for (const item of sortedWish.slice(0, 60)) {
+    if (tier2Alternatives.length >= 24) break;
     const alts = discoverAlternatives(item, eligibleDeals);
     // Prioritize genuinely different comparable products (better_similar_price, similar_lower_price) and never repeat exact Tier 1 items here
     const allBuckets = [
@@ -1587,6 +1649,7 @@ export function buildPersonalizedRecommendations({
       ...(alts.same_better_price || []).filter((a) => !tier1AllExactIds.has(a.dealId)),
     ];
     for (const alt of allBuckets) {
+      if (tier2Alternatives.length >= 24) break;
       if (usedIds.has(alt.dealId) || tier1AllExactIds.has(alt.dealId)) continue;
       const fullDeal = eligibleDeals.find((d) => d.id === alt.dealId);
       if (!fullDeal) continue;
@@ -1611,7 +1674,8 @@ export function buildPersonalizedRecommendations({
 
   // ---- TIER 3: Related / Complementary Products to Wish Lists ----
   const tier3Related = [];
-  for (const item of sortedWish) {
+  for (const item of sortedWish.slice(0, 60)) {
+    if (tier3Related.length >= 18) break;
     const itemTokens = new Set((item.identity?.tokens || tokenizeProduct(item.name)).filter((t) => t.length >= 3 && !GENERIC_SIMILARITY_STOP.has(t)));
     const itemBrand = (item.brand || item.identity?.brand || '').toLowerCase();
     const itemCat = item.category || item.identity?.category || 'other';

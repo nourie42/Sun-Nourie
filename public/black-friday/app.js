@@ -40,9 +40,24 @@ const appState = {
   data: null,
   activeView: 'command-center',
   homeStoreQuery: '',
+  homeSelectedStore: 'all',
+  homeDealsSearch: '',
+  homeDealsSort: 'score',
+  homeDeals25Plus: false,
+  homeDealsImgOnly: false,
+  homeDealsLimit: 18,
+  homeRecipient: 'all',
+  homeWlSearch: '',
+  homeWlStore: 'all',
+  homeWlFilter: 'all',
+  homeWlSort: 'discount',
+  homeWlLimit: 24,
   uploadType: 'wishlist', // 'wishlist' | 'deal'
   uploadMode: 'file',     // 'file' | 'bulk' | 'urls' | 'manual'
-  uploadPreview: null,    // { uploadType, uploadFileId, parseWarning, items: [...] }
+  uploadPreview: null,    // { uploadType, suggestedUploadType, uploadFileId, uploadFileIds, parseWarning, items: [...] }
+  previewPage: 0,
+  previewQuery: '',
+  previewPageSize: 50,
   selectedProfileId: 'all',
   wishlistStatusFilter: 'all',
   bfSubtab: 'all',
@@ -98,8 +113,20 @@ function toast(msg) {
   setTimeout(() => el.remove(), 4500);
 }
 
-function getStoreMeta(retailerId) {
-  return appState.data?.storesDirectory?.find((s) => s.id === retailerId) || null;
+function getStoreMeta(retailerId, fallbackDomain = null, fallbackName = null) {
+  const known = appState.data?.storesDirectory?.find((s) => s.id === retailerId);
+  if (known) return known;
+  if (fallbackDomain) {
+    return {
+      id: retailerId || 'store',
+      name: fallbackName || fallbackDomain,
+      domain: fallbackDomain,
+      logoUrl: `https://www.google.com/s2/favicons?domain=${encodeURIComponent(fallbackDomain)}&sz=128`,
+      monogram: (fallbackName || fallbackDomain).replace(/[^A-Za-z0-9]/g, '').slice(0, 2).toUpperCase() || 'ST',
+      accent: '#38bdf8',
+    };
+  }
+  return null;
 }
 
 function renderStoreAvatar(store, small = false) {
@@ -121,6 +148,25 @@ function attachLogoFallbacks(root = document) {
       if (!parent) return;
       parent.style.background = img.dataset.accent || '#38bdf8';
       parent.innerHTML = `<span class="store-logo-monogram">${esc(img.dataset.monogram || 'ST')}</span>`;
+    });
+  });
+}
+
+function attachImageFallbacks(root = document) {
+  attachLogoFallbacks(root);
+  root.querySelectorAll('.deal-media img').forEach((img) => {
+    if (img.dataset.boundImgFallback) return;
+    img.dataset.boundImgFallback = '1';
+    img.addEventListener('error', () => {
+      const media = img.parentElement;
+      if (!media) return;
+      img.remove();
+      if (!media.querySelector('.deal-media-fallback')) {
+        const fb = document.createElement('div');
+        fb.className = 'deal-media-fallback';
+        fb.textContent = img.dataset.fallbackIcon || '🛍️';
+        media.prepend(fb);
+      }
     });
   });
 }
@@ -198,13 +244,15 @@ function renderProductCardHtml(deal, recMeta = null) {
       ? 'At Typical Price'
       : (deal.verifiedDiscountPct !== null && deal.verifiedDiscountPct > 0 ? 'Near Typical' : 'Baseline Unknown'));
   const imgHtml = deal.imageUrl
-    ? `<img src="${esc(deal.imageUrl)}" alt="${esc(deal.title)}" loading="lazy" decoding="async" />`
+    ? `<img src="${esc(deal.imageUrl)}" alt="${esc(deal.title)}" loading="lazy" decoding="async" data-fallback-icon="${CAT_ICONS[deal.category] || '🛍️'}" />`
     : `<div class="deal-media-fallback" aria-hidden="true">${CAT_ICONS[deal.category] || '🛍️'}</div>`;
 
-  // Priority 6: Honest SHOP NOW label — never disguise a tracker page as a direct retailer product listing
+  // Priority 6: Honest SHOP NOW label — direct merchant links & merchant jump links vs aggregator thread
   const shopLabel = deal.isDirectProductUrl
     ? `SHOP NOW ↗`
-    : `VIEW DEAL (${esc(deal.sourceName?.split(' ')[0] || 'Deal')}) ↗`;
+    : deal.isMerchantJumpUrl
+      ? `SHOP AT ${esc((deal.retailerName || 'STORE').toUpperCase())} ↗`
+      : `VIEW DEAL (${esc(deal.sourceName?.split(' ')[0] || 'Deal')}) ↗`;
 
   const recExplanationHtml = recMeta
     ? `<div class="rec-why-grid">
@@ -277,12 +325,320 @@ function renderProductCardHtml(deal, recMeta = null) {
     </article>`;
 }
 
-/* ==================== 1. HOME PAGE (EXACT PRIORITY 5 ORDER: 1 -> 8) ==================== */
+function renderUploadedItemCardHtml(item) {
+  const isSavedDeal = item._kind === 'deal';
+  const store = getStoreMeta(item.retailerId, item.storeDomain, item.retailerName) || {
+    name: item.retailerName || 'Store',
+    monogram: (item.retailerName || 'ST').slice(0, 2).toUpperCase(),
+    accent: '#38bdf8',
+  };
+  const salePrice = isSavedDeal ? item.currentPrice : (item.bestOffer?.currentPrice ?? item.preferredPrice);
+  const regPrice = isSavedDeal ? item.originalRegularPrice : (item.originalPrice ?? item.bestOffer?.normalPrice ?? null);
+  const discPct = isSavedDeal ? item.verifiedDiscountPct : (item.discountPct ?? item.bestOffer?.verifiedDiscountPct ?? null);
+  const saveDollar = isSavedDeal
+    ? (item.savingsAmount ?? (regPrice != null && salePrice != null && regPrice > salePrice ? regPrice - salePrice : null))
+    : (item.savingsAmount ?? (regPrice != null && salePrice != null && regPrice > salePrice ? regPrice - salePrice : null));
+
+  const tierClass = discPct >= 40 ? 'tier-exceptional' : discPct >= 25 ? 'tier-great' : discPct >= 15 ? 'tier-good' : 'tier-watch';
+  const badgeClass = discPct >= 40 ? 'badge-exceptional' : discPct >= 25 ? 'badge-great' : discPct >= 15 ? 'badge-good' : 'badge-watch';
+
+  const thumb = item.imageUrl || item.screenshotThumbnail || item.bestOffer?.imageUrl || null;
+  const imgHtml = thumb
+    ? `<img src="${esc(thumb)}" alt="${esc(item.name)}" loading="lazy" decoding="async" data-fallback-icon="${CAT_ICONS[item.category] || '🎁'}" />`
+    : `<div class="deal-media-fallback" style="flex-direction:column;gap:8px;">${renderStoreAvatar(store, false)}<span class="small muted">${esc(item.retailerName || 'Saved Item')}</span></div>`;
+
+  const directUrl = item.url || item.sourceUrl || item.matchedLiveUrl || item.bestOffer?.retailerUrl || null;
+  const searchFallbackUrl = item.storeSearchUrl || item.storeHomeUrl || store.url || null;
+  const actionUrl = directUrl || searchFallbackUrl;
+  const actionLabel = directUrl ? 'SHOP NOW ↗' : `Search ${esc(item.retailerName || 'Store')} ↗`;
+
+  return `
+    <article class="deal-card ${tierClass} uploaded-deal-card">
+      <div class="deal-media">
+        ${imgHtml}
+        <div class="deal-media-top">
+          <span class="badge ${badgeClass} tabular">${discPct != null ? `${Number(discPct).toFixed(1).replace(/\.0$/, '')}% OFF` : (isSavedDeal ? 'Saved Deal' : 'Wish List')}</span>
+          ${item.evidence ? `<span class="badge ${item.evidence === 'Strong' ? 'badge-buy' : item.evidence === 'Medium' ? 'badge-great' : 'badge-watch'}">${esc(item.evidence)} Evid.</span>` : ''}
+        </div>
+      </div>
+
+      <div class="deal-body">
+        <div class="deal-meta-row">
+          <span style="display:inline-flex;align-items:center;gap:7px;min-width:0;">
+            ${renderStoreAvatar(store, true)}
+            <span class="retailer-tag" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(item.retailerName || 'Store')}</span>
+          </span>
+          <span style="display:inline-flex;gap:5px;flex-wrap:wrap;">
+            ${item.recipient ? `<span class="badge badge-local">${esc(item.recipient)}</span>` : ''}
+            ${item.tier ? `<span class="badge badge-watch">${esc(item.tier)}</span>` : ''}
+          </span>
+        </div>
+
+        <h3 class="deal-title" title="${esc(item.name)}">${esc(item.name)}</h3>
+
+        <div class="deal-price-box">
+          <span class="price-now tabular">${salePrice != null ? money(salePrice) : 'Price Needed'}</span>
+          <span class="tabular">
+            ${regPrice != null && (salePrice == null || regPrice > salePrice) ? `<span class="price-normal">${money(regPrice)}</span>` : ''}
+            ${saveDollar != null && saveDollar > 0 ? `<span class="badge badge-exceptional" style="margin-left:6px;">Save ${money(saveDollar)}</span>` : ''}
+          </span>
+          ${(item.checkedAtText || item.foundBy || item.regularPriceSource) ? `
+            <div class="price-breakdown">
+              ${item.regularPriceSource ? `<span>Src: <strong>${esc(item.regularPriceSource.slice(0, 32))}</strong></span>` : ''}
+              ${item.foundBy ? `<span>By: <strong>${esc(item.foundBy)}</strong></span>` : ''}
+              ${item.checkedAtText ? `<span>Checked: <strong>${esc(item.checkedAtText)}</strong></span>` : ''}
+            </div>` : ''}
+        </div>
+
+        ${item.notes ? `<div class="deal-why">${esc(item.notes.slice(0, 170))}${item.notes.length > 170 ? '…' : ''}</div>` : ''}
+
+        <div class="deal-actions">
+          ${actionUrl ? `<a class="btn btn-primary btn-sm" href="${esc(actionUrl)}" target="_blank" rel="noopener noreferrer">${actionLabel}</a>` : ''}
+          ${item.storeHomeUrl && directUrl ? `<a class="btn btn-sm" href="${esc(item.storeHomeUrl)}" target="_blank" rel="noopener noreferrer">Store ↗</a>` : ''}
+          ${!isSavedDeal ? `<button class="btn btn-sm" data-wl-search="${esc(item.id)}" type="button">🔍 Check Live</button>` : ''}
+        </div>
+      </div>
+    </article>`;
+}
+
+/* ==================== 1. HOME PAGE (EXACT 3-SECTION EXPERIENCE) ==================== */
 function renderHomePage() {
   const d = appState.data;
   if (!d) return;
 
-  // 1. SHOP ALL STORES horizontal logo strip
+  // ---- SECTION 1: MAIN STORES LIVE DEALS WITH STORE PICKER ----
+  const mainStats = d.mainStoreStats || [];
+  const allLiveWithPrice = (d.deals || []).filter((x) => x.currentPrice !== null);
+  const storePickerEl = $('home-store-picker');
+  if (storePickerEl) {
+    const pickerHtml = [
+      `<button class="store-pick-pill ${appState.homeSelectedStore === 'all' ? 'is-active' : ''}" data-pick-store="all" type="button">🛍️ All Main Stores <span class="store-pick-count tabular">${allLiveWithPrice.length}</span></button>`,
+      ...mainStats.map((st) => `
+        <button class="store-pick-pill ${appState.homeSelectedStore === st.id ? 'is-active' : ''}" data-pick-store="${esc(st.id)}" type="button">
+          ${renderStoreAvatar(st, true)}
+          <span>${esc(st.name)}</span>
+          <span class="store-pick-count tabular">${st.verifiedDealsCount}</span>
+        </button>`),
+    ].join('');
+    storePickerEl.innerHTML = pickerHtml;
+  }
+
+  let liveFiltered = [...allLiveWithPrice];
+  if (appState.homeSelectedStore !== 'all') {
+    liveFiltered = liveFiltered.filter((x) => x.retailerId === appState.homeSelectedStore);
+  }
+  if (appState.homeDealsSearch.trim()) {
+    const q = appState.homeDealsSearch.trim().toLowerCase();
+    liveFiltered = liveFiltered.filter((x) =>
+      `${x.title} ${x.brand || ''} ${x.modelNumber || ''} ${x.retailerName || ''}`.toLowerCase().includes(q)
+    );
+  }
+  if (appState.homeDeals25Plus) {
+    liveFiltered = liveFiltered.filter((x) => x.verifiedDiscountPct !== null && x.verifiedDiscountPct >= 25);
+  }
+  if (appState.homeDealsImgOnly) {
+    liveFiltered = liveFiltered.filter((x) => Boolean(x.imageUrl));
+  }
+
+  if (appState.homeDealsSort === 'discount') {
+    liveFiltered.sort((a, b) => (b.verifiedDiscountPct ?? -1) - (a.verifiedDiscountPct ?? -1) || (b.imageUrl ? 1 : 0) - (a.imageUrl ? 1 : 0));
+  } else if (appState.homeDealsSort === 'price_asc') {
+    liveFiltered.sort((a, b) => (a.currentPrice ?? 1e9) - (b.currentPrice ?? 1e9));
+  } else if (appState.homeDealsSort === 'newest') {
+    liveFiltered.sort((a, b) => Date.parse(b.publishedAt || b.verifiedAt || 0) - Date.parse(a.publishedAt || a.verifiedAt || 0));
+  } else {
+    // 'score': Put deals WITH product photos + direct links + real discounts first, spread across selected stores when 'all'
+    liveFiltered.sort((a, b) => {
+      const aVis = (a.imageUrl ? 18 : 0) + (a.isDirectProductUrl || a.isMerchantJumpUrl ? 12 : 0) + (a.decision?.score || 0);
+      const bVis = (b.imageUrl ? 18 : 0) + (b.isDirectProductUrl || b.isMerchantJumpUrl ? 12 : 0) + (b.decision?.score || 0);
+      return bVis - aVis;
+    });
+  }
+
+  // When 'all' is selected and no search, interleave top deals across stores (max 3 per store in top view) so all major companies are visible at a glance
+  let dealsToDisplay = liveFiltered;
+  if (appState.homeSelectedStore === 'all' && !appState.homeDealsSearch.trim() && appState.homeDealsSort === 'score') {
+    const interleaved = [];
+    const seenIds = new Set();
+    const byStore = new Map();
+    for (const deal of liveFiltered) {
+      const arr = byStore.get(deal.retailerId) || [];
+      arr.push(deal);
+      byStore.set(deal.retailerId, arr);
+    }
+    for (let round = 0; round < 4; round += 1) {
+      for (const [, arr] of byStore) {
+        if (arr[round] && !seenIds.has(arr[round].id)) {
+          seenIds.add(arr[round].id);
+          interleaved.push(arr[round]);
+        }
+      }
+    }
+    for (const deal of liveFiltered) {
+      if (!seenIds.has(deal.id)) interleaved.push(deal);
+    }
+    dealsToDisplay = interleaved;
+  }
+
+  const mainGrid = $('home-main-deals-grid');
+  const slicedDeals = dealsToDisplay.slice(0, appState.homeDealsLimit);
+  if (slicedDeals.length) {
+    mainGrid.innerHTML = slicedDeals.map((x) => renderProductCardHtml(x)).join('');
+  } else {
+    const pickedStore = mainStats.find((s) => s.id === appState.homeSelectedStore);
+    mainGrid.innerHTML = `
+      <div class="onboarding-box" style="grid-column:1/-1;">
+        <h3>No live deals currently matched ${pickedStore ? `from ${esc(pickedStore.name)}` : 'for these filters'}</h3>
+        <p>${pickedStore ? `Live feeds currently didn’t return an active post tagged to ${esc(pickedStore.name)}. You can open ${esc(pickedStore.name)} deals directly or clear the filter.` : 'Try clearing the search/filter or click Pull Latest Deals.'}</p>
+        <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;">
+          ${pickedStore ? `<a class="btn btn-primary btn-sm" href="${esc(pickedStore.dealsUrl)}" target="_blank" rel="noopener noreferrer">Open ${esc(pickedStore.name)} Deals ↗</a>` : ''}
+          <button class="btn btn-sm" data-pick-store="all" type="button">Show All Main Stores</button>
+        </div>
+      </div>`;
+  }
+  const moreFooter = $('home-main-deals-footer');
+  if (moreFooter) {
+    moreFooter.hidden = dealsToDisplay.length <= appState.homeDealsLimit;
+    if (!moreFooter.hidden && $('home-main-deals-more')) {
+      $('home-main-deals-more').textContent = `Show More Deals (${slicedDeals.length} of ${dealsToDisplay.length}) ↓`;
+    }
+  }
+
+  // ---- SECTION 2: WISH LISTS & UPLOADED DEALS BROWSER ----
+  const combinedUploaded = [
+    ...(d.savedDeals || []).map((sd) => ({ ...sd, _kind: 'deal' })),
+    ...(d.wishlist || []).map((wl) => ({ ...wl, _kind: 'wishlist' })),
+  ];
+
+  const recipientCounts = new Map();
+  for (const it of combinedUploaded) {
+    const r = (it.recipient || '').trim() || 'Family';
+    recipientCounts.set(r, (recipientCounts.get(r) || 0) + 1);
+  }
+  const recTabs = $('home-uploaded-recipient-tabs');
+  if (recTabs) {
+    if (!combinedUploaded.length) {
+      recTabs.innerHTML = '';
+    } else {
+      recTabs.innerHTML = [
+        `<button class="pill-tab ${appState.homeRecipient === 'all' ? 'is-active' : ''}" data-home-recip="all" type="button">All (${combinedUploaded.length})</button>`,
+        ...[...recipientCounts.entries()].sort((a, b) => b[1] - a[1]).map(([rec, cnt]) =>
+          `<button class="pill-tab ${appState.homeRecipient === rec ? 'is-active' : ''}" data-home-recip="${esc(rec)}" type="button">${esc(rec)} (${cnt})</button>`
+        ),
+      ].join('');
+    }
+  }
+
+  if ($('home-uploaded-controls')) $('home-uploaded-controls').hidden = combinedUploaded.length === 0;
+
+  // Populate store dropdown in Section 2
+  const wlStoreSel = $('home-wl-store');
+  if (wlStoreSel) {
+    const storeMap = new Map();
+    for (const it of combinedUploaded) {
+      const sName = (it.retailerName || '').trim();
+      if (sName) storeMap.set(sName, (storeMap.get(sName) || 0) + 1);
+    }
+    const prevVal = appState.homeWlStore;
+    wlStoreSel.innerHTML = `<option value="all">All Stores (${storeMap.size})</option>` +
+      [...storeMap.entries()].sort((a, b) => b[1] - a[1]).slice(0, 60).map(([sn, c]) => `<option value="${esc(sn)}">${esc(sn)} (${c})</option>`).join('');
+    if ([...wlStoreSel.options].some((o) => o.value === prevVal)) wlStoreSel.value = prevVal;
+  }
+
+  let upFiltered = [...combinedUploaded];
+  if (appState.homeRecipient !== 'all') {
+    upFiltered = upFiltered.filter((it) => ((it.recipient || '').trim() || 'Family') === appState.homeRecipient);
+  }
+  if (appState.homeWlStore !== 'all') {
+    upFiltered = upFiltered.filter((it) => (it.retailerName || '').trim() === appState.homeWlStore);
+  }
+  if (appState.homeWlSearch.trim()) {
+    const q = appState.homeWlSearch.trim().toLowerCase();
+    upFiltered = upFiltered.filter((it) => `${it.name} ${it.retailerName || ''} ${it.notes || ''} ${it.tier || ''}`.toLowerCase().includes(q));
+  }
+  if (appState.homeWlFilter === '25plus') {
+    upFiltered = upFiltered.filter((it) => (it.verifiedDiscountPct ?? it.discountPct ?? 0) >= 25);
+  } else if (appState.homeWlFilter === 'strong_medium') {
+    upFiltered = upFiltered.filter((it) => /^(strong|medium)$/i.test(it.evidence || ''));
+  } else if (appState.homeWlFilter === 'wishlist_only') {
+    upFiltered = upFiltered.filter((it) => it._kind === 'wishlist');
+  } else if (appState.homeWlFilter === 'deals_only') {
+    upFiltered = upFiltered.filter((it) => it._kind === 'deal');
+  }
+
+  const getDisc = (it) => Number(it.verifiedDiscountPct ?? it.discountPct ?? -1);
+  const getSave = (it) => Number(it.savingsAmount ?? -1);
+  const getPrice = (it) => Number(it.currentPrice ?? it.preferredPrice ?? 1e9);
+
+  if (appState.homeWlSort === 'discount') {
+    upFiltered.sort((a, b) => getDisc(b) - getDisc(a) || getSave(b) - getSave(a));
+  } else if (appState.homeWlSort === 'savings') {
+    upFiltered.sort((a, b) => getSave(b) - getSave(a));
+  } else if (appState.homeWlSort === 'price_asc') {
+    upFiltered.sort((a, b) => getPrice(a) - getPrice(b));
+  } else {
+    upFiltered.sort((a, b) => Date.parse(b.uploadedAt || b.createdAt || 0) - Date.parse(a.uploadedAt || a.createdAt || 0));
+  }
+
+  const upSummary = $('home-uploaded-summary');
+  const upGrid = $('home-uploaded-items-grid');
+  const upFooter = $('home-uploaded-footer');
+  if (!combinedUploaded.length) {
+    if (upSummary) upSummary.textContent = '';
+    if (upGrid) {
+      upGrid.innerHTML = `
+        <div class="onboarding-box" style="grid-column:1/-1;">
+          <h3>No Wish Lists or Uploaded Deals Yet</h3>
+          <p>Click <strong>+ ADD WISH LIST</strong> or <strong>+ UPLOAD DEALS</strong> above to upload your Excel (.xlsx/.xls), CSV, PDF, Word docs, screenshots, emails, or product links. All rows will appear right here cleanly organized by family member, store, discount %, and working shopping links.</p>
+        </div>`;
+    }
+    if (upFooter) upFooter.hidden = true;
+  } else {
+    const slicedUp = upFiltered.slice(0, appState.homeWlLimit);
+    if (upSummary) {
+      upSummary.textContent = `Showing ${slicedUp.length} of ${upFiltered.length} uploaded items (${combinedUploaded.length} total saved across family lists)`;
+    }
+    if (upGrid) {
+      upGrid.innerHTML = slicedUp.map((it) => renderUploadedItemCardHtml(it)).join('') ||
+        '<div class="small muted" style="grid-column:1/-1;">No uploaded items match your current filter.</div>';
+    }
+    if (upFooter) {
+      upFooter.hidden = upFiltered.length <= appState.homeWlLimit;
+      if (!upFooter.hidden && $('home-uploaded-more')) {
+        $('home-uploaded-more').textContent = `Show More Uploaded Items (${slicedUp.length} of ${upFiltered.length}) ↓`;
+      }
+    }
+  }
+
+  // Live Retailer Matches & Alternatives for Wish Lists (inside Section 2)
+  const p = d.personalized || { hasPreferences: false, tier1Exact: [], tier2Alternatives: [] };
+  const t1Host = $('home-tier1-wishlist');
+  if (t1Host) {
+    if (!combinedUploaded.length) {
+      t1Host.innerHTML = '';
+    } else if (p.tier1Exact.length) {
+      t1Host.innerHTML = `<div class="deals-grid">${p.tier1Exact.slice(0, 9).map((rec) => renderProductCardHtml(rec.deal, rec)).join('')}</div>`;
+    } else {
+      t1Host.innerHTML = `
+        <div class="small muted">
+          Monitoring ${esc(d.wishlist.length)} wish-list items + ${esc(d.savedDeals?.length || 0)} uploaded deals against live store feeds.
+          <button class="btn btn-sm" id="home-recheck-now" type="button" style="margin-left:8px;">↻ Run Live Check Now</button>
+        </div>`;
+    }
+  }
+
+  const t2Host = $('home-tier2-alternatives');
+  if (t2Host) {
+    if (p.tier2Alternatives?.length) {
+      t2Host.innerHTML = `
+        <div class="section-kicker" style="margin-bottom:8px;">Closer &amp; Better-Value Alternatives Found</div>
+        <div class="deals-grid">${p.tier2Alternatives.slice(0, 6).map((rec) => renderProductCardHtml(rec.deal, rec)).join('')}</div>`;
+    } else {
+      t2Host.innerHTML = '';
+    }
+  }
+
+  // ---- SECTION 3: SEPARATE SECTION — ALL STORES & MAIN BLACK FRIDAY DEALS ----
   const q = appState.homeStoreQuery.trim().toLowerCase();
   const storesToShow = q
     ? d.storesDirectory.filter((s) => s.name.toLowerCase().includes(q) || s.category.toLowerCase().includes(q))
@@ -293,66 +649,8 @@ function renderHomePage() {
       ${renderStoreAvatar(st, false)}
       <span class="store-tile-name">${esc(st.name)}</span>
       <span class="small muted" style="font-size:10px;">${st.verifiedDealsCount > 0 ? `${st.verifiedDealsCount} ${st.verifiedDealsCount === 1 ? 'deal' : 'deals'}` : 'Shop ↗'}</span>
-    </a>`).join('') || '<div class="small muted" style="padding:12px;">No favorite stores match that search — click VIEW ALL STORES to browse all 96 retailers.</div>';
+    </a>`).join('') || '<div class="small muted" style="padding:12px;">No favorite stores match that search — click Browse All 96 Stores above.</div>';
 
-  const p = d.personalized || { hasPreferences: false, tier1Exact: [], tier2Alternatives: [], tier3Related: [], tier4Discoveries: [] };
-
-  // 3. BEST DEALS ON OUR WISH LISTS (Tier 1)
-  const t1Host = $('home-tier1-wishlist');
-  if (!d.wishlist.length && !d.savedDeals?.length) {
-    t1Host.innerHTML = `
-      <div class="onboarding-box">
-        <h3>Upload Your Family Wish Lists to Unlock Personalized Deal Tracking</h3>
-        <p>We intentionally do <strong>not</strong> clutter your homepage with random unrelated deals. Upload an Excel sheet, CSV, PDF, Word doc, screenshot, pasted email, or product links — we’ll extract every product, let you review &amp; edit, and automatically find the best verified prices and closer alternatives.</p>
-        <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
-          <button class="btn btn-primary" data-open-upload="wishlist" type="button">+ Upload Wish List Now</button>
-          <button class="btn" data-goto="profiles" type="button">👨‍👩‍👧‍👦 Set Up Family Member Profiles</button>
-        </div>
-      </div>`;
-  } else if (p.tier1Exact.length) {
-    t1Host.innerHTML = `<div class="deals-grid">${p.tier1Exact.slice(0, 9).map((rec) => renderProductCardHtml(rec.deal, rec)).join('')}</div>`;
-  } else {
-    t1Host.innerHTML = `
-      <div class="onboarding-box">
-        <h3>Tracking ${esc(d.wishlist.length)} Wish-List Item${d.wishlist.length === 1 ? '' : 's'} — Monitoring for Exact Verified Deals</h3>
-        <p>No exact live feed matches dropped yet for your current items. Click below to run an immediate live check or add product URLs for direct verification.</p>
-        <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
-          <button class="btn btn-primary" data-goto="wishlists" type="button">View Our Wish Lists (${esc(d.wishlist.length)})</button>
-          <button class="btn" id="home-recheck-now" type="button">↻ Run Live Check Now</button>
-        </div>
-      </div>`;
-  }
-
-  // 4. BETTER ALTERNATIVES (Tier 2)
-  const t2Host = $('home-tier2-alternatives');
-  if (!p.hasPreferences) {
-    t2Host.innerHTML = `<div class="small muted">Once you upload wish-list items, genuinely comparable alternatives (same brand, better version at similar price, or comparable quality for less) will appear here automatically.</div>`;
-  } else if (p.tier2Alternatives.length) {
-    t2Host.innerHTML = `<div class="deals-grid">${p.tier2Alternatives.slice(0, 6).map((rec) => renderProductCardHtml(rec.deal, rec)).join('')}</div>`;
-  } else {
-    t2Host.innerHTML = `<div class="small muted">No closely matching alternatives found yet for your current wish-list items — automated sweeps re-check continuously.</div>`;
-  }
-
-  // 5. DEALS YOU MIGHT LOVE (Tier 3 Related + Tier 4 Profile-Matched)
-  const t34Host = $('home-tier34-love');
-  const combinedLove = [...(p.tier3Related || []), ...(p.tier4Discoveries || [])];
-  if (!p.hasPreferences) {
-    t34Host.innerHTML = `<div class="small muted">Add your family members' favorite brands, hobbies, clothing sizes, preferred stores, and gift budgets in <button class="btn btn-sm" data-goto="profiles" type="button" style="margin-left:6px;">Family Profiles</button> — every recommendation will explain exactly which family preference triggered it.</div>`;
-  } else if (combinedLove.length) {
-    t34Host.innerHTML = `<div class="deals-grid">${combinedLove.slice(0, 9).map((rec) => renderProductCardHtml(rec.deal, rec)).join('')}</div>`;
-  } else {
-    t34Host.innerHTML = `<div class="small muted">No additional Tier 3/4 deals currently match your configured wish lists or family profile interests. Add favorite brands or hobbies in Family Profiles, or tap <strong>LOVE IT</strong> on deals you like.</div>`;
-  }
-
-  // Move store-wide deals above family tracking: all retailer promotions first,
-  // then a distinct section for uploaded/tracked family products.
-  const storeSales = $('home-bf-store-sales')?.closest('section');
-  const trackedDeals = $('home-tier1-wishlist')?.closest('section');
-  if (storeSales && trackedDeals && storeSales.parentElement === trackedDeals.parentElement) {
-    trackedDeals.before(storeSales);
-  }
-
-  // 6. BLACK FRIDAY STORE SALES (Direct working retailer Black Friday / deals links)
   const bfHighlightIds = ['amazon', 'target', 'walmart', 'bestbuy', 'homedepot', 'lowes', 'macys', 'kohls', 'nike', 'sephora', 'ulta', 'lego'];
   const bfStores = bfHighlightIds.map((id) => d.storesDirectory.find((s) => s.id === id)).filter(Boolean);
   $('home-bf-store-sales').innerHTML = bfStores.map((s) => `
@@ -371,7 +669,6 @@ function renderHomePage() {
       </div>
     </div>`).join('');
 
-  // 7. LOCAL KNIGHTDALE / RALEIGH STORES
   $('home-local-stores').innerHTML = d.localStores.slice(0, 8).map((st) => {
     const storeMeta = getStoreMeta(st.retailerId);
     return `
@@ -391,7 +688,6 @@ function renderHomePage() {
       </div>`;
   }).join('');
 
-  // 8. DEAL MONITORING STATUS
   const m = d.kpis.monitoringStatus;
   const persist = d.persistence || {};
   $('home-monitoring-status').innerHTML = `
@@ -423,7 +719,7 @@ function renderHomePage() {
       </div>`).join('')}
     </div>`;
 
-  attachLogoFallbacks($('view-command-center'));
+  attachImageFallbacks($('view-command-center'));
 }
 
 /* ==================== 2. REAL UPLOAD CENTER (PRIORITY 2) ==================== */
@@ -442,11 +738,15 @@ function renderUploadCenter() {
     stage.innerHTML = `
       <form id="uc-file-form" class="intake-grid">
         <div class="field span-3">
-          <label for="uc-file-input">Choose File — Excel (.xlsx, .xls), CSV, TSV, PDF, Word (.docx/.doc), RTF, Text, HTML List, JSON, or Screenshot/Image (.png/.jpg/.webp)</label>
-          <input id="uc-file-input" type="file" accept=".xlsx,.xls,.csv,.tsv,.pdf,.docx,.doc,.rtf,.txt,.html,.htm,.json,image/*" required />
+          <div id="uc-dropzone" class="dropzone">
+            <label for="uc-file-input" style="display:block;cursor:pointer;font-weight:750;margin-bottom:6px;">
+              Drop or Choose One or Multiple Files — Excel (.xlsx, .xls), CSV, TSV, PDF, Word (.docx/.doc), RTF, Text, HTML, JSON, or Screenshots
+            </label>
+            <input id="uc-file-input" type="file" multiple accept=".xlsx,.xls,.csv,.tsv,.pdf,.docx,.doc,.rtf,.txt,.html,.htm,.json,image/*" required />
+          </div>
         </div>
-        <div class="field"><label for="uc-profile">Assign to Family Profile</label><select id="uc-profile">${profileOpts}</select></div>
-        <div class="field"><label for="uc-recipient">Recipient (optional)</label><input id="uc-recipient" type="text" placeholder="e.g. Mom, Kids" /></div>
+        <div class="field"><label for="uc-profile">Default Family Profile</label><select id="uc-profile">${profileOpts}</select></div>
+        <div class="field"><label for="uc-recipient">Recipient (if not in file)</label><input id="uc-recipient" type="text" placeholder="e.g. Mom, Kids" /></div>
         <div class="field"><label for="uc-priority">Monitoring Priority</label>
           <select id="uc-priority"><option value="high">High (15 min)</option><option value="standard" selected>Standard</option><option value="low">Low</option></select>
         </div>
@@ -508,6 +808,30 @@ function renderUploadCenter() {
   renderUploadedFilesVault();
 }
 
+function syncDomEditsIntoPreview() {
+  const prev = appState.uploadPreview;
+  if (!prev) return [];
+  const rows = [...document.querySelectorAll('#upload-preview-table-host tbody tr[data-pidx]')];
+  for (const tr of rows) {
+    const idx = Number(tr.dataset.pidx);
+    const base = prev.items[idx];
+    if (!base) continue;
+    base.selected = tr.querySelector('.pv-sel')?.checked ?? base.selected;
+    base.name = tr.querySelector('.pv-name')?.value?.trim() || base.name;
+    base.brand = tr.querySelector('.pv-brand')?.value?.trim() || '';
+    base.modelNumber = tr.querySelector('.pv-model')?.value?.trim() || '';
+    base.size = tr.querySelector('.pv-size')?.value?.trim() || '';
+    base.color = tr.querySelector('.pv-color')?.value?.trim() || '';
+    const pRaw = tr.querySelector('.pv-price')?.value;
+    base.price = pRaw ? Number(pRaw) : null;
+    base.retailerName = tr.querySelector('.pv-retailer')?.value?.trim() || '';
+    base.url = tr.querySelector('.pv-url')?.value?.trim() || '';
+    base.recipient = tr.querySelector('.pv-recip')?.value?.trim() || base.recipient || '';
+    base.profileId = tr.querySelector('.pv-profile')?.value || base.profileId || 'family-main';
+  }
+  return prev.items;
+}
+
 function renderUploadPreviewPanel() {
   const panel = $('upload-preview-panel');
   const prev = appState.uploadPreview;
@@ -517,8 +841,9 @@ function renderUploadPreviewPanel() {
   }
   panel.hidden = false;
   const isDeal = prev.uploadType === 'deal';
-  $('upload-preview-kicker').textContent = `${isDeal ? 'SAVING AS DISCOVERED DEALS' : 'SAVING TO MONITORED WISH LISTS'} · ${prev.items.length} Extracted · ${prev.duplicatesCount || 0} Duplicates · ${prev.needsReviewCount || 0} Flagged for Review`;
-  $('upload-preview-title').textContent = `Preview & Correct Before Saving${prev.filename ? ` (${prev.filename})` : ''}`;
+  const selectedTotal = prev.items.filter((i) => i.selected && (i.name || i.url)).length;
+  $('upload-preview-kicker').textContent = `${isDeal ? 'SAVING AS UPLOADED DEALS' : 'SAVING AS WISH LIST ITEMS'} · ${prev.items.length} Unique Extracted${prev.intraFileDuplicatesRemoved ? ` (${prev.intraFileDuplicatesRemoved} intra-file duplicates merged)` : ''} · ${selectedTotal} Selected · ${prev.duplicatesCount || 0} Already Saved`;
+  $('upload-preview-title').textContent = `Preview & Approve Before Saving${prev.filename ? ` (${prev.filename})` : ''}`;
 
   const warn = $('upload-preview-warning');
   if (prev.parseWarning) {
@@ -528,6 +853,38 @@ function renderUploadPreviewPanel() {
     warn.hidden = true;
   }
 
+  const pq = appState.previewQuery.trim().toLowerCase();
+  const filteredIndices = [];
+  for (let i = 0; i < prev.items.length; i += 1) {
+    const it = prev.items[i];
+    if (!pq || `${it.name} ${it.retailerName} ${it.recipient} ${it.notes}`.toLowerCase().includes(pq)) {
+      filteredIndices.push(i);
+    }
+  }
+  const pageSize = appState.previewPageSize || 50;
+  const totalPages = Math.max(1, Math.ceil(filteredIndices.length / pageSize));
+  if (appState.previewPage >= totalPages) appState.previewPage = totalPages - 1;
+  const start = appState.previewPage * pageSize;
+  const pageIndices = filteredIndices.slice(start, start + pageSize);
+
+  const toolbarEl = $('upload-preview-toolbar');
+  if (toolbarEl) {
+    toolbarEl.innerHTML = `
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <input id="pv-search-input" type="search" value="${esc(appState.previewQuery)}" placeholder="Filter preview rows…" style="width:210px;" />
+        <button class="btn btn-sm" id="pv-select-all-btn" type="button">✓ Select All (${prev.items.length})</button>
+        <button class="btn btn-sm" id="pv-deselect-all-btn" type="button">Clear Selection</button>
+        <button class="btn btn-sm ${prev.suggestedUploadType === 'deal' && !isDeal ? 'btn-gold' : ''}" id="pv-switch-type-btn" type="button">
+          ${isDeal ? 'Save as Wish List Instead' : '🏷️ Save as Discovered Deals Instead'}
+        </button>
+      </div>
+      <div style="display:flex;gap:6px;align-items:center;" class="small tabular">
+        <button class="btn btn-sm" id="pv-prev-page" type="button" ${appState.previewPage <= 0 ? 'disabled' : ''}>← Prev</button>
+        <span>Page ${appState.previewPage + 1} / ${totalPages} (${filteredIndices.length} rows)</span>
+        <button class="btn btn-sm" id="pv-next-page" type="button" ${appState.previewPage >= totalPages - 1 ? 'disabled' : ''}>Next →</button>
+      </div>`;
+  }
+
   const profileOpts = (appState.data?.profiles || []).map((p) => ({ id: p.id, label: `${p.icon || '👤'} ${p.name}` }));
   $('upload-preview-table-host').innerHTML = `
     <table class="data-table preview-table">
@@ -535,32 +892,47 @@ function renderUploadPreviewPanel() {
         <tr>
           <th>Keep</th>
           <th>Product Name</th>
-          <th>Brand / Model</th>
-          <th>Size / Color</th>
-          <th>${isDeal ? 'Deal $' : 'Target $'}</th>
-          <th>Retailer</th>
+          <th>Recipient / Tier</th>
+          <th>Sale $ / Reg $</th>
+          <th>Discount</th>
+          <th>Store</th>
           <th>Product URL</th>
           <th>Profile</th>
           <th>Status</th>
         </tr>
       </thead>
-      <tbody>${prev.items.map((it, idx) => `
+      <tbody>${pageIndices.map((idx) => {
+        const it = prev.items[idx];
+        return `
         <tr class="${it.needsReview ? 'preview-row-warn' : ''} ${it.isDuplicate ? 'preview-row-dup' : ''}" data-pidx="${idx}">
           <td><input type="checkbox" class="pv-sel" ${it.selected ? 'checked' : ''} style="width:auto;" /></td>
-          <td><input type="text" class="pv-name" value="${esc(it.name)}" style="min-width:190px;" /></td>
           <td>
-            <input type="text" class="pv-brand" value="${esc(it.brand || '')}" placeholder="Brand" style="margin-bottom:4px;min-width:100px;" />
-            <input type="text" class="pv-model" value="${esc(it.modelNumber || '')}" placeholder="Model" style="min-width:100px;" />
+            <input type="text" class="pv-name" value="${esc(it.name)}" style="min-width:210px;margin-bottom:4px;" />
+            <div style="display:flex;gap:4px;">
+              <input type="text" class="pv-brand" value="${esc(it.brand || '')}" placeholder="Brand" style="min-width:85px;" />
+              <input type="text" class="pv-model" value="${esc(it.modelNumber || '')}" placeholder="Model" style="min-width:85px;" />
+              <input type="text" class="pv-size" value="${esc(it.size || '')}" placeholder="Size" style="min-width:55px;" />
+              <input type="text" class="pv-color" value="${esc(it.color || '')}" placeholder="Color" style="min-width:55px;" />
+            </div>
           </td>
           <td>
-            <input type="text" class="pv-size" value="${esc(it.size || '')}" placeholder="Size" style="margin-bottom:4px;min-width:80px;" />
-            <input type="text" class="pv-color" value="${esc(it.color || '')}" placeholder="Color" style="min-width:80px;" />
+            <input type="text" class="pv-recip" value="${esc(it.recipient || '')}" placeholder="For whom" style="min-width:95px;margin-bottom:4px;" />
+            <div class="small muted">${esc(it.tier || '')}</div>
           </td>
-          <td><input type="number" step="0.01" class="pv-price" value="${it.price ?? ''}" placeholder="$" style="width:88px;" /></td>
-          <td><input type="text" class="pv-retailer" value="${esc(it.retailerName || '')}" placeholder="Store" style="min-width:105px;" /></td>
-          <td><input type="text" class="pv-url" value="${esc(it.url || '')}" placeholder="https://..." style="min-width:150px;" /></td>
+          <td class="tabular">
+            <input type="number" step="0.01" class="pv-price" value="${it.price ?? ''}" placeholder="Sale $" style="width:88px;" />
+            ${it.originalPrice != null ? `<div class="small muted">Reg ${money(it.originalPrice)}</div>` : ''}
+          </td>
+          <td class="small tabular">
+            ${it.discountPct != null ? `<span class="badge badge-exceptional">${it.discountPct}% OFF</span>` : '<span class="muted">—</span>'}
+            ${it.evidence ? `<div class="muted">${esc(it.evidence)}</div>` : ''}
+          </td>
+          <td><input type="text" class="pv-retailer" value="${esc(it.retailerName || '')}" placeholder="Store" style="min-width:115px;" /></td>
           <td>
-            <select class="pv-profile" style="min-width:125px;">
+            <input type="text" class="pv-url" value="${esc(it.url || '')}" placeholder="${it.storeSearchUrl ? 'Optional link (Store search ready)' : 'https://...'}" style="min-width:155px;" />
+          </td>
+          <td>
+            <select class="pv-profile" style="min-width:120px;">
               ${profileOpts.map((po) => `<option value="${esc(po.id)}" ${it.profileId === po.id ? 'selected' : ''}>${esc(po.label)}</option>`).join('')}
             </select>
           </td>
@@ -568,31 +940,14 @@ function renderUploadPreviewPanel() {
             ${it.isDuplicate ? `<span class="badge badge-danger" title="${esc(it.duplicateReason || '')}">Duplicate</span>` : ''}
             ${it.needsReview ? `<span class="badge badge-good" title="${esc(it.reviewReason || '')}">Check</span><div class="muted" style="font-size:10.5px;">${esc(it.reviewReason || '')}</div>` : (!it.isDuplicate ? '<span class="badge badge-exceptional">Ready</span>' : '')}
           </td>
-        </tr>`).join('')}
+        </tr>`;
+      }).join('')}
       </tbody>
     </table>`;
 }
 
 function collectPreviewItemsFromDom() {
-  const prev = appState.uploadPreview;
-  if (!prev) return [];
-  const rows = [...document.querySelectorAll('#upload-preview-table-host tbody tr[data-pidx]')];
-  return rows.map((tr) => {
-    const base = prev.items[Number(tr.dataset.pidx)] || {};
-    return {
-      ...base,
-      selected: tr.querySelector('.pv-sel')?.checked ?? true,
-      name: tr.querySelector('.pv-name')?.value?.trim() || base.name,
-      brand: tr.querySelector('.pv-brand')?.value?.trim() || '',
-      modelNumber: tr.querySelector('.pv-model')?.value?.trim() || '',
-      size: tr.querySelector('.pv-size')?.value?.trim() || '',
-      color: tr.querySelector('.pv-color')?.value?.trim() || '',
-      price: tr.querySelector('.pv-price')?.value ? Number(tr.querySelector('.pv-price').value) : null,
-      retailerName: tr.querySelector('.pv-retailer')?.value?.trim() || '',
-      url: tr.querySelector('.pv-url')?.value?.trim() || '',
-      profileId: tr.querySelector('.pv-profile')?.value || base.profileId || 'family-main',
-    };
-  });
+  return syncDomEditsIntoPreview();
 }
 
 function renderUploadedFilesVault() {
@@ -1241,6 +1596,20 @@ function bindEvents() {
     renderHomePage();
   });
 
+  // Home Section 1: Store Picker & Live Deals filters
+  $('home-deals-search')?.addEventListener('input', (e) => { appState.homeDealsSearch = e.target.value; appState.homeDealsLimit = 18; renderHomePage(); });
+  $('home-deals-sort')?.addEventListener('change', (e) => { appState.homeDealsSort = e.target.value; renderHomePage(); });
+  $('home-deals-25plus')?.addEventListener('change', (e) => { appState.homeDeals25Plus = e.target.checked; appState.homeDealsLimit = 18; renderHomePage(); });
+  $('home-deals-img-only')?.addEventListener('change', (e) => { appState.homeDealsImgOnly = e.target.checked; appState.homeDealsLimit = 18; renderHomePage(); });
+  $('home-main-deals-more')?.addEventListener('click', () => { appState.homeDealsLimit += 24; renderHomePage(); });
+
+  // Home Section 2: Uploaded Wish Lists & Deals filters
+  $('home-wl-search')?.addEventListener('input', (e) => { appState.homeWlSearch = e.target.value; appState.homeWlLimit = 24; renderHomePage(); });
+  $('home-wl-store')?.addEventListener('change', (e) => { appState.homeWlStore = e.target.value; appState.homeWlLimit = 24; renderHomePage(); });
+  $('home-wl-filter')?.addEventListener('change', (e) => { appState.homeWlFilter = e.target.value; appState.homeWlLimit = 24; renderHomePage(); });
+  $('home-wl-sort')?.addEventListener('change', (e) => { appState.homeWlSort = e.target.value; renderHomePage(); });
+  $('home-uploaded-more')?.addEventListener('click', () => { appState.homeWlLimit += 36; renderHomePage(); });
+
   $('theme-toggle-btn').addEventListener('click', () => {
     applyTheme(document.documentElement.dataset.theme === 'light' ? 'dark' : 'light', true);
   });
@@ -1256,6 +1625,7 @@ function bindEvents() {
     finally { if (btn) btn.disabled = false; }
   };
   $('refresh-now-btn').addEventListener('click', (e) => runManualRefresh(e.currentTarget));
+  $('home-recheck-live-btn')?.addEventListener('click', (e) => runManualRefresh(e.currentTarget));
   $('diag-refresh-btn').addEventListener('click', (e) => runManualRefresh(e.currentTarget));
 
   $('deal-modal-close').addEventListener('click', () => { $('deal-modal').hidden = true; });
@@ -1265,6 +1635,54 @@ function bindEvents() {
   document.addEventListener('click', async (e) => {
     const gotoBtn = e.target.closest('[data-goto]');
     if (gotoBtn) return switchView(gotoBtn.dataset.goto);
+
+    const pickStore = e.target.closest('[data-pick-store]');
+    if (pickStore) {
+      appState.homeSelectedStore = pickStore.dataset.pickStore;
+      appState.homeDealsLimit = 18;
+      renderHomePage();
+      return;
+    }
+
+    const homeRecip = e.target.closest('[data-home-recip]');
+    if (homeRecip) {
+      appState.homeRecipient = homeRecip.dataset.homeRecip;
+      appState.homeWlLimit = 24;
+      renderHomePage();
+      return;
+    }
+
+    if (e.target.id === 'pv-select-all-btn' && appState.uploadPreview) {
+      syncDomEditsIntoPreview();
+      appState.uploadPreview.items.forEach((it) => { it.selected = true; });
+      renderUploadPreviewPanel();
+      return;
+    }
+    if (e.target.id === 'pv-deselect-all-btn' && appState.uploadPreview) {
+      syncDomEditsIntoPreview();
+      appState.uploadPreview.items.forEach((it) => { it.selected = false; });
+      renderUploadPreviewPanel();
+      return;
+    }
+    if (e.target.id === 'pv-switch-type-btn' && appState.uploadPreview) {
+      syncDomEditsIntoPreview();
+      appState.uploadPreview.uploadType = appState.uploadPreview.uploadType === 'deal' ? 'wishlist' : 'deal';
+      appState.uploadType = appState.uploadPreview.uploadType;
+      renderUploadCenter();
+      return;
+    }
+    if (e.target.id === 'pv-prev-page' && appState.previewPage > 0) {
+      syncDomEditsIntoPreview();
+      appState.previewPage -= 1;
+      renderUploadPreviewPanel();
+      return;
+    }
+    if (e.target.id === 'pv-next-page') {
+      syncDomEditsIntoPreview();
+      appState.previewPage += 1;
+      renderUploadPreviewPanel();
+      return;
+    }
 
     const openUp = e.target.closest('[data-open-upload]');
     if (openUp) return openUploadCenter(openUp.dataset.openUpload, 'file');
@@ -1409,7 +1827,7 @@ function bindEvents() {
     const approved = collectPreviewItemsFromDom().filter((i) => i.selected && (i.name || i.url));
     if (!approved.length) return toast('Check at least one valid product row to save.');
     btn.disabled = true;
-    toast(`Saving ${approved.length} approved item(s) & searching deals…`);
+    toast(`Saving ${approved.length} approved item(s)…`);
     try {
       const out = await api('/api/black-friday/uploads/commit', {
         method: 'POST',
@@ -1419,12 +1837,50 @@ function bindEvents() {
           items: approved,
         },
       });
+      const committedType = appState.uploadPreview.uploadType;
       appState.uploadPreview = null;
+      appState.previewPage = 0;
+      appState.previewQuery = '';
+      appState.homeRecipient = 'all';
+      appState.homeWlLimit = 24;
       hydrateData(out.dashboard);
       toast(`Saved ${out.addedCount} item(s)${out.immediateMatches ? ` · Found ${out.immediateMatches} live deal match(es)!` : ''}`);
-      switchView(out.uploadType === 'deal' ? 'wishlists' : 'command-center');
+      switchView('command-center');
+      $('home-wishlist-hub-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     } catch (err) { toast(err.message); }
     finally { btn.disabled = false; }
+  });
+
+  // Preview search filter & drag-and-drop
+  document.addEventListener('input', (e) => {
+    if (e.target.id === 'pv-search-input' && appState.uploadPreview) {
+      syncDomEditsIntoPreview();
+      appState.previewQuery = e.target.value;
+      appState.previewPage = 0;
+      renderUploadPreviewPanel();
+    }
+  });
+  document.addEventListener('dragover', (e) => {
+    if (e.target.closest('#uc-dropzone')) {
+      e.preventDefault();
+      e.target.closest('#uc-dropzone').classList.add('is-dragover');
+    }
+  });
+  document.addEventListener('dragleave', (e) => {
+    if (e.target.closest('#uc-dropzone')) {
+      e.target.closest('#uc-dropzone').classList.remove('is-dragover');
+    }
+  });
+  document.addEventListener('drop', (e) => {
+    const dz = e.target.closest('#uc-dropzone');
+    if (!dz) return;
+    e.preventDefault();
+    dz.classList.remove('is-dragover');
+    const inp = $('uc-file-input');
+    if (inp && e.dataTransfer?.files?.length) {
+      inp.files = e.dataTransfer.files;
+      inp.dispatchEvent(new Event('change', { bubbles: true }));
+    }
   });
 
   // Delegated changes (status, move profile, file image preview)
@@ -1455,23 +1911,55 @@ function bindEvents() {
     const form = e.target;
     if (form.id === 'uc-file-form') {
       e.preventDefault();
-      const file = $('uc-file-input')?.files?.[0];
-      if (!file) return;
-      toast(`Reading ${file.name}…`);
+      const files = [...($('uc-file-input')?.files || [])];
+      if (!files.length) return;
+      toast(`Reading ${files.length} file${files.length > 1 ? 's' : ''} (${files[0].name}${files.length > 1 ? ` + ${files.length - 1} more` : ''})…`);
       try {
-        const b64 = await fileToBase64(file);
-        const prev = await api('/api/black-friday/uploads/preview', {
-          method: 'POST',
-          body: {
-            uploadType: appState.uploadType, mode: 'file', filename: file.name, mimeType: file.type,
-            contentBase64: b64, extractedOcrText: $('uc-ocr-text')?.value?.trim() || '',
-            profileId: $('uc-profile').value, recipient: $('uc-recipient').value.trim(), priority: $('uc-priority').value,
-          },
-        });
-        appState.uploadPreview = prev;
-        if (appState.data && Array.isArray(prev.uploadedFiles)) appState.data.uploadedFiles = prev.uploadedFiles;
+        const mergedItems = [];
+        const warnings = [];
+        let lastFileId = null;
+        let totalIntraDup = 0;
+        let dealSugCount = 0;
+        let lastUploadedFiles = null;
+
+        for (const file of files) {
+          const b64 = await fileToBase64(file);
+          const prev = await api('/api/black-friday/uploads/preview', {
+            method: 'POST',
+            body: {
+              uploadType: appState.uploadType, mode: 'file', filename: file.name, mimeType: file.type,
+              contentBase64: b64, extractedOcrText: $('uc-ocr-text')?.value?.trim() || '',
+              profileId: $('uc-profile').value, recipient: $('uc-recipient').value.trim(), priority: $('uc-priority').value,
+            },
+          });
+          lastFileId = prev.uploadFileId || lastFileId;
+          if (Array.isArray(prev.uploadedFiles)) lastUploadedFiles = prev.uploadedFiles;
+          if (prev.parseWarning) warnings.push(`${file.name}: ${prev.parseWarning}`);
+          if (prev.suggestedUploadType === 'deal') dealSugCount += 1;
+          totalIntraDup += prev.intraFileDuplicatesRemoved || 0;
+          for (const it of prev.items || []) {
+            mergedItems.push({ ...it, uploadFileId: prev.uploadFileId });
+          }
+        }
+
+        const effectiveType = appState.uploadType;
+        appState.previewPage = 0;
+        appState.previewQuery = '';
+        appState.uploadPreview = {
+          uploadType: effectiveType,
+          suggestedUploadType: dealSugCount > 0 ? 'deal' : effectiveType,
+          uploadFileId: lastFileId,
+          filename: files.map((f) => f.name).join(', '),
+          parseWarning: warnings.join(' · ') || null,
+          intraFileDuplicatesRemoved: totalIntraDup,
+          extractedCount: mergedItems.length,
+          duplicatesCount: mergedItems.filter((i) => i.isDuplicate).length,
+          needsReviewCount: mergedItems.filter((i) => i.needsReview).length,
+          items: mergedItems,
+        };
+        if (appState.data && Array.isArray(lastUploadedFiles)) appState.data.uploadedFiles = lastUploadedFiles;
         renderUploadCenter();
-        toast(`Extracted ${prev.extractedCount} product(s) — review & click Save Approved Items.`);
+        toast(`Extracted ${mergedItems.length} unique item(s)${totalIntraDup ? ` (${totalIntraDup} duplicates merged)` : ''} — review & click Save Approved Items.`);
       } catch (err) { toast(err.message); }
     } else if (form.id === 'uc-bulk-form') {
       e.preventDefault();
@@ -1483,6 +1971,8 @@ function bindEvents() {
             contentText: $('uc-bulk-text').value, profileId: $('uc-bulk-profile').value, recipient: $('uc-bulk-recipient').value.trim(),
           },
         });
+        appState.previewPage = 0;
+        appState.previewQuery = '';
         appState.uploadPreview = prev;
         if (appState.data && Array.isArray(prev.uploadedFiles)) appState.data.uploadedFiles = prev.uploadedFiles;
         renderUploadCenter();
@@ -1499,6 +1989,8 @@ function bindEvents() {
             urlsText: $('uc-urls-text').value, profileId: $('uc-urls-profile').value, recipient: $('uc-urls-recipient').value.trim(),
           },
         });
+        appState.previewPage = 0;
+        appState.previewQuery = '';
         appState.uploadPreview = prev;
         if (appState.data && Array.isArray(prev.uploadedFiles)) appState.data.uploadedFiles = prev.uploadedFiles;
         renderUploadCenter();
@@ -1506,6 +1998,8 @@ function bindEvents() {
       } catch (err) { toast(err.message); }
     } else if (form.id === 'uc-manual-form') {
       e.preventDefault();
+      appState.previewPage = 0;
+      appState.previewQuery = '';
       appState.uploadPreview = {
         uploadType: appState.uploadType,
         uploadFileId: null,

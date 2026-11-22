@@ -19,6 +19,7 @@ import {
   detectRetailer,
   roundMoney,
 } from './intelligence.js';
+import { RETAILER_BY_ID, buildStoreSearchUrl } from './constants.js';
 import { inspectRetailerUrl } from './adapters.js';
 
 function cleanCell(val) {
@@ -96,10 +97,33 @@ function colLettersToIndex(letters) {
   return Math.max(0, idx - 1);
 }
 
+const GENERIC_LINK_LABELS = new Set(['', 'open', 'link', 'buy', 'view', 'shop', 'here', 'click', 'url', 'product', 'deal', 'open link', 'buy now', 'go']);
+
+function decodeXmlEntities(s) {
+  return String(s || '')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'");
+}
+
+function parseRelsXml(relsXml) {
+  const map = new Map();
+  if (!relsXml) return map;
+  for (const m of relsXml.matchAll(/<Relationship\b([^>]+)\/?>/gi)) {
+    const attrs = m[1] || '';
+    const id = attrs.match(/\bId="([^"]+)"/i)?.[1];
+    const target = attrs.match(/\bTarget="([^"]+)"/i)?.[1];
+    if (id && target) map.set(id, decodeXmlEntities(target));
+  }
+  return map;
+}
+
 /**
- * Zero-dependency XLSX spreadsheet reader (preserves exact sparse cell columns & sharedStrings).
+ * Multi-sheet XLSX reader preserving sparse columns, sharedStrings, <hyperlinks> + .rels URLs, and =HYPERLINK() formulas.
  */
-export function parseXlsxBuffer(buffer) {
+export function parseXlsxSheets(buffer) {
   if (!Buffer.isBuffer(buffer) || buffer.length < 30) return [];
   const entries = new Map();
 
@@ -128,7 +152,12 @@ export function parseXlsxBuffer(buffer) {
     const name = buffer.subarray(pos + 46, pos + 46 + nameLen).toString('utf8');
     pos += 46 + nameLen + extraLen + commentLen;
 
-    if (name === 'xl/sharedStrings.xml' || /^xl\/worksheets\/sheet\d+\.xml$/i.test(name)) {
+    if (
+      name === 'xl/sharedStrings.xml' ||
+      name === 'xl/workbook.xml' ||
+      name === 'xl/_rels/workbook.xml.rels' ||
+      /^xl\/worksheets\/(?:_rels\/)?sheet\d+\.xml(?:\.rels)?$/i.test(name)
+    ) {
       if (localHeaderOffset + 30 > buffer.length) continue;
       const lNameLen = buffer.readUInt16LE(localHeaderOffset + 26);
       const lExtraLen = buffer.readUInt16LE(localHeaderOffset + 28);
@@ -141,54 +170,104 @@ export function parseXlsxBuffer(buffer) {
     }
   }
 
-  const sheetKey = [...entries.keys()].find((k) => /sheet1\.xml$/i.test(k)) || [...entries.keys()].find((k) => /sheet\d+\.xml$/i.test(k));
-  const sheetXml = sheetKey ? entries.get(sheetKey) : null;
-  if (!sheetXml) return [];
-
   const sharedStrings = [];
   const ssXml = entries.get('xl/sharedStrings.xml');
   if (ssXml) {
     for (const si of ssXml.matchAll(/<si[^>]*>([\s\S]*?)<\/si>/gi)) {
       const parts = [...si[1].matchAll(/<t[^>]*>([\s\S]*?)<\/t>/gi)].map((m) => m[1]);
-      sharedStrings.push(
-        parts.join('')
-          .replace(/&amp;/g, '&')
-          .replace(/&lt;/g, '<')
-          .replace(/&gt;/g, '>')
-          .replace(/&quot;/g, '"')
-          .replace(/&apos;/g, "'")
-      );
+      sharedStrings.push(decodeXmlEntities(parts.join('')));
     }
   }
 
-  const rows = [];
-  for (const rowMatch of sheetXml.matchAll(/<row\b[^>]*>([\s\S]*?)<\/row>/gi)) {
-    const cells = [];
-    let fallbackCol = 0;
-    for (const cMatch of rowMatch[1].matchAll(/<c\b([^>]*)(?:\/>|>([\s\S]*?)<\/c>)/gi)) {
-      const attrs = cMatch[1] || '';
-      const inner = cMatch[2] || '';
-      const refMatch = attrs.match(/\br="([A-Z]+)\d+"/i);
-      const colIdx = refMatch ? colLettersToIndex(refMatch[1]) : fallbackCol;
-      fallbackCol = colIdx + 1;
+  const sheetKeys = [...entries.keys()]
+    .filter((k) => /^xl\/worksheets\/sheet\d+\.xml$/i.test(k))
+    .sort((a, b) => {
+      const na = Number(a.match(/sheet(\d+)\.xml/i)?.[1] || 0);
+      const nb = Number(b.match(/sheet(\d+)\.xml/i)?.[1] || 0);
+      return na - nb;
+    });
 
-      const typeMatch = attrs.match(/\bt="([^"]+)"/);
-      const cellType = typeMatch ? typeMatch[1] : '';
-      let val = '';
-      if (cellType === 'inlineStr') {
-        val = [...inner.matchAll(/<t[^>]*>([\s\S]*?)<\/t>/gi)].map((t) => t[1]).join('');
-      } else {
-        const vMatch = inner.match(/<v>([\s\S]*?)<\/v>/i);
-        if (vMatch) {
-          val = cellType === 's' ? (sharedStrings[Number(vMatch[1])] || '') : vMatch[1];
-        }
+  const sheets = [];
+  for (const sheetKey of sheetKeys) {
+    const sheetXml = entries.get(sheetKey);
+    if (!sheetXml) continue;
+
+    const baseFile = sheetKey.split('/').pop();
+    const relsMap = parseRelsXml(entries.get(`xl/worksheets/_rels/${baseFile}.rels`));
+    const hyperlinkMap = new Map();
+    for (const hm of sheetXml.matchAll(/<hyperlink\b([^>]+)\/?>/gi)) {
+      const attrs = hm[1] || '';
+      const ref = attrs.match(/\bref="([A-Z]+\d+)"/i)?.[1]?.toUpperCase();
+      const rid = attrs.match(/\br:id="([^"]+)"/i)?.[1];
+      const target = rid ? relsMap.get(rid) : null;
+      if (ref && target && /^https?:\/\//i.test(target)) {
+        hyperlinkMap.set(ref, target);
       }
-      while (cells.length <= colIdx) cells.push('');
-      cells[colIdx] = val.replace(/&amp;/g, '&').trim();
     }
-    if (cells.some((c) => c.length > 0)) rows.push(cells);
+
+    const rows = [];
+    for (const rowMatch of sheetXml.matchAll(/<row\b[^>]*>([\s\S]*?)<\/row>/gi)) {
+      const cells = [];
+      const rowHyperlinks = [];
+      let fallbackCol = 0;
+      for (const cMatch of rowMatch[1].matchAll(/<c\b([^>]*)(?:\/>|>([\s\S]*?)<\/c>)/gi)) {
+        const attrs = cMatch[1] || '';
+        const inner = cMatch[2] || '';
+        const refMatch = attrs.match(/\br="([A-Z]+\d+)"/i);
+        const cellRef = refMatch ? refMatch[1].toUpperCase() : null;
+        const colLetters = cellRef ? cellRef.replace(/\d+$/, '') : null;
+        const colIdx = colLetters ? colLettersToIndex(colLetters) : fallbackCol;
+        fallbackCol = colIdx + 1;
+
+        const typeMatch = attrs.match(/\bt="([^"]+)"/);
+        const cellType = typeMatch ? typeMatch[1] : '';
+        let val = '';
+        if (cellType === 'inlineStr') {
+          val = decodeXmlEntities([...inner.matchAll(/<t[^>]*>([\s\S]*?)<\/t>/gi)].map((t) => t[1]).join(''));
+        } else {
+          const vMatch = inner.match(/<v>([\s\S]*?)<\/v>/i);
+          if (vMatch) {
+            val = cellType === 's' ? (sharedStrings[Number(vMatch[1])] || '') : decodeXmlEntities(vMatch[1]);
+          }
+        }
+
+        // Extract =HYPERLINK("https://...", "Label") formula or worksheet <hyperlink> relationship
+        let linkUrl = cellRef ? hyperlinkMap.get(cellRef) || null : null;
+        const fMatch = inner.match(/<f\b[^>]*>([\s\S]*?)<\/f>/i);
+        if (fMatch) {
+          const hlFormula = decodeXmlEntities(fMatch[1]).match(/HYPERLINK\s*\(\s*"(https?:\/\/[^"]+)"/i);
+          if (hlFormula?.[1]) linkUrl = hlFormula[1];
+        }
+
+        const cleanVal = String(val || '').trim();
+        let finalCell = cleanVal;
+        if (linkUrl) {
+          if (GENERIC_LINK_LABELS.has(cleanVal.toLowerCase())) {
+            finalCell = linkUrl;
+          } else {
+            rowHyperlinks.push(linkUrl);
+          }
+        }
+
+        while (cells.length <= colIdx) cells.push('');
+        cells[colIdx] = finalCell;
+      }
+      // Attach any extra hyperlinks (e.g. from clickable product-title cells) so URL is never lost
+      for (const extraUrl of rowHyperlinks) {
+        if (!cells.includes(extraUrl)) cells.push(extraUrl);
+      }
+      if (cells.some((c) => c.length > 0)) rows.push(cells);
+    }
+
+    if (rows.length) sheets.push({ name: baseFile, rows });
   }
-  return rows;
+
+  return sheets;
+}
+
+export function parseXlsxBuffer(buffer) {
+  const sheets = parseXlsxSheets(buffer);
+  return sheets[0]?.rows || [];
 }
 
 /**
@@ -301,55 +380,196 @@ export function extractTextFromPdfBuffer(buffer) {
   return { text, urls: [...urls] };
 }
 
+const KNOWN_HEADER_RE = /^(?:rank|#|recipient|for|person|member|tier|level|item|product|product\s*name|item\s*name|name|title|store|retailer|merchant|site|vendor|shop|link|url|website|product\s*url|sale\s*price|deal\s*price|current\s*price|target\s*price|preferred\s*price|price|regular\s*price|original\s*price|was\s*price|normal\s*price|list\s*price|msrp|you\s*save|you\s*save\s*\$|savings|discount|discount\s*%|%\s*off|evidence|confidence|regular-price\s*source|price\s*source|checked|checked\s*et|found\s*by|scout|notes|note|brand|model|priority|size|color|colour|asin|upc|category|image|image\s*url|photo)$/;
+
+function scoreHeaderRow(cells = []) {
+  let score = 0;
+  for (const c of cells) {
+    const h = cleanCell(c).toLowerCase().replace(/\s+/g, ' ');
+    if (h.length > 0 && h.length <= 36 && KNOWN_HEADER_RE.test(h)) score += 1;
+  }
+  return score;
+}
+
+function parseDiscountPercent(raw, salePrice = null, regularPrice = null) {
+  const s = cleanCell(raw).replace(/%/g, '').trim();
+  if (s && /^-?\d+(?:\.\d+)?$/.test(s)) {
+    const n = Number(s);
+    if (Number.isFinite(n) && n > 0 && n < 1 && !cleanCell(raw).includes('%')) {
+      return Math.round(n * 1000) / 10;
+    }
+    if (Number.isFinite(n) && n > 0 && n <= 100) {
+      return Math.round(n * 10) / 10;
+    }
+  }
+  if (salePrice != null && regularPrice != null && regularPrice > salePrice) {
+    return Math.round(((regularPrice - salePrice) / regularPrice) * 1000) / 10;
+  }
+  return null;
+}
+
+function extractFirstHttpUrl(text) {
+  const m = String(text || '').match(/https?:\/\/[^\s,)"'<>]+/i);
+  return m ? m[0].replace(/[),.;!?]+$/, '') : null;
+}
+
+function deriveStoreHomeUrl(retailerRaw, retailerId, sourceUrl) {
+  const dom = String(retailerRaw || '').match(/([a-z0-9.-]+\.(?:com|net|org|co|io|us))/i)?.[1];
+  if (dom) return `https://${dom.replace(/^https?:\/\//i, '')}/`;
+  const known = RETAILER_BY_ID[retailerId]?.url;
+  if (known) return known;
+  if (sourceUrl && /^https?:\/\//i.test(sourceUrl)) {
+    try { return `${new URL(sourceUrl).origin}/`; } catch {}
+  }
+  return null;
+}
+
+function draftRichnessScore(d) {
+  const ev = String(d.evidence || '').toLowerCase();
+  const evScore = ev === 'strong' ? 30 : ev === 'medium' ? 20 : ev === 'weak' ? 10 : 0;
+  return evScore + (d.sourceUrl ? 15 : 0) + (d.originalPrice != null ? 5 : 0) + Math.min(10, Math.floor((d.notes || '').length / 25));
+}
+
+export function dedupeDraftsWithinFile(drafts = []) {
+  const map = new Map();
+  let duplicatesRemoved = 0;
+  for (const d of drafts) {
+    const nameKey = String(d.name || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+    const storeKey = String(d.retailerName || d.retailerId || '').toLowerCase().replace(/\([^)]*\)/g, '').replace(/[^a-z0-9]+/g, '');
+    const priceKey = d.preferredPrice != null ? d.preferredPrice.toFixed(2) : '';
+    const key = `${nameKey}|${storeKey}|${priceKey}`;
+    const existing = map.get(key);
+    if (!existing) {
+      map.set(key, d);
+    } else {
+      duplicatesRemoved += 1;
+      if (draftRichnessScore(d) > draftRichnessScore(existing)) {
+        map.set(key, d);
+      }
+    }
+  }
+  return { unique: [...map.values()], duplicatesRemoved };
+}
+
 /**
- * Convert tabular rows (with or without headers) into normalized preview items.
+ * Convert tabular rows (with or without headers, banner title rows, or stacked tables with repeated headers) into normalized preview items.
  */
 export function rowsToWishlistDrafts(rows, defaults = {}) {
   if (!Array.isArray(rows) || !rows.length) return [];
 
-  const first = rows[0].map((c) => cleanCell(c).toLowerCase());
-  const looksLikeHeader = first.some((h) =>
-    /^(product|item|name|title|description|brand|model|url|link|price|sale|target|max|regular|original|retailer|store|merchant|recipient|for|priority|notes|category|asin|upc|size|color)$/.test(h) ||
-    /product name|item name|target price|max price|sale price|regular price|wish list|store name|retailer/.test(h)
-  );
+  // Smart Header Discovery across top 25 rows (handles CSV/Excel exports with title & summary banner rows above the table)
+  let headerIdx = -1;
+  let bestScore = 0;
+  for (let i = 0; i < Math.min(rows.length, 25); i += 1) {
+    const sc = scoreHeaderRow(rows[i]);
+    if (sc >= 3) {
+      headerIdx = i;
+      bestScore = sc;
+      break;
+    }
+    if (sc > bestScore) {
+      bestScore = sc;
+      headerIdx = i;
+    }
+  }
+  if (bestScore < 2) headerIdx = -1;
 
-  const header = looksLikeHeader ? first : ['name', 'url', 'price', 'recipient', 'priority', 'notes'];
-  const dataRows = looksLikeHeader ? rows.slice(1) : rows;
+  const header = headerIdx >= 0
+    ? rows[headerIdx].map((c) => cleanCell(c).toLowerCase().replace(/\s+/g, ' '))
+    : ['name', 'url', 'price', 'recipient', 'priority', 'notes'];
+  const dataRows = headerIdx >= 0 ? rows.slice(headerIdx + 1) : rows;
+  const headerSet = new Set(header.filter(Boolean));
 
   const findCol = (...patterns) => header.findIndex((h) => patterns.some((p) => p.test(h)));
-  const colName = findCol(/^(product|item|name|title)/, /product name|item name|title/);
+  const colName = findCol(/^(item|product|product\s*name|item\s*name|name|title|description)$/, /product\s*name|item\s*name/);
   const colBrand = findCol(/^brand/, /manufacturer/);
   const colModel = findCol(/^model/, /sku|mpn|part/);
   const colUpc = findCol(/^upc/, /gtin|ean|barcode/);
   const colAsin = findCol(/^asin/);
-  const colRetailer = findCol(/^(retailer|store|merchant|site|vendor|shop)/);
-  const colUrl = findCol(/^(url|link|website|product url)/, /http|link/);
-  const colPref = findCol(/^(preferred|target|desired|ideal|sale|deal|current|price)/, /target price|preferred price|sale price|deal price/);
-  const colOrig = findCol(/^(original|regular|msrp|list|was|normal)/, /regular price|original price/);
-  const colMax = findCol(/^(max|budget|limit|ceiling)/, /max price/);
-  const colRecip = findCol(/^(recipient|for|person|member|who)/);
-  const colPrio = findCol(/^(priority|urgency)/);
-  const colColor = findCol(/^(color|colour|finish)/);
-  const colSize = findCol(/^(size|capacity|storage)/);
-  const colNotes = findCol(/^(notes|comment|features|specs|details)/);
+  const colRetailer = findCol(/^(store|retailer|merchant|site|vendor|shop|store\s*name)$/);
+  const colUrl = findCol(/^(link|url|website|product\s*url|product\s*link)$/);
+  const colPref = findCol(/^(sale\s*price|deal\s*price|current\s*price|target\s*price|preferred\s*price|desired\s*price|ideal\s*price|price)$/, /sale\s*price|target\s*price|preferred\s*price|deal\s*price/);
+  const colOrig = findCol(/^(regular\s*price|original\s*price|orig\.?\s*price|was\s*price|normal\s*price|list\s*price|msrp|compare\s*at|was|reg\.?)$/, /regular\s*price|original\s*price/);
+  const colMax = findCol(/^(max|max\s*price|budget|limit|ceiling)$/, /max\s*price/);
+  const colSavings = findCol(/^(you\s*save|you\s*save\s*\$|savings|save\s*\$|saved|dollar\s*savings)$/);
+  const colDiscount = findCol(/^(discount|discount\s*%|%\s*off|pct\s*off|percent\s*off)$/);
+  const colTier = findCol(/^(tier|level|bucket|group|category)$/);
+  const colEvidence = findCol(/^(evidence|confidence|verified|strength)$/);
+  const colPriceSource = findCol(/^(regular-price\s*source|price\s*source|baseline\s*source|source)$/);
+  const colChecked = findCol(/^(checked|checked\s*et|last\s*checked|verified\s*at|date)$/);
+  const colFoundBy = findCol(/^(found\s*by|scout|discovered\s*by|added\s*by)$/);
+  const colImage = findCol(/^(image|image\s*url|photo|thumbnail|img)$/);
+  const colRecip = findCol(/^(recipient|for|person|member|who)$/);
+  const colPrio = findCol(/^(priority|urgency)$/);
+  const colColor = findCol(/^(color|colour|finish)$/);
+  const colSize = findCol(/^(size|capacity|storage)$/);
+  const colNotes = findCol(/^(notes|note|comment|comments|features|specs|details)$/);
 
   const drafts = [];
   for (const r of dataRows) {
-    const get = (idx) => (idx >= 0 && idx < r.length ? cleanCell(r[idx]) : '');
-    let name = get(colName >= 0 ? colName : 0);
-    let url = get(colUrl);
-    if (!url) {
-      const anyUrl = r.find((c) => /^https?:\/\//i.test(cleanCell(c)));
-      if (anyUrl) url = cleanCell(anyUrl);
+    // Skip repeated header rows separating stacked sections in a spreadsheet
+    if (headerIdx >= 0 && scoreHeaderRow(r) >= 3) {
+      const overlap = r.filter((c) => headerSet.has(cleanCell(c).toLowerCase().replace(/\s+/g, ' '))).length;
+      if (overlap >= 3) continue;
     }
+
+    const nonEmptyCount = r.filter((c) => cleanCell(c).length > 0).length;
+    const get = (idx) => (idx >= 0 && idx < r.length ? cleanCell(r[idx]) : '');
+
+    let name = get(colName >= 0 ? colName : 0);
+    const retailerRaw = get(colRetailer);
+    const saleRaw = get(colPref);
+    const origRaw = get(colOrig);
+
+    // Skip title/summary banner rows (only 1 populated cell and no store/price)
+    if (nonEmptyCount <= 1 && !retailerRaw && !saleRaw && headerIdx >= 0) continue;
+
+    // Extract actual HTTP(S) URL cleanly (NEVER save literal "Open" / "Link" from CSV exports!)
+    let url = '';
+    const urlCellVal = get(colUrl);
+    if (/^https?:\/\//i.test(urlCellVal)) {
+      url = urlCellVal;
+    } else {
+      for (const cell of r) {
+        const extracted = extractFirstHttpUrl(cell);
+        if (extracted) {
+          url = extracted;
+          break;
+        }
+      }
+    }
+
     if (!url && /^https?:\/\//i.test(name)) {
       url = name;
       name = '';
     }
     if (!name && !url) continue;
 
-    const retailerRaw = get(colRetailer);
     const detectedRet = detectRetailer({ vendorName: retailerRaw, url, text: `${name} ${retailerRaw}` });
+    const preferredPrice = parseMoney(saleRaw);
+    const originalPrice = parseMoney(origRaw);
+    const savingsAmount = parseMoney(get(colSavings)) ?? (originalPrice != null && preferredPrice != null && originalPrice > preferredPrice ? roundMoney(originalPrice - preferredPrice) : null);
+    const discountPct = parseDiscountPercent(get(colDiscount), preferredPrice, originalPrice);
+
+    const imgRaw = get(colImage);
+    const imageUrl = /^https?:\/\//i.test(imgRaw) ? imgRaw : null;
+
+    const storeNameFinal = retailerRaw || detectedRet.name;
+    const storeHomeUrl = deriveStoreHomeUrl(retailerRaw, detectedRet.id, url);
+    const storeSearchUrl = buildStoreSearchUrl(detectedRet.id, storeNameFinal, name || url, storeHomeUrl);
+
+    const tierRaw = get(colTier);
+    const evidenceRaw = get(colEvidence);
+    const prioRaw = get(colPrio);
+    const derivedPriority = prioRaw
+      ? normalizePriority(prioRaw)
+      : /level\s*1|best|high/i.test(tierRaw)
+        ? 'high'
+        : /stocking|low/i.test(tierRaw)
+          ? 'low'
+          : (defaults.priority || 'standard');
+
+    const extraNotes = [get(colNotes), get(colPriceSource) ? `Baseline: ${get(colPriceSource)}` : ''].filter(Boolean).join(' · ');
 
     drafts.push(
       createWishlistItemObject({
@@ -359,16 +579,26 @@ export function rowsToWishlistDrafts(rows, defaults = {}) {
         upc: get(colUpc) || null,
         asin: get(colAsin) || null,
         sourceUrl: url || null,
+        storeHomeUrl,
+        storeSearchUrl,
+        imageUrl,
         retailerId: detectedRet.id,
-        retailerName: retailerRaw || detectedRet.name,
-        preferredPrice: parseMoney(get(colPref)),
-        originalPrice: parseMoney(get(colOrig)),
+        retailerName: storeNameFinal,
+        preferredPrice,
+        originalPrice,
         maxPrice: parseMoney(get(colMax)),
+        savingsAmount,
+        discountPct,
+        tier: tierRaw || null,
+        evidence: evidenceRaw || null,
+        regularPriceSource: get(colPriceSource) || null,
+        checkedAtText: get(colChecked) || null,
+        foundBy: get(colFoundBy) || null,
         recipient: get(colRecip) || defaults.recipient || '',
-        priority: normalizePriority(get(colPrio) || defaults.priority),
+        priority: derivedPriority,
         color: get(colColor) || null,
         size: get(colSize) || null,
-        notes: get(colNotes) || '',
+        notes: extraNotes,
         profileId: defaults.profileId || 'family-main',
         sourceType: defaults.sourceType || 'spreadsheet',
       })
@@ -589,23 +819,29 @@ export async function parseUploadedDocument({
     return { drafts, parseWarning: drafts.length ? null : 'JSON file contained no recognizable product records.' };
   }
 
-  // 4. Excel .xlsx
+  // 4. Excel .xlsx (parse ALL sheets + hyperlinks + intra-file dedup)
   if (lower.endsWith('.xlsx') || /spreadsheetml/i.test(mimeType)) {
-    const rows = parseXlsxBuffer(buf || Buffer.alloc(0));
-    const drafts = rowsToWishlistDrafts(rows, { ...defaults, sourceType: 'xlsx' });
+    const sheets = parseXlsxSheets(buf || Buffer.alloc(0));
+    const allDrafts = [];
+    for (const sh of sheets) {
+      allDrafts.push(...rowsToWishlistDrafts(sh.rows, { ...defaults, sourceType: 'xlsx' }));
+    }
+    const { unique, duplicatesRemoved } = dedupeDraftsWithinFile(allDrafts);
     return {
-      drafts,
-      parseWarning: drafts.length ? null : 'Could not extract tabular rows from .xlsx workbook. Original file preserved.',
+      drafts: unique,
+      intraFileDuplicatesRemoved: duplicatesRemoved,
+      parseWarning: unique.length ? null : 'Could not extract tabular rows from .xlsx workbook. Original file preserved.',
     };
   }
 
   // 5. Legacy Excel .xls
   if (lower.endsWith('.xls') || /ms-excel/i.test(mimeType)) {
     const rows = parseXlsBuffer(buf || Buffer.alloc(0));
-    const drafts = rowsToWishlistDrafts(rows, { ...defaults, sourceType: 'xls' });
+    const { unique, duplicatesRemoved } = dedupeDraftsWithinFile(rowsToWishlistDrafts(rows, { ...defaults, sourceType: 'xls' }));
     return {
-      drafts,
-      parseWarning: drafts.length ? null : 'Legacy binary .xls layout could not be fully parsed. Save as .xlsx/.csv or edit extracted lines below; original file preserved.',
+      drafts: unique,
+      intraFileDuplicatesRemoved: duplicatesRemoved,
+      parseWarning: unique.length ? null : 'Legacy binary .xls layout could not be fully parsed. Save as .xlsx/.csv or edit extracted lines below; original file preserved.',
     };
   }
 
@@ -635,12 +871,16 @@ export async function parseUploadedDocument({
     return { drafts, parseWarning: drafts.length ? null : 'No products detected in RTF document.' };
   }
 
-  // 8. CSV / TSV
+  // 8. CSV / TSV (supports banner rows, stacked multi-table headers, decimal discounts & dedup)
   const text = contentText || (buf ? buf.toString('utf8') : '');
-  if (lower.endsWith('.csv') || lower.endsWith('.tsv')) {
+  if (lower.endsWith('.csv') || lower.endsWith('.tsv') || /text\/csv/i.test(mimeType)) {
     const rows = parseDelimitedText(text, lower.endsWith('.tsv') ? '\t' : ',');
-    const drafts = rowsToWishlistDrafts(rows, { ...defaults, sourceType: 'csv' });
-    return { drafts, parseWarning: drafts.length ? null : 'No product rows found in CSV/TSV file.' };
+    const { unique, duplicatesRemoved } = dedupeDraftsWithinFile(rowsToWishlistDrafts(rows, { ...defaults, sourceType: 'csv' }));
+    return {
+      drafts: unique,
+      intraFileDuplicatesRemoved: duplicatesRemoved,
+      parseWarning: unique.length ? null : 'No product rows found in CSV/TSV file.',
+    };
   }
 
   // 9. Saved HTML shopping list (Amazon / Target / Walmart / Best Buy)
@@ -668,14 +908,26 @@ export async function parseUploadedDocument({
     if (drafts.length) return { drafts, parseWarning: null };
   }
 
+  // Detect comma-separated CSV pasted directly into the Bulk Text box
+  if (rowsLookCsv(text)) {
+    const rows = parseDelimitedText(text);
+    const { unique, duplicatesRemoved } = dedupeDraftsWithinFile(rowsToWishlistDrafts(rows, { ...defaults, sourceType: 'bulk' }));
+    if (unique.length) return { drafts: unique, intraFileDuplicatesRemoved: duplicatesRemoved, parseWarning: null };
+  }
+
   // 10. Plain text / email / pasted list
   const drafts = parseBulkTextToDrafts(text, { ...defaults, sourceType: 'text' });
   return { drafts, parseWarning: drafts.length ? null : 'Could not identify products in uploaded text. Original file preserved.' };
 }
 
+function rowsLookCsv(text) {
+  const lines = String(text || '').split(/\r?\n/).filter((l) => l.trim().length > 0).slice(0, 15);
+  return lines.length >= 2 && lines.filter((l) => (l.match(/,/g) || []).length >= 3).length >= 2;
+}
+
 /**
  * Full Upload Center Preview Pipeline: parses any mode/file, enriches multi-URLs if needed,
- * runs duplicate detection, flags items needing review, and returns editable preview rows.
+ * runs fast O(1) duplicate detection, flags items needing review, and returns up to 1000 editable preview rows.
  */
 export async function buildUploadPreview({
   uploadType = 'wishlist',
@@ -693,13 +945,14 @@ export async function buildUploadPreview({
 } = {}) {
   let drafts = [];
   let parseWarning = null;
+  let intraFileDuplicatesRemoved = 0;
 
   if (mode === 'urls') {
     const urls = String(urlsText || contentText || '')
       .split(/[\r\n,]+/)
       .map((s) => s.trim())
       .filter((s) => /^https?:\/\//i.test(s))
-      .slice(0, 25);
+      .slice(0, 50);
     for (const rawUrl of urls) {
       try {
         const { item, inspected } = await buildWishlistItemFromUrl(rawUrl, defaults, { fetchImpl });
@@ -730,7 +983,14 @@ export async function buildUploadPreview({
     }
     if (!drafts.length) parseWarning = 'No valid http/https URLs were found. Paste one URL per line.';
   } else if (mode === 'bulk') {
-    drafts = parseBulkTextToDrafts(contentText, { ...defaults, sourceType: 'bulk' });
+    if (rowsLookCsv(contentText)) {
+      const rows = parseDelimitedText(contentText);
+      const deduped = dedupeDraftsWithinFile(rowsToWishlistDrafts(rows, { ...defaults, sourceType: 'bulk' }));
+      drafts = deduped.unique;
+      intraFileDuplicatesRemoved = deduped.duplicatesRemoved;
+    } else {
+      drafts = parseBulkTextToDrafts(contentText, { ...defaults, sourceType: 'bulk' });
+    }
     if (!drafts.length) parseWarning = 'No products could be parsed from the pasted text.';
   } else {
     const res = await parseUploadedDocument({
@@ -742,13 +1002,40 @@ export async function buildUploadPreview({
       defaults,
     });
     drafts = res.drafts || [];
+    intraFileDuplicatesRemoved = res.intraFileDuplicatesRemoved || 0;
     parseWarning = res.parseWarning || null;
   }
 
-  // Flag duplicates & incomplete extractions for user review before committing
+  // O(1) duplicate index against existing wish list or saved deals (fast even for 500+ rows)
   const existingPool = uploadType === 'deal' ? existingSavedDeals : existingWishlist;
-  const previewItems = drafts.slice(0, 150).map((d) => {
-    const dup = findDuplicateWishlistItem(d, existingPool);
+  const makeExactDupKey = (obj) => {
+    const n = String(obj.name || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+    const r = String(obj.recipient || '').toLowerCase().trim();
+    const s = String(obj.retailerId || obj.retailerName || '').toLowerCase().trim();
+    return n ? `${n}|${r}|${s}` : '';
+  };
+  const exByExactKey = new Map();
+  const exByAsin = new Map();
+  const exByUpc = new Map();
+  for (const ex of existingPool || []) {
+    if (ex.status === 'no_longer_interested') continue;
+    const k = makeExactDupKey(ex);
+    if (k) exByExactKey.set(k, ex);
+    if (ex.asin) exByAsin.set(String(ex.asin).toUpperCase(), ex);
+    if (ex.upc) exByUpc.set(String(ex.upc), ex);
+  }
+
+  const dealEvidenceRows = drafts.filter((d) => d.preferredPrice != null && d.originalPrice != null && d.originalPrice > d.preferredPrice).length;
+  const suggestedUploadType = drafts.length >= 2 && dealEvidenceRows / drafts.length >= 0.35 ? 'deal' : 'wishlist';
+
+  const previewItems = drafts.slice(0, 1000).map((d) => {
+    const dupKey = makeExactDupKey(d);
+    const dup =
+      (dupKey && exByExactKey.get(dupKey)) ||
+      (d.asin && exByAsin.get(String(d.asin).toUpperCase())) ||
+      (d.upc && exByUpc.get(String(d.upc))) ||
+      null;
+
     const needsReview = Boolean(
       d.needsReview ||
       !d.name ||
@@ -772,10 +1059,19 @@ export async function buildUploadPreview({
       color: d.color || '',
       price: d.preferredPrice ?? null,
       originalPrice: d.originalPrice ?? null,
+      savingsAmount: d.savingsAmount ?? null,
+      discountPct: d.discountPct ?? null,
       maxPrice: d.maxPrice ?? null,
+      tier: d.tier || null,
+      evidence: d.evidence || null,
+      regularPriceSource: d.regularPriceSource || null,
+      checkedAtText: d.checkedAtText || null,
+      foundBy: d.foundBy || null,
       retailerId: d.retailerId || detectRetailer({ url: d.sourceUrl || '', text: d.name }).id,
       retailerName: d.retailerName || detectRetailer({ url: d.sourceUrl || '', text: d.name }).name,
       url: d.sourceUrl || '',
+      storeHomeUrl: d.storeHomeUrl || null,
+      storeSearchUrl: d.storeSearchUrl || null,
       recipient: d.recipient || defaults.recipient || '',
       profileId: d.profileId || defaults.profileId || 'family-main',
       priority: d.priority || defaults.priority || 'standard',
@@ -793,8 +1089,10 @@ export async function buildUploadPreview({
   return {
     ok: true,
     uploadType,
+    suggestedUploadType,
     filename: filename || null,
     parseWarning,
+    intraFileDuplicatesRemoved,
     extractedCount: previewItems.length,
     duplicatesCount: previewItems.filter((i) => i.isDuplicate).length,
     needsReviewCount: previewItems.filter((i) => i.needsReview).length,
@@ -826,11 +1124,21 @@ export function createWishlistItemObject(input = {}) {
     },
   });
 
+  const cleanUrl = input.sourceUrl || input.url || '';
+  const validSourceUrl = /^https?:\/\//i.test(cleanUrl) ? cleanUrl : null;
   const ret = detectRetailer({
     vendorName: input.retailerName || '',
-    url: input.sourceUrl || input.url || '',
-    text: rawName,
+    url: validSourceUrl || '',
+    text: `${rawName} ${input.retailerName || ''}`,
   });
+  const retailerId = input.retailerId || ret.id;
+  const retailerName = input.retailerName || ret.name;
+  const storeHomeUrl = input.storeHomeUrl || deriveStoreHomeUrl(retailerName, retailerId, validSourceUrl);
+  const storeSearchUrl = input.storeSearchUrl || buildStoreSearchUrl(retailerId, retailerName, rawName, storeHomeUrl);
+  const preferredPrice = parseMoney(input.preferredPrice ?? input.price);
+  const originalPrice = parseMoney(input.originalPrice);
+  const savingsAmount = parseMoney(input.savingsAmount) ?? (originalPrice != null && preferredPrice != null && originalPrice > preferredPrice ? roundMoney(originalPrice - preferredPrice) : null);
+  const discountPct = input.discountPct != null ? Number(input.discountPct) : parseDiscountPercent('', preferredPrice, originalPrice);
 
   return {
     id: input.id || `wl_${crypto.randomBytes(6).toString('hex')}`,
@@ -846,20 +1154,30 @@ export function createWishlistItemObject(input = {}) {
     size: input.size || identity.specs.screenSize || identity.specs.storage || identity.specs.capacity || null,
     specs: input.specs || [identity.specs.storage, identity.specs.screenSize, identity.specs.generation, identity.specs.capacity].filter(Boolean).join(', ') || null,
     requiredFeatures: String(input.requiredFeatures || '').trim(),
-    preferredPrice: parseMoney(input.preferredPrice ?? input.price),
-    originalPrice: parseMoney(input.originalPrice),
+    preferredPrice,
+    originalPrice,
     maxPrice: parseMoney(input.maxPrice),
+    savingsAmount,
+    discountPct,
+    tier: input.tier || null,
+    evidence: input.evidence || null,
+    regularPriceSource: input.regularPriceSource || null,
+    checkedAtText: input.checkedAtText || null,
+    foundBy: input.foundBy || null,
     recipient: String(input.recipient || '').trim(),
     profileId: input.profileId || 'family-main',
-    retailerId: input.retailerId || ret.id,
-    retailerName: input.retailerName || ret.name,
+    retailerId,
+    retailerName,
+    storeDomain: ret.storeDomain || RETAILER_BY_ID[retailerId]?.domain || null,
+    storeHomeUrl,
+    storeSearchUrl,
     category: input.category || identity.category || 'other',
     priority: normalizePriority(input.priority),
     status: normalizeStatus(input.status || 'monitoring'),
     allowRefurbished: Boolean(input.allowRefurbished),
     allowOpenBox: Boolean(input.allowOpenBox),
     isGiftIdea,
-    sourceUrl: input.sourceUrl || input.url || null,
+    sourceUrl: validSourceUrl,
     sourceType: input.sourceType || 'manual',
     uploadFileId: input.uploadFileId || null,
     imageUrl: input.imageUrl || null,
@@ -887,6 +1205,8 @@ export function createUserSavedDealObject(input = {}) {
   const base = createWishlistItemObject(input);
   const uploadedPrice = parseMoney(input.price ?? input.currentPrice ?? input.preferredPrice);
   const regularPrice = parseMoney(input.originalPrice ?? input.reportedRegularPrice);
+  const savingsAmount = base.savingsAmount ?? (regularPrice != null && uploadedPrice != null && regularPrice > uploadedPrice ? roundMoney(regularPrice - uploadedPrice) : null);
+  const discountPct = base.discountPct ?? parseDiscountPercent('', uploadedPrice, regularPrice);
 
   return {
     id: input.id || `ud_${crypto.randomBytes(6).toString('hex')}`,
@@ -899,12 +1219,22 @@ export function createUserSavedDealObject(input = {}) {
     category: base.category,
     retailerId: base.retailerId,
     retailerName: base.retailerName,
+    storeDomain: base.storeDomain,
+    storeHomeUrl: base.storeHomeUrl,
+    storeSearchUrl: base.storeSearchUrl,
     url: base.sourceUrl || null,
     imageUrl: base.imageUrl || base.screenshotThumbnail || null,
     screenshotThumbnail: base.screenshotThumbnail || null,
     originalUploadedPrice: uploadedPrice,
     currentPrice: uploadedPrice,
     originalRegularPrice: regularPrice,
+    savingsAmount,
+    verifiedDiscountPct: discountPct,
+    tier: base.tier,
+    evidence: base.evidence,
+    regularPriceSource: base.regularPriceSource,
+    checkedAtText: base.checkedAtText,
+    foundBy: base.foundBy,
     uploadedAt: input.uploadedAt || nowIso,
     updatedAt: nowIso,
     profileId: base.profileId,
@@ -946,26 +1276,19 @@ export async function buildWishlistItemFromUrl(rawUrl, extras = {}, { fetchImpl 
 }
 
 export function findDuplicateWishlistItem(candidate, existingList = []) {
+  const norm = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+  const candName = norm(candidate.name);
+  const candRec = String(candidate.recipient || '').toLowerCase().trim();
+  const candStore = String(candidate.retailerId || candidate.retailerName || '').toLowerCase().trim();
   for (const ex of existingList || []) {
     if (ex.status === 'no_longer_interested') continue;
-    if (candidate.asin && ex.asin && candidate.asin === ex.asin) return ex;
-    if (candidate.upc && ex.upc && candidate.upc === ex.upc) return ex;
-    if (candidate.gtin && ex.gtin && candidate.gtin === ex.gtin) return ex;
-    const candUrl = candidate.sourceUrl || candidate.url;
-    const exUrl = ex.sourceUrl || ex.url;
-    if (candUrl && exUrl && candUrl === exUrl) return ex;
-    if (
-      candidate.canonicalKey &&
-      ex.canonicalKey &&
-      candidate.canonicalKey === ex.canonicalKey &&
-      (candidate.recipient || '').toLowerCase() === (ex.recipient || '').toLowerCase()
-    ) {
-      return ex;
-    }
-    if (
-      (candidate.name || '').toLowerCase() === (ex.name || '').toLowerCase() &&
-      (candidate.recipient || '').toLowerCase() === (ex.recipient || '').toLowerCase()
-    ) {
+    if (candidate.asin && ex.asin && String(candidate.asin).toUpperCase() === String(ex.asin).toUpperCase()) return ex;
+    if (candidate.upc && ex.upc && String(candidate.upc) === String(ex.upc)) return ex;
+    if (candidate.gtin && ex.gtin && String(candidate.gtin) === String(ex.gtin)) return ex;
+    const exName = norm(ex.name);
+    const exRec = String(ex.recipient || '').toLowerCase().trim();
+    const exStore = String(ex.retailerId || ex.retailerName || '').toLowerCase().trim();
+    if (candName && exName && candName === exName && candRec === exRec && (!candStore || !exStore || candStore === exStore)) {
       return ex;
     }
   }

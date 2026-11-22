@@ -10,6 +10,7 @@ import { EventEmitter } from 'node:events';
 import {
   BLACK_FRIDAY_VERSION,
   RETAILER_DIRECTORY,
+  MAIN_STORE_IDS,
   LOCAL_STORES_KNIGHTDALE,
   SHOPPING_EVENTS_2026,
   PRIMARY_LOCATION,
@@ -496,6 +497,29 @@ export function createBlackFridayEngine({
     });
 
     const favoriteStoresList = storesDirectory.filter((s) => s.isFavorite);
+    const dealByCanonical = new Map();
+    for (const d of visibleDeals) {
+      if (d.canonicalKey && !dealByCanonical.has(d.canonicalKey)) {
+        dealByCanonical.set(d.canonicalKey, d);
+      }
+    }
+    const enrichedSavedDeals = (state.savedDeals || []).map((sd) => {
+      const liveMatch = sd.canonicalKey ? dealByCanonical.get(sd.canonicalKey) : null;
+      return {
+        ...sd,
+        imageUrl: sd.imageUrl || sd.screenshotThumbnail || liveMatch?.imageUrl || null,
+        matchedLiveUrl: liveMatch?.retailerUrl || null,
+        matchedLivePrice: liveMatch?.currentPrice ?? null,
+      };
+    });
+
+    const mainStoreSet = new Set(MAIN_STORE_IDS);
+    const mainStoreStats = storesDirectory
+      .filter((s) => mainStoreSet.has(s.id) || s.verifiedDealsCount >= 3)
+      .filter((s) => !['slickdeals', 'dealnews', 'bradsdeals', 'retailmenot', 'rakuten', 'camelcamelcamel', 'keepa', 'cashbackmonitor'].includes(s.id))
+      .sort((a, b) => b.verifiedDealsCount - a.verifiedDealsCount || (MAIN_STORE_IDS.indexOf(a.id) - MAIN_STORE_IDS.indexOf(b.id)))
+      .slice(0, 26);
+
     const unreadAlertsCount = (state.alerts || []).filter((a) => !a.read).length;
 
     const verified25Plus = visibleDeals.filter((d) => d.verifiedDiscountPct !== null && d.verifiedDiscountPct >= 25);
@@ -545,7 +569,8 @@ export function createBlackFridayEngine({
       deals: visibleDeals,
       archivedDeals: archivedDeals.slice(0, 60),
       wishlist: enrichedWishlist,
-      savedDeals: state.savedDeals || [],
+      savedDeals: enrichedSavedDeals,
+      mainStoreStats,
       uploadedFiles: state.uploadedFiles || [],
       profiles: state.profiles,
       hunter,

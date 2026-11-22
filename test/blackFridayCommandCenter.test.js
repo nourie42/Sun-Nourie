@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import zlib from 'node:zlib';
 import express from 'express';
 
 import { BLACK_FRIDAY_VERSION, RETAILER_DIRECTORY, LOCAL_STORES_KNIGHTDALE } from '../src/black-friday/constants.js';
@@ -17,6 +18,7 @@ import {
   parseDealPricingFromText,
   buildPersonalizedRecommendations,
   findSimilarOrCheaper,
+  detectRetailer,
 } from '../src/black-friday/intelligence.js';
 import {
   parseBulkTextToDrafts,
@@ -25,6 +27,8 @@ import {
   createWishlistItemObject,
   findDuplicateWishlistItem,
   parseXlsxBuffer,
+  parseXlsxSheets,
+  dedupeDraftsWithinFile,
   extractTextFromPdfBuffer,
 } from '../src/black-friday/wishlistParser.js';
 import { evaluateSmartAlerts, isWithinQuietHours } from '../src/black-friday/notifications.js';
@@ -597,4 +601,109 @@ test('v2.0: 96+ required retailers, zero-filler personalized 4-tier hierarchy, e
   const pdfOut = extractTextFromPdfBuffer(miniPdf);
   assert.match(pdfOut.text, /Sony WH-1000XM5/);
   assert.ok(pdfOut.urls.includes('https://www.amazon.com/dp/B09XS7JWHH'));
+});
+
+test('v2.1: real banner-row + stacked-table CSV, Excel hyperlinks, and main-store attribution fixes', () => {
+  // 1. User's exact CSV layout: 2 banner lines, real header row, repeated header row, Link="Open", decimal Discount %
+  const sampleCsv = [
+    '"Gift Deals Ranked by Discount — November 20, 2026",,,,,,,,,,,,,,',
+    '"36 deals over 25% off out of 487 unique deals.",,,,,,,,,,,,,,',
+    'Rank,Recipient,Tier,Item,Store,Link,Sale price,Regular price,You save $,Discount %,Evidence,Regular-price source,Checked ET,Found by,Notes',
+    '1,Angel,Stocking stuffers (<$10),"Kuromi 10"" Western Rodeo Plush",Sanrio (official online),Open,9.99,38,28.01,0.737105,Medium,Seller compare-at,"Nov 20, 2026, 1:20 PM ET",Gift Scout 4,"Sanrio ask"',
+    '4,Angel,Level 3 (under $20),Okarun Figure,Good Smile US,Open,13.19,32.99,19.8,0.60018,Medium,Holiday Guide,"Nov 20, 2026, 1:20 PM ET",Gift Scout 2,"See (https://www.goodsmileus.com/pages/2026-holiday-gift-guides)"',
+    'Rank,Recipient,Tier,Item,Store,Link,Sale price,Regular price,You save $,Discount %,Evidence,Regular-price source,Checked ET,Found by,Notes',
+    '1,Angel,Stocking stuffers (<$10),"Kuromi 10"" Western Rodeo Plush",Sanrio (official online),Open,9.99,38,28.01,0.737105,Medium,Seller compare-at,"Nov 20, 2026, 1:20 PM ET",Gift Scout 4,"Duplicate in full table"',
+    '2,Kish,Great,"Ray-Ban Meta Gen 2 Wayfarer",Walmart.com,Open,306,409,103,0.25183,Weak,Walmart strikethrough,"Nov 20, 2026, 1:19 PM ET",Gift Scout 4,"Sold by Walmart.com"',
+  ].join('\n');
+
+  const rawRows = parseDelimitedText(sampleCsv);
+  const parsedDrafts = rowsToWishlistDrafts(rawRows, { sourceType: 'csv' });
+  const deduped = dedupeDraftsWithinFile(parsedDrafts);
+  assert.equal(deduped.duplicatesRemoved, 1, 'should merge repeated item from top table + full table');
+  assert.equal(deduped.unique.length, 3);
+
+  const kuromi = deduped.unique.find((d) => /Kuromi/i.test(d.name));
+  assert.equal(kuromi.recipient, 'Angel');
+  assert.equal(kuromi.preferredPrice, 9.99);
+  assert.equal(kuromi.originalPrice, 38);
+  assert.equal(kuromi.discountPct, 73.7);
+  assert.equal(kuromi.evidence, 'Medium');
+  assert.equal(kuromi.sourceUrl, null, 'must NEVER store literal "Open" as sourceUrl');
+  assert.ok(kuromi.storeSearchUrl && kuromi.storeSearchUrl.startsWith('https://'), 'should derive valid working storeSearchUrl');
+
+  const okarun = deduped.unique.find((d) => /Okarun/i.test(d.name));
+  assert.equal(okarun.sourceUrl, 'https://www.goodsmileus.com/pages/2026-holiday-gift-guides');
+
+  const rayban = deduped.unique.find((d) => /Ray-Ban/i.test(d.name));
+  assert.equal(rayban.retailerId, 'walmart');
+  assert.equal(rayban.recipient, 'Kish');
+
+  // 2. Retailer attribution skips slickdeals/dealnews URLs and detects true merchant from bracket domain & &trd=
+  const sdWalmart = detectRetailer({
+    url: 'https://slickdeals.net/f/12345-tv-deal',
+    text: 'Walmart [walmart.com] has TCL 65" QLED 4K TV for $398',
+  });
+  assert.equal(sdWalmart.id, 'walmart');
+  assert.equal(sdWalmart.name, 'Walmart');
+
+  const dnTarget = detectRetailer({
+    url: 'https://www.dealnews.com/products/Sony-WH1000XM5/12345.html',
+    vendorName: 'Target',
+    text: 'Sony Headphones at Target',
+  });
+  assert.equal(dnTarget.id, 'target');
+
+  const amzThird = detectRetailer({ vendorName: 'Amazon (3rd-party seller)' });
+  assert.equal(amzThird.id, 'amazon');
+
+  // 3. XLSX hyperlink + formula extraction when Link cell says "Open"
+  function crc32(buf) {
+    let c = 0xffffffff;
+    for (let i = 0; i < buf.length; i += 1) {
+      c ^= buf[i];
+      for (let k = 0; k < 8; k += 1) c = (c >>> 1) ^ (0xedb88320 & -(c & 1));
+    }
+    return (c ^ 0xffffffff) >>> 0;
+  }
+  function makeZip(files) {
+    const locals = [];
+    const centrals = [];
+    let offset = 0;
+    for (const [name, content] of files) {
+      const nameBuf = Buffer.from(name, 'utf8');
+      const rawBuf = Buffer.from(content, 'utf8');
+      const compBuf = zlib.deflateRawSync(rawBuf);
+      const crc = crc32(rawBuf);
+      const local = Buffer.alloc(30 + nameBuf.length);
+      local.writeUInt32LE(0x04034b50, 0); local.writeUInt16LE(20, 4); local.writeUInt16LE(8, 8);
+      local.writeUInt32LE(crc, 14); local.writeUInt32LE(compBuf.length, 18); local.writeUInt32LE(rawBuf.length, 22);
+      local.writeUInt16LE(nameBuf.length, 26); nameBuf.copy(local, 30);
+      locals.push(local, compBuf);
+      const central = Buffer.alloc(46 + nameBuf.length);
+      central.writeUInt32LE(0x02014b50, 0); central.writeUInt16LE(20, 4); central.writeUInt16LE(20, 6);
+      central.writeUInt16LE(8, 10); central.writeUInt32LE(crc, 16); central.writeUInt32LE(compBuf.length, 20);
+      central.writeUInt32LE(rawBuf.length, 24); central.writeUInt16LE(nameBuf.length, 28); central.writeUInt32LE(offset, 42);
+      nameBuf.copy(central, 46);
+      centrals.push(central);
+      offset += local.length + compBuf.length;
+    }
+    const cd = Buffer.concat(centrals);
+    const eocd = Buffer.alloc(22);
+    eocd.writeUInt32LE(0x06054b50, 0); eocd.writeUInt16LE(files.length, 8); eocd.writeUInt16LE(files.length, 10);
+    eocd.writeUInt32LE(cd.length, 12); eocd.writeUInt32LE(offset, 16);
+    return Buffer.concat([...locals, cd, eocd]);
+  }
+  const sheetXml = `<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>Banner</t></is></c></row><row r="2"><c r="A2" t="inlineStr"><is><t>Item</t></is></c><c r="B2" t="inlineStr"><is><t>Store</t></is></c><c r="C2" t="inlineStr"><is><t>Link</t></is></c><c r="D2" t="inlineStr"><is><t>Sale price</t></is></c></row><row r="3"><c r="A3" t="inlineStr"><is><t>Samsung Galaxy Tab S10 FE</t></is></c><c r="B3" t="inlineStr"><is><t>Samsung</t></is></c><c r="C3" t="inlineStr"><is><t>Open</t></is></c><c r="D3"><v>349.99</v></c></row></sheetData><hyperlinks><hyperlink ref="C3" r:id="rId9"/></hyperlinks></worksheet>`;
+  const sheetRels = `<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId9" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="https://www.samsung.com/us/tablets/galaxy-tab-s10-fe/" TargetMode="External"/></Relationships>`;
+  // Note: sheetXml uses inlineStr <is><t>...</t></is> so check inlineStr tag parsing cleanly
+  const xlsxBuf = makeZip([
+    ['xl/worksheets/sheet1.xml', sheetXml],
+    ['xl/worksheets/_rels/sheet1.xml.rels', sheetRels],
+  ]);
+  const sheets = parseXlsxSheets(xlsxBuf);
+  assert.equal(sheets.length, 1);
+  const hlDrafts = rowsToWishlistDrafts(sheets[0].rows);
+  assert.equal(hlDrafts.length, 1);
+  assert.equal(hlDrafts[0].name, 'Samsung Galaxy Tab S10 FE');
+  assert.equal(hlDrafts[0].sourceUrl, 'https://www.samsung.com/us/tablets/galaxy-tab-s10-fe/');
 });

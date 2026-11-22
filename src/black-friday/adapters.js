@@ -21,16 +21,37 @@ import { RETAILER_DIRECTORY, PRIMARY_LOCATION } from './constants.js';
 
 const DEFAULT_UA = 'BlackFridayCommandCenter/1.0 (Personal Family Shopping Monitor; +https://github.com/nourie42/Sun-Nourie)';
 
-const RETAILER_DOMAINS = RETAILER_DIRECTORY.flatMap((r) => r.domainHints || []);
+const AGGREGATOR_DOMAINS = ['slickdeals.net', 'slickdealscdn.com', 'dealnews.com', 'hip2save.com', '9to5toys.com', 'dealcatcher.com', 'dansdeals.com', 'bradsdeals.com', 'camelcamelcamel.com', 'keepa.com', 'cashbackmonitor.com', 'rakuten.com', 'retailmenot.com', 'cheapshark.com'];
+const RETAILER_DOMAINS = RETAILER_DIRECTORY
+  .filter((r) => !AGGREGATOR_DOMAINS.some((ad) => r.domain?.includes(ad)))
+  .flatMap((r) => r.domainHints || []);
 
 export const SOURCE_CATALOG = Object.freeze([
   { id: 'dealnews_main', name: 'DealNews (Frontpage)', kind: 'rss', category: 'General Deals', url: 'https://www.dealnews.com/?rss=1', maxItems: 50 },
   { id: 'dealnews_electronics', name: 'DealNews Electronics', kind: 'rss', category: 'Electronics', url: 'https://www.dealnews.com/c142/Electronics/?rss=1', maxItems: 40 },
   { id: 'dealnews_home', name: 'DealNews Home & Garden', kind: 'rss', category: 'Home & Kitchen', url: 'https://www.dealnews.com/c196/Home-Garden/?rss=1', maxItems: 35 },
   { id: 'dealnews_clothing', name: 'DealNews Clothing', kind: 'rss', category: 'Apparel', url: 'https://www.dealnews.com/c202/Clothing-Accessories/?rss=1', maxItems: 35 },
+  { id: 'dealnews_bestbuy', name: 'DealNews Best Buy', kind: 'rss', category: 'Best Buy Store Feed', url: 'https://www.dealnews.com/s321/Best-Buy/?rss=1', maxItems: 25 },
   { id: 'slickdeals_frontpage', name: 'Slickdeals Frontpage', kind: 'rss', category: 'Community Verified', url: 'https://slickdeals.net/newsearch.php?mode=frontpage&searcharea=deals&searchin=first&rss=1', maxItems: 30 },
   { id: 'slickdeals_popular', name: 'Slickdeals Popular', kind: 'rss', category: 'Community Verified', url: 'https://slickdeals.net/newsearch.php?mode=popdeals&searcharea=deals&searchin=first&rss=1', maxItems: 30 },
   { id: 'slickdeals_black_friday', name: 'Slickdeals Black Friday', kind: 'rss', category: 'Black Friday', url: 'https://slickdeals.net/newsearch.php?q=black+friday&searcharea=deals&searchin=first&rss=1', maxItems: 30 },
+  { id: 'slickdeals_walmart', name: 'Walmart Live Deals', kind: 'rss', category: 'Walmart Store Feed', url: 'https://slickdeals.net/newsearch.php?q=walmart&searcharea=deals&searchin=first&rss=1', maxItems: 25 },
+  { id: 'slickdeals_target', name: 'Target Live Deals', kind: 'rss', category: 'Target Store Feed', url: 'https://slickdeals.net/newsearch.php?q=target&searcharea=deals&searchin=first&rss=1', maxItems: 25 },
+  { id: 'slickdeals_bestbuy', name: 'Best Buy Live Deals', kind: 'rss', category: 'Best Buy Store Feed', url: 'https://slickdeals.net/newsearch.php?q=best+buy&searcharea=deals&searchin=first&rss=1', maxItems: 25 },
+  { id: 'slickdeals_homedepot', name: 'Home Depot Live Deals', kind: 'rss', category: 'Home Depot Store Feed', url: 'https://slickdeals.net/newsearch.php?q=home+depot&searcharea=deals&searchin=first&rss=1', maxItems: 25 },
+  { id: 'slickdeals_lowes', name: "Lowe's Live Deals", kind: 'rss', category: 'Lowes Store Feed', url: 'https://slickdeals.net/newsearch.php?q=lowes&searcharea=deals&searchin=first&rss=1', maxItems: 25 },
+  { id: 'slickdeals_costco', name: 'Costco Live Deals', kind: 'rss', category: 'Costco Store Feed', url: 'https://slickdeals.net/newsearch.php?q=costco&searcharea=deals&searchin=first&rss=1', maxItems: 25 },
+  { id: 'slickdeals_samsclub', name: "Sam's Club Live Deals", kind: 'rss', category: 'Sams Club Store Feed', url: 'https://slickdeals.net/newsearch.php?q=sams+club&searcharea=deals&searchin=first&rss=1', maxItems: 25 },
+  { id: 'slickdeals_macys', name: "Macy's Live Deals", kind: 'rss', category: 'Macys Store Feed', url: 'https://slickdeals.net/newsearch.php?q=macys&searcharea=deals&searchin=first&rss=1', maxItems: 25 },
+  { id: 'slickdeals_kohls', name: "Kohl's Live Deals", kind: 'rss', category: 'Kohls Store Feed', url: 'https://slickdeals.net/newsearch.php?q=kohls&searcharea=deals&searchin=first&rss=1', maxItems: 25 },
+  { id: 'slickdeals_nike', name: 'Nike Live Deals', kind: 'rss', category: 'Nike Store Feed', url: 'https://slickdeals.net/newsearch.php?q=nike&searcharea=deals&searchin=first&rss=1', maxItems: 25 },
+  { id: 'slickdeals_lego', name: 'LEGO Live Deals', kind: 'rss', category: 'LEGO Store Feed', url: 'https://slickdeals.net/newsearch.php?q=lego&searcharea=deals&searchin=first&rss=1', maxItems: 25 },
+  { id: 'slickdeals_apple', name: 'Apple Live Deals', kind: 'rss', category: 'Apple Store Feed', url: 'https://slickdeals.net/newsearch.php?q=apple&searcharea=deals&searchin=first&rss=1', maxItems: 25 },
+  { id: 'slickdeals_sephora', name: 'Sephora Live Deals', kind: 'rss', category: 'Sephora Store Feed', url: 'https://slickdeals.net/newsearch.php?q=sephora&searcharea=deals&searchin=first&rss=1', maxItems: 25 },
+  { id: 'slickdeals_ulta', name: 'Ulta Live Deals', kind: 'rss', category: 'Ulta Store Feed', url: 'https://slickdeals.net/newsearch.php?q=ulta&searcharea=deals&searchin=first&rss=1', maxItems: 25 },
+  { id: 'slickdeals_wayfair', name: 'Wayfair Live Deals', kind: 'rss', category: 'Wayfair Store Feed', url: 'https://slickdeals.net/newsearch.php?q=wayfair&searcharea=deals&searchin=first&rss=1', maxItems: 25 },
+  { id: 'slickdeals_nordstrom', name: 'Nordstrom Live Deals', kind: 'rss', category: 'Nordstrom Store Feed', url: 'https://slickdeals.net/newsearch.php?q=nordstrom&searcharea=deals&searchin=first&rss=1', maxItems: 25 },
+  { id: 'slickdeals_newegg', name: 'Newegg Live Deals', kind: 'rss', category: 'Newegg Store Feed', url: 'https://slickdeals.net/newsearch.php?q=newegg&searcharea=deals&searchin=first&rss=1', maxItems: 25 },
   { id: 'camelcamelcamel_drops', name: 'CamelCamelCamel Amazon Drops', kind: 'rss', category: 'Amazon Historical Drops', url: 'https://camelcamelcamel.com/top_drops/feed', maxItems: 25 },
   { id: 'techbargains', name: 'TechBargains Live Feed', kind: 'rss', category: 'Multi-Retailer Deals', url: 'https://www.techbargains.com/rss.xml', maxItems: 80 },
   { id: 'hip2save', name: 'Hip2Save Family & BF Deals', kind: 'rss', category: 'Family, Target & Walmart', url: 'https://hip2save.com/feed/', maxItems: 60 },
@@ -94,11 +115,30 @@ export async function fetchWithRetry(url, {
   return { ok: false, status: 0, latencyMs: 0, error: String(lastError?.message || 'Request failed'), text: '' };
 }
 
-const DEAL_TRACKER_HOSTS = ['slickdeals.net', 'dealnews.com', 'hip2save.com', '9to5toys.com', 'dealcatcher.com', 'dansdeals.com', 'bradsdeals.com', 'camelcamelcamel.com', 'cheapshark.com'];
+const DEAL_TRACKER_HOSTS = [
+  'slickdeals.net', 'slickdealscdn.com', 'dealnews.com', 'hip2save.com',
+  '9to5toys.com', 'dealcatcher.com', 'dansdeals.com', 'bradsdeals.com',
+  'camelcamelcamel.com', 'cheapshark.com',
+];
 
 function isTrackerHost(url) {
   const lower = String(url || '').toLowerCase();
   return DEAL_TRACKER_HOSTS.some((h) => lower.includes(h));
+}
+
+function unwrapEmbeddedRetailerUrl(href) {
+  const raw = String(href || '').trim();
+  if (!/^https?:\/\//i.test(raw)) return null;
+  try {
+    const u = new URL(raw);
+    for (const key of ['u2', 'url', 'u', 'redirect', 'dest', 'target']) {
+      const val = u.searchParams.get(key);
+      if (val && /^https?:\/\//i.test(val) && !isTrackerHost(val)) {
+        return val;
+      }
+    }
+  } catch {}
+  return null;
 }
 
 function pickDirectRetailerUrl(rawItem, sourceId) {
@@ -111,24 +151,41 @@ function pickDirectRetailerUrl(rawItem, sourceId) {
         retailerUrl: `https://www.amazon.com/dp/${asinMatch[1].toUpperCase()}`,
         dealPageUrl: link,
         isDirectProductUrl: true,
+        isMerchantJumpUrl: false,
       };
     }
   }
 
   // If primary link is already directly on a known non-tracker retailer domain
   if (!isTrackerHost(link) && RETAILER_DOMAINS.some((d) => link.toLowerCase().includes(d))) {
-    return { retailerUrl: link, dealPageUrl: link, isDirectProductUrl: true };
+    return { retailerUrl: link, dealPageUrl: link, isDirectProductUrl: true, isMerchantJumpUrl: false };
   }
 
-  // Check embedded links in RSS HTML for a clean direct retailer URL
+  // Check embedded links in RSS HTML for URL-encoded direct destinations or clean direct merchant domains
+  let firstJumpUrl = null;
   for (const href of rawItem.embeddedLinks || []) {
+    const unwrapped = unwrapEmbeddedRetailerUrl(href);
+    if (unwrapped && RETAILER_DOMAINS.some((d) => unwrapped.toLowerCase().includes(d))) {
+      return { retailerUrl: unwrapped, dealPageUrl: link, isDirectProductUrl: true, isMerchantJumpUrl: false };
+    }
     const lower = href.toLowerCase();
-    if (!isTrackerHost(lower) && RETAILER_DOMAINS.some((d) => lower.includes(d)) && !/redirect|track|doubleclick|googleadservices/i.test(lower)) {
-      return { retailerUrl: href, dealPageUrl: link, isDirectProductUrl: true };
+    if (
+      !isTrackerHost(lower) &&
+      !/redirect|doubleclick|googleadservices|facebook\.com|twitter\.com|x\.com|youtube\.com|instagram\.com/i.test(lower) &&
+      RETAILER_DOMAINS.some((d) => lower.includes(d))
+    ) {
+      return { retailerUrl: href, dealPageUrl: link, isDirectProductUrl: true, isMerchantJumpUrl: false };
+    }
+    if (!firstJumpUrl && /slickdeals\.net\/click\b/i.test(lower)) {
+      firstJumpUrl = href;
     }
   }
 
-  return { retailerUrl: link, dealPageUrl: link, isDirectProductUrl: false };
+  if (firstJumpUrl) {
+    return { retailerUrl: firstJumpUrl, dealPageUrl: link, isDirectProductUrl: false, isMerchantJumpUrl: true };
+  }
+
+  return { retailerUrl: link, dealPageUrl: link, isDirectProductUrl: false, isMerchantJumpUrl: false };
 }
 
 function parseSlickdealsThumbScore(text) {
@@ -148,7 +205,7 @@ export function normalizeRssItemToDeal(rawItem, source, nowIso) {
   if (!rawItem?.title || !rawItem.link) return null;
 
   const fullText = `${rawItem.title}\n${rawItem.contentText || rawItem.descriptionText || ''}`;
-  const { retailerUrl, dealPageUrl, isDirectProductUrl } = pickDirectRetailerUrl(rawItem, source.id);
+  const { retailerUrl, dealPageUrl, isDirectProductUrl, isMerchantJumpUrl } = pickDirectRetailerUrl(rawItem, source.id);
 
   // Clean CamelCamelCamel title suffix ("- down 16.88% ($3.90) to $19.20 from $23.10") for clean display name
   const displayTitle = source.id.startsWith('camel')
@@ -168,12 +225,13 @@ export function normalizeRssItemToDeal(rawItem, source, nowIso) {
     return null;
   }
 
+  const embeddedHint = (rawItem.embeddedLinks || []).slice(0, 6).join(' ');
   const retailer = source.id.startsWith('camel')
     ? { id: 'amazon', name: 'Amazon', matchedBy: 'camel_source' }
     : detectRetailer({
         vendorName: rawItem.vendorName,
-        url: retailerUrl,
-        text: `${rawItem.title} ${rawItem.descriptionText} ${(rawItem.categories || []).join(' ')}`,
+        url: `${retailerUrl} ${embeddedHint}`,
+        text: `${rawItem.title} ${rawItem.contentText || ''} ${rawItem.descriptionText || ''} ${(rawItem.categories || []).join(' ')}`,
       });
 
   const identity = normalizeProductIdentity({
@@ -227,6 +285,7 @@ export function normalizeRssItemToDeal(rawItem, source, nowIso) {
     retailerUrl,
     dealPageUrl,
     isDirectProductUrl,
+    isMerchantJumpUrl: Boolean(isMerchantJumpUrl),
     priceHistoryUrl: source.id.startsWith('camel') ? dealPageUrl : null,
     availabilityStatus: 'unverified',
     localPickupKnightdale: 'unverified',
@@ -782,8 +841,8 @@ export async function runAllAdapters({
   const activeSources = SOURCE_CATALOG.filter((s) => enabledSources[s.id] !== false);
 
   const results = [];
-  // Run in polite batches of 5 so we never hammer any network
-  const batchSize = 5;
+  // Run in polite batches of 8 so per-store + main feeds complete briskly
+  const batchSize = 8;
   for (let i = 0; i < activeSources.length; i += batchSize) {
     const batch = activeSources.slice(i, i + batchSize);
     const batchOut = await Promise.all(

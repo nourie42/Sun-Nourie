@@ -1212,9 +1212,109 @@ table.data-table tr:hover td { background: var(--bg-chip); }
   text-align: center;
   background: rgba(56, 189, 248, 0.05);
   cursor: pointer;
-  transition: background 0.15s ease;
+  transition: background 0.15s ease, border-color 0.15s ease;
 }
-.dropzone:hover { background: rgba(56, 189, 248, 0.11); }
+.dropzone:hover, .dropzone.is-dragover {
+  background: rgba(56, 189, 248, 0.14);
+  border-color: var(--accent-cyan);
+}
+
+/* Interactive Store Picker Pill Bar */
+.store-picker-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.store-pick-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 11px;
+  border-radius: 999px;
+  border: 1px solid var(--border-glass);
+  background: var(--bg-chip);
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.14s ease, border-color 0.14s ease, background 0.14s ease;
+}
+.store-pick-pill:hover {
+  transform: translateY(-1px);
+  border-color: var(--border-strong);
+  color: var(--text-primary);
+}
+.store-pick-pill.is-active {
+  background: linear-gradient(135deg, rgba(56, 189, 248, 0.28), rgba(16, 185, 129, 0.22));
+  border-color: var(--accent-cyan);
+  color: var(--text-primary);
+  box-shadow: 0 4px 14px rgba(56, 189, 248, 0.22);
+}
+.store-pick-count {
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--text-primary);
+}
+
+.home-deals-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 14px;
+}
+.home-deals-controls input[type="search"] {
+  flex: 1 1 210px;
+  min-width: 170px;
+}
+.toggle-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 11px;
+  border-radius: 10px;
+  border: 1px solid var(--border-glass);
+  background: var(--bg-chip);
+  font-size: 12px;
+  font-weight: 650;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.uploaded-browser-box {
+  margin-top: 14px;
+}
+
+.section-divider-block {
+  margin-top: 26px;
+  padding-top: 20px;
+  border-top: 2px solid var(--border-strong);
+}
+.section-divider-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 16px 20px;
+  margin-bottom: 16px;
+  border-radius: var(--radius-lg);
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.14), rgba(56, 189, 248, 0.12));
+  border: 1px solid var(--border-strong);
+}
+
+.preview-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
 
 @media (max-width: 760px) {
   .upload-hero-grid { grid-template-columns: 1fr; }

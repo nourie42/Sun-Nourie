@@ -21,7 +21,7 @@ const DEFAULT_DATA_DIR = path.join(ROOT_DIR, 'data', 'black-friday');
 const GITHUB_SNAPSHOT_URL = 'https://raw.githubusercontent.com/nourie42/Sun-Nourie/black-friday-data/snapshot.json';
 const MAX_BACKUPS = 10;
 const MAX_ALERTS = 250;
-const MAX_DEALS = 500;
+const MAX_DEALS = 1200;
 const MAX_HISTORY_PER_PRODUCT = 365;
 const MAX_SCHEDULER_HISTORY = 40;
 const MAX_UPLOADED_FILES = 120;
@@ -370,11 +370,26 @@ export function createBlackFridayStore({
 
     const allIds = Object.keys(state.deals);
     if (allIds.length > MAX_DEALS) {
+      // Preserve up to the newest 45 deals per retailer before pruning so Amazon never crowds out Walmart/Target/Best Buy/etc.
+      const keep = new Set();
+      const perRetailerCount = new Map();
       const sorted = Object.values(state.deals).sort((a, b) => {
         if (Boolean(a.archived) !== Boolean(b.archived)) return a.archived ? 1 : -1;
         return Date.parse(b.lastSeenAt || b.verifiedAt || 0) - Date.parse(a.lastSeenAt || a.verifiedAt || 0);
       });
-      const keep = new Set(sorted.slice(0, MAX_DEALS).map((d) => d.id));
+      for (const d of sorted) {
+        if (d.archived) continue;
+        const rid = d.retailerId || 'other';
+        const c = perRetailerCount.get(rid) || 0;
+        if (c < 45 && keep.size < MAX_DEALS) {
+          keep.add(d.id);
+          perRetailerCount.set(rid, c + 1);
+        }
+      }
+      for (const d of sorted) {
+        if (keep.size >= MAX_DEALS) break;
+        keep.add(d.id);
+      }
       for (const id of allIds) {
         if (!keep.has(id)) delete state.deals[id];
       }

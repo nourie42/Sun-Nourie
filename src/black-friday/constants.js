@@ -9,7 +9,7 @@
  * - urlStatus tracks verified browser/HTTP verification ('verified' | 'bot_protected' | 'unverified').
  */
 
-export const BLACK_FRIDAY_VERSION = '2.0.0-bf2026.2';
+export const BLACK_FRIDAY_VERSION = '2.1.0-bf2026.3';
 export const SCHEMA_VERSION = 2;
 
 export const PRIMARY_LOCATION = Object.freeze({
@@ -30,6 +30,71 @@ export const DEFAULT_FAVORITE_STORES = Object.freeze([
   'nike', 'lululemon', 'oldnavy', 'tjmaxx', 'sephora', 'ulta',
   'apple', 'wayfair', 'dicks', 'lego', 'etsy', 'slickdeals', 'dealnews', 'rakuten',
 ]);
+
+export const MAIN_STORE_IDS = Object.freeze([
+  'amazon', 'walmart', 'target', 'bestbuy', 'homedepot', 'lowes',
+  'costco', 'samsclub', 'macys', 'kohls', 'apple', 'nike',
+  'adidas', 'lego', 'sephora', 'ulta', 'wayfair', 'nordstrom',
+  'newegg', 'dicks', 'rei', 'oldnavy', 'chewy',
+]);
+
+export const RETAILER_SEARCH_URLS = Object.freeze({
+  amazon: 'https://www.amazon.com/s?k={q}',
+  walmart: 'https://www.walmart.com/search?q={q}',
+  target: 'https://www.target.com/s?searchTerm={q}',
+  bestbuy: 'https://www.bestbuy.com/site/searchpage.jsp?st={q}',
+  costco: 'https://www.costco.com/CatalogSearch?keyword={q}',
+  samsclub: 'https://www.samsclub.com/s/{q}',
+  ebay: 'https://www.ebay.com/sch/i.html?_nkw={q}',
+  macys: 'https://www.macys.com/shop/featured/{q}',
+  kohls: 'https://www.kohls.com/search.jsp?search={q}',
+  nordstrom: 'https://www.nordstrom.com/sr?keyword={q}',
+  nordstromrack: 'https://www.nordstromrack.com/sr?keyword={q}',
+  homedepot: 'https://www.homedepot.com/s/{q}',
+  lowes: 'https://www.lowes.com/search?searchTerm={q}',
+  wayfair: 'https://www.wayfair.com/keyword.php?keyword={q}',
+  nike: 'https://www.nike.com/w?q={q}',
+  adidas: 'https://www.adidas.com/us/search?q={q}',
+  apple: 'https://www.apple.com/us/search/{q}',
+  samsung: 'https://www.samsung.com/us/search/searchMain/?listType=g&searchTerm={q}',
+  newegg: 'https://www.newegg.com/p/pl?d={q}',
+  sephora: 'https://www.sephora.com/search?keyword={q}',
+  ulta: 'https://www.ulta.com/search?search={q}',
+  lego: 'https://www.lego.com/en-us/search?q={q}',
+  dicks: 'https://www.dickssportinggoods.com/search/SearchDisplay?searchTerm={q}',
+  rei: 'https://www.rei.com/search?q={q}',
+  oldnavy: 'https://oldnavy.gap.com/browse/search.do?searchText={q}',
+  chewy: 'https://www.chewy.com/s?query={q}',
+  williamssonoma: 'https://www.williams-sonoma.com/search/results.html?words={q}',
+  harborfreight: 'https://www.harborfreight.com/search?q={q}',
+  gamestop: 'https://www.gamestop.com/search/?q={q}',
+  etsy: 'https://www.etsy.com/search?q={q}',
+});
+
+export function buildStoreSearchUrl(retailerId, storeName = '', productName = '', fallbackHomeUrl = '') {
+  const cleanQuery = String(productName || '')
+    .replace(/["'()]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 90);
+  const template = RETAILER_SEARCH_URLS[retailerId];
+  if (template && cleanQuery) {
+    return template.replace('{q}', encodeURIComponent(cleanQuery));
+  }
+  if (fallbackHomeUrl && /^https?:\/\//i.test(fallbackHomeUrl) && !cleanQuery) {
+    return fallbackHomeUrl;
+  }
+  if (cleanQuery && fallbackHomeUrl && /^https?:\/\//i.test(fallbackHomeUrl)) {
+    try {
+      const host = new URL(fallbackHomeUrl).hostname.replace(/^www\./, '');
+      return `https://www.google.com/search?q=${encodeURIComponent(`site:${host} ${cleanQuery}`)}`;
+    } catch {}
+  }
+  if (cleanQuery && storeName) {
+    return `https://www.google.com/search?q=${encodeURIComponent(`${storeName} ${cleanQuery}`)}`;
+  }
+  return fallbackHomeUrl || null;
+}
 
 export const DEFAULT_SETTINGS = Object.freeze({
   location: { ...PRIMARY_LOCATION },
@@ -84,9 +149,27 @@ export const DEFAULT_SETTINGS = Object.freeze({
     dealnews_electronics: true,
     dealnews_home: true,
     dealnews_clothing: true,
+    dealnews_bestbuy: true,
     slickdeals_frontpage: true,
     slickdeals_popular: true,
     slickdeals_black_friday: true,
+    slickdeals_walmart: true,
+    slickdeals_target: true,
+    slickdeals_bestbuy: true,
+    slickdeals_homedepot: true,
+    slickdeals_lowes: true,
+    slickdeals_costco: true,
+    slickdeals_samsclub: true,
+    slickdeals_macys: true,
+    slickdeals_kohls: true,
+    slickdeals_nike: true,
+    slickdeals_lego: true,
+    slickdeals_apple: true,
+    slickdeals_sephora: true,
+    slickdeals_ulta: true,
+    slickdeals_wayfair: true,
+    slickdeals_nordstrom: true,
+    slickdeals_newegg: true,
     camelcamelcamel_drops: true,
     techbargains: true,
     hip2save: true,

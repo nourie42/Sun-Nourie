@@ -94,7 +94,7 @@ export function registerBlackFridayRoutes(app, {
   app.use('/black-friday', uiRouter);
 
   const api = express.Router();
-  api.use(express.json({ limit: '10mb' }));
+  api.use(express.json({ limit: '25mb' }));
   api.use((_req, res, next) => {
     setPrivateHeaders(res, false);
     next();
@@ -241,44 +241,120 @@ export function registerBlackFridayRoutes(app, {
       const skippedDuplicates = [];
       const createdWishlistIds = [];
 
-      for (const raw of items.slice(0, 150)) {
+      // Fast O(1) duplicate indexes + automatic recipient profile creation
+      const targetList = uploadType === 'deal' ? state.savedDeals : state.wishlist;
+      const makeExactDupKey = (obj) => {
+        const n = String(obj.name || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+        const r = String(obj.recipient || '').toLowerCase().trim();
+        const s = String(obj.retailerId || obj.retailerName || '').toLowerCase().trim();
+        return n ? `${n}|${r}|${s}` : '';
+      };
+      const exKeys = new Set();
+      const exAsins = new Set();
+      const exUpcs = new Set();
+      for (const ex of targetList || []) {
+        if (ex.status === 'no_longer_interested') continue;
+        const k = makeExactDupKey(ex);
+        if (k) exKeys.add(k);
+        if (ex.asin) exAsins.add(String(ex.asin).toUpperCase());
+        if (ex.upc) exUpcs.add(String(ex.upc));
+      }
+
+      const profileByLower = new Map((state.profiles || []).map((p) => [p.name.toLowerCase(), p]));
+      const ensureRecipientProfile = (recipientName, fallbackProfileId) => {
+        const clean = String(recipientName || '').trim();
+        if (!clean || clean.toLowerCase() === 'family' || clean.toLowerCase() === 'household') {
+          return fallbackProfileId || 'family-main';
+        }
+        const existing = profileByLower.get(clean.toLowerCase());
+        if (existing) return existing.id;
+        const profId = `prof_${clean.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 24) || crypto.randomBytes(3).toString('hex')}`;
+        const existingById = (state.profiles || []).find((p) => p.id === profId);
+        if (existingById) {
+          profileByLower.set(clean.toLowerCase(), existingById);
+          return existingById.id;
+        }
+        const newProf = {
+          id: profId,
+          name: clean.slice(0, 60),
+          type: 'member',
+          icon: '🎁',
+          budget: 300,
+          description: 'Created from uploaded family list',
+          favoriteBrands: [],
+          clothingSizes: '',
+          interests: [],
+          preferredRetailers: [],
+          dislikedProducts: [],
+          savedIdeas: [],
+        };
+        state.profiles.push(newProf);
+        profileByLower.set(clean.toLowerCase(), newProf);
+        return profId;
+      };
+
+      const batchToAdd = [];
+      for (const raw of items.slice(0, 1000)) {
         if (raw.selected === false) continue;
         if (!String(raw.name || '').trim() && !String(raw.url || '').trim()) continue;
+
+        const assignedProfileId = ensureRecipientProfile(raw.recipient, raw.profileId || 'family-main');
 
         if (uploadType === 'deal') {
           const dealObj = createUserSavedDealObject({
             ...raw,
+            profileId: assignedProfileId,
             sourceUrl: raw.url || raw.sourceUrl || null,
             price: raw.price ?? raw.preferredPrice,
             originalPrice: raw.originalPrice,
             uploadFileId: b.uploadFileId || raw.uploadFileId || null,
           });
-          const dup = findDuplicateWishlistItem(dealObj, state.savedDeals);
-          if (dup && !b.allowDuplicates) {
-            skippedDuplicates.push({ name: dealObj.name, existing: dup.name });
+          const dupKey = makeExactDupKey(dealObj);
+          const isDup =
+            (dupKey && exKeys.has(dupKey)) ||
+            (dealObj.asin && exAsins.has(String(dealObj.asin).toUpperCase())) ||
+            (dealObj.upc && exUpcs.has(String(dealObj.upc)));
+          if (isDup && !b.allowDuplicates) {
+            skippedDuplicates.push({ name: dealObj.name });
             continue;
           }
-          state.savedDeals.unshift(dealObj);
-          added.push(dealObj);
+          if (dupKey) exKeys.add(dupKey);
+          if (dealObj.asin) exAsins.add(String(dealObj.asin).toUpperCase());
+          if (dealObj.upc) exUpcs.add(String(dealObj.upc));
+          batchToAdd.push(dealObj);
         } else {
           const wlObj = createWishlistItemObject({
             ...raw,
+            profileId: assignedProfileId,
             sourceUrl: raw.url || raw.sourceUrl || null,
             preferredPrice: raw.price ?? raw.preferredPrice,
             maxPrice: raw.maxPrice,
             originalPrice: raw.originalPrice,
             uploadFileId: b.uploadFileId || raw.uploadFileId || null,
           });
-          const dup = findDuplicateWishlistItem(wlObj, state.wishlist);
-          if (dup && !b.allowDuplicates) {
-            skippedDuplicates.push({ name: wlObj.name, existing: dup.name, status: dup.status });
+          const dupKey = makeExactDupKey(wlObj);
+          const isDup =
+            (dupKey && exKeys.has(dupKey)) ||
+            (wlObj.asin && exAsins.has(String(wlObj.asin).toUpperCase())) ||
+            (wlObj.upc && exUpcs.has(String(wlObj.upc)));
+          if (isDup && !b.allowDuplicates) {
+            skippedDuplicates.push({ name: wlObj.name });
             continue;
           }
-          state.wishlist.unshift(wlObj);
-          added.push(wlObj);
+          if (dupKey) exKeys.add(dupKey);
+          if (wlObj.asin) exAsins.add(String(wlObj.asin).toUpperCase());
+          if (wlObj.upc) exUpcs.add(String(wlObj.upc));
+          batchToAdd.push(wlObj);
           createdWishlistIds.push(wlObj.id);
         }
       }
+
+      if (uploadType === 'deal') {
+        state.savedDeals = [...batchToAdd, ...(state.savedDeals || [])];
+      } else {
+        state.wishlist = [...batchToAdd, ...(state.wishlist || [])];
+      }
+      added.push(...batchToAdd);
 
       await store.persist({ createBackup: added.length >= 5 });
 
@@ -291,7 +367,7 @@ export function registerBlackFridayRoutes(app, {
         }
         if (createdWishlistIds.length > 3) {
           void (async () => {
-            for (const wid of createdWishlistIds.slice(3, 12)) {
+            for (const wid of createdWishlistIds.slice(3, 8)) {
               await engine.searchForWishlistItem(wid).catch(() => {});
             }
           })();
