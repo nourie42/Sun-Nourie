@@ -137,14 +137,19 @@ export function renderHourlyExplorerChart({
     maxVal = Math.max(maxVal, ...suns);
   }
 
-  if (maxVal - minVal < (metric.decimals ? 0.12 : 6)) {
-    const pad = metric.decimals ? 0.08 : 4;
-    if (metric.min === undefined) minVal -= pad;
-    maxVal += pad;
+  if (metric.decimals) {
+    const rawSpan = Math.max(0.06, maxVal - minVal);
+    const pad = Math.max(0.03, rawSpan * 0.15);
+    if (metric.min === undefined) minVal = Number((minVal - pad).toFixed(metric.decimals));
+    if (metric.max === undefined) maxVal = Number((maxVal + pad).toFixed(metric.decimals));
+  } else if (maxVal - minVal < 6) {
+    const pad = 3;
+    if (metric.min === undefined) minVal = Math.floor(minVal - pad);
+    if (metric.max === undefined) maxVal = Math.ceil(maxVal + pad);
   } else {
     const span = maxVal - minVal;
-    if (metric.min === undefined) minVal = Math.floor(minVal - span * 0.12);
-    if (metric.max === undefined) maxVal = Math.ceil(maxVal + span * 0.14);
+    if (metric.min === undefined) minVal = Math.floor(minVal - Math.max(1.5, span * 0.1));
+    if (metric.max === undefined) maxVal = Math.ceil(maxVal + Math.max(1.5, span * 0.12));
   }
 
   const xForIdx = (i) => padL + (i / Math.max(1, hours48.length - 1)) * plotW;
@@ -692,13 +697,21 @@ export function renderNext24HoursSplineChart({
   let maxVal = metricId === 'rain' ? Math.max(40, Math.max(...vals)) : Math.max(...vals);
 
   if (metricId === 'temp' || metricId === 'feels') {
-    minVal = Math.floor((minVal - 4) / 5) * 5;
-    maxVal = Math.ceil((maxVal + 5) / 5) * 5;
-    if (maxVal - minVal < 15) maxVal = minVal + 20;
+    const rawMin = Math.min(...vals);
+    const rawMax = Math.max(...vals);
+    const pad = Math.max(2, Math.ceil((rawMax - rawMin) * 0.15));
+    minVal = rawMin - pad;
+    maxVal = rawMax + pad;
+    if (maxVal - minVal < 6) {
+      minVal -= 2;
+      maxVal += 2;
+    }
   } else if (metricId === 'rain') {
-    maxVal = Math.min(100, Math.ceil(maxVal / 20) * 20);
+    maxVal = Math.min(100, Math.max(20, Math.ceil((maxVal + 5) / 10) * 10));
   } else {
-    maxVal = Math.max(12, Math.ceil((maxVal + 4) / 5) * 5);
+    const rawMin = Math.min(...vals);
+    minVal = Math.max(0, rawMin - 2);
+    maxVal = Math.max(minVal + 6, Math.ceil(maxVal + 2));
   }
 
   // Native 340px width fits 1:1 inside mobile card with zero scrolling & large readable text
@@ -899,11 +912,11 @@ export function renderSevenDayDualSplineChart({
   const highs = days.map((d) => convT(d.highF));
   const lows = days.map((d) => convT(d.lowF));
 
-  let minVal = Math.floor((Math.min(...lows) - 6) / 10) * 10;
-  let maxVal = Math.ceil((Math.max(...highs) + 6) / 10) * 10;
-  if (maxVal - minVal < 25) {
-    minVal -= 5;
-    maxVal += 5;
+  let minVal = Math.floor(Math.min(...lows) - 3);
+  let maxVal = Math.ceil(Math.max(...highs) + 3);
+  if (maxVal - minVal < 12) {
+    minVal -= 3;
+    maxVal += 3;
   }
 
   // Native 350px coordinate space renders at ~1:1 scale on phones for ~2x larger, ultra-legible labels

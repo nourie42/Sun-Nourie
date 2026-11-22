@@ -16,6 +16,13 @@ import {
   computePavementProfile,
   computeThermalComfort
 } from './physics.js';
+import {
+  currentSample,
+  formatRainLikelihoodTooltip,
+  reconcileRainLikelihood
+} from '../../weather-display.js?v=rain-reconcile-v2';
+import { displayedFeelsAt } from '../../hourly-feels.js?v=current-rain-20261017-v3';
+import { shadeFeelsLike, thermalComfort } from '../../weather-math.js?v=current-rain-20261017-v3';
 
 const US_STATE_ABBR = {
   Alabama: 'AL', Alaska: 'AK', Arizona: 'AZ', Arkansas: 'AR', California: 'CA',
@@ -190,18 +197,23 @@ export function scoreRainChance100Pt({
   ecmwfQpf = 0,
   gefsQpf = 0,
   wnQpf = 0,
+  nbmProbability = null,
   leadHours = 0
 }) {
   const nwsMax = 40;
-  const nwsPts = Math.round((clamp(nwsPop, 0, 100) / 100) * nwsMax);
+  const nwsVal = clamp(nwsPop, 0, 100);
+  const nwsPts = Number(((nwsVal / 100) * nwsMax).toFixed(2));
+  const hasWn = typeof wnQpf === 'number' && Number.isFinite(wnQpf) && wnQpf > 0;
 
   let shares;
   if (leadHours < 24) {
-    shares = { hrrr: 30, nbm: 20, ecmwf: 10, gefs: 0, weathernext: 10 };
-  } else if (leadHours < 48) {
-    shares = { hrrr: 20, nbm: 20, ecmwf: 20, gefs: 0, weathernext: 10 };
+    shares = hasWn
+      ? { hrrr: 25, nbm: 16.67, ecmwf: 8.33, gefs: 0, weathernext: 10 }
+      : { hrrr: 30, nbm: 20, ecmwf: 10, gefs: 0, weathernext: 0 };
   } else {
-    shares = { hrrr: 0, nbm: 25, ecmwf: 25, gefs: 10, weathernext: 10 };
+    shares = hasWn
+      ? { hrrr: 0, nbm: 14.71, ecmwf: 25.29, gefs: 10, weathernext: 10 }
+      : { hrrr: 0, nbm: 17.65, ecmwf: 30.35, gefs: 12, weathernext: 0 };
   }
 
   const qpfMap = {
@@ -212,18 +224,18 @@ export function scoreRainChance100Pt({
     weathernext: Math.max(0, wnQpf || 0)
   };
 
-  // Count how many deterministic/AI models are wet (>= 0.005 in/hr)
   const wetModelsCount =
     Object.entries(qpfMap).filter(([k, val]) => shares[k] > 0 && val >= 0.005).length +
-    (nwsPop >= 40 ? 1 : 0);
+    (nwsVal >= 20 ? 1 : 0);
 
   function scoreModelQpf(qpf, maxPts) {
     if (maxPts <= 0 || qpf < 0.005) {
       return { pts: 0, maxPts, qpf, tier: 'Dry (<0.005")', fraction: '0' };
     }
-    if (qpf < 0.01) {
+    if (qpf <= 0.01) {
+      const pts = Number((maxPts / 3).toFixed(2));
       return {
-        pts: Math.round(maxPts / 3),
+        pts,
         maxPts,
         qpf,
         tier: 'Light (0.005–0.010")',
@@ -232,8 +244,9 @@ export function scoreRainChance100Pt({
     }
     if (qpf < 0.05) {
       const hasPeerSupport = wetModelsCount >= 2;
+      const pts = Number((hasPeerSupport ? maxPts : maxPts / 3).toFixed(2));
       return {
-        pts: hasPeerSupport ? maxPts : Math.round(maxPts / 3),
+        pts,
         maxPts,
         qpf,
         tier: hasPeerSupport
@@ -243,7 +256,7 @@ export function scoreRainChance100Pt({
       };
     }
     return {
-      pts: maxPts,
+      pts: Number(maxPts.toFixed(2)),
       maxPts,
       qpf,
       tier: 'Solid Wet (≥0.050"/hr)',
@@ -251,32 +264,62 @@ export function scoreRainChance100Pt({
     };
   }
 
+  const hasNbmProb = typeof nbmProbability === 'number' && Number.isFinite(nbmProbability) && nbmProbability >= 0 && nbmProbability <= 100;
+  const nbmScored = hasNbmProb
+    ? {
+        pts: Number(((nbmProbability / 100) * shares.nbm).toFixed(2)),
+        maxPts: shares.nbm,
+        qpf: qpfMap.nbm,
+        pop: Math.round(nbmProbability),
+        tier: `${Math.round(nbmProbability)}% NBM PoP`,
+        fraction: `${Number(((nbmProbability / 100) * shares.nbm).toFixed(2))}/${shares.nbm} pts`
+      }
+    : scoreModelQpf(qpfMap.nbm, shares.nbm);
+
   const breakdown = {
     nws: {
       pts: nwsPts,
       maxPts: nwsMax,
-      pop: Math.round(nwsPop),
-      tier: `${Math.round(nwsPop)}% Official PoP`,
+      pop: Math.round(nwsVal),
+      tier: `${Math.round(nwsVal)}% Official PoP`,
       fraction: `${nwsPts}/40 pts`
     },
     hrrr: scoreModelQpf(qpfMap.hrrr, shares.hrrr),
-    nbm: scoreModelQpf(qpfMap.nbm, shares.nbm),
+    nbm: nbmScored,
     ecmwf: scoreModelQpf(qpfMap.ecmwf, shares.ecmwf),
     gefs: scoreModelQpf(qpfMap.gefs, shares.gefs),
     weathernext: scoreModelQpf(qpfMap.weathernext, shares.weathernext)
   };
 
-  const rawTotal =
-    breakdown.nws.pts +
-    breakdown.hrrr.pts +
-    breakdown.nbm.pts +
-    breakdown.ecmwf.pts +
-    breakdown.gefs.pts +
-    breakdown.weathernext.pts;
+  const syntheticLikelihood = {
+    sourceValues: {
+      nws: nwsVal,
+      ...(shares.hrrr > 0 ? { hrrr: breakdown.hrrr.pts > 0 ? 100 : 0 } : {}),
+      ecmwf: breakdown.ecmwf.pts > 0 ? 100 : 0,
+      nbm: hasNbmProb ? nbmProbability : (breakdown.nbm.pts > 0 ? 100 : 0),
+      ...(shares.gefs > 0 ? { gefs: breakdown.gefs.pts > 0 ? 100 : 0 } : {}),
+      ...(shares.weathernext > 0 ? { wn: breakdown.weathernext.pts > 0 ? 100 : 0 } : {})
+    },
+    sourcePoints: {
+      nws: breakdown.nws.pts,
+      ...(shares.hrrr > 0 ? { hrrr: breakdown.hrrr.pts } : {}),
+      ecmwf: breakdown.ecmwf.pts,
+      nbm: breakdown.nbm.pts,
+      ...(shares.gefs > 0 ? { gefs: breakdown.gefs.pts } : {}),
+      ...(shares.weathernext > 0 ? { wn: breakdown.weathernext.pts } : {})
+    },
+    sourceKinds: {
+      nws: 'probability',
+      hrrr: 'deterministic',
+      ecmwf: 'deterministic',
+      nbm: hasNbmProb ? 'probability' : 'deterministic',
+      gefs: 'deterministic',
+      wn: 'deterministic'
+    }
+  };
 
-  const totalPts = clamp(rawTotal, 0, 100);
+  const rec = reconcileRainLikelihood(syntheticLikelihood);
 
-  // Blended QPF amount (in/hr)
   let blendedQpf;
   if (leadHours < 24) {
     blendedQpf = qpfMap.hrrr * 0.35 + qpfMap.nbm * 0.30 + qpfMap.ecmwf * 0.20 + qpfMap.weathernext * 0.15;
@@ -286,16 +329,113 @@ export function scoreRainChance100Pt({
     blendedQpf = (qpfMap.ecmwf + qpfMap.nbm + qpfMap.gefs + qpfMap.weathernext) / 4;
   }
 
-  if (totalPts < 15 && blendedQpf < 0.008) {
+  if (rec.value < 15 && blendedQpf < 0.008) {
     blendedQpf = 0;
   }
 
   return {
-    totalPts,
-    rawTotal,
+    totalPts: rec.value,
+    rawTotal: Number(rec.rawTotal.toFixed(2)),
     blendedQpfIn: Number(blendedQpf.toFixed(3)),
     wetModelsCount,
-    breakdown
+    breakdown,
+    entries: rec.entries,
+    tooltip: formatRainLikelihoodTooltip(syntheticLikelihood)
+  };
+}
+
+export function reconcileRainLedgerWithCanonical(canonRl, fallbackLedger) {
+  if (!canonRl || typeof canonRl !== 'object' || !Number.isFinite(canonRl.value)) {
+    return fallbackLedger;
+  }
+  const rec = reconcileRainLikelihood(canonRl);
+  if (!rec.entries.length) {
+    const val = Math.round(canonRl.value);
+    const bd = structuredClone(fallbackLedger.breakdown);
+    bd.nws = { pts: val, maxPts: 100, pop: val, tier: `${val}% Official NWS PoP`, fraction: `${val}/100 pts` };
+    bd.hrrr.pts = 0;
+    bd.nbm.pts = 0;
+    bd.ecmwf.pts = 0;
+    bd.gefs.pts = 0;
+    bd.weathernext.pts = 0;
+    return {
+      ...fallbackLedger,
+      totalPts: val,
+      rawTotal: val,
+      breakdown: bd,
+      entries: [{ id: 'nws', label: 'NWS base', vote: val, points: val, shownPoints: val, kind: 'probability' }],
+      tooltip: formatRainLikelihoodTooltip(canonRl)
+    };
+  }
+
+  const byId = new Map(rec.entries.map((e) => [e.id, e]));
+  const srcById = new Map((canonRl.sources || []).map((s) => [s.id, s]));
+  const amts = canonRl.sourceAmounts || {};
+
+  const buildModelBd = (id, defaultMax) => {
+    const e = byId.get(id);
+    const src = srcById.get(id);
+    const maxPts = Number(((src?.weight ?? defaultMax / 100) * 100).toFixed(2));
+    const pts = e ? e.shownPoints : 0;
+    const qpf = Number.isFinite(amts[id]) ? amts[id] : (fallbackLedger.breakdown[id]?.qpf ?? 0);
+    if (!e) {
+      return { pts: 0, maxPts: 0, qpf, tier: 'Unavailable / Not in period', fraction: '0' };
+    }
+    if (e.kind === 'probability') {
+      return {
+        pts,
+        maxPts,
+        qpf,
+        pop: Math.round(e.vote),
+        tier: `${Math.round(e.vote)}% ${id.toUpperCase()} PoP`,
+        fraction: `${pts}/${maxPts} pts`
+      };
+    }
+    return {
+      pts,
+      maxPts,
+      qpf,
+      tier: pts > 0 ? (pts >= maxPts * 0.9 ? 'Wet signal (Full share)' : 'Trace / Partial signal (1/3 share)') : 'Dry (<0.005")',
+      fraction: pts > 0 ? `${pts}/${maxPts} pts` : '0'
+    };
+  };
+
+  const wnEntry = byId.get('wn');
+  const wn3Entry = byId.get('weathernext3');
+  const wnPts = Number(((wnEntry?.shownPoints || 0) + (wn3Entry?.shownPoints || 0)).toFixed(2));
+  const wnMax = Number((((srcById.get('wn')?.weight || 0) + (srcById.get('weathernext3')?.weight || 0)) * 100).toFixed(2));
+  const nwsE = byId.get('nws');
+  const nwsPts = nwsE ? nwsE.shownPoints : 0;
+  const nwsPop = nwsE ? Math.round(nwsE.vote) : 0;
+
+  const breakdown = {
+    nws: {
+      pts: nwsPts,
+      maxPts: 40,
+      pop: nwsPop,
+      tier: `${nwsPop}% Official PoP`,
+      fraction: `${nwsPts}/40 pts`
+    },
+    hrrr: buildModelBd('hrrr', 30),
+    nbm: buildModelBd('nbm', 20),
+    ecmwf: buildModelBd('ecmwf', 25),
+    gefs: buildModelBd('gefs', 10),
+    weathernext: {
+      pts: wnPts,
+      maxPts: wnMax || 10,
+      qpf: Number.isFinite(amts.wn) ? amts.wn : (fallbackLedger.breakdown.weathernext?.qpf ?? 0),
+      tier: !wnEntry && !wn3Entry ? 'Unavailable' : wnPts > 0 ? 'Wet signal' : 'Dry (<0.005")',
+      fraction: wnPts > 0 ? `${wnPts}/${wnMax || 10} pts` : '0'
+    }
+  };
+
+  return {
+    ...fallbackLedger,
+    totalPts: rec.value,
+    rawTotal: Number(rec.rawTotal.toFixed(2)),
+    breakdown,
+    entries: rec.entries,
+    tooltip: formatRainLikelihoodTooltip(canonRl)
   };
 }
 
@@ -997,14 +1137,17 @@ export function buildUnifiedFusionPayload(loc, baseData, multiModelData, aqiData
     const hrrrQpf = i < 48 ? Math.max(0, realHrrrQpf ?? (isLiveApi ? 0 : baseQpf)) : 0;
     const wnQpf = Math.max(0, realWnQpf ?? (isLiveApi ? 0 : baseQpf));
 
-    const rainLedger = scoreRainChance100Pt({ nwsPop, hrrrQpf, nbmQpf, ecmwfQpf, gefsQpf, wnQpf, leadHours: i });
-    if (typeof canonRl?.value === 'number' && Number.isFinite(canonRl.value)) {
-      rainLedger.totalPts = Math.round(canonRl.value);
-    } else if (typeof csPop?.value === 'number' && Number.isFinite(csPop.value)) {
-      rainLedger.totalPts = Math.round(csPop.value);
-    } else if (typeof ch?.pop === 'number' && Number.isFinite(ch.pop)) {
-      rainLedger.totalPts = Math.round(ch.pop);
-    }
+    const baseRainLedger = scoreRainChance100Pt({
+      nwsPop,
+      hrrrQpf,
+      nbmQpf,
+      ecmwfQpf,
+      gefsQpf,
+      wnQpf,
+      nbmProbability: canonRl?.nbmProbability ?? null,
+      leadHours: i
+    });
+    const rainLedger = reconcileRainLedgerWithCanonical(canonRl, baseRainLedger);
     const canonPrecipVal = cr?.precipitation ?? ch?.precipitation ?? csQpf?.value;
     if (typeof canonPrecipVal === 'number' && Number.isFinite(canonPrecipVal)) {
       rainLedger.blendedQpfIn = Number(canonPrecipVal.toFixed(3));
@@ -1037,14 +1180,55 @@ export function buildUnifiedFusionPayload(loc, baseData, multiModelData, aqiData
       time: dt
     });
 
-    const feelsLikeF = Number.isFinite(csFeels?.value) ? Math.round(csFeels.value) : Number.isFinite(ch?.feelsLike) ? Math.round(ch.feelsLike) : comfort.activeFeelsF;
-    const shadeFeelsF = Number.isFinite(csFeels?.shadeValue) ? Math.round(csFeels.shadeValue) : Number.isFinite(csShade?.value) ? Math.round(csShade.value) : Number.isFinite(ch?.feelsLikeShade) ? Math.round(ch.feelsLikeShade) : comfort.shadeFeelsF;
+    // Main-page science Steadman apparent temperature + solar exposure (identical to main site)
+    const mainPageHourlyFeels = canonicalData ? displayedFeelsAt(canonicalData, isoTime) : null;
+    const mainPageSteadman = shadeFeelsLike(tempFusion.blendedF, rh, windMph, dewPointF);
+    const mainPageThermal = thermalComfort(
+      {
+        temperature: tempFusion.blendedF,
+        humidity: rh,
+        dewpoint: dewPointF,
+        wind: windMph,
+        skyCover: cloudCover,
+        solarRadiation: solarWm2,
+        condition: ch?.condition || cr?.condition || ''
+      },
+      { latitude: lat, longitude: lon },
+      hourEpoch
+    );
+
+    const feelsLikeF = Number.isFinite(mainPageHourlyFeels)
+      ? Math.round(mainPageHourlyFeels)
+      : Number.isFinite(csFeels?.value)
+      ? Math.round(csFeels.value)
+      : Number.isFinite(ch?.feelsLike)
+      ? Math.round(ch.feelsLike)
+      : Number.isFinite(mainPageThermal?.outdoors)
+      ? Math.round(mainPageThermal.outdoors)
+      : Number.isFinite(mainPageSteadman?.value)
+      ? Math.round(mainPageSteadman.value)
+      : comfort.activeFeelsF;
+
+    const shadeFeelsF = Number.isFinite(csFeels?.shadeValue)
+      ? Math.round(csFeels.shadeValue)
+      : Number.isFinite(csShade?.value)
+      ? Math.round(csShade.value)
+      : Number.isFinite(ch?.feelsLikeShade)
+      ? Math.round(ch.feelsLikeShade)
+      : Number.isFinite(mainPageThermal?.shade)
+      ? Math.round(mainPageThermal.shade)
+      : Number.isFinite(mainPageSteadman?.value)
+      ? Math.round(mainPageSteadman.value)
+      : comfort.shadeFeelsF;
+
     const canonSunVal = Number.isFinite(csFeels?.sunValue)
       ? Math.round(csFeels.sunValue)
       : Number.isFinite(csSun?.value)
       ? Math.round(csSun.value)
       : Number.isFinite(ch?.feelsLikeSun)
       ? Math.round(ch.feelsLikeSun)
+      : Number.isFinite(mainPageThermal?.sun)
+      ? Math.round(mainPageThermal.sun)
       : null;
 
     const condFallback = describeWeatherCondition(wmoCode, rainLedger.totalPts, tempFusion.blendedF, isDay, windMph);
@@ -1136,13 +1320,20 @@ export function buildUnifiedFusionPayload(loc, baseData, multiModelData, aqiData
     });
   }
 
-  // Sync current hour (hours[0]) with exact canonicalData.current readings/observations
+  // Sync current hour (hours[0]) with exact canonicalData.current readings/observations & main-page currentSample science
   if (canonicalData?.current && hours[0]) {
     const cc = canonicalData.current;
+    const mainNowSample = currentSample(canonicalData, now.getTime());
     if (typeof cc.temperature === 'number' && Number.isFinite(cc.temperature)) hours[0].tempF = Math.round(cc.temperature);
-    if (typeof cc.feelsLike === 'number' && Number.isFinite(cc.feelsLike)) hours[0].feelsLikeF = Math.round(cc.feelsLike);
+    else if (Number.isFinite(mainNowSample?.temperature)) hours[0].tempF = Math.round(mainNowSample.temperature);
+
+    if (Number.isFinite(mainNowSample?.feels)) hours[0].feelsLikeF = Math.round(mainNowSample.feels);
+    else if (typeof cc.feelsLike === 'number' && Number.isFinite(cc.feelsLike)) hours[0].feelsLikeF = Math.round(cc.feelsLike);
     else if (typeof cc.apparent === 'number' && Number.isFinite(cc.apparent)) hours[0].feelsLikeF = Math.round(cc.apparent);
-    if (typeof cc.feelsLikeShade === 'number' && Number.isFinite(cc.feelsLikeShade)) hours[0].shadeFeelsF = Math.round(cc.feelsLikeShade);
+
+    if (Number.isFinite(mainNowSample?.comfort?.shade)) hours[0].shadeFeelsF = Math.round(mainNowSample.comfort.shade);
+    else if (typeof cc.feelsLikeShade === 'number' && Number.isFinite(cc.feelsLikeShade)) hours[0].shadeFeelsF = Math.round(cc.feelsLikeShade);
+    else hours[0].shadeFeelsF = hours[0].feelsLikeF;
     if (typeof cc.skyCover === 'number' && Number.isFinite(cc.skyCover)) {
       hours[0].cloudCover = clamp(Math.round(cc.skyCover), 0, 100);
     }
@@ -1156,6 +1347,11 @@ export function buildUnifiedFusionPayload(loc, baseData, multiModelData, aqiData
     }
     if (typeof cc.pressure === 'number' && Number.isFinite(cc.pressure)) hours[0].pressureInHg = Number(cc.pressure.toFixed(2));
     if (typeof cc.visibility === 'number' && Number.isFinite(cc.visibility)) hours[0].visibilityMi = Number(cc.visibility.toFixed(1));
+
+    if (mainNowSample?.rainLikelihood && Number.isFinite(mainNowSample.rainLikelihood.value)) {
+      hours[0].rainLedger = reconcileRainLedgerWithCanonical(mainNowSample.rainLikelihood, hours[0].rainLedger);
+      hours[0].rainChance = hours[0].rainLedger.totalPts;
+    }
 
     const curFeelsSeries = canonSeries.feels?.get(startEpoch);
     const curCanonHour = canonHours.get(startEpoch) || canonicalData.hours?.[0];

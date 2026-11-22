@@ -2,8 +2,9 @@ import assert from 'node:assert/strict';
 import {readFileSync,readdirSync,statSync} from 'node:fs';
 import {join} from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {deterministicRainSignal,precipitationLikelihood} from '../src/weatherFusionDirect.js';
-import {weatherIcon} from '../public/weather-fusion/weather-display.js';
+import {deterministicRainSignal,precipitationLikelihood,publishedPrecipitationLikelihood} from '../src/weatherFusionDirect.js';
+import {precipitationPolicy} from '../src/weatherFusionPolicy.js';
+import {weatherIcon,hourlyRainHTML} from '../public/weather-fusion/weather-display.js';
 import {conditionForRainChance,weatherState} from '../public/weather-fusion/weather-state.js';
 import {todaySkyProfile,confidenceBannerHTML} from '../public/weather-fusion/today-card.js';
 import {precipitationActivity,comfortSceneState} from '../public/weather-fusion/exposure-scene.js';
@@ -35,6 +36,12 @@ assert.equal(speck.reductionReasons.ecmwf,'negligible');
 const lone=precipitationLikelihood(7,{sourceValues:{hrrr:0,ecmwf:0.012,nbm:0}});
 assert.equal(lone.reductionReasons.ecmwf,'uncorroborated');
 assert.ok(close(lone.sourcePoints.ecmwf,10/3));
+
+// Tooltip input points must always reconcile to the displayed card percentage across extended Sun-Mon hours
+const extBlend=publishedPrecipitationLikelihood(56,{sourceValues:{hrrr:null,ecmwf:0.06,nbm:0.08,gefs:0.05,wn:0.05,weathernext3:0.05}},precipitationPolicy(1,true),{nbmProbability:62});
+const extHtml=hourlyRainHTML({rainLikelihood:extBlend,pop:extBlend.value});
+const extPts=[...extHtml.matchAll(/\(\+([\d.]+) points\)/g)].reduce((s,m)=>s+Number(m[1]),0);
+assert.equal(Math.min(100,Math.round(extPts)),extBlend.value,'hourlyRainHTML tooltip inputs must sum to the displayed rain percentage');
 
 assert.equal(conditionForRainChance('Rain',100),'Rain');
 assert.equal(conditionForRainChance('Sunny',100),'Rain');

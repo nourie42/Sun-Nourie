@@ -8,7 +8,7 @@ import {
   fetchCompleteFusionForecast,
   reverseGeocodeLocation,
   searchLocations
-} from './fusion-engine.js?v=v3-accuracy-5';
+} from './fusion-engine.js?v=v3-all-13';
 import { getLunarPhaseFraction, renderWeatherIconSvg } from './icons.js?v=v3-sky-8';
 import {
   COMPARE_MODELS,
@@ -21,16 +21,21 @@ import {
   renderModelCompareChart,
   renderNext24HoursSplineChart,
   renderSevenDayDualSplineChart
-} from './charts.js?v=v3-accuracy-7';
+} from './charts.js?v=v3-all-13';
 import {
   WeatherMapController
-} from './map.js?v=accurate-point-v6';
+} from './map.js?v=v3-all-13';
 import { dogWalkerScene, referenceScene } from '../../exposure-scene.js?v=true-night-art-v6';
 import { danCard, danOverview, danTakeDisplay } from '../../dans-summary.js?v=afd-discussion-section-v1';
 import { activeRiskOutlooks, outlookDetailHTML } from '../../risk-outlooks.js?v=risk-outlooks-v5';
 import { forecastWindowDetailHTML } from '../../forecast-window-banners.js?v=current-rain-20261017-v3';
 import {GlobePanel} from './globe-panel.js?v=tiled-v3';
 import {outlookItems,renderOutlookPanel,openOutlookNote} from '../../outlook-panel.js?v=compact-v1';
+import { todayForecastHTML } from '../../today-card.js?v=glass-today-v2';
+import { dayGraphHTML, installDayGraph } from '../../day-graph.js?v=hourly-rain-v2';
+import { dewpointFeelLevel, renderDewpointMeter } from '../../dewpoint-meter.js?v=air-moisture-v1';
+import { TREND_METRICS, mainTrendSeries, trendReading } from '../../main-hourly-trend.js?v=beta-glass-48h-v1';
+import { mountChart, solarDays, nightBands, fmt as haloFmt, H as HALO_H } from '../../halo.js?v=shared-chart-v2';
 
 const LEGACY_LOC_KEY = 'weather-nourie-v3-location';
 const SAVED_LOC_KEY = 'weather-nourie-v3-gps-location';
@@ -309,15 +314,107 @@ function fetchAccuracyCached(lat, lon, days = 10, horizon = 24) {
   return req;
 }
 
+function escapeAttr(val) {
+  return String(val ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+function isSkyCloudyOrWet(f) {
+  const cur = f?.current;
+  if (!cur) return false;
+  const cond = String(cur.condition || f?.canonical?.current?.condition || '').toLowerCase();
+  const clouds = Math.max(Number(cur.cloudCover) || 0, Number(f?.canonical?.current?.skyCover) || 0);
+  if (/storm|thunder|rain|shower|drizzle|snow|sleet|flurr|ice|freez|wintry|overcast|mostly cloudy|\bcloudy\b|fog|mist|haze|smoke/.test(cond)) {
+    return true;
+  }
+  if (!/sunny|clear/.test(cond) && clouds >= 70) return true;
+  return (cur.precipIn || 0) >= 0.02 || (cur.rainChance || 0) >= 60;
+}
+
+function renderBetaTodayCard(f) {
+  const host = document.getElementById('today-forecast');
+  if (!host) return;
+  if (f?.canonical?.days?.length) {
+    host.hidden = false;
+    host.innerHTML = todayForecastHTML(f.canonical, Date.now());
+    host.querySelectorAll('[data-today-forecast]').forEach((btn) => {
+      btn.addEventListener('click', () => openMainDayDetailModal(f, 0));
+    });
+  } else if (f?.days?.length) {
+    const d = f.days[0];
+    const cur = f.current;
+    host.hidden = false;
+    host.innerHTML = `
+      <button type="button" class="today-weather-card today-remainder" data-today-forecast>
+        <span class="today-copy">
+          <span class="day-name">Remainder of Today</span>
+          <span class="today-condition">${escapeAttr(d.condition || cur.condition)}</span>
+          <span class="today-temperatures">
+            <span class="today-low"><strong>${fmtTemp(d.lowF)}</strong><small>Low</small></span>
+            <i>—</i>
+            <span class="today-high"><strong>${fmtTemp(d.highF)}</strong><small>High</small></span>
+          </span>
+          <span class="today-feels">Peak forecast feels like <b>${fmtTemp(d.peakFeelsF)}</b><small>outdoors</small></span>
+        </span>
+        <span class="today-symbol" title="${escapeAttr(cur.rainLedger?.tooltip || '')}">
+          ${renderWeatherIconSvg(d.icon || cur.icon, 56)}
+          ${d.rainChance >= 5 ? `<strong>${Math.round(d.rainChance)}%</strong><small>Rain chance</small>` : ''}
+        </span>
+        <span class="today-metrics">
+          <span class="today-metric"><span><strong>${Math.round(d.maxWindMph || cur.windMph || 0)} mph</strong><small>Avg wind</small></span></span>
+          <span class="today-metric"><span><strong>${Math.round(f.airQuality?.currentAqi ?? 42)}</strong><small>AQI now</small></span></span>
+          <span class="today-metric"><span><strong>${Math.round(d.maxUvIndex ?? cur.uvIndex ?? 0)}</strong><small>Peak UV</small></span></span>
+        </span>
+        <span class="today-more">Tap for more details</span>
+      </button>
+    `;
+    host.querySelectorAll('[data-today-forecast]').forEach((btn) => {
+      btn.addEventListener('click', () => openDayHourlyModal(d, f));
+    });
+  } else {
+    host.hidden = true;
+  }
+}
+
+function openMainDayDetailModal(f, dayIndex = 0) {
+  const d = f?.days?.[dayIndex] || f?.days?.[0];
+  if (f?.canonical?.days?.[dayIndex]) {
+    const graphHtml = dayGraphHTML(f.canonical, dayIndex, false, Date.now());
+    openModal(
+      `${d?.dayName || 'Today'} (${d?.dateLabel || ''}) · ${f.location.name}`,
+      `
+        <div class="d7-modal-summary" style="margin-bottom:10px;">
+          <div><strong>${escapeAttr(d?.condition || f.current.condition)}</strong> · High ${fmtTemp(d?.highF)} / Low ${fmtTemp(d?.lowF)}</div>
+          <div style="font-size:12.5px;color:var(--muted);margin-top:3px;">
+            Feels ${fmtTemp(d?.minFeelsF)}–${fmtTemp(d?.peakFeelsF)} · Rain ${d?.rainChance ?? 0}% (${(d?.totalQpfIn ?? 0).toFixed(2)}") · Wind up to ${d?.maxWindMph ?? 0} mph
+          </div>
+        </div>
+        <div id="beta-main-day-graph-host">${graphHtml}</div>
+      `
+    );
+    const host = document.getElementById('beta-main-day-graph-host');
+    if (host) installDayGraph(host, f.canonical, dayIndex, false, Date.now());
+  } else if (d) {
+    openDayHourlyModal(d, f);
+  }
+}
+
 function renderAll() {
   const f = state.forecast;
   if (!f) return;
+
+  if (f.canonical) {
+    try {
+      globalThis.__weatherNourieForecast = f.canonical;
+      document.dispatchEvent(new CustomEvent('weather-nourie:forecast', { detail: f.canonical }));
+    } catch {}
+  }
 
   updateSkyAtmosphere(f);
   renderStatusAndAlerts(f);
   renderWeatherHazards(f);
   renderHeroAndBriefing(f);
   renderTopCompactPills(f);
+  renderBetaTodayCard(f);
   renderFeelsTimeAndTrio(f);
   renderNext24QuickCard(f);
   renderSevenDayForecast(f);
@@ -328,7 +425,10 @@ function renderAll() {
   renderCompareModelsSection(f);
 
   state.globePanel?.updateForecast(f);
-  if (state.mapController?.map) state.mapController.init(f);
+  // Preload radar immediately when forecast loads so first radar frame is ready without a 30-60s wait
+  if (state.mapController) {
+    void state.mapController.init(f);
+  }
 }
 
 function applyBackdropPhotoForSky(f) {
@@ -346,7 +446,7 @@ function applyBackdropPhotoForSky(f) {
   } else if (state.skyOverride === 'sunset') {
     photo = { src: '/weather-fusion/today-sky-sunset.jpg', cls: 'sky-sunset' };
   } else {
-    photo = selectHeroBackdropPhoto(f.current);
+    photo = selectHeroBackdropPhoto(f.current, f.canonical);
   }
   const targetCls = photo.cls ? `hero-bg-photo ${photo.cls}` : 'hero-bg-photo';
   if (heroBg.getAttribute('src') !== photo.src) {
@@ -363,7 +463,10 @@ function applyBackdropPhotoForSky(f) {
 }
 
 function updateSkyAtmosphere(f) {
-  const autoMood = f.current?.skyMood || (f.current?.isDay ? 'day' : 'night');
+  const cloudyOrWet = isSkyCloudyOrWet(f);
+  const autoMood = cloudyOrWet
+    ? ((f.current?.rainChance >= 60 || (f.current?.precipIn || 0) >= 0.02) ? 'rain' : 'cloudy')
+    : (f.current?.skyMood || (f.current?.isDay ? 'day' : 'night'));
   const mood = state.skyOverride === 'auto' ? autoMood : state.skyOverride;
   state.skyMood = mood;
   document.body.setAttribute('data-sky', mood);
@@ -538,26 +641,27 @@ function renderTopCompactPills(f) {
   }});
 }
 
-function selectHeroBackdropPhoto(cur) {
-  const cond = String(cur.condition || '').toLowerCase();
+function selectHeroBackdropPhoto(cur, canonical = null) {
+  const cond = String(cur.condition || canonical?.current?.condition || '').toLowerCase();
+  const clouds = Math.max(Number(cur.cloudCover) || 0, Number(canonical?.current?.skyCover) || 0);
   const isNight = !cur.isDay;
   const isStorm = /storm|thunder|t-storm|lightning/.test(cond);
   const isRain = /rain|shower|drizzle|snow|sleet|flurr|ice|freez|wintry/.test(cond) || (cur.precipIn || 0) >= 0.02 || (cur.rainChance || 0) >= 60;
-  const isExplicitSunny = /partly|mostly sunny|sunny|clear/.test(cond);
-  const isOvercastCloudy = /overcast|mostly cloudy|\bcloudy\b|fog|mist|haze|smoke/.test(cond) || (!isExplicitSunny && (cur.cloudCover || 0) >= 70);
-  const isPartly = /partly|mostly sunny|few clouds|scattered/.test(cond) || (cur.cloudCover || 0) >= 30;
+  const isExplicitSunny = /partly|mostly sunny|sunny|clear/.test(cond) && !/mostly cloudy|\bcloudy\b|overcast/.test(cond);
+  const isOvercastCloudy = /overcast|mostly cloudy|\bcloudy\b|fog|mist|haze|smoke/.test(cond) || (!isExplicitSunny && clouds >= 70);
+  const isPartly = /partly|mostly sunny|few clouds|scattered/.test(cond) || clouds >= 30;
 
-  if (isNight && !isRain && !isStorm) {
-    return { src: '/weather-fusion/today-sky-night-v2.webp', cls: '' };
-  }
   if (isStorm) {
     return { src: '/weather-fusion/today-sky-rain.webp', cls: 'sky-storm' };
   }
   if (isRain) {
-    return { src: '/weather-fusion/today-sky-rain.webp', cls: '' };
+    return { src: '/weather-fusion/today-sky-rain.webp', cls: isNight ? 'sky-overcast-night' : '' };
   }
   if (isOvercastCloudy) {
-    return { src: '/weather-fusion/today-sky-rain.webp', cls: 'sky-overcast' };
+    return { src: '/weather-fusion/today-sky-rain.webp', cls: isNight ? 'sky-overcast-night' : 'sky-overcast' };
+  }
+  if (isNight) {
+    return { src: '/weather-fusion/today-sky-night-v2.webp', cls: '' };
   }
   if (isPartly) {
     return { src: '/weather-fusion/today-sky-clouds.webp', cls: 'sky-partly' };
@@ -804,10 +908,13 @@ function renderHeroAndBriefing(f) {
     takeBannerCopy.textContent = card?.text ? cleanTakeJargon(card.text.replace(/\n+/g, ' · ')) : firstSentence;
   }
 
-  // 4-Column Quick Stats Glass Strip
-  const next24Precip = (f.hours48 || [])
-    .slice(0, 24)
-    .reduce((acc, h) => acc + (Number(h.precipIn) || 0), 0);
+  // 4-Column Quick Stats Glass Strip (use exact canonical 24-hour QPF sum when available so Main and Beta match identically)
+  const canonNext24 = f.canonical?.precipitation?.value;
+  const next24Precip = typeof canonNext24 === 'number' && Number.isFinite(canonNext24)
+    ? canonNext24
+    : (f.hours48 || [])
+        .slice(0, 24)
+        .reduce((acc, h) => acc + (Number(h.precipIn) || 0), 0);
   const rainEl = document.getElementById('qs-rain-val');
   const precipEl = document.getElementById('qs-precip-val');
   const aqiValEl = document.getElementById('qs-aqi-val');
@@ -815,7 +922,10 @@ function renderHeroAndBriefing(f) {
   const meterArcEl = document.getElementById('qs-weather-meter-arc');
   const meterSubEl = document.getElementById('qs-meter-sub');
 
-  if (rainEl) rainEl.textContent = `${Math.round(today.rainChance ?? cur.rainChance ?? 0)}%`;
+  if (rainEl) {
+    rainEl.textContent = `${Math.round(today.rainChance ?? cur.rainChance ?? 0)}%`;
+    rainEl.title = cur.rainLedger?.tooltip || '';
+  }
   if (precipEl) precipEl.textContent = `${next24Precip.toFixed(2)}"`;
   if (aqiValEl) {
     aqiValEl.textContent = String(Math.round(aqi));
@@ -911,7 +1021,8 @@ function renderFeelsTimeAndTrio(f) {
     trioOutfitEl.innerHTML = referenceScene(1, Boolean(h.isDay), h.condition || 'Clear', h.feelsLikeF ?? h.tempF, sceneCtx);
   }
   if (trioDpVal) trioDpVal.textContent = fmtTemp(h.dewPointF);
-  if (trioDpLbl) trioDpLbl.textContent = getDewPointVerdict(h.dewPointF ?? 50);
+  const feelMeterVerdict = dewpointFeelLevel(h.dewPointF ?? 50, h.windMph ?? 0);
+  if (trioDpLbl) trioDpLbl.textContent = feelMeterVerdict?.label || getDewPointVerdict(h.dewPointF ?? 50);
   if (trioWindSpd) trioWindSpd.textContent = String(Math.round(h.windMph ?? 0));
   if (trioWindUnit) trioWindUnit.textContent = `mph ${h.windCardinal || 'N'}`;
   if (trioWindGust) trioWindGust.textContent = `Gusts ${Math.round(h.windGustMph ?? h.windMph ?? 0)} mph`;
@@ -921,17 +1032,34 @@ function renderFeelsTimeAndTrio(f) {
 function renderNext24QuickCard(f) {
   const stage = document.getElementById('next24-spline-stage');
   if (!stage) return;
-
-  renderNext24HoursSplineChart({
-    containerEl: stage,
-    hours: f.hours48,
-    metricId: state.n24MetricId,
-    selectedHourIdx: state.selectedHourIdx,
-    useCelsius: state.useCelsius,
-    renderIconFn: renderWeatherIconSvg,
-    onSelectHour: (idx) => {
-      state.selectedHourIdx = idx;
-    }
+  const hrs = (f.hours48 || []).slice(0, 24);
+  const tz = f.timeZone || f.location?.timeZone || 'America/New_York';
+  stage.innerHTML = `
+    <div class="hourly-strip-scroll" aria-label="Next 24 hours hourly cards with rain chance and rainfall amount">
+      ${hrs
+        .map((h, idx) => {
+          const dayShort = idx === 0 ? '' : new Intl.DateTimeFormat('en-US', { timeZone: tz, weekday: 'short' }).format(h.dateObj);
+          const timeLbl = idx === 0 ? 'Now' : `${dayShort} ${h.hourLabel}`;
+          const amtStr = (h.precipIn || 0) > 0 ? `${Number(h.precipIn).toFixed(2)}"` : '0.00"';
+          return `
+            <button type="button" class="hour-tile ${idx === state.selectedHourIdx ? 'active' : ''}" data-n24-card="${idx}" title="${escapeAttr(h.rainLedger?.tooltip || '')}">
+              <span class="hour-tile-time">${escapeAttr(timeLbl)}</span>
+              <div>${renderWeatherIconSvg(h.icon, 28)}</div>
+              <span class="hour-tile-temp">${fmtTemp(h.tempF)}</span>
+              <span class="hour-tile-feels">Feels ${fmtTemp(h.feelsLikeF)}</span>
+              <span class="hour-pop-pill" title="${escapeAttr(h.rainLedger?.tooltip || '')}">💧 ${h.rainChance}%</span>
+              <span class="hour-qpf-sub" style="font-size:10.5px;color:var(--blue);font-weight:600;">${amtStr}</span>
+            </button>
+          `;
+        })
+        .join('')}
+    </div>
+  `;
+  stage.querySelectorAll('[data-n24-card]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      state.selectedHourIdx = Number(btn.dataset.n24Card) || 0;
+      renderNext24QuickCard(f);
+    });
   });
 }
 
@@ -957,7 +1085,8 @@ function openDayHourlyModal(day, f) {
         <td><span style="display:inline-flex;align-items:center;gap:5px;">${renderWeatherIconSvg(h.icon, 20)}<span>${h.condition}</span></span></td>
         <td><strong>${fmtTemp(h.tempF)}</strong></td>
         <td>${fmtTemp(h.feelsLikeF)}</td>
-        <td>💧 ${h.rainChance}%</td>
+        <td title="${escapeAttr(h.rainLedger?.tooltip || '')}">💧 ${h.rainChance}%</td>
+        <td><strong>${Number(h.precipIn || 0).toFixed(2)}"</strong></td>
         <td>${h.windMph} mph ${h.windCardinal || ''}</td>
         <td>${h.cloudCover ?? '—'}%</td>
       </tr>
@@ -982,7 +1111,8 @@ function openDayHourlyModal(day, f) {
               <th>Sky</th>
               <th>Temp</th>
               <th>Feels</th>
-              <th>Rain</th>
+              <th>Rain %</th>
+              <th>Rain Amt</th>
               <th>Wind</th>
               <th>Clouds</th>
             </tr>
@@ -1063,6 +1193,25 @@ function renderSevenDayForecast(f) {
         <div class="d7-stat-cell">
           <span class="d7-stat-lbl">Sun</span>
           <strong class="d7-stat-val">${formatHHMMTo12h(d.sunrise)} / ${formatHHMMTo12h(d.sunset)}</strong>
+        </div>
+      </div>
+      <div class="day-hourly-rain-breakdown" style="margin-top:10px;" aria-label="Hourly rain amounts for ${escapeAttr(d.dayName)}">
+        <div class="day-hourly-rain-head">
+          <strong>Hourly Rain Amounts · ${escapeAttr(d.dayName)}</strong>
+          <span>Day total: ${d.totalQpfIn.toFixed(2)} in</span>
+        </div>
+        <div class="day-hourly-rain-grid">
+          ${(d.hours || [])
+            .map(
+              (h) => `
+            <div class="day-hour-rain-cell" title="${escapeAttr(h.rainLedger?.tooltip || '')}">
+              <span class="dhr-time">${escapeAttr(h.hourLabel)}</span>
+              <strong class="dhr-amt">${Number(h.precipIn || 0).toFixed(2)}"</strong>
+              <small class="dhr-pop">💧 ${h.rainChance}%</small>
+            </div>
+          `
+            )
+            .join('')}
         </div>
       </div>
     `;
@@ -1357,8 +1506,8 @@ function renderOutdoorExposureCards(f) {
     const isOpen=state.expandedExposureIds.has(item.id),pets=item.id==='pets';
     const value=pets?fmtTemp(pave.concreteTempF):item.badgeVal;
     const subtitle=pets?pave.pawSafety.label:!Number.isFinite(item.id==='shade'?cur.shadeFeelsF:sunTileFeels)?'Estimate unavailable':item.id==='shade'?getFeelsVerdict(cur.shadeFeelsF,isRaining).label:getFeelsVerdict(sunTileFeels,isRaining).label;
-    const caption=pets?'Concrete surface':item.id==='shade'?'Feels like in shade':!cur.isDay?'Feels like at night':isRaining||isCloudyNoSun?'Feels like outdoors':'Feels like in sun';
-    return `<article class="glass exposure-person-card" data-exp-card="${item.id}"><button type="button" class="exposure-person-button" data-exp-toggle="${item.id}" aria-expanded="${isOpen}" aria-controls="exposure-detail-${item.id}"><span class="person-card-title">${titles[item.id]}</span><span class="person-card-scene">${item.svg}</span><span class="person-card-reading"><strong>${value}</strong><span>${caption}</span>${pets?`<b>Asphalt ${fmtTemp(pave.asphaltTempF)}</b><small>Est. surface temp</small>`:''}</span><span class="person-card-description"${pets?` style="color:${pave.pawSafety.color}"`:''}>${subtitle}</span><small class="person-card-detail-hint">${isOpen?'Close details':'Details'} ›</small></button></article>`;
+    const caption=pets?`Concrete · Asphalt ${fmtTemp(pave.asphaltTempF)}`:item.id==='shade'?'Feels like in shade':!cur.isDay?'Feels like at night':isRaining||isCloudyNoSun?'Feels like outdoors':'Feels like in sun';
+    return `<article class="glass exposure-person-card" data-exp-card="${item.id}"><button type="button" class="exposure-person-button" data-exp-toggle="${item.id}" aria-expanded="${isOpen}" aria-controls="exposure-detail-${item.id}"><span class="person-card-title">${titles[item.id]}</span><span class="person-card-scene">${item.svg}</span><span class="person-card-reading"><strong>${value}</strong><span>${caption}</span></span><span class="person-card-description"${pets?` style="color:${pave.pawSafety.color}"`:''}>${subtitle}</span><small class="person-card-detail-hint">${isOpen?'Close details':'Details'} ›</small></button></article>`;
   }).join('')+items.filter(item=>state.expandedExposureIds.has(item.id)).map(item=>`<section class="exposure-expanded-body" id="exposure-detail-${item.id}" data-exp-id="${item.id}" aria-label="${titles[item.id]} details">${item.detailsHtml}</section>`).join('');
 
   container.querySelectorAll('[data-exp-toggle]').forEach((btn) => {
@@ -2095,7 +2244,16 @@ function renderAqiAndGlanceTiles(f) {
 
     metricsGrid.querySelectorAll('.apple-tile').forEach((tile) => {
       tile.addEventListener('click', () => {
-        state.selectedMetricId = tile.dataset.jumpMetric || 'temp';
+        const metricId = tile.dataset.jumpMetric || 'temp';
+        if (metricId === 'humidity' || metricId === 'dewPoint') {
+          openDewPointFeelMeterModal(f);
+          return;
+        }
+        if (metricId === 'wind') {
+          openWindCompassModal(f);
+          return;
+        }
+        state.selectedMetricId = metricId;
         open48hExplorerModal(f);
       });
     });
@@ -2485,7 +2643,17 @@ function initHeaderControls() {
     });
   });
 
-  // How It Feels Trio Card -> Open What to Wear & Comfort Modal
+  // Dew Point Feel Meter Card -> Open Main-Site Dew Point Feel Meter Modal
+  document.getElementById('dewpoint-feel-card-btn')?.addEventListener('click', () => {
+    if (state.forecast) openDewPointFeelMeterModal(state.forecast);
+  });
+
+  // Wind Compass Card -> Open Interactive Animated Wind Compass Modal
+  document.getElementById('wind-compass-card-btn')?.addEventListener('click', () => {
+    if (state.forecast) openWindCompassModal(state.forecast);
+  });
+
+  // Legacy How It Feels Trio Card (if present) -> Open What to Wear & Comfort Modal
   document.getElementById('how-feels-card-btn')?.addEventListener('click', () => {
     if (state.forecast) openWardrobeModal(state.forecast);
   });
@@ -2913,57 +3081,231 @@ function openWardrobeModal(f) {
   drawWardrobeContent();
 }
 
+function openDewPointFeelMeterModal(f) {
+  openModal(
+    `Dew Point Feel Meter · ${f.location.name}`,
+    `<section id="dewpoint-gross-meter" class="gross-panel" aria-label="Dew Point Feel Meter"></section>`
+  );
+  if (f?.canonical) {
+    renderDewpointMeter(f.canonical, Date.now());
+  } else {
+    const host = document.getElementById('dewpoint-gross-meter');
+    const cur = f.current;
+    const verdict = dewpointFeelLevel(cur?.dewPointF, cur?.windMph);
+    if (host) {
+      host.innerHTML = `
+        <div style="padding:12px;">
+          <div style="font-size:32px;font-weight:800;">${fmtTemp(cur?.dewPointF)}</div>
+          <div style="font-size:17px;font-weight:700;margin:4px 0;">${escapeAttr(verdict.label)}</div>
+          <p style="font-size:13.5px;color:var(--muted);margin:0 0 12px;">${escapeAttr(verdict.note)}</p>
+          <div id="fallback-dp-chart" style="height:210px;"></div>
+        </div>
+      `;
+      const chartEl = document.getElementById('fallback-dp-chart');
+      if (chartEl) {
+        renderDewPointFeelChart({
+          containerEl: chartEl,
+          hoursAll: f.hoursAll || f.hours48,
+          rangeHours: 48,
+          selectedHourIdx: 0,
+          useCelsius: state.useCelsius
+        });
+      }
+    }
+  }
+}
+
+function openWindCompassModal(f) {
+  const hrs = f.hours48 || [f.current];
+  let idx = clamp(state.feelsHourIdx || 0, 0, hrs.length - 1);
+  const tz = f.timeZone || f.location?.timeZone || 'America/New_York';
+
+  openModal(
+    `Wind & Live Compass · ${f.location.name}`,
+    `
+      <div class="wind-compass-modal-shell">
+        <div class="wind-compass-stage">
+          <svg class="wind-compass-large-svg" viewBox="0 0 240 240" width="216" height="216" role="img" aria-label="Interactive wind direction compass">
+            <defs>
+              <radialGradient id="wc-dial-bg" cx="50%" cy="45%" r="55%">
+                <stop offset="0%" stop-color="rgba(26, 56, 94, 0.72)"/>
+                <stop offset="100%" stop-color="rgba(8, 22, 42, 0.88)"/>
+              </radialGradient>
+            </defs>
+            <circle cx="120" cy="120" r="106" fill="url(#wc-dial-bg)" stroke="rgba(210, 235, 255, 0.42)" stroke-width="2"/>
+            <circle cx="120" cy="120" r="86" fill="none" stroke="rgba(180, 215, 250, 0.18)" stroke-width="1" stroke-dasharray="3 5"/>
+            <text x="120" y="30" text-anchor="middle" fill="#ffffff" font-size="14" font-weight="800">N</text>
+            <text x="176" y="64" text-anchor="middle" fill="rgba(210,230,250,0.65)" font-size="11" font-weight="600">NE</text>
+            <text x="210" y="125" text-anchor="middle" fill="#dcecfb" font-size="13" font-weight="700">E</text>
+            <text x="176" y="184" text-anchor="middle" fill="rgba(210,230,250,0.65)" font-size="11" font-weight="600">SE</text>
+            <text x="120" y="216" text-anchor="middle" fill="#dcecfb" font-size="13" font-weight="700">S</text>
+            <text x="64" y="184" text-anchor="middle" fill="rgba(210,230,250,0.65)" font-size="11" font-weight="600">SW</text>
+            <text x="30" y="125" text-anchor="middle" fill="#dcecfb" font-size="13" font-weight="700">W</text>
+            <text x="64" y="64" text-anchor="middle" fill="rgba(210,230,250,0.65)" font-size="11" font-weight="600">NW</text>
+            <!-- Smoothly rotating wind needle (points in direction wind is coming from / blowing toward) -->
+            <g id="wc-live-needle" style="transform-origin:120px 120px;transition:transform 0.38s cubic-bezier(0.22, 1, 0.36, 1);">
+              <line x1="120" y1="44" x2="120" y2="188" stroke="rgba(140, 204, 255, 0.85)" stroke-width="3.2" stroke-linecap="round"/>
+              <!-- Arrowhead at meteorological wind origin (From bearing) -->
+              <polygon points="120,34 111,56 120,50 129,56" fill="#8fd3ff" stroke="#ffffff" stroke-width="1.2" stroke-linejoin="round"/>
+              <!-- Tail feathers -->
+              <circle cx="120" cy="188" r="4.5" fill="rgba(255,255,255,0.45)"/>
+            </g>
+            <circle cx="120" cy="120" r="32" fill="rgba(10, 24, 46, 0.88)" stroke="rgba(210, 235, 255, 0.36)" stroke-width="1.5"/>
+            <text id="wc-center-spd" x="120" y="119" text-anchor="middle" fill="#ffffff" font-size="20" font-weight="800">--</text>
+            <text id="wc-center-unit" x="120" y="135" text-anchor="middle" fill="#b8d8f8" font-size="10.5" font-weight="600">mph</text>
+          </svg>
+        </div>
+        <div id="wc-readout-box" style="text-align:center;margin:10px 0 12px;"></div>
+        <div class="feels-slider-row" style="margin-top:6px;">
+          <span class="feels-slider-edge">Now</span>
+          <input id="wc-hour-slider" type="range" min="0" max="${Math.max(0, hrs.length - 1)}" value="${idx}" aria-label="Preview wind direction and speed across 48 hours" />
+          <span class="feels-slider-edge">+47h</span>
+        </div>
+      </div>
+    `
+  );
+
+  const updateCompassUI = (hIdx) => {
+    idx = clamp(hIdx, 0, hrs.length - 1);
+    const h = hrs[idx] || f.current;
+    const deg = Number.isFinite(h.windDirDeg) ? h.windDirDeg : 45;
+    const needle = document.getElementById('wc-live-needle');
+    const spdEl = document.getElementById('wc-center-spd');
+    const readoutEl = document.getElementById('wc-readout-box');
+    if (needle) needle.style.transform = `rotate(${deg}deg)`;
+    if (spdEl) spdEl.textContent = `${Math.round(h.windMph ?? 0)}`;
+    if (readoutEl) {
+      const stamp = formatZonedHourStamp(h, idx, tz);
+      readoutEl.innerHTML = `
+        <div style="font-size:17px;font-weight:800;color:#ffffff;">
+          From ${escapeAttr(h.windCardinal || 'N')} (${Math.round(deg)}°) · ${Math.round(h.windMph ?? 0)} mph
+        </div>
+        <div style="font-size:13px;color:var(--muted);margin-top:3px;">
+          ${escapeAttr(stamp)} · Gusts up to <strong>${Math.round(h.windGustMph ?? h.windMph ?? 0)} mph</strong>
+        </div>
+      `;
+    }
+  };
+
+  updateCompassUI(idx);
+  const slider = document.getElementById('wc-hour-slider');
+  slider?.addEventListener('input', () => {
+    updateCompassUI(Number(slider.value) || 0);
+  });
+}
+
+function mapV3MetricToMainTrend(metricId) {
+  const map = {
+    temp: 'temperature',
+    temperature: 'temperature',
+    feels: 'feels',
+    rainChance: 'precip',
+    precip: 'precip',
+    rainfall: 'rainfall',
+    wind: 'wind',
+    gusts: 'gust',
+    gust: 'gust',
+    humidity: 'humidity',
+    dewPoint: 'dewpoint',
+    dewpoint: 'dewpoint',
+    cloudCover: 'cloud',
+    cloud: 'cloud',
+    uvIndex: 'uv',
+    uv: 'uv',
+    pressure: 'pressure',
+    airQuality: 'aqi',
+    aqi: 'aqi'
+  };
+  return map[metricId] || 'temperature';
+}
+
 function open48hExplorerModal(f) {
   openModal(
-    `48-Hour Detailed Timeline · ${f.location.name}`,
+    `Next 48 Hours · ${f.location.name}`,
     `
-      <div id="modal-hourly-tabs" class="metric-tabs-bar"></div>
-      <div id="modal-hourly-readout" class="hourly-readout-bar" style="margin-bottom:10px;"></div>
-      <div id="modal-hourly-chart"></div>
+      <div id="modal-hourly-tabs" class="main-trend-tabs" role="tablist" aria-label="Hourly graph weather variable"></div>
+      <div class="main-trend-reading" aria-live="polite" style="margin:10px 0 8px;">
+        <strong id="modal-main-trend-value">—</strong>
+        <span id="modal-main-trend-time">Now · drag across the graph</span>
+      </div>
+      <div id="modal-hourly-chart" class="chart tall" style="min-height:220px;"></div>
       <div id="modal-hourly-strip" class="hourly-strip-scroll" style="margin-top:12px;"></div>
     `
   );
 
   const tabsWrap = document.getElementById('modal-hourly-tabs');
-  const readoutWrap = document.getElementById('modal-hourly-readout');
+  const valEl = document.getElementById('modal-main-trend-value');
+  const timeEl = document.getElementById('modal-main-trend-time');
   const chartStage = document.getElementById('modal-hourly-chart');
   const stripWrap = document.getElementById('modal-hourly-strip');
+  let activeTrendKey = mapV3MetricToMainTrend(state.selectedMetricId);
 
   const drawModalHourly = () => {
-    const activeMetric = HOURLY_METRICS.find((m) => m.id === state.selectedMetricId) || HOURLY_METRICS[0];
     if (tabsWrap) {
-      tabsWrap.innerHTML = HOURLY_METRICS.map(
-        (m) => `<button class="metric-tab-btn ${m.id === state.selectedMetricId ? 'active' : ''}" data-m-metric="${m.id}" type="button">${m.label}</button>`
-      ).join('');
-      tabsWrap.querySelectorAll('[data-m-metric]').forEach((btn) => {
+      tabsWrap.innerHTML = Object.entries(TREND_METRICS)
+        .map(
+          ([id, d]) =>
+            `<button type="button" role="tab" aria-selected="${id === activeTrendKey}" data-m-trend="${id}">${d.label}</button>`
+        )
+        .join('');
+      tabsWrap.querySelectorAll('[data-m-trend]').forEach((btn) => {
         btn.addEventListener('click', () => {
-          state.selectedMetricId = btn.dataset.mMetric;
+          activeTrendKey = btn.dataset.mTrend;
           drawModalHourly();
         });
       });
     }
 
-    const h = f.hours48[clamp(state.selectedHourIdx, 0, f.hours48.length - 1)];
-    const val = extractHourMetricValue(h, state.selectedMetricId, state.useCelsius);
-    const fmtV = activeMetric.decimals ? Number(val).toFixed(activeMetric.decimals) : Math.round(val);
-    if (readoutWrap) {
-      readoutWrap.innerHTML = `
-        <div class="hourly-readout-primary">
-          <span class="readout-big-val" style="color:${activeMetric.color};">${fmtV}${activeMetric.unit}</span>
-          <div>
-            <div style="font-size:15px;font-weight:700;color:#ffffff;">${h.dateObj.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} · ${h.hourLabel} (${h.condition})</div>
-            <div class="readout-meta">Temp ${fmtTemp(h.tempF)} · Feels ${fmtTemp(h.feelsLikeF)} · Rain ${h.rainChance}% · Wind ${h.windMph} mph</div>
-          </div>
-        </div>
-      `;
+    if (f.canonical && chartStage) {
+      const series = mainTrendSeries(f.canonical);
+      const start = Math.floor(Date.now() / HALO_H) * HALO_H;
+      const end = start + 48 * HALO_H;
+      const def = TREND_METRICS[activeTrendKey] || TREND_METRICS.temperature;
+      const points = series[activeTrendKey] || [];
+      const available = points.filter((p) => p.t >= start && p.t <= end && typeof p.v === 'number' && Number.isFinite(p.v));
+      const tz = f.canonical.location?.timeZone || f.timeZone || 'America/New_York';
+      const showPoint = (p) => {
+        if (valEl) valEl.textContent = trendReading(activeTrendKey, p);
+        if (timeEl) {
+          timeEl.textContent = p
+            ? haloFmt(p.t, tz, { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+            : 'Now · drag across the graph';
+        }
+      };
+      mountChart(
+        chartStage,
+        {
+          points,
+          extra: activeTrendKey === 'wind' ? series.gust : [],
+          t0: start,
+          t1: end,
+          tz,
+          nowT: null,
+          nights: nightBands(solarDays(f.canonical), start, end),
+          multiDay: true
+        },
+        def,
+        (p) => showPoint(p || available[0])
+      );
+      showPoint(available[0]);
+    } else if (chartStage) {
+      renderHourlyExplorerChart({
+        containerEl: chartStage,
+        hours48: f.hours48,
+        metricId: state.selectedMetricId,
+        selectedHourIdx: state.selectedHourIdx,
+        useCelsius: state.useCelsius
+      });
     }
+
     if (stripWrap) {
-      stripWrap.innerHTML = f.hours48.slice(0, 24).map((hr, idx) => `
-        <div class="hour-tile ${idx === state.selectedHourIdx ? 'active' : ''}" data-m-h="${idx}">
+      stripWrap.innerHTML = (f.hours48 || []).slice(0, 24).map((hr, idx) => `
+        <div class="hour-tile ${idx === state.selectedHourIdx ? 'active' : ''}" data-m-h="${idx}" title="${escapeAttr(hr.rainLedger?.tooltip || '')}">
           <span class="hour-tile-time">${hr.hourLabel}</span>
           <div>${renderWeatherIconSvg(hr.icon, 28)}</div>
           <span class="hour-tile-temp">${fmtTemp(hr.tempF)}</span>
-          <span class="hour-pop-pill">💧 ${hr.rainChance}%</span>
+          <span class="hour-pop-pill" title="${escapeAttr(hr.rainLedger?.tooltip || '')}">💧 ${hr.rainChance}%</span>
+          <span style="font-size:10.5px;color:var(--blue);font-weight:600;">${Number(hr.precipIn || 0).toFixed(2)}"</span>
         </div>
       `).join('');
       stripWrap.querySelectorAll('[data-m-h]').forEach((el) => {
@@ -2973,17 +3315,6 @@ function open48hExplorerModal(f) {
         });
       });
     }
-    renderHourlyExplorerChart({
-      containerEl: chartStage,
-      hours48: f.hours48,
-      metricId: state.selectedMetricId,
-      selectedHourIdx: state.selectedHourIdx,
-      useCelsius: state.useCelsius,
-      onSelectHour: (idx) => {
-        state.selectedHourIdx = idx;
-        drawModalHourly();
-      }
-    });
   };
   drawModalHourly();
 }
@@ -3313,8 +3644,8 @@ function initSkyCanvas() {
         }
         if (p.x < -40) p.x = W + 20;
       });
-    } else if (mood === 'night') {
-      // Twinkling stars
+    } else if (mood === 'night' && (state.skyOverride === 'night' || !isSkyCloudyOrWet(state.forecast))) {
+      // Twinkling stars & current moon phase only on clear/partly-cloudy nights (never when overcast cloudy)
       particles.slice(0, 55).forEach((p) => {
         const twinkle = 0.25 + 0.55 * (0.5 + 0.5 * Math.sin(ts * 0.002 + p.phase));
         ctx.fillStyle = `rgba(220, 236, 255, ${twinkle.toFixed(2)})`;
@@ -3322,13 +3653,12 @@ function initSkyCanvas() {
         ctx.arc(p.x, p.y * 0.65, p.radius, 0, Math.PI * 2);
         ctx.fill();
       });
-      // Realistic current astronomical moon phase in upper-left night sky
       const moonR = W < 600 ? 25 : 32;
       const mImg = ensureMoonCanvas(moonR);
       const mx = W < 600 ? W * 0.23 : W * 0.22;
       const my = W < 600 ? 224 : 210;
       ctx.drawImage(mImg, Math.round(mx - mImg.width / 2), Math.round(my - mImg.height / 2));
-    } else if (mood !== 'cloudy' && mood !== 'sunset') {
+    } else if (mood !== 'cloudy' && mood !== 'sunset' && !isSkyCloudyOrWet(state.forecast)) {
       // Subtle floating solar light motes (never on overcast/cloudy days)
       particles.slice(0, 35).forEach((p) => {
         ctx.fillStyle = `rgba(255, 232, 175, ${(p.alpha * 0.38).toFixed(2)})`;

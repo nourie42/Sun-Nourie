@@ -561,6 +561,13 @@ body[data-sky="night"] .atmosphere {
   filter: brightness(0.96) saturate(0.84);
 }
 
+.hero-bg-photo.sky-overcast-night {
+  object-position: 0% 10% !important;
+  transform: scale(2.25);
+  transform-origin: 0% 10%;
+  filter: brightness(0.42) saturate(0.65) contrast(1.12);
+}
+
 @media (max-width: 760px) {
   .hero-bg-photo.sky-clear {
     object-position: 66% 42%;
@@ -573,6 +580,12 @@ body[data-sky="night"] .atmosphere {
     transform: scale(1.04);
     transform-origin: 0% 50%;
     filter: brightness(0.96) saturate(0.86);
+  }
+  .hero-bg-photo.sky-overcast-night {
+    object-position: 0% 50% !important;
+    transform: scale(1.04);
+    transform-origin: 0% 50%;
+    filter: brightness(0.42) saturate(0.65) contrast(1.12);
   }
 }
 

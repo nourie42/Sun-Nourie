@@ -10,10 +10,13 @@
   <link rel="stylesheet" href="/weather-fusion/car-wash.css?v=center-answer-v43" />
   <link rel="stylesheet" href="/weather-fusion/risk-outlooks.css?v=risk-outlooks-v5" />
   <link rel="stylesheet" href="/weather-fusion/forecast-window-banners.css?v=current-rain-20261017-v3" />
-  <link rel="stylesheet" href="/weather-fusion/weather-glass.css?v=ice-v2" />
+  <link rel="stylesheet" href="/weather-fusion/forecast-cards.css?v=beta-glass-today-v1" />
+  <link rel="stylesheet" href="/weather-fusion/main-hourly-trend.css?v=beta-glass-48h-v1" />
+  <link rel="stylesheet" href="/weather-fusion/dewpoint-meter.css?v=feel-chart-v3" />
+  <link rel="stylesheet" href="/weather-fusion/weather-glass.css?v=ice-v3" />
   <link rel="stylesheet" href="/weather-fusion/outlook-panel.css?v=compact-v3" />
-  <link rel="stylesheet" href="/weather-fusion/v3/css/styles.css?v=v3-sky-8" />
-  <link rel="stylesheet" href="/weather-fusion/v3/css/people-globe.css?v=refined-12" />
+  <link rel="stylesheet" href="/weather-fusion/v3/css/styles.css?v=v3-all-13" />
+  <link rel="stylesheet" href="/weather-fusion/v3/css/people-globe.css?v=v3-all-13" />
 </head>
 <body data-sky="cloudy">
   <!-- Full-Viewport Fixed Dynamic Living Sky Backdrop (Flows Behind Every Glass Tile) -->
@@ -72,6 +75,7 @@
           <button class="mode-pill" id="open-wardrobe-modal" type="button">👕 What to Wear</button>
           <button class="mode-pill" id="open-snow-modal" type="button">❄️ Snow Outlook</button>
           <button class="mode-pill" id="open-behind-modal" type="button">ℹ Behind Forecast</button>
+          <a class="mode-pill" href="/weather-fusion/analytics.html">📊 View Analytics</a>
           <button id="sky-audio-btn" class="mode-pill" type="button">🔊 Sky Sounds</button>
           <select id="sky-mood-select" class="sky-select" aria-label="Sky background theme">
             <option value="auto">Sky: Auto</option>
@@ -146,6 +150,9 @@
     <section id="weather-outlook-summary" class="weather-outlook-panel glass" hidden aria-label="Nourie Take and applicable weather outlooks"></section>
     <div id="top-compact-pills" class="top-compact-pills" aria-label="Forecast highlights"></div>
 
+    <!-- Remainder of Today / Today Card from Main App (Placed Just Below Nourie Take & Other Alerts) -->
+    <section id="today-forecast" class="glass today-panel beta-today-panel" aria-label="Today's forecast"></section>
+
     <!-- 4-Column Quick Stats Glass Strip (Rain | Precip | AQI Clickable | Weather Meter Clickable) -->
     <section id="quick-stats-strip" class="glass quick-stats-strip" aria-label="Quick Weather Summary">
       <div class="qs-col">
@@ -189,28 +196,10 @@
       <div id="pollutant-bars" class="pollutant-list"></div>
     </section>
 
-    <section id="weather-globe-panel" class="glass weather-globe-panel" aria-label="Interactive weather globe">
-      <button id="open-weather-globe" class="globe-preview-button" type="button" aria-haspopup="dialog" aria-label="Expand weather globe">
-        <span class="globe-preview-copy"><strong>Weather around the world</strong><span id="globe-location-label">Your selected location</span><small>Radar · Satellite · Moving wind</small><span class="globe-expand-hint">Explore globe <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 13 13 3M4 3h9v9" fill="none" stroke="currentColor" stroke-width="1.6" /></svg></span></span>
-        <span id="globe-preview-mount" class="globe-preview-mount"><span class="globe-loading" id="globe-loading">Loading Earth…</span></span>
-      </button>
-    </section>
-
-    <!-- Next 24 Hours Smooth Luminous Spline Card -->
+    <!-- Next 48 Hours Graphs From the Main Site -->
     <section id="next-24-panel" class="glass section-panel card-compact">
-      <div class="n24-header">
-        <h2 class="card-title-clean">Next 24 Hours</h2>
-        <div id="n24-metric-pills" class="n24-pill-group" role="tablist" aria-label="Hourly view">
-          <button class="n24-pill active" data-n24-metric="temp" type="button">Temp</button>
-          <button class="n24-pill" data-n24-metric="feels" type="button">Feels Like</button>
-          <button class="n24-pill" data-n24-metric="rain" type="button">Rain</button>
-          <button class="n24-pill" data-n24-metric="wind" type="button">Wind</button>
-        </div>
-      </div>
-      <div id="next24-spline-stage"></div>
-      <div class="card-more-row">
-        <button id="open-48h-explorer-btn" class="subtle-link-pill" type="button">View 48-Hour Breakdown &amp; Charts ›</button>
-      </div>
+      <div id="main-hourly-trend"></div>
+      <div id="next24-spline-stage" style="margin-top:10px;"></div>
     </section>
 
     <!-- 7-Day Outlook Dual-Curve High & Low Spline + Full Selected-Day Details -->
@@ -223,27 +212,16 @@
       <div id="seven-day-selected-detail" class="d7-detail-card"></div>
     </section>
 
-    <!-- 3-Column Comfort & Conditions Trio -->
-    <section id="comfort-trio-section" class="comfort-trio-grid" aria-label="How It Feels, Dew Point, and Wind">
-      <button id="how-feels-card-btn" class="glass trio-card trio-feels-card trio-clickable" type="button" aria-label="What to Wear suggestions">
-        <div class="trio-head"><span aria-hidden="true">🌡</span> How It Feels <span class="bar-chevron trio-tap-hint" aria-hidden="true">›</span></div>
-        <div class="trio-feels-body">
-          <div class="trio-feels-text">
-            <div id="trio-feels-label" class="trio-feels-verdict">Comfortable</div>
-            <div id="trio-feels-note" class="trio-sub">What to Wear</div>
-          </div>
-          <div id="trio-outfit-visual" class="trio-cartoon-thumb"></div>
-        </div>
+    <!-- 2-Column Dew Point (Feel Meter) & Wind (Animated Compass) Glass Row -->
+    <section id="comfort-trio-section" class="comfort-trio-grid comfort-duo-grid" aria-label="Dew Point Feel Meter and Wind Compass">
+      <button id="dewpoint-feel-card-btn" class="glass trio-card trio-center-card trio-clickable" type="button" aria-label="Open Dew Point Feel Meter">
+        <div class="trio-head"><span aria-hidden="true">💧</span> Dew Point · Feel Meter <span class="bar-chevron trio-tap-hint" aria-hidden="true">›</span></div>
+        <div id="trio-dewpoint-val" class="trio-big-val">--°</div>
+        <div id="trio-dewpoint-label" class="trio-sub">Tap for Feel Meter</div>
       </button>
 
-      <article class="glass trio-card trio-center-card">
-        <div class="trio-head"><span aria-hidden="true">💧</span> Dew Point</div>
-        <div id="trio-dewpoint-val" class="trio-big-val">--°</div>
-        <div id="trio-dewpoint-label" class="trio-sub">Comfortable</div>
-      </article>
-
-      <article class="glass trio-card trio-wind-card">
-        <div class="trio-head"><span aria-hidden="true">💨</span> Wind</div>
+      <button id="wind-compass-card-btn" class="glass trio-card trio-wind-card trio-clickable" type="button" aria-label="Open interactive Wind Compass">
+        <div class="trio-head"><span aria-hidden="true">💨</span> Wind · Live Compass <span class="bar-chevron trio-tap-hint" aria-hidden="true">›</span></div>
         <div class="trio-wind-body">
           <div>
             <div class="trio-wind-val-row">
@@ -254,7 +232,7 @@
           </div>
           <div id="trio-wind-compass" class="trio-compass-wrap" aria-hidden="true"></div>
         </div>
-      </article>
+      </button>
     </section>
 
     <!-- Interactive Time Selector for How It Feels, What to Wear & Outdoor Cartoon Cards -->
@@ -299,32 +277,14 @@
       </div>
     </button>
 
-    <!-- Conditions & Details (8 Interactive Apple/Samsung Tiles) -->
-    <section id="your-day" class="your-day-clean">
-      <div class="section-inline-head">
-        <h2 class="card-title-clean">Conditions &amp; Details</h2>
-      </div>
-      <div id="metrics-grid" class="apple-tiles-grid"></div>
+    <section id="weather-globe-panel" class="glass weather-globe-panel" aria-label="Interactive weather globe">
+      <button id="open-weather-globe" class="globe-preview-button" type="button" aria-haspopup="dialog" aria-label="Expand weather globe">
+        <span class="globe-preview-copy"><strong>Weather around the world</strong><span id="globe-location-label">Your selected location</span><small>Radar · Satellite · Moving wind</small><span class="globe-expand-hint">Explore globe <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 13 13 3M4 3h9v9" fill="none" stroke="currentColor" stroke-width="1.6" /></svg></span></span>
+        <span id="globe-preview-mount" class="globe-preview-mount"><span class="globe-loading" id="globe-loading">Loading Earth…</span></span>
+      </button>
     </section>
 
-    <!-- Best Times to Be Outside -->
-    <section id="best-times" class="glass section-panel card-compact">
-      <div class="n24-header">
-        <div>
-          <h2 class="card-title-clean">Best Times Outside</h2>
-          <p class="section-subtitle" style="margin-top:2px;">Gold = great outdoor weather · Dot = rain possible</p>
-        </div>
-        <div id="perfect-hours-badge" class="wfo-pill"></div>
-      </div>
-      <div class="heatmap-scroll">
-        <div id="best-times-grid" class="heatmap-grid"></div>
-      </div>
-      <div id="heatmap-hover-readout" style="margin-top:10px;font-size:12.5px;color:var(--blue);font-weight:600;">
-        Select any hour box to see how it feels.
-      </div>
-    </section>
-
-    <!-- Live Radar -->
+    <!-- Live Radar (Immediately After Weather Around the World) -->
     <section id="map-panel" class="glass section-panel card-compact">
       <div class="n24-header">
         <div>
@@ -352,6 +312,31 @@
           <span id="radar-stamp" class="wfo-pill">Live</span>
         </div>
         <div id="map-legend" style="display:flex;gap:10px;flex-wrap:wrap;font-size:11.5px;color:var(--muted);"></div>
+      </div>
+    </section>
+
+    <!-- Conditions & Details (8 Interactive Apple/Samsung Tiles) -->
+    <section id="your-day" class="your-day-clean">
+      <div class="section-inline-head">
+        <h2 class="card-title-clean">Conditions &amp; Details</h2>
+      </div>
+      <div id="metrics-grid" class="apple-tiles-grid"></div>
+    </section>
+
+    <!-- Best Times to Be Outside -->
+    <section id="best-times" class="glass section-panel card-compact">
+      <div class="n24-header">
+        <div>
+          <h2 class="card-title-clean">Best Times Outside</h2>
+          <p class="section-subtitle" style="margin-top:2px;">Gold = great outdoor weather · Dot = rain possible</p>
+        </div>
+        <div id="perfect-hours-badge" class="wfo-pill"></div>
+      </div>
+      <div class="heatmap-scroll">
+        <div id="best-times-grid" class="heatmap-grid"></div>
+      </div>
+      <div id="heatmap-hover-readout" style="margin-top:10px;font-size:12.5px;color:var(--blue);font-weight:600;">
+        Select any hour box to see how it feels.
       </div>
     </section>
 
@@ -427,6 +412,14 @@
           </span>
           <span class="bar-chevron" aria-hidden="true">›</span>
         </button>
+        <a href="/weather-fusion/analytics.html" class="more-tile-btn" style="text-decoration:none;color:inherit;">
+          <span class="more-tile-ico">📊</span>
+          <span>
+            <strong>Page View Analytics</strong>
+            <small>Live view counts, visitor locations, and traffic breakdown</small>
+          </span>
+          <span class="bar-chevron" aria-hidden="true">›</span>
+        </a>
       </div>
     </section>
   </main>
@@ -483,6 +476,7 @@
   </footer>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
-  <script type="module" src="/weather-fusion/v3/js/app.js?v=v3-refined-12"></script>
+  <script type="module" src="/weather-fusion/main-hourly-trend.js?v=beta-glass-48h-v1"></script>
+  <script type="module" src="/weather-fusion/v3/js/app.js?v=v3-all-13"></script>
 </body>
 </html>

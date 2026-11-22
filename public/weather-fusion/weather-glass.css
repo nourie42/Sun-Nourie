@@ -1,3 +1,91 @@
 /* Shared frosted ice-frame glass finish for the main weather app and V3 Beta. */
 :root{--weather-tile-fill:rgba(15,25,45,.18) linear-gradient(180deg,rgba(255,255,255,.10),rgba(255,255,255,0) 42%);--weather-tile-border:rgba(255,255,255,.34);--weather-tile-radius:20px;--weather-tile-shadow:inset 0 1px 0 rgba(255,255,255,.42),inset 0 0 0 1px rgba(210,235,255,.14),0 8px 24px rgba(0,0,0,.18);--weather-tile-blur:blur(22px) saturate(155%);--weather-tile-text-shadow:0 1px 4px rgba(0,0,0,.55),0 0 1px rgba(0,0,0,.45);--weather-tile-gap:16px}
 body[data-sky=night]{--weather-tile-fill:rgba(255,255,255,.07) linear-gradient(180deg,rgba(255,255,255,.09),rgba(255,255,255,0) 42%);--weather-tile-border:rgba(255,255,255,.30);--weather-tile-blur:blur(18px) saturate(155%);--weather-tile-text-shadow:0 1px 3px rgba(0,0,0,.55)}
+
+/* Translucent frosted glass Remainder of Today / Today card across Main and Beta */
+html body #today-forecast .today-weather-card.today-weather-card{
+  background:var(--weather-tile-fill)!important;
+  backdrop-filter:var(--weather-tile-blur)!important;
+  -webkit-backdrop-filter:var(--weather-tile-blur)!important;
+  border:1px solid var(--weather-tile-border)!important;
+  box-shadow:var(--weather-tile-shadow)!important;
+}
+html body #today-forecast .today-sky{opacity:.28}
+html body #today-forecast .today-scene-shade{background:linear-gradient(180deg,rgba(8,22,42,.18),rgba(8,22,42,.32))}
+html body #today-forecast .today-metrics.today-metrics{
+  background:rgba(14,28,50,.24)!important;
+  backdrop-filter:blur(16px) saturate(150%)!important;
+  -webkit-backdrop-filter:blur(16px) saturate(150%)!important;
+  border:1px solid rgba(255,255,255,.28)!important;
+  grid-template-columns:repeat(3,minmax(0,1fr))!important;
+}
+html body #today-forecast .today-more{
+  background:rgba(255,255,255,.12)!important;
+  border:1px solid rgba(255,255,255,.28)!important;
+}
+
+/* Offset readable radar place label so city names like Raleigh are never hidden behind the marker */
+.map-marker-wrap{position:relative;display:block}
+.map-marker-wrap .map-marker{display:block;width:13px;height:13px;border-radius:50%;background:#66d2ff;border:2px solid #fff;box-shadow:0 0 0 3px rgba(8,24,48,.55)}
+.map-place-offset-label{
+  position:absolute;
+  left:15px;
+  top:-24px;
+  white-space:nowrap;
+  padding:3px 9px;
+  border-radius:999px;
+  background:rgba(8,20,38,.86);
+  backdrop-filter:blur(10px);
+  -webkit-backdrop-filter:blur(10px);
+  border:1px solid rgba(210,235,255,.45);
+  color:#ffffff;
+  font-size:11.5px;
+  font-weight:700;
+  line-height:1.25;
+  box-shadow:0 4px 12px rgba(0,0,0,.38);
+  pointer-events:none;
+}
+
+/* Hourly rain amounts breakdown inside Day Detail on Main and Beta */
+.day-hourly-rain-breakdown{
+  margin-top:12px;
+  padding:10px 12px;
+  border-radius:14px;
+  background:rgba(14,28,50,.28);
+  border:1px solid rgba(210,235,255,.26);
+}
+.day-hourly-rain-head{
+  display:flex;
+  align-items:baseline;
+  justify-content:space-between;
+  gap:8px;
+  font-size:12.5px;
+  margin-bottom:8px;
+  color:#e8f3ff;
+}
+.day-hourly-rain-head span{
+  color:#9fd3ff;
+  font-weight:600;
+}
+.day-hourly-rain-grid{
+  display:flex;
+  gap:6px;
+  overflow-x:auto;
+  padding-bottom:4px;
+}
+.day-hour-rain-cell{
+  flex:0 0 auto;
+  min-width:58px;
+  padding:6px 7px;
+  border-radius:10px;
+  background:rgba(255,255,255,.08);
+  border:1px solid rgba(255,255,255,.18);
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:2px;
+  text-align:center;
+}
+.day-hour-rain-cell .dhr-time{font-size:10.5px;color:#cfe2f6}
+.day-hour-rain-cell .dhr-amt{font-size:12.5px;color:#ffffff;font-variant-numeric:tabular-nums}
+.day-hour-rain-cell .dhr-pop{font-size:10px;color:#8ad0ff}

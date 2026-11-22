@@ -53,6 +53,95 @@ export function hrrrRainAmount(row){
  const value=row?.precipitationBlend?.sourceValues?.hrrr??row?.qpfBlend?.sourceValues?.hrrr;
  return finite(value)&&value>=HRRR_RAIN_THRESHOLD_IN?value:null;
 }
+export const RAIN_SOURCE_ORDER = ['nws', 'hrrr', 'ecmwf', 'nbm', 'gefs', 'wn', 'weathernext3'];
+export const RAIN_SOURCE_LABELS = {
+  nws: 'NWS base',
+  hrrr: 'HRRR',
+  ecmwf: 'ECMWF',
+  nbm: 'NBM',
+  gefs: 'GEFS',
+  wn: 'WeatherNext',
+  weathernext3: 'WeatherNext 3'
+};
+
+export function reconcileRainLikelihood(blend, fallbackPop = null) {
+  if (!blend || typeof blend !== 'object') {
+    const v = rainChanceValue(null, fallbackPop);
+    return { value: v, rawTotal: v, entries: [], mode: 'fallback' };
+  }
+  if (blend.mode === 'nws-fallback') {
+    const v = rainChanceValue(blend, fallbackPop);
+    return { value: v, rawTotal: v, entries: [], mode: 'nws-fallback', fallbackReason: blend.fallbackReason };
+  }
+  const votes = blend.sourceValues || {};
+  const awarded = blend.sourcePoints || {};
+  const kinds = blend.sourceKinds || {};
+  const srcList = Array.isArray(blend.sources) ? blend.sources : [];
+  const fullPoints = { nws: 40, hrrr: 30, ecmwf: 10, nbm: 20 };
+  const hasAwarded = Object.values(awarded).some(finite) || srcList.some((s) => finite(s?.points));
+
+  const ids = [...new Set([...RAIN_SOURCE_ORDER, ...Object.keys(awarded), ...Object.keys(votes), ...srcList.map((s) => s?.id).filter(Boolean)])];
+  const entries = [];
+  for (const id of ids) {
+    const src = srcList.find((s) => s?.id === id);
+    let pts = null;
+    if (Object.hasOwn(awarded, id)) {
+      pts = finite(awarded[id]) ? awarded[id] : null;
+    } else if (finite(src?.points)) {
+      pts = src.points;
+    } else if (finite(src?.value) && finite(src?.weight)) {
+      pts = src.value * src.weight;
+    } else if (!hasAwarded && finite(votes[id]) && finite(fullPoints[id])) {
+      pts = (votes[id] / 100) * fullPoints[id];
+    }
+    if (!finite(pts)) continue;
+    const vote = finite(votes[id]) ? votes[id] : finite(src?.value) ? src.value : pts > 0 ? 100 : 0;
+    const kind = kinds[id] || src?.kind || (id === 'nws' ? 'probability' : 'deterministic');
+    entries.push({ id, label: RAIN_SOURCE_LABELS[id] || id.toUpperCase(), vote, points: pts, kind });
+  }
+
+  if (!entries.length) {
+    const v = rainChanceValue(blend, fallbackPop);
+    return { value: v, rawTotal: v, entries: [], mode: blend.mode || 'direct' };
+  }
+
+  const rawSum = entries.reduce((sum, e) => sum + e.points, 0);
+  const value = Math.min(100, Math.max(0, Math.round(rawSum)));
+  const shownPts = entries.map((e) => Math.round(e.points * 100) / 100);
+  const shownSum = shownPts.reduce((sum, p) => sum + p, 0);
+  if (Math.min(100, Math.max(0, Math.round(shownSum))) !== value) {
+    for (let i = shownPts.length - 1; i >= 0; i--) {
+      if (shownPts[i] > 0) {
+        shownPts[i] = Number((shownPts[i] + (rawSum - shownSum)).toFixed(2));
+        break;
+      }
+    }
+  }
+  const reconciledEntries = entries.map((e, i) => ({ ...e, shownPoints: shownPts[i] }));
+  return { value, rawTotal: rawSum, entries: reconciledEntries, mode: blend.mode || 'blend' };
+}
+
+export function formatRainLikelihoodTooltip(blend, fallbackPop = null) {
+  const rec = reconcileRainLikelihood(blend, fallbackPop);
+  if (rec.mode === 'nws-fallback') {
+    return rec.fallbackReason === 'calibrated-probability-not-supplied'
+      ? 'Official NWS hourly rain probability; model rainfall amounts are separate'
+      : 'Official NWS hourly rain chance; model data is unavailable';
+  }
+  const pointText = (points) => String(Math.round(points * 100) / 100);
+  const parts = rec.entries.map((e) => {
+    if (e.id === 'nws') {
+      return `NWS base ${Math.round(e.vote)}% (+${pointText(e.shownPoints)} points)`;
+    }
+    if (e.kind === 'probability') {
+      return `${e.label} ${Math.round(e.vote)}% (+${pointText(e.shownPoints)} points)`;
+    }
+    return `${e.label} rain ${e.vote > 0 || e.shownPoints > 0 ? `yes (+${pointText(e.shownPoints)} points)` : 'no (+0 points)'}`;
+  });
+  const detail = parts.length ? ` Inputs: ${parts.join(', ')}.` : '';
+  return `Weather Nourie rain likelihood.${detail}`;
+}
+
 export function hourlyRainHTML(sample){
  if(sample?.now&&sample.currentPrecipitation){
   const status=sample.currentPrecipitation;
@@ -60,23 +149,13 @@ export function hourlyRainHTML(sample){
   const label=status.forecast&&finite(sample.pop)?`${Math.round(sample.pop)}%`:status.label;
   return `<span class="hour-rain" title="${esc(status.source)}"><small class="hour-pop">${weatherMetricIcon('drop')}${esc(label)}</small></span>`;
  }
- const blend=sample.rainLikelihood,value=sampleRainChance(sample);
+ const blend=sample.rainLikelihood,rec=reconcileRainLikelihood(blend,sample?.pop),value=rec.value;
  if(hideLowRainChance(value))return '<span class="hour-rain" aria-hidden="true"></span>';
- if(blend?.mode==='nws-fallback')return `<span class="hour-rain" title="${blend.fallbackReason==='calibrated-probability-not-supplied'?'Official NWS hourly rain probability; model rainfall amounts are separate':'Official NWS hourly rain chance; model data is unavailable'}"><small class="hour-pop">${weatherMetricIcon('drop')}${finite(value)?Math.round(value)+'%':'—'}</small></span>`;
- const votes=blend?.sourceValues||{},awarded=blend?.sourcePoints||{},parts=[];
- const pointText=points=>String(Math.round(points*100)/100);
- const fullPoints={nws:40,hrrr:30,ecmwf:10,nbm:20};
- const pointsFor=id=>Object.hasOwn(awarded,id)?(finite(awarded[id])?awarded[id]:null):finite(votes[id])?votes[id]/100*fullPoints[id]:null;
- if(finite(votes.nws))parts.push(`NWS base ${Math.round(votes.nws)}% (+${pointText(pointsFor('nws'))} points)`);
- for(const id of ['hrrr','ecmwf','nbm'])if(finite(votes[id])&&pointsFor(id)!==null){
-  const points=pointsFor(id);
-  parts.push(`${id.toUpperCase()} rain ${votes[id]>0?`yes (+${pointText(points)} points)`:'no (+0 points)'}`);
- }
- const detail=parts.length?` Inputs: ${parts.join(', ')}.`:'';
- return `<span class="hour-rain" title="Weather Nourie rain likelihood.${detail}"><small class="hour-pop">${weatherMetricIcon('drop')}${finite(value)?`${Math.round(value)}%`:'—'}</small></span>`;
+ const tooltip=formatRainLikelihoodTooltip(blend,sample?.pop);
+ return `<span class="hour-rain" title="${esc(tooltip)}"><small class="hour-pop">${weatherMetricIcon('drop')}${finite(value)?`${Math.round(value)}%`:'—'}</small></span>`;
 }
 function sampleRainChance(sample){
- return sample?.rainLikelihood&&Object.hasOwn(sample.rainLikelihood,'value')?rainChanceValue(sample.rainLikelihood):rainChanceValue(null,sample?.pop);
+ return reconcileRainLikelihood(sample?.rainLikelihood,sample?.pop).value;
 }
 export function currentSample(forecast, now = Date.now()) {
   const current = currentComfortInputs(forecast,now), assembled = Date.parse(forecast?.assembledAt);

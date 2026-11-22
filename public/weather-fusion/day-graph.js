@@ -13,18 +13,32 @@ function rainAt(f,time){
  // Rainfall inches and a day/night probability cannot fill an hourly gap.
  const row=(canonical?f.rainTimeline:f?.hours||[]).find(p=>Date.parse(p.time)===epoch);
  const end=row?.end??row?.endTime;
- if(!row||(end!=null&&Date.parse(end)!==epoch+H))return {value:null,source:''};
+ if(!row||(end!=null&&Date.parse(end)!==epoch+H))return {value:null,source:'',precipitation:null};
  const hasLikelihood=row.rainLikelihood&&Object.hasOwn(row.rainLikelihood,'value');
  const value=hasLikelihood?rainChanceValue(row.rainLikelihood):rainChanceValue(null,row.pop);
- return {value,source:finite(value)?(hasLikelihood?row.rainLikelihood.source||'Hourly forecast blend':'NWS hourly forecast'):''};
+ const precip=finite(row.precipitation)&&row.precipitation>=0?row.precipitation:null;
+ return {value,source:finite(value)?(hasLikelihood?row.rainLikelihood.source||'Hourly forecast blend':'NWS hourly forecast'):'',precipitation:precip};
 }
 export function dayGraphPoints(f,index,tonight=false,now=Date.now()){
  const d=f?.days?.[index];if(!d?.date)return [];
  const rain=dailyRainPeriod(d,'overall'),window=calendarDayWindow(d,index,now,f.location?.timeZone),start=window.start,end=window.end,points=[];
- for(let t=(rain.canonical?Math.floor(start/H):Math.ceil(start/H))*H;t<end&&points.length<30;t+=H){const time=new Date(t).toISOString(),rain=rainAt(f,time);points.push({time,temperature:forecastValue(f,'temperature',time),feels:displayedFeelsAt(f,time),dewpoint:forecastValue(f,'dewpoint',time),wind:forecastValue(f,'wind',time),uv:hourlyUvValue(f,t),rainChance:rain.value,rainChanceSource:rain.source});}
+ for(let t=(rain.canonical?Math.floor(start/H):Math.ceil(start/H))*H;t<end&&points.length<30;t+=H){const time=new Date(t).toISOString(),rain=rainAt(f,time);points.push({time,temperature:forecastValue(f,'temperature',time),feels:displayedFeelsAt(f,time),dewpoint:forecastValue(f,'dewpoint',time),wind:forecastValue(f,'wind',time),uv:hourlyUvValue(f,t),rainChance:rain.value,rainChanceSource:rain.source,precipitation:rain.precipitation});}
  return points;
 }
 const fields=[['temperature','Temp','#ffcd79'],['feels','Feels','#ff9caf'],['dewpoint','Feel · dew point','#83e3cc'],['uv','UV','#c8adff'],['rainChance','Chance of rain','#73d8ff']];
+export function dayHourlyRainHTML(points=[],zone='America/New_York'){
+ const withAmounts=points.filter(p=>finite(p.precipitation)||finite(p.rainChance));
+ if(!withAmounts.length)return '';
+ const clock=time=>new Intl.DateTimeFormat('en-US',{timeZone:zone,hour:'numeric'}).format(new Date(time));
+ const total=points.reduce((sum,p)=>sum+(finite(p.precipitation)?p.precipitation:0),0);
+ const hasAnyPrecip=points.some(p=>finite(p.precipitation));
+ const cells=points.map(p=>{
+  const amt=finite(p.precipitation)?`${p.precipitation.toFixed(2)}"`:'—';
+  const pop=finite(p.rainChance)&&!hideLowRainChance(p.rainChance)?`${Math.round(p.rainChance)}%`:'';
+  return `<div class="day-hour-rain-cell" data-hour-rain="${esc(p.time)}"><span class="dhr-time">${esc(clock(p.time))}</span><strong class="dhr-amt">${amt}</strong>${pop?`<small class="dhr-pop">${pop}</small>`:''}</div>`;
+ }).join('');
+ return `<div class="day-hourly-rain-breakdown" aria-label="Hourly rain amounts for this day"><div class="day-hourly-rain-head"><strong>Hourly rain amounts</strong><span>${hasAnyPrecip?`Day total: ${total.toFixed(2)} in`:'Hourly amounts unavailable'}</span></div><div class="day-hourly-rain-grid">${cells}</div></div>`;
+}
 export function dayGraphHTML(f,index,tonight=false,now=Date.now()){
  const points=dayGraphPoints(f,index,tonight,now),zone=f.location?.timeZone||'America/New_York';
  if(!points.length)return '<section class="day-graph"><h3>Hour by hour</h3><p>Hourly forecast unavailable.</p></section>';
@@ -33,14 +47,14 @@ export function dayGraphHTML(f,index,tonight=false,now=Date.now()){
  const isExp=typeof document!=='undefined'&&document.documentElement?.dataset?.weatherPage==='experimental';
  const paths=fields.map(([k,,color])=>{let pen=false;const d=points.map((p,i)=>{if(!finite(p[k])){pen=false;return '';}const s=`${pen?'L':'M'}${x(i).toFixed(1)},${y(p[k],k).toFixed(1)}`;pen=true;return s;}).join(' ');const isMain=k==='temperature';const sw=isExp?(isMain?'4.6':'2.1'):'3';const glow=isExp&&isMain&&d?`<path class="day-graph-glow" d="${d}" fill="none" stroke="rgba(255,205,121,.28)" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/>`:'';return `${glow}<path data-series="${k}" d="${d}" fill="none" stroke="${color}" stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round" ${k==='uv'||k==='rainChance'?'stroke-dasharray="5 4"':''}/>`;}).join('');
  const clock=time=>new Intl.DateTimeFormat('en-US',{timeZone:zone,hour:'numeric'}).format(new Date(time));
- return `<section class="day-graph" aria-label="Temperature, feels-like, Feel Meter, UV and rain chance hourly graph"><h3>Hour by hour <small>Slide to explore</small></h3><div class="day-graph-readout" aria-live="polite"></div><svg viewBox="0 0 500 305" role="img" aria-label="Shared time axis. Temperature, feels-like and Feel Meter dew point use the left Fahrenheit scale. UV uses the right scale. Rain chance uses its own zero to 100 percent scale below."><text x="8" y="16">°F</text><text x="468" y="16">UV</text>${[0,.5,1].map(v=>`<path d="M40 ${170-v*140} H460" stroke="currentColor" opacity=".15"/><text x="4" y="${174-v*140}">${Math.round(lo+v*(hi-lo))}</text><text x="467" y="${174-v*140}">${Math.round(v*uvMax)}</text>`).join('')}<text x="40" y="202" fill="#73d8ff">Chance of rain</text>${[0,.5,1].map(v=>`<path d="M40 ${265-v*50} H460" stroke="currentColor" opacity=".15"/><text x="4" y="${269-v*50}">${Math.round(v*100)}%</text>`).join('')}${paths}<path class="day-graph-cursor" d="M40 25 V275" stroke="white" stroke-width="1" opacity=".7"/><text x="40" y="294">${esc(clock(points[0].time))}</text><text x="460" y="294" text-anchor="end">${esc(clock(points.at(-1).time))}</text></svg><label class="day-graph-time" for="day-graph-hour"></label><input id="day-graph-hour" aria-label="Forecast hour for all five graph values" type="range" min="0" max="${points.length-1}" value="0" step="1"></section>`;
+ return `<section class="day-graph" aria-label="Temperature, feels-like, Feel Meter, UV and rain chance hourly graph"><h3>Hour by hour <small>Slide to explore</small></h3><div class="day-graph-readout" aria-live="polite"></div><svg viewBox="0 0 500 305" role="img" aria-label="Shared time axis. Temperature, feels-like and Feel Meter dew point use the left Fahrenheit scale. UV uses the right scale. Rain chance uses its own zero to 100 percent scale below."><text x="8" y="16">°F</text><text x="468" y="16">UV</text>${[0,.5,1].map(v=>`<path d="M40 ${170-v*140} H460" stroke="currentColor" opacity=".15"/><text x="4" y="${174-v*140}">${Math.round(lo+v*(hi-lo))}</text><text x="467" y="${174-v*140}">${Math.round(v*uvMax)}</text>`).join('')}<text x="40" y="202" fill="#73d8ff">Chance of rain</text>${[0,.5,1].map(v=>`<path d="M40 ${265-v*50} H460" stroke="currentColor" opacity=".15"/><text x="4" y="${269-v*50}">${Math.round(v*100)}%</text>`).join('')}${paths}<path class="day-graph-cursor" d="M40 25 V275" stroke="white" stroke-width="1" opacity=".7"/><text x="40" y="294">${esc(clock(points[0].time))}</text><text x="460" y="294" text-anchor="end">${esc(clock(points.at(-1).time))}</text></svg><label class="day-graph-time" for="day-graph-hour"></label><input id="day-graph-hour" aria-label="Forecast hour for all five graph values" type="range" min="0" max="${points.length-1}" value="0" step="1">${dayHourlyRainHTML(points,zone)}</section>`;
 }
 export function installDayGraph(root,f,index,tonight=false,now=Date.now()){
  const points=dayGraphPoints(f,index,tonight,now),input=root.querySelector('#day-graph-hour');if(!input)return;
  const svg=root.querySelector('.day-graph svg'),zone=f.location?.timeZone||'America/New_York';
  const update=()=>{const i=Number(input.value),p=points[i],time=new Intl.DateTimeFormat('en-US',{timeZone:zone,weekday:'short',hour:'numeric',minute:'2-digit'}).format(new Date(p.time));
   root.querySelector('.day-graph-time').textContent=time;
-  root.querySelector('.day-graph-readout').innerHTML=fields.filter(([k])=>k!=='rainChance'||!hideLowRainChance(p[k])).map(([k,label,color])=>`<div style="--line-color:${color}" data-readout="${k}"${k==='rainChance'&&p.rainChanceSource?` title="${esc(p.rainChanceSource)}"`:''}><span>${label}</span><strong>${k==='uv'?(uvCategory(p.uv).index??'—'):k==='rainChance'?(finite(p[k])?`${Math.round(p[k])}%`:'—'):degrees(p[k])}</strong><small>${k==='dewpoint'?esc(forecastGrossLevel(p.dewpoint,p.wind).label):k==='uv'?uvCategory(p.uv).label:finite(p[k])?(k==='rainChance'?'At this hour':'°F'):'Unavailable'}</small></div>`).join('');
+  root.querySelector('.day-graph-readout').innerHTML=fields.filter(([k])=>k!=='rainChance'||!hideLowRainChance(p[k])).map(([k,label,color])=>`<div style="--line-color:${color}" data-readout="${k}"${k==='rainChance'&&p.rainChanceSource?` title="${esc(p.rainChanceSource)}"`:''}><span>${label}</span><strong>${k==='uv'?(uvCategory(p.uv).index??'—'):k==='rainChance'?(finite(p[k])?`${Math.round(p[k])}%`:'—'):degrees(p[k])}</strong><small>${k==='dewpoint'?esc(forecastGrossLevel(p.dewpoint,p.wind).label):k==='uv'?uvCategory(p.uv).label:finite(p[k])?(k==='rainChance'?(finite(p.precipitation)?`${p.precipitation.toFixed(2)} in · At this hour`:'At this hour'):'°F'):'Unavailable'}</small></div>`).join('');
   root.querySelector('.day-graph-cursor').setAttribute('d',`M${40+i/Math.max(1,points.length-1)*420} 25 V275`);input.setAttribute('aria-valuetext',time);
  };input.addEventListener('input',update);
  const point=e=>{const r=svg.getBoundingClientRect();input.value=String(Math.round(Math.max(0,Math.min(1,((e.clientX-r.left)/r.width*500-40)/420))*(points.length-1)));update();};

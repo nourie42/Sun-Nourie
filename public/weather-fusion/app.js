@@ -5,8 +5,8 @@ import {danCard,danTakeDisplay} from './dans-summary.js?v=afd-discussion-section
 import {fetchJsonWithDeadline} from './request-deadline.js?v=loading-recovery-v1';
 import {dailyUvHTML} from './daily-uv.js?v=weather-art-labels-v10';
 import {currentReadingFreshness} from './weather-freshness.js?v=accuracy-20261019-v1';
-import {weatherIcon,renderHourlyWeather,currentSample} from './weather-display.js?v=low-rain-display-v1';
-import {dayGraphHTML,dayGraphPoints,installDayGraph} from './day-graph.js?v=low-rain-display-v1';
+import {weatherIcon,renderHourlyWeather,currentSample} from './weather-display.js?v=rain-reconcile-v2';
+import {dayGraphHTML,dayGraphPoints,installDayGraph} from './day-graph.js?v=hourly-rain-v2';
 import {degrees,feelsAt,GUSTY_FEELS_DISPLAY_MPH} from './hourly-feels.js?v=current-rain-20261017-v3';
 import {createFramePlayer} from './frame-player.js';
 import {dailyConfidenceNoticeHTML,renderComfort,selectComfortHour,renderDailyRows,renderMetricTiles,resetExperience,installExperience} from './experience.js?v=comparison-chart-v3';
@@ -254,7 +254,7 @@ function render(data) {
     draw('briefing-summary', 'Local outlook', () => renderBriefing({ mode: 'nws-summary', signature: data.signature, headline: currentDay.tonight ? 'Your evening outlook' : currentDay.condition, summary: outlook.summary, nearTerm: outlook.nearTerm, extended: outlook.extended,
       uncertainty: '', danSummary:data.danSummary, danTake:data.danTake||rebindDanTake(currentBriefing?.danTake||currentBriefing,data), reason: data.aiConfigured ? 'Updating your local outlook…' : 'Weather Nourie forecast', sources: ['nws',...(data.modelContributions||[]).map(model=>model.id)] }));
   }
-  if (map) { marker?.setLatLng([place.latitude, place.longitude]); renderMapWarnings(data); }
+  if (map) { updateMarkerLabel(); renderMapWarnings(data); }
   const sourceHealth = forecastSourceHealth(data);
   const unavailable = sourceHealth.requiredIssues;
   const sourceNote = sourceHealth.note;
@@ -368,6 +368,7 @@ async function load({ moveMap = false, refreshModels = false, briefingRetry = 0 
     }).catch((error) => {
       if (id === generation && error.name !== 'AbortError' && forecast) renderBulletins(forecast, {mode:'official', signature:forecast.signature});
     });
+    requestMap();
     if (mapRequested && !map && window.L) initMap();
     if (moveMap && map) map.setView([place.latitude, place.longitude], 8);
     if (selectedLayer !== 'radar' && (refreshModels || moveMap || Date.now()-modelFetched >= 55000)) void loadModelMap(refreshModels);
@@ -505,6 +506,26 @@ function setBasemap() {
   }).addTo(map);
   baseLayer.on('tileerror', () => mapMessage('The USGS background map could not load. Weather-model overlays and official source links remain available.'));
 }
+function makeMarkerIcon(labelName) {
+  const L = window.L;
+  const safeName = esc(labelName || place?.name || 'Selected location');
+  return L.divIcon({
+    className: 'map-marker-wrap',
+    html: `<span class="map-marker"></span><span class="map-place-offset-label">${safeName}</span>`,
+    iconSize: [13, 13],
+    iconAnchor: [6, 6]
+  });
+}
+function updateMarkerLabel() {
+  if (!map || !window.L) return;
+  const label = forecast?.location?.name || place?.name || 'Selected location';
+  if (!marker) {
+    marker = window.L.marker([place.latitude, place.longitude], { icon: makeMarkerIcon(label) }).addTo(map);
+  } else {
+    marker.setLatLng([place.latitude, place.longitude]);
+    marker.setIcon(makeMarkerIcon(label));
+  }
+}
 function initMap() {
   if (map) return;
   if (!window.L) { mapMessage('The mapping library could not load. Check your connection or use the official radar link.'); return; }
@@ -515,7 +536,7 @@ function initMap() {
   }
   map.getPane('weather-model').style.pointerEvents='none';map.getPane('weather-radar').style.pointerEvents='none';
   setBasemap();
-  marker = L.marker([place.latitude, place.longitude], { icon: L.divIcon({ className: 'map-marker', iconSize: [13, 13] }) }).addTo(map);
+  updateMarkerLabel();
   warningLayer = L.geoJSON(null, { pane:'weather-warnings', style: { color: '#ffc1b4', weight: 2, fillOpacity: 0.1 }, onEachFeature: (f, layer) => {
     const node = document.createElement('div'); node.textContent = `${f.properties?.event || 'NWS alert'} — ${f.properties?.headline || ''}`; layer.bindPopup(node);
   } }).addTo(map);

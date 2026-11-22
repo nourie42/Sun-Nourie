@@ -208,8 +208,8 @@ export class WeatherMapController {
         version: '1.1.1',
         time: frame.isoTime,
         opacity: 0.78,
-        updateWhenIdle: true,
-        keepBuffer: 2,
+        updateWhenIdle: false,
+        keepBuffer: 3,
         className: 'radar-crisp-layer'
       });
       wms.on('tileerror', () => {
@@ -298,16 +298,17 @@ export class WeatherMapController {
       }).addTo(this.locationGroup);
     });
 
+    const safeName = String(name || 'Selected Location').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
     const markerIcon = L.divIcon({
       className: 'nourie-map-pin',
       html: `
-        <div class="map-pin-pill">
+        <div class="map-pin-point-anchor">
           <span class="map-pin-dot"></span>
-          <span class="map-pin-temp">${cur.tempF}°</span>
+          <span class="map-pin-offset-pill">${safeName} · ${cur.tempF}°</span>
         </div>
       `,
-      iconSize: [64, 28],
-      iconAnchor: [32, 14]
+      iconSize: [14, 14],
+      iconAnchor: [7, 7]
     });
 
     L.marker([latitude, longitude], { icon: markerIcon })

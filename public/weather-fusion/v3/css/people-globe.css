@@ -26,8 +26,9 @@ button:focus-visible,a:focus-visible{outline:2px solid #d6efff;outline-offset:3p
 #skin-exposure .section-inline-head h2{font-size:19px;margin:0;line-height:1.2;flex:1}
 #skin-exposure #exposure-time-note{margin:0;font-size:11px;white-space:nowrap}
 #skin-exposure .comfort-current-context{margin:0 0 12px;font-size:11px;text-align:left;line-height:1.4;padding:0}
-#skin-exposure .exposure-person-card{border-radius:15px!important;background:rgba(18,49,73,.16)!important;box-shadow:inset 0 1px 0 #ffffff24}
-#skin-exposure .exposure-person-button{display:flex;gap:0;min-height:0;height:auto;align-items:stretch;text-align:center}
+#exposure-cards-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));align-items:stretch;gap:var(--tile-gap)}
+#skin-exposure .exposure-person-card{border-radius:15px!important;background:var(--weather-tile-fill)!important;backdrop-filter:blur(18px) saturate(155%);-webkit-backdrop-filter:blur(18px) saturate(155%);border:1px solid var(--weather-tile-border)!important;box-shadow:var(--weather-tile-shadow);display:flex;flex-direction:column}
+#skin-exposure .exposure-person-button{display:flex;flex-direction:column;flex:1;gap:0;min-height:0;height:100%;align-items:stretch;text-align:center}
 #skin-exposure .person-card-title{display:block;min-height:0;padding:9px 2px 7px;font-size:15px;line-height:1.1}
 #skin-exposure .person-card-scene{width:100%;max-height:none;aspect-ratio:1;line-height:0}
 #skin-exposure .person-card-reading{min-height:0;height:auto;margin:0;padding:9px 4px 3px;gap:3px;background:none}
@@ -35,7 +36,14 @@ button:focus-visible,a:focus-visible{outline:2px solid #d6efff;outline-offset:3p
 #skin-exposure .person-card-reading>span,#skin-exposure .person-card-reading>b{font-size:10px;line-height:1.25}
 #skin-exposure .person-card-reading>small{font-size:9px}
 #skin-exposure .person-card-description{display:block;min-height:0;height:auto;padding:3px 4px;margin:0;font-size:10px;line-height:1.3}
-#skin-exposure .person-card-detail-hint{display:block;margin:0;padding:5px 2px 8px;font-size:10px;line-height:1;color:#d7e9f4;opacity:1}
+#skin-exposure .person-card-detail-hint{display:block;margin:auto 0 0;padding:5px 2px 8px;font-size:10px;line-height:1;color:#d7e9f4;opacity:1}
+.comfort-trio-grid.comfort-duo-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+.beta-today-panel{padding:0!important;overflow:hidden}
+.beta-today-panel .today-weather-card{margin:0!important;width:100%}
+.map-pin-point-anchor{position:relative;width:14px;height:14px}
+.map-pin-point-anchor .map-pin-dot{display:block;width:12px;height:12px;border-radius:50%;background:#62cce7;border:2px solid #fff;box-shadow:0 0 0 3px rgba(8,22,42,.55)}
+.map-pin-offset-pill{position:absolute;left:16px;top:-24px;white-space:nowrap;padding:3px 9px;border-radius:999px;background:rgba(8,20,38,.86);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border:1px solid rgba(210,235,255,.45);color:#fff;font-size:11.5px;font-weight:700;line-height:1.25;box-shadow:0 4px 12px rgba(0,0,0,.38);pointer-events:none}
+.wind-compass-stage{display:flex;justify-content:center;align-items:center;padding:8px 0}
 @media(max-width:370px){.beta-brand-logo{width:37px;height:37px}.beta-brand-wordmark>strong{font-size:25px}.beta-brand-wordmark>span{font-size:8px}#skin-exposure .person-card-title{font-size:14px}#skin-exposure .person-card-reading>strong{font-size:31px}}
 @media(min-width:720px){#skin-exposure .exposure-person-button{display:grid;grid-template-columns:100px 1fr;grid-template-rows:auto auto auto auto;text-align:left;column-gap:12px;padding:10px}#skin-exposure .person-card-scene{grid-column:1;grid-row:1/5;width:100px;height:100px;border-radius:11px;overflow:hidden}#skin-exposure .person-card-title{grid-column:2;padding:0 0 4px;font-size:17px}#skin-exposure .person-card-reading{grid-column:2;padding:0;align-items:flex-start}#skin-exposure .person-card-description{grid-column:2;padding:4px 0}#skin-exposure .person-card-detail-hint{grid-column:2;padding:4px 0 0}#skin-exposure .person-card-reading>span{font-size:11px}}
 .globe-map-shell{position:relative;width:100%;height:100%;overflow:hidden;border-radius:15px}
