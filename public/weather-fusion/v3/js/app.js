@@ -4,11 +4,10 @@
 
 import { clamp, computePavementProfile, pavementDayPeak } from './physics.js?v=v3-pet-day-6';
 import {
-  buildUnifiedFusionPayload,
   fetchCompleteFusionForecast,
-  reverseGeocodeLocation,
   searchLocations
-} from './fusion-engine.js?v=v3-all-16';
+} from './fusion-engine.js?v=local-hourly-v1';
+import {hourlyRainInputsHTML, rainPercent} from './hourly-rain.js?v=local-hourly-v1';
 import { getLunarPhaseFraction, renderWeatherIconSvg } from './icons.js?v=v3-sky-8';
 import {
   HOURLY_METRICS,
@@ -24,9 +23,9 @@ import {
 import { dogWalkerScene, referenceScene } from '../../exposure-scene.js?v=true-night-art-v6';
 import { danCard, danOverview, danTakeDisplay } from '../../dans-summary.js?v=afd-discussion-section-v1';
 import { activeRiskOutlooks, outlookDetailHTML } from '../../risk-outlooks.js?v=risk-outlooks-v5';
-import { forecastWindowDetailHTML } from '../../forecast-window-banners.js?v=current-rain-20261017-v3';
+import { forecastWindowDetailHTML } from '../../forecast-window-banners.js?v=daily-hourly-v1';
 import {GlobePanel} from './globe-panel.js?v=smooth-radar-v1';
-import {outlookItems,renderOutlookPanel,openOutlookNote} from '../../outlook-panel.js?v=compact-v1';
+import {outlookItems,renderOutlookPanel,openOutlookNote} from '../../outlook-panel.js?v=daily-hourly-v1';
 import { todayForecastHTML, todayRainDisplay } from '../../today-card.js?v=radar-parity-v3';
 import {applyLocalRadar, displayedRainChance, observedRainLabel} from '../../rain-display.js?v=local-radar-v2';
 import {currentWeatherDisplay} from '../../current-weather.js?v=local-radar-v2';
@@ -38,6 +37,7 @@ import { mountChart, solarDays, nightBands, fmt as haloFmt, H as HALO_H } from '
 const LEGACY_LOC_KEY = 'weather-nourie-v3-location';
 const SAVED_LOC_KEY = 'weather-nourie-v3-gps-location';
 const DEVICE_LOC_KEY = 'weather-fusion-device-place';
+const BETA_SELECTED_LOC_KEY = 'weather-nourie-v3-selected-location';
 const RISK_COLORS = { Marginal: '#74d36a', Slight: '#f4e14a', Enhanced: '#e67a22', Moderate: '#e03b3b', High: '#d34cff' };
 
 // Purge any legacy hardcoded preset/fallback cache on load
@@ -75,18 +75,12 @@ function loadInitialLocationContext() {
     if (isValidCoordPair(qLat, qLon)) {
       return { id: 'query', name: qName || 'Selected Location', latitude: qLat, longitude: qLon, explicitChoice: true, fromQuery: true };
     }
-    const raw = localStorage.getItem(SAVED_LOC_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (parsed && parsed.gpsVerified === true && isValidCoordPair(Number(parsed.latitude), Number(parsed.longitude))) {
-        return {
-          ...parsed,
-          id: 'gps',
-          latitude: Number(parsed.latitude),
-          longitude: Number(parsed.longitude),
-          fromCache: true
-        };
-      }
+    for (const key of [BETA_SELECTED_LOC_KEY, 'weather-fusion-selected-city', SAVED_LOC_KEY, DEVICE_LOC_KEY]) {
+      let place;
+      try { place = JSON.parse(localStorage.getItem(key)); } catch { continue; }
+      if (!isValidCoordPair(place?.latitude,place?.longitude)) continue;
+      const device = place.gpsVerified === true || key === DEVICE_LOC_KEY;
+      return {...place, fromCache:true, explicitChoice:!device};
     }
   } catch {}
   return null;
@@ -137,73 +131,56 @@ function setAwaitingLocationUi(isAwaiting, showCard = false) {
   if (locCard) locCard.hidden = !showCard;
 }
 
+function locationStatus(message) {
+  const status = document.getElementById('location-status');
+  if (status) {
+    status.hidden = !message;
+    status.textContent = message;
+  }
+}
+
 function showLocationNeededState() {
-  state.geoDenied = true;
-  const cityNameEl = document.getElementById('city-name');
-  const condEl = document.getElementById('hero-condition');
-  if (cityNameEl) cityNameEl.textContent = 'Location Needed';
-  if (condEl) condEl.textContent = 'Enable location to see your weather';
+  const cityName = document.getElementById('city-name');
+  if (cityName) cityName.textContent = 'Your local weather';
   setAwaitingLocationUi(true, true);
 }
 
-function requestAutoDeviceLocation({ hasCachedLoc = false, fromQuery = false } = {}) {
-  if (fromQuery) return;
-
+let gpsRequest = 0;
+function requestDeviceLocation({manual = false} = {}) {
+  const request = ++gpsRequest;
+  const unable = () => {
+    if (request !== gpsRequest) return;
+    document.getElementById('locate-btn')?.removeAttribute('aria-busy');
+    state.geoDenied = true;
+    if (!state.location) showLocationNeededState();
+    if (manual || !state.location) locationStatus('Location is unavailable. Allow location in your browser or search for your city or ZIP.');
+  };
   if (!navigator.geolocation) {
-    if (!hasCachedLoc) showLocationNeededState();
+    unable();
     return;
   }
 
-  navigator.geolocation.getCurrentPosition(
-    async (pos) => {
-      state.geoDenied = false;
-
-      const lat = Number(pos.coords.latitude.toFixed(4));
-      const lon = Number(pos.coords.longitude.toFixed(4));
-      const movedFar =
-        !state.location ||
-        state.location.id !== 'gps' ||
-        Math.abs(lat - state.location.latitude) > 0.005 ||
-        Math.abs(lon - state.location.longitude) > 0.005;
-
-      const resolvedName = await Promise.race([
-        reverseGeocodeLocation(lat, lon),
-        new Promise((r) => setTimeout(() => r(''), 2000))
-      ]);
-      const cleanName = resolvedName || state.location?.name || 'Current Location';
-
-      const gpsPlace = {
-        id: 'gps',
-        name: cleanName,
-        latitude: lat,
-        longitude: lon,
-        gpsVerified: true,
-        source: 'device'
-      };
-
-      try {
-        localStorage.setItem(SAVED_LOC_KEY, JSON.stringify(gpsPlace));
-        localStorage.setItem(DEVICE_LOC_KEY, JSON.stringify({ id: 'device', name: cleanName, latitude: lat, longitude: lon, source: 'device' }));
-      } catch {}
-
-      if (movedFar || !state.forecast) {
-        loadLocationForecast(gpsPlace);
-      } else if (cleanName && cleanName !== 'Current Location' && state.forecast?.location) {
-        state.forecast.location.name = cleanName;
-        const cityEl = document.getElementById('city-name');
-        if (cityEl) cityEl.textContent = cleanName;
-      }
-    },
-    () => {
-      if (!hasCachedLoc && !state.forecast) {
-        showLocationNeededState();
-      } else {
-        state.geoDenied = true;
-        if (state.forecast) renderTopCompactPills(state.forecast);
-      }
-    },
-    { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
-  );
+  const locate = document.getElementById('locate-btn');
+  locate?.setAttribute('aria-busy','true');
+  if (manual || !state.location) locationStatus('Finding your location…');
+  navigator.geolocation.getCurrentPosition(pos => {
+    if (request !== gpsRequest) return;
+    const latitude = Number(pos.coords.latitude.toFixed(4));
+    const longitude = Number(pos.coords.longitude.toFixed(4));
+    if (!isValidCoordPair(latitude,longitude)) { unable(); return; }
+    state.geoDenied = false;
+    locate?.removeAttribute('aria-busy');
+    const samePoint = state.location?.latitude === latitude && state.location?.longitude === longitude;
+    if (samePoint && !manual) return;
+    const place = {id:'gps', name:'Current Location', latitude, longitude, gpsVerified:true, source:'device'};
+    try {
+      localStorage.setItem(SAVED_LOC_KEY,JSON.stringify(place));
+      localStorage.setItem(DEVICE_LOC_KEY,JSON.stringify({...place,id:'device'}));
+      localStorage.setItem(BETA_SELECTED_LOC_KEY,JSON.stringify(place));
+    } catch {}
+    document.getElementById('search-cluster')?.classList.remove('open');
+    void loadLocationForecast(place,{forceRefresh:manual});
+  },unable,{enableHighAccuracy:manual,timeout:12000,maximumAge:manual ? 0 : 120000});
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -216,24 +193,10 @@ document.addEventListener('DOMContentLoaded', () => {
   initBottomNavDock();
 
   const initialLoc = state.location;
-  if (initialLoc) {
-    setAwaitingLocationUi(false, false);
-    state.forecast = buildUnifiedFusionPayload(initialLoc, null, null, null, {
-      wfo: initialLoc.wfo || 'NWS',
-      alerts: [],
-      afdText: null,
-      nwsHourlyMap: new Map(),
-      available: false
-    });
-    renderAll();
-    loadLocationForecast(initialLoc);
-    requestAutoDeviceLocation({ hasCachedLoc: true, fromQuery: Boolean(initialLoc.fromQuery) });
-  } else {
-    setAwaitingLocationUi(true, false);
-    const cityNameEl = document.getElementById('city-name');
-    if (cityNameEl) cityNameEl.textContent = 'Finding your location…';
-    requestAutoDeviceLocation({ hasCachedLoc: false, fromQuery: false });
-  }
+  if (initialLoc) void loadLocationForecast(initialLoc);
+  else setAwaitingLocationUi(true, false);
+  if (!initialLoc?.explicitChoice) requestDeviceLocation();
+
 });
 
 function initBrandIcon() {
@@ -281,26 +244,45 @@ setInterval(() => {
 async function loadLocationForecast(loc, { forceRefresh = false } = {}) {
   if (!loc || !isValidCoordPair(Number(loc.latitude), Number(loc.longitude))) return;
   const token = ++state.loadToken;
+  const changingPoint = !state.forecast ||
+    state.forecast.location.latitude !== loc.latitude || state.forecast.location.longitude !== loc.longitude;
   state.location = loc;
-  setAwaitingLocationUi(false, false);
-  try {
-    if (loc.gpsVerified) localStorage.setItem(SAVED_LOC_KEY, JSON.stringify(loc));
-  } catch {}
+  if (changingPoint) {
+    state.forecast = null;
+    setAwaitingLocationUi(true, false);
+    const cityName = document.getElementById('city-name');
+    if (cityName) cityName.textContent = loc.name || 'Your local weather';
+  }
+  locationStatus('Loading local forecast…');
   state.liveAlerts = null;
   state.liveBriefing = null;
   void refreshLocalRadar(loc, token);
 
-  const [liveForecast, alertsRes] = await Promise.all([
-    fetchCompleteFusionForecast(loc, { forceRefresh }),
-    fetch(`/api/weather-fusion/alerts?latitude=${encodeURIComponent(loc.latitude)}&longitude=${encodeURIComponent(loc.longitude)}`)
-      .then((r) => (r.ok ? r.json() : null))
-      .catch(() => null)
-  ]);
-  if (token !== state.loadToken) return;
+  fetch(`/api/weather-fusion/alerts?latitude=${encodeURIComponent(loc.latitude)}&longitude=${encodeURIComponent(loc.longitude)}`, {signal:AbortSignal.timeout(10000)})
+    .then(response => response.ok ? response.json() : null)
+    .then(data => {
+      if (token !== state.loadToken || !Array.isArray(data?.alerts)) return;
+      state.liveAlerts = data.alerts;
+      if (state.forecast) {
+        if (data.alerts.length) state.forecast.alerts = data.alerts;
+        renderStatusAndAlerts(state.forecast);
+        renderTopCompactPills(state.forecast);
+        state.mapController?.renderAlertPolygons(state.forecast.alerts);
+      }
+    }).catch(() => {});
 
-  if (alertsRes && Array.isArray(alertsRes.alerts)) {
-    state.liveAlerts = alertsRes.alerts;
-    if (alertsRes.alerts.length) liveForecast.alerts = alertsRes.alerts;
+  const liveForecast = await fetchCompleteFusionForecast(loc,{forceRefresh}).catch(() => null);
+  if (token !== state.loadToken) return;
+  if (!liveForecast?.isLiveApi) {
+    locationStatus('Local forecast unavailable. Tap Refresh or search for another location.');
+    if (!state.forecast) setAwaitingLocationUi(true,true);
+    return;
+  }
+  if (state.liveAlerts?.length) liveForecast.alerts = state.liveAlerts;
+  locationStatus('');
+  setAwaitingLocationUi(false, false);
+  if (!loc.fromQuery) {
+    try { localStorage.setItem(BETA_SELECTED_LOC_KEY,JSON.stringify(liveForecast.location)); } catch {}
   }
 
   if (latestLocalRadar?.token === token) applyLocalRadar(liveForecast.canonical, latestLocalRadar.data);
@@ -1071,46 +1053,32 @@ function renderFeelsTimeAndTrio(f) {
 function renderNext24QuickCard(f) {
   const stage = document.getElementById('next24-spline-stage');
   if (!stage) return;
-  const hrs = (f.hours48 || []).slice(0, 24);
-  const tz = f.timeZone || f.location?.timeZone || 'America/New_York';
-  stage.innerHTML = `
-    <details id="n24-strip-disclosure" class="n24-hourly-strip-disclosure" ${state.n24StripExpanded ? 'open' : ''}>
-      <summary class="n24-strip-summary" style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;padding:8px 12px;border-radius:12px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.20);font-size:13px;font-weight:700;color:#e8f3ff;list-style:none;">
-        <span>Hourly Cards &amp; Rain Amounts (Next 24h)</span>
-        <span class="bar-chevron" aria-hidden="true">›</span>
-      </summary>
-      <div class="hourly-strip-scroll" style="margin-top:8px;" aria-label="Next 24 hours hourly cards with rain chance and rainfall amount">
-        ${hrs
-          .map((h, idx) => {
-            const dayShort = idx === 0 ? '' : new Intl.DateTimeFormat('en-US', { timeZone: tz, weekday: 'short' }).format(h.dateObj);
-            const timeLbl = idx === 0 ? 'Now' : `${dayShort} ${h.hourLabel}`;
-            const amtStr = (h.precipIn || 0) > 0 ? `${Number(h.precipIn).toFixed(2)}"` : '0.00"';
-            return `
-              <button type="button" class="hour-tile ${idx === state.selectedHourIdx ? 'active' : ''}" data-n24-card="${idx}" title="${escapeAttr(h.rainLedger?.tooltip || '')}">
-                <span class="hour-tile-time">${escapeAttr(timeLbl)}</span>
-                <div>${renderWeatherIconSvg(h.icon, 28)}</div>
-                <span class="hour-tile-temp">${fmtTemp(h.tempF)}</span>
-                <span class="hour-tile-feels">Feels ${fmtTemp(h.feelsLikeF)}</span>
-                <span class="hour-pop-pill" title="${escapeAttr(h.rainLedger?.tooltip || '')}">💧 ${h.rainChance}%</span>
-                <span class="hour-qpf-sub" style="font-size:10.5px;color:var(--blue);font-weight:600;">${amtStr}</span>
-              </button>
-            `;
-          })
-          .join('')}
-      </div>
-    </details>
-  `;
-  const disc = stage.querySelector('#n24-strip-disclosure');
-  disc?.addEventListener('toggle', () => {
-    state.n24StripExpanded = Boolean(disc.open);
-  });
-  stage.querySelectorAll('[data-n24-card]').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      state.selectedHourIdx = Number(btn.dataset.n24Card) || 0;
-      state.n24StripExpanded = true;
-      renderNext24QuickCard(f);
-    });
-  });
+  const time = new Intl.DateTimeFormat('en-US',{timeZone:f.timeZone,weekday:'short',hour:'numeric'});
+  const hours = f.hours48.slice(0,24);
+  stage.innerHTML = hours.map((hour,index) => `
+    <button type="button" class="hour-tile" data-n24-card="${index}" aria-haspopup="dialog"
+      title="${escapeAttr(hour.rainLedger.tooltip)}">
+      <span class="hour-tile-time">${index === 0 ? 'This hour' : escapeAttr(time.format(hour.dateObj))}</span>
+      ${renderWeatherIconSvg(hour.icon,27)}
+      <span class="hour-tile-temp">${fmtTemp(hour.tempF)}</span>
+      <span class="hour-tile-feels">Feels ${fmtTemp(hour.feelsLikeF)}</span>
+      <span class="hour-pop-pill">💧 ${rainPercent(hour.rainChance)}</span>
+      ${hour.precipIn >= .01 ? `<span class="hour-qpf-sub">${hour.precipIn.toFixed(2)}″</span>` : ''}
+    </button>`).join('');
+  stage.onclick = event => {
+    const card = event.target.closest('[data-n24-card]');
+    if (card) {
+      state.selectedHourIdx = Number(card.dataset.n24Card);
+      state.selectedMetricId = 'rainChance';
+      open48hExplorerModal(f);
+    }
+  };
+  const more = document.getElementById('beta-hourly-more');
+  more.onclick = () => {
+    state.selectedHourIdx = 0;
+    state.selectedMetricId = 'temp';
+    open48hExplorerModal(f);
+  };
 }
 
 function formatHHMMTo12h(hhmm) {
@@ -1135,7 +1103,7 @@ function openDayHourlyModal(day, f) {
         <td><span style="display:inline-flex;align-items:center;gap:5px;">${renderWeatherIconSvg(h.icon, 20)}<span>${h.condition}</span></span></td>
         <td><strong>${fmtTemp(h.tempF)}</strong></td>
         <td>${fmtTemp(h.feelsLikeF)}</td>
-        <td title="${escapeAttr(h.rainLedger?.tooltip || '')}">💧 ${h.rainChance}%</td>
+        <td title="${escapeAttr(h.rainLedger?.tooltip || '')}">💧 ${rainPercent(h.rainChance)}</td>
         <td><strong>${Number(h.precipIn || 0).toFixed(2)}"</strong></td>
         <td>${h.windMph} mph ${h.windCardinal || ''}</td>
         <td>${h.cloudCover ?? '—'}%</td>
@@ -1150,7 +1118,7 @@ function openDayHourlyModal(day, f) {
       <div class="d7-modal-summary">
         <div><strong>${day.condition}</strong> · High ${fmtTemp(day.highF)} / Low ${fmtTemp(day.lowF)}</div>
         <div style="font-size:12.5px;color:var(--muted);margin-top:3px;">
-          Feels ${fmtTemp(day.minFeelsF)}–${fmtTemp(day.peakFeelsF)} · Rain ${day.rainChance}% (${day.totalQpfIn.toFixed(2)}") · Wind up to ${day.maxWindMph} mph (gusts ${day.maxGustMph} mph)
+          Feels ${fmtTemp(day.minFeelsF)}–${fmtTemp(day.peakFeelsF)} · Rain ${rainPercent(day.rainChance)} (${day.totalQpfIn.toFixed(2)}") · Wind up to ${day.maxWindMph} mph (gusts ${day.maxGustMph} mph)
         </div>
       </div>
       <div class="compare-table-wrap" style="margin-top:10px;max-height:380px;overflow-y:auto;">
@@ -1237,8 +1205,8 @@ function renderSevenDayForecast(f) {
     const dpLabel = getDewPointVerdict(dayDp);
     const windDir = d.hours?.[Math.floor((d.hours?.length || 1) / 2)]?.windCardinal || '';
     const rainLine = d.totalSnowIn > 0
-      ? `${d.rainChance}% · ${d.totalQpfIn.toFixed(2)}" · ❄ ${d.totalSnowIn}"`
-      : `${d.rainChance}% · ${d.totalQpfIn.toFixed(2)}"`;
+      ? `${rainPercent(d.rainChance)} · ${d.totalQpfIn.toFixed(2)}" · ❄ ${d.totalSnowIn}"`
+      : `${rainPercent(d.rainChance)} · ${d.totalQpfIn.toFixed(2)}"`;
     const wetHours = (d.hours || []).filter((h) => Number(h.precipIn || 0) >= 0.01);
     const wetHoursBlock = wetHours.length
       ? `
@@ -1254,7 +1222,7 @@ function renderSevenDayForecast(f) {
             <div class="day-hour-rain-cell" title="${escapeAttr(h.rainLedger?.tooltip || '')}">
               <span class="dhr-time">${escapeAttr(h.hourLabel)}</span>
               <strong class="dhr-amt">${Number(h.precipIn).toFixed(2)}"</strong>
-              <small class="dhr-pop">💧 ${h.rainChance}%</small>
+              <small class="dhr-pop">💧 ${rainPercent(h.rainChance)}</small>
             </div>
           `
             )
@@ -1343,13 +1311,12 @@ function renderHourlyExplorerSection(f) {
     state.selectedHourIdx = clamp(idx, 0, f.hours48.length - 1);
     const h = f.hours48[state.selectedHourIdx];
     const val = extractHourMetricValue(h, state.selectedMetricId, state.useCelsius);
-    const fmtV = activeMetric.decimals ? Number(val).toFixed(activeMetric.decimals) : Math.round(val);
-    const rl = h.rainLedger.breakdown;
+    const fmtV = Number.isFinite(val) ? (activeMetric.decimals ? val.toFixed(activeMetric.decimals) : Math.round(val))+activeMetric.unit : "—";
 
     if (readoutWrap) {
       readoutWrap.innerHTML = `
         <div class="hourly-readout-primary">
-          <span class="readout-big-val" style="color:${activeMetric.color};">${fmtV}${activeMetric.unit}</span>
+          <span class="readout-big-val" style="color:${activeMetric.color};">${fmtV}</span>
           <div>
             <div style="font-size:15px;font-weight:700;color:#ffffff;">
               ${h.dateObj.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} · ${h.hourLabel} (${h.condition})
@@ -1359,9 +1326,7 @@ function renderHourlyExplorerSection(f) {
             </div>
           </div>
         </div>
-        <div style="display:flex;gap:6px;flex-wrap:wrap;">
-          <span class="wfo-pill">Rain 100-Pt: <strong>${h.rainChance}%</strong> (NWS ${rl.nws.pts} + HRRR ${rl.hrrr.pts} + NBM ${rl.nbm.pts} + ECMWF ${rl.ecmwf.pts} + WN ${rl.weathernext.pts})</span>
-        </div>
+        ${hourlyRainInputsHTML(h.rainLedger)}
       `;
     }
 
@@ -1382,7 +1347,7 @@ function renderHourlyExplorerSection(f) {
           <div>${renderWeatherIconSvg(h.icon, 30)}</div>
           <span class="hour-tile-temp">${fmtTemp(h.tempF)}</span>
           <span class="hour-tile-feels">Feels ${fmtTemp(h.feelsLikeF)}</span>
-          <span class="hour-pop-pill">💧 ${h.rainChance}%</span>
+          <span class="hour-pop-pill">💧 ${rainPercent(h.rainChance)}</span>
           <span style="font-size:10.5px;color:var(--faint);">${h.windMph} mph</span>
         </div>
       `
@@ -1510,7 +1475,7 @@ function renderOutdoorExposureCards(f) {
       id: 'sun',
       title: isRaining ? 'In the Rain' : !cur.isDay ? 'Evening Air' : isCloudyNoSun ? 'Under Clouds' : 'In Direct Sun',
       shortLine: isRaining
-        ? `${cur.rainChance}% rain risk · Damp outdoor chill`
+        ? `${rainPercent(cur.rainChance)} rain risk · Damp outdoor chill`
         : !cur.isDay
         ? 'No direct sunlight outdoors'
         : isCloudyNoSun
@@ -1526,7 +1491,7 @@ function renderOutdoorExposureCards(f) {
           <span class="exposure-big-temp" style="color:${isRaining ? '#7ac6ff' : isCloudyNoSun || !cur.isDay ? '#bae6fd' : '#ffd470'};">
             ${fmtTemp(sunTileFeels)}
           </span>
-          <span class="wfo-pill">${isRaining ? `${cur.rainChance}% Rain` : !cur.isDay ? 'After Dusk' : isCloudyNoSun ? `${Math.round(cur.cloudCover || 85)}% Clouds` : `UV ${cur.uvIndex}`}</span>
+          <span class="wfo-pill">${isRaining ? `${rainPercent(cur.rainChance)} Rain` : !cur.isDay ? 'After Dusk' : isCloudyNoSun ? `${Math.round(cur.cloudCover || 85)}% Clouds` : `UV ${cur.uvIndex}`}</span>
         </div>
         <div style="font-size:14.5px;font-weight:700;color:#ffffff;margin-bottom:4px;">
           ${
@@ -1657,77 +1622,8 @@ function renderModelExplanationSection(f) {
 
   const wettest = periodHours.reduce((best, h) => (h.rainChance > best.rainChance ? h : best), periodHours[0]);
   const warmest = periodHours.reduce((best, h) => (h.tempF > best.tempF ? h : best), periodHours[0]);
-  const rl = wettest.rainLedger;
-  const bd = rl.breakdown;
-
   if (rainCard) {
-    rainCard.innerHTML = `
-      <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;">
-        <div>
-          <span class="section-kicker">100-Point Rain Scoring Ledger</span>
-          <h3 style="margin:3px 0;font-size:17px;">Peak Hour: ${wettest.hourLabel} (${rl.totalPts}/100 pts)</h3>
-        </div>
-        <span class="wfo-pill">${rl.blendedQpfIn}"/hr Blended QPF</span>
-      </div>
-
-      <div class="ledger-stacked-bar">
-        <div style="width:${bd.nws.pts}%;background:#6bc5ff;" title="NWS: ${bd.nws.pts} pts"></div>
-        <div style="width:${bd.hrrr.pts}%;background:#ff9f5a;" title="HRRR: ${bd.hrrr.pts} pts"></div>
-        <div style="width:${bd.nbm.pts}%;background:#5ce0a0;" title="NBM: ${bd.nbm.pts} pts"></div>
-        <div style="width:${bd.ecmwf.pts}%;background:#b88cff;" title="ECMWF: ${bd.ecmwf.pts} pts"></div>
-        <div style="width:${bd.gefs.pts}%;background:#ffd166;" title="GEFS: ${bd.gefs.pts} pts"></div>
-        <div style="width:${bd.weathernext.pts}%;background:#ff7eb6;" title="WeatherNext: ${bd.weathernext.pts} pts"></div>
-      </div>
-
-      <table class="math-table">
-        <thead>
-          <tr>
-            <th>Source Feed</th>
-            <th>Input Value</th>
-            <th>Rule / Threshold</th>
-            <th>Points</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td><strong style="color:#6bc5ff;">NWS Official PoP</strong></td>
-            <td>${bd.nws.pop}% PoP</td>
-            <td>Proportional 40-pt share</td>
-            <td><strong>${bd.nws.pts} / ${bd.nws.maxPts}</strong></td>
-          </tr>
-          <tr>
-            <td><strong style="color:#ff9f5a;">NOAA HRRR 3km</strong></td>
-            <td>${bd.hrrr.maxPts > 0 ? bd.hrrr.qpf.toFixed(3) + '"/hr' : 'Out of range (>48h)'}</td>
-            <td>${bd.hrrr.tier}</td>
-            <td><strong>${bd.hrrr.pts} / ${bd.hrrr.maxPts}</strong></td>
-          </tr>
-          <tr>
-            <td><strong style="color:#5ce0a0;">National Blend (NBM)</strong></td>
-            <td>${bd.nbm.qpf.toFixed(3)}"/hr</td>
-            <td>${bd.nbm.tier}</td>
-            <td><strong>${bd.nbm.pts} / ${bd.nbm.maxPts}</strong></td>
-          </tr>
-          <tr>
-            <td><strong style="color:#b88cff;">ECMWF IFS 0.25°</strong></td>
-            <td>${bd.ecmwf.qpf.toFixed(3)}"/hr</td>
-            <td>${bd.ecmwf.tier}</td>
-            <td><strong>${bd.ecmwf.pts} / ${bd.ecmwf.maxPts}</strong></td>
-          </tr>
-          <tr>
-            <td><strong style="color:#ffd166;">GEFS Ensemble</strong></td>
-            <td>${bd.gefs.maxPts > 0 ? bd.gefs.qpf.toFixed(3) + '"/hr' : 'Carved Day 3+'}</td>
-            <td>${bd.gefs.tier}</td>
-            <td><strong>${bd.gefs.pts} / ${bd.gefs.maxPts}</strong></td>
-          </tr>
-          <tr>
-            <td><strong style="color:#ff7eb6;">WeatherNext AI</strong></td>
-            <td>${bd.weathernext.qpf.toFixed(3)}"/hr</td>
-            <td>${bd.weathernext.tier}</td>
-            <td><strong>+${bd.weathernext.pts} / ${bd.weathernext.maxPts}</strong></td>
-          </tr>
-        </tbody>
-      </table>
-    `;
+    rainCard.innerHTML = `<h3>Peak hourly rain chance · ${escapeAttr(wettest.hourLabel)}</h3>${hourlyRainInputsHTML(wettest.rainLedger)}`;
   }
 
   const tf = warmest.tempFusion;
@@ -1826,7 +1722,7 @@ function renderModelExplanationSection(f) {
               <td>${fmtTemp(h.modelTemps.gefs)}</td>
               <td>${fmtTemp(h.modelTemps.weathernext)}</td>
               <td>${h.rainChance} pts</td>
-              <td>${h.precipIn.toFixed(3)}"</td>
+              <td>${Number.isFinite(h.precipIn) ? h.precipIn.toFixed(3)+'″' : '—'}</td>
             </tr>
           `
             )
@@ -2104,7 +2000,7 @@ function renderAqiAndGlanceTiles(f) {
         id: 'rainfall',
         label: '🌧 Precip',
         val: `${today.totalQpfIn}"`,
-        badge: `${today.rainChance}% chance`,
+        badge: `${rainPercent(today.rainChance)} chance`,
         visual: `<div class="apple-meter-track"><div class="apple-meter-fill" style="width:${clamp(today.rainChance, 6, 100)}%;background:linear-gradient(90deg,#0ea5e9,#3b82f6);"></div></div>`,
         sub: cur.precipIn > 0 ? `Currently ${cur.precipIn}"/hr` : 'Expected today total'
       },
@@ -2218,7 +2114,7 @@ function renderMainStyleCarWashHtml(f) {
           <small>${d.dateLabel}</small>
           ${renderWeatherIconSvg(d.icon, 42)}
           <span class="car-wash-temps">${fmtTemp(d.lowF)} <i>|</i> ${fmtTemp(d.highF)}</span>
-          <span class="car-wash-chance">💧 ${d.rainChance}%</span>
+          <span class="car-wash-chance">💧 ${rainPercent(d.rainChance)}</span>
           <b class="car-wash-day-verdict">${dayVerdict}</b>
         </article>
       `;
@@ -2244,7 +2140,7 @@ function renderMainStyleCarWashHtml(f) {
         <div class="car-wash-checks">
           <span class="car-wash-fact ${today.rainChance <= 25 ? 'good' : ''}">
             <i aria-hidden="true">💧</i>
-            <span><b>${today.rainChance}%</b><small>Rain chance today</small></span>
+            <span><b>${rainPercent(today.rainChance)}</b><small>Rain chance today</small></span>
           </span>
           <span class="car-wash-fact ${lowRainDays === 3 ? 'good' : ''}">
             <i aria-hidden="true">☀</i>
@@ -2360,7 +2256,11 @@ function initHeaderControls() {
           dropdown.hidden = true;
           searchInput.value = '';
           document.getElementById('search-cluster')?.classList.remove('open');
-          if (picked) loadLocationForecast({ ...picked, source: 'search', explicitChoice: true });
+          if (picked) {
+            ++gpsRequest;
+            locateBtn?.removeAttribute('aria-busy');
+            void loadLocationForecast({...picked, source:'search', explicitChoice:true});
+          }
         });
       });
     }, 180);
@@ -2391,54 +2291,7 @@ function initHeaderControls() {
     }
   });
 
-  locateBtn?.addEventListener('click', () => {
-    if (!navigator.geolocation) {
-      openModal('Location Not Supported', `<p style="color:var(--muted);">Your browser does not support automatic location lookup. Type your city, ZIP, or street address in the search bar.</p>`);
-      return;
-    }
-    const cityNameEl = document.getElementById('city-name');
-    if (cityNameEl) cityNameEl.textContent = 'Finding your location…';
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        state.geoDenied = false;
-        const lat = Number(pos.coords.latitude.toFixed(4));
-        const lon = Number(pos.coords.longitude.toFixed(4));
-        const resolvedName = await Promise.race([
-          reverseGeocodeLocation(lat, lon),
-          new Promise((r) => setTimeout(() => r('Current Location'), 2000))
-        ]);
-        const cleanName = resolvedName || 'Current Location';
-        const gpsPlace = {
-          id: 'gps',
-          name: cleanName,
-          latitude: lat,
-          longitude: lon,
-          gpsVerified: true,
-          source: 'device'
-        };
-        try {
-          localStorage.setItem(SAVED_LOC_KEY, JSON.stringify(gpsPlace));
-          localStorage.setItem(DEVICE_LOC_KEY, JSON.stringify({ id: 'device', name: cleanName, latitude: lat, longitude: lon, source: 'device' }));
-        } catch {}
-        document.getElementById('search-cluster')?.classList.remove('open');
-        loadLocationForecast(gpsPlace, { forceRefresh: true });
-      },
-      () => {
-        state.geoDenied = true;
-        if (!state.forecast) {
-          showLocationNeededState();
-        } else {
-          if (cityNameEl) cityNameEl.textContent = state.forecast?.location?.name || 'Location Needed';
-          renderTopCompactPills(state.forecast);
-        }
-        openModal(
-          'Allow Location Access',
-          `<p style="color:var(--muted);line-height:1.5;margin-top:0;">To show weather for your exact spot automatically, allow location permission in your browser settings and tap <strong>⌖ Use My Current Location</strong> — or search any address or ZIP above.</p>`
-        );
-      },
-      { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
-    );
-  });
+  locateBtn?.addEventListener('click', () => requestDeviceLocation({manual:true}));
 
   unitBtn?.addEventListener('click', () => {
     state.useCelsius = !state.useCelsius;
@@ -2746,7 +2599,7 @@ function initModalSystem() {
               <tr>
                 <td><strong>${d.shortWeekday} · ${d.dateLabel}</strong></td>
                 <td>${fmtTemp(d.highF)} / ${fmtTemp(d.lowF)}</td>
-                <td>${d.rainChance}%</td>
+                <td>${rainPercent(d.rainChance)}</td>
                 <td><strong>${d.totalSnowIn}"</strong></td>
                 <td style="color:${d.confidence.color};">${d.confidence.level}</td>
               </tr>
@@ -2839,7 +2692,7 @@ function openWeatherMeterModal(f) {
         <div class="take-modal-row"><span>🌡 Temperature Feel (${fmtTemp(feels)})</span><strong>${tempComfort}</strong></div>
         <div class="take-modal-row"><span>☁ Sky &amp; Clouds</span><strong>${skyNote}</strong></div>
         <div class="take-modal-row"><span>💧 Air Freshness</span><strong>${airComfort}</strong></div>
-        <div class="take-modal-row"><span>☔ Rain Risk (${today.rainChance}%)</span><strong>${rainNote}</strong></div>
+        <div class="take-modal-row"><span>☔ Rain Risk (${rainPercent(today.rainChance)})</span><strong>${rainNote}</strong></div>
         <div class="take-modal-row"><span>💨 Wind (${cur.windMph} mph)</span><strong>${windNote}</strong></div>
         <div class="take-modal-row"><span>🍃 Air Quality (${aqi} AQI)</span><strong>${aqiNote}</strong></div>
       </div>
@@ -2940,7 +2793,7 @@ function openWardrobeModal(f) {
           <div class="wardrobe-badge">${advice.title}</div>
           <div style="font-size:28px;font-weight:800;line-height:1.1;margin:6px 0;">Feels Like ${fmtTemp(cur.feelsLikeF)}</div>
           <div style="font-size:13.5px;color:var(--muted);margin-bottom:10px;">
-            Air ${fmtTemp(cur.tempF)} · Shade ${fmtTemp(cur.shadeFeelsF)} · ${cur.hasDirectSun ? `Sun ${fmtTemp(cur.sunFeelsF)}` : `Under Clouds ${fmtTemp(cur.feelsLikeF)}`} · Wind ${cur.windMph} mph · Rain ${cur.rainChance}% · Air feels <strong>${dpDesc.toLowerCase()}</strong>
+            Air ${fmtTemp(cur.tempF)} · Shade ${fmtTemp(cur.shadeFeelsF)} · ${cur.hasDirectSun ? `Sun ${fmtTemp(cur.sunFeelsF)}` : `Under Clouds ${fmtTemp(cur.feelsLikeF)}`} · Wind ${cur.windMph} mph · Rain ${rainPercent(cur.rainChance)} · Air feels <strong>${dpDesc.toLowerCase()}</strong>
           </div>
           <ul class="wardrobe-list">
             ${advice.items.map((item) => `<li>✓ ${item}</li>`).join('')}
@@ -3119,6 +2972,10 @@ function open48hExplorerModal(f) {
         <span id="modal-main-trend-time">Now · drag across the graph</span>
       </div>
       <div id="modal-hourly-chart" class="chart tall" tabindex="0" role="tabpanel"></div>
+      <details id="modal-rain-inputs" class="beta-hour-rain-details">
+        <summary id="modal-rain-input-title">Rain chance inputs</summary>
+        <div id="modal-rain-input-rows"></div>
+      </details>
       <div id="modal-hourly-strip" class="hourly-strip-scroll" style="margin-top:12px;"></div>
       </section>
     `
@@ -3130,6 +2987,26 @@ function open48hExplorerModal(f) {
   const chartStage = document.getElementById('modal-hourly-chart');
   const stripWrap = document.getElementById('modal-hourly-strip');
   let activeTrendKey = mapV3MetricToMainTrend(state.selectedMetricId);
+
+  const inputs = document.getElementById('modal-rain-inputs');
+  const inputTitle = document.getElementById('modal-rain-input-title');
+  const inputRows = document.getElementById('modal-rain-input-rows');
+  let shownHour;
+  const showRainInputs = index => {
+    const hour = f.hours48[index];
+    if (!hour || shownHour === hour) return;
+    shownHour = hour;
+    state.selectedHourIdx = index;
+    inputTitle.textContent = `Rain chance inputs · ${rainPercent(hour.rainChance)}`;
+    inputRows.innerHTML = hourlyRainInputsHTML(hour.rainLedger);
+    for (const tile of stripWrap.querySelectorAll('[data-m-h]')) {
+      const selected = Number(tile.dataset.mH) === index;
+      tile.classList.toggle('active',selected);
+      tile.setAttribute('aria-pressed',String(selected));
+    }
+  };
+  inputs.open = activeTrendKey === 'precip';
+  const hoursByTime = new Map(f.hours48.map((hour,index) => [Date.parse(hour.time),index]));
 
   let plottedHours = [];
   const drawModalHourly = () => {
@@ -3143,6 +3020,7 @@ function open48hExplorerModal(f) {
       tabsWrap.querySelectorAll('[data-m-trend]').forEach((btn) => {
         btn.addEventListener('click', () => {
           activeTrendKey = btn.dataset.mTrend;
+          if (activeTrendKey === 'precip') inputs.open = true;
           drawModalHourly();
         });
       });
@@ -3154,8 +3032,9 @@ function open48hExplorerModal(f) {
     chartStage.setAttribute('aria-labelledby', 'beta-trend-tab-' + activeTrendKey);
     if (f.canonical && chartStage) {
       const series = mainTrendSeries(f.canonical);
+      series.precip = f.hours48.map(hour => ({t:Date.parse(hour.time),v:hour.rainChance}));
       const start = Math.floor(Date.now() / HALO_H) * HALO_H;
-      const end = start + 48 * HALO_H;
+      const end = start + 47 * HALO_H;
       const def = TREND_METRICS[activeTrendKey] || TREND_METRICS.temperature;
       const rawPoints = series[activeTrendKey] || [];
       const points = state.useCelsius && def.unit === '°'
@@ -3166,13 +3045,7 @@ function open48hExplorerModal(f) {
       const tz = f.canonical.location?.timeZone || f.timeZone || 'America/New_York';
       const showPoint = (p) => {
         if (valEl) valEl.textContent = trendReading(activeTrendKey, p);
-        if (p) {
-          for (const tile of stripWrap.querySelectorAll('[data-time]')) {
-            const selected = +tile.dataset.time === p.t;
-            tile.classList.toggle('active', selected);
-            tile.setAttribute('aria-pressed', String(selected));
-          }
-        }
+        if (p) showRainInputs(hoursByTime.get(p.t));
         if (timeEl) {
           timeEl.textContent = p
             ? haloFmt(p.t, tz, { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
@@ -3196,15 +3069,18 @@ function open48hExplorerModal(f) {
         def,
         (p) => showPoint(p || available[0])
       );
-      chartStage.selectChartTime(available.find(p => p.t === Date.parse(f.hours48[state.selectedHourIdx]?.time))?.t ?? available[0]?.t);
-      if (!available.length) showPoint(null);
+      const selected = Date.parse(f.hours48[state.selectedHourIdx]?.time);
+      if (available.some(point => point.t === selected)) chartStage.selectChartTime(selected);
+      else if (Number.isFinite(selected)) showPoint({t:selected,v:null});
+      else showPoint(available[0]);
     } else if (chartStage) {
       renderHourlyExplorerChart({
         containerEl: chartStage,
         hours48: f.hours48,
         metricId: HOURLY_METRICS.find(m => mapV3MetricToMainTrend(m.id) === activeTrendKey)?.id || 'temp',
         selectedHourIdx: state.selectedHourIdx,
-        useCelsius: state.useCelsius
+        useCelsius: state.useCelsius,
+        onSelectHour: showRainInputs
       });
     }
 
@@ -3214,15 +3090,20 @@ function open48hExplorerModal(f) {
           <span class="hour-tile-time">${hr.hourLabel}</span>
           <div>${renderWeatherIconSvg(hr.icon, 28)}</div>
           <span class="hour-tile-temp">${fmtTemp(hr.tempF)}</span>
-          <span class="hour-pop-pill" title="${escapeAttr(hr.rainLedger?.tooltip || '')}">💧 ${hr.rainChance}%</span>
+          <span class="hour-pop-pill" title="${escapeAttr(hr.rainLedger?.tooltip || '')}">💧 ${rainPercent(hr.rainChance)}</span>
           ${hr.precipIn>=.01 ? `<span style="font-size:10.5px;color:var(--blue);font-weight:600;">${hr.precipIn.toFixed(2)}"</span>` : ''}
         </button>
       `).join('');
       stripWrap.querySelectorAll('[data-m-h]').forEach((el) => {
         el.addEventListener('click', () => {
-          state.selectedHourIdx = Number(el.dataset.mH) || 0;
-          if (f.canonical) chartStage.selectChartTime(+el.dataset.time);
-          else drawModalHourly();
+          const index = Number(el.dataset.mH);
+          showRainInputs(index);
+          if (f.canonical && plottedHours.some(point => point.t === +el.dataset.time)) chartStage.selectChartTime(+el.dataset.time);
+          else if (f.canonical) {
+            chartStage.querySelector('.c-scrub')?.setAttribute('visibility','hidden');
+            valEl.textContent = 'Unavailable';
+            timeEl.textContent = haloFmt(+el.dataset.time,f.timeZone,{weekday:'short',hour:'numeric',minute:'2-digit'});
+          } else drawModalHourly();
         });
       });
     }
@@ -3238,6 +3119,7 @@ function open48hExplorerModal(f) {
     chartStage.selectChartTime(time);
   });
   drawModalHourly();
+  showRainInputs(state.selectedHourIdx);
 }
 
 function openBehindForecastModal(f) {

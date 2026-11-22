@@ -17,7 +17,7 @@
   <link rel="stylesheet" href="/weather-fusion/weather-glass.css?v=ice-v5" />
   <link rel="stylesheet" href="/weather-fusion/outlook-panel.css?v=compact-v3" />
   <link rel="stylesheet" href="/weather-fusion/v3/css/styles.css?v=v3-all-15" />
-  <link rel="stylesheet" href="/weather-fusion/v3/css/people-globe.css?v=rain-radar-v1" />
+  <link rel="stylesheet" href="/weather-fusion/v3/css/people-globe.css?v=local-hourly-v1" />
 </head>
 <body data-sky="cloudy">
   <!-- Full-Viewport Fixed Dynamic Living Sky Backdrop (Flows Behind Every Glass Tile) -->
@@ -51,7 +51,6 @@
             </div>
             <div id="search-results" class="search-dropdown" hidden></div>
           </div>
-          <button id="locate-btn" class="icon-btn compact-btn glass-chip-btn" type="button" title="Use my current location" aria-label="Use my location">⌖</button>
         </div>
 
         <!-- Compact Action Buttons -->
@@ -62,9 +61,12 @@
       </div>
     </header>
 
-    <nav class="shell main-app-return" aria-label="Return to the main weather app">
+    <nav class="shell main-app-return beta-location-actions" aria-label="Location and app navigation">
+      <button id="locate-btn" class="main-app-button" type="button"><span aria-hidden="true">⌖</span> Use my location</button>
       <a id="main-app-link" class="main-app-button" href="/weather-fusion/"><span aria-hidden="true">←</span> Main app</a>
     </nav>
+
+    <p class="shell beta-location-status" id="location-status" role="status" hidden></p>
 
     <!-- Slide-Down Menu Drawer (All Clickable Tools) -->
     <div id="tools-strip" class="tools-strip">
@@ -150,6 +152,15 @@
     <section id="weather-outlook-summary" class="weather-outlook-panel glass" hidden aria-label="Nourie Take and applicable weather outlooks"></section>
     <div id="top-compact-pills" class="top-compact-pills" aria-label="Forecast highlights"></div>
 
+    <section id="next-24-panel" class="glass section-panel card-compact beta-hourly-preview" aria-labelledby="beta-hourly-title">
+      <div class="n24-header">
+        <h2 id="beta-hourly-title" class="card-title-clean">Hourly forecast</h2>
+        <button id="beta-hourly-more" class="mode-pill" type="button" aria-haspopup="dialog">48 hours ›</button>
+      </div>
+      <div id="next24-spline-stage" class="hourly-strip-scroll" aria-label="Next 24 hours"></div>
+      <div id="main-hourly-trend"></div>
+    </section>
+
     <!-- Remainder of Today / Today Card from Main App (Placed Just Below Nourie Take & Other Alerts) -->
     <section id="today-forecast" class="glass today-panel beta-today-panel" aria-label="Today's forecast"></section>
 
@@ -194,11 +205,6 @@
         </div>
       </div>
       <div id="pollutant-bars" class="pollutant-list"></div>
-    </section>
-
-    <!-- Next 48 Hours Graphs From the Main Site (Collapsed by default, only opens when clicked) -->
-    <section id="next-24-panel" class="glass section-panel card-compact">
-      <div id="main-hourly-trend"></div>
     </section>
 
     <!-- 7-Day Outlook High, Low & Dew Point Spline + Collapsible Selected-Day Details (Expands Only When a Day Is Selected) -->
@@ -455,7 +461,7 @@
   </footer>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
-  <script type="module" src="/weather-fusion/main-hourly-trend.js?v=beta-glass-48h-v3"></script>
-  <script type="module" src="/weather-fusion/v3/js/app.js?v=rain-charts-radar-20261122"></script>
+  <script type="module" src="/weather-fusion/main-hourly-trend.js?v=local-hourly-v1"></script>
+  <script type="module" src="/weather-fusion/v3/js/app.js?v=local-hourly-v1"></script>
 </body>
 </html>

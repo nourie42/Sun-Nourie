@@ -30,12 +30,12 @@ import {renderAirQuality} from './air-quality.js?v=mobile-repair-v1';
 import {hideLowRainChance,displayedRainChance,rainAwareCondition,dailySkyCover} from './rain-display.js?v=low-rain-display-v1';
 import {weatherChangeMessages,WEATHER_CHANGE_TITLE} from './weather-changes.js?v=current-rain-20261017-v3';
 import {renderSnowOutlook,resetSnowOutlook} from './snow-outlook.js?v=snow-readable-v1';
-import {renderForecastWindowBanners,resetForecastWindowBanners,currentForecastWindowView} from './forecast-window-banners.js?v=compact-outlook-v1';
+import {renderForecastWindowBanners,resetForecastWindowBanners,currentForecastWindowView} from './forecast-window-banners.js?v=daily-hourly-v1';
 import {createSevenDayCarousel} from './seven-day.js?v=low-rain-display-v1';
 import {forecastSourceHealth} from './forecast-status.js?v=source-health-v1';
 import {forecastRefreshDue} from './forecast-refresh.js?v=coverage-recovery-v2';
 import {forecastSky} from './sky-display.js?v=radar-sky-v5-local-observation-v2';
-import {outlookItems,renderOutlookPanel,openOutlookNote} from './outlook-panel.js?v=compact-v1';
+import {outlookItems,renderOutlookPanel,openOutlookNote} from './outlook-panel.js?v=daily-hourly-v1';
 /* Weather Nourie browser client. Forecast values never originate in AI prose. */
 const $ = (id) => document.getElementById(id);
 const experimentalPage = isExperimentalWeatherPage();

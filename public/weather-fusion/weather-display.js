@@ -108,14 +108,13 @@ export function reconcileRainLikelihood(blend, fallbackPop = null) {
   const rawSum = entries.reduce((sum, e) => sum + e.points, 0);
   const value = Math.min(100, Math.max(0, Math.round(rawSum)));
   const shownPts = entries.map((e) => Math.round(e.points * 100) / 100);
-  const shownSum = shownPts.reduce((sum, p) => sum + p, 0);
-  if (Math.min(100, Math.max(0, Math.round(shownSum))) !== value) {
-    for (let i = shownPts.length - 1; i >= 0; i--) {
-      if (shownPts[i] > 0) {
-        shownPts[i] = Number((shownPts[i] + (rawSum - shownSum)).toFixed(2));
-        break;
-      }
-    }
+  const shownCents = shownPts.reduce((sum, points) => sum + Math.round(points * 100), 0);
+  const minCents = value === 0 ? 0 : value * 100 - 50;
+  const maxCents = value === 100 ? Infinity : value * 100 + 49;
+  const correction = Math.min(maxCents, Math.max(minCents, shownCents)) - shownCents;
+  if (correction) {
+    const i = shownPts.indexOf(Math.max(...shownPts));
+    shownPts[i] = (Math.round(shownPts[i] * 100) + correction) / 100;
   }
   const reconciledEntries = entries.map((e, i) => ({ ...e, shownPoints: shownPts[i] }));
   return { value, rawTotal: rawSum, entries: reconciledEntries, mode: blend.mode || 'blend' };

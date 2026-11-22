@@ -1,4 +1,4 @@
-import {forecastSample} from './weather-display.js?v=low-rain-display-v1';
+import {forecastSample,reconcileRainLikelihood} from './weather-display.js?v=low-rain-display-v1';
 import {sunExposureTemperature} from './outdoor-feels.js?v=current-rain-20261017-v3';
 import {finite,rainChanceValue,solarElevation} from './weather-math.js?v=current-rain-20261017-v3';
 import {forecastSnapshotFreshness} from './weather-freshness.js?v=accuracy-20261019-v1';
@@ -94,7 +94,7 @@ export function buildForecastWindows(forecast = {}, now = Date.now()) {
   const formatter = dateFormatter(forecast.location?.timeZone || 'America/New_York');
   const timeZone = formatter.resolvedOptions().timeZone;
   const snapshotFreshness=forecastSnapshotFreshness(forecast,now);
-  if (!finite(now)) return {perfect:[],rain:[],timeZone,snapshotFreshness};
+  if (!finite(now)) return {perfect:[],rain:[],rainHours:[],timeZone,snapshotFreshness};
   const startDate = dateKey(now,formatter);
   const hours = timeMap(forecast.hours);
   const series = forecast.metricForecasts?.series || {};
@@ -103,6 +103,7 @@ export function buildForecastWindows(forecast = {}, now = Date.now()) {
   const rain = canonical ? timeMap(forecast.rainTimeline) : hours;
   const times = [...new Set([...hours.keys(),...feels.keys(),...rain.keys()])].sort((a,b) => a-b);
   const rows = [];
+  const rainHours = [];
   for (const time of times) {
     if (time+HOUR <= now) continue;
     const offset = dayOffset(dateKey(time,formatter),startDate);
@@ -125,6 +126,11 @@ export function buildForecastWindows(forecast = {}, now = Date.now()) {
     // The feels series may inherit coarse day/night wording upstream. It cannot
     // identify thunder timing or veto an otherwise qualifying blended hour.
     const thunder = /thunder|\btstms?\b|\bt-?storms?\b/i.test(hourlyCondition);
+    if (wet || hour) {
+      const source = hour && (Object.hasOwn(hour,'rainLikelihood') || finite(hour.pop)) ? hour : wet;
+      const hourlyChance = reconcileRainLikelihood(source?.rainLikelihood,source?.pop).value;
+      rainHours.push({forecastTime:new Date(time).toISOString(),rainChance:hourlyChance,precipitation,thunder});
+    }
     const adverseCondition = hourlyCondition.replace(/\bwind[ -]?storms?\b/gi,'');
     const adverse = /rain|shower|drizzle|thunder|\bstorms?\b|\btstms?\b|snow|sleet|flurr|ice pellets|fog|mist|haze|smoke|obscured/i.test(adverseCondition);
     const perfect = snapshotFreshness.status==='fresh'
@@ -137,5 +143,5 @@ export function buildForecastWindows(forecast = {}, now = Date.now()) {
       perfect:perfect?'perfect':null,
       rain:thunder?'thunder':rainChance !== null && rainChance >= 80?'high':rainChance !== null && rainChance >= 60?'rain':null});
   }
-  return {perfect:groups(rows,'perfect',formatter,now),rain:groups(rows,'rain',formatter,now),timeZone,horizonDays:WINDOW_DAYS,snapshotFreshness};
+  return {perfect:groups(rows,'perfect',formatter,now),rain:groups(rows,'rain',formatter,now),rainHours,timeZone,horizonDays:WINDOW_DAYS,snapshotFreshness};
 }

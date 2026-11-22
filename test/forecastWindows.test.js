@@ -308,3 +308,16 @@ test('sunset prevents an hourly perfect window from extending into darkness',()=
   data.location={timeZone:'America/New_York',latitude:35.7931,longitude:-78.481};
   assert.deepEqual(buildForecastWindows(data,Date.parse(data.hours[0].time)).perfect,[]);
 });
+
+test('rain details show one local-date table including dry hours between different risk levels', () => {
+  const now = Date.parse('2026-11-22T11:00:00Z');
+  const f = {location:{timeZone:'America/New_York'},assembledAt:new Date(now).toISOString(),
+    rainTimeline:[83,79,0,82].map((value,i)=>({time:new Date(now+i*3600000).toISOString(),rainLikelihood:{value}}))};
+  const view = buildForecastWindows(f,now);
+  assert.equal(view.rain.length,3);
+  const html=forecastWindowDetailHTML(view,'rain','Knightdale',now);
+  assert.equal((html.match(/<table /g)||[]).length,1);
+  assert.equal((html.match(/data-forecast-hour=/g)||[]).length,4);
+  assert.match(html,/<td>0%<\/td><td>Dry forecast/);
+  assert.doesNotMatch(html,/<h4>/);
+});

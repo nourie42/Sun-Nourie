@@ -1,4 +1,4 @@
-import {buildForecastWindows} from './forecast-windows.js?v=current-rain-20261017-v3';
+import {buildForecastWindows} from './forecast-windows.js?v=daily-hourly-v1';
 
 const finite = n => typeof n === 'number' && Number.isFinite(n);
 const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -51,10 +51,37 @@ export function forecastWindowDetailHTML(view, kind, place, now = Date.now()) {
   const stamp=snapshotStamp(view),snapshotNote=lastKnownSnapshot(view)?` Last-known forecast; ${stamp?'snapshot updated '+stamp:'update time unavailable'}.`:stamp?` Forecast updated ${stamp}.`:'';
   for (const w of windows) {if(!groups.has(w.date))groups.set(w.date,[]);groups.get(w.date).push(w);}
   const headers = perfect ? '<th scope="col">Forecast hour</th><th scope="col">Feels like outdoors</th><th scope="col">Dew point</th><th scope="col">Clouds</th><th scope="col">Rain</th>' : '<th scope="col">Forecast hour</th><th scope="col">Rain likelihood</th><th scope="col">Outlook</th>';
-  const row = h => `<tr data-forecast-hour="${esc(h.forecastTime||h.time)}"><th scope="row">${esc(clock(Date.parse(h.forecastTime||h.time),zone,true))}</th>${perfect ? `<td>${value(h.feels,'°')}</td><td>${value(h.dewpoint,'°')}</td><td>${value(h.cloud,'%')}</td><td>${value(h.rainChance,'%')}</td>` : `<td>${value(h.rainChance,'%')}</td><td>${h.thunder ? 'Thunderstorms possible' : finite(h.rainChance)&&h.rainChance>=80 ? 'High rain likelihood' : 'Rain likely'}</td>`}</tr>`;
-  const period = w => `<div class="forecast-window-period"><h4>${esc(timeRange(w,zone,now))}${perfect?'':` <span>${esc(w.title)}</span>`}</h4><div class="forecast-window-table-wrap"><table class="forecast-window-table"><caption class="sr-only">${esc(heading)}: ${esc(dayLabel(w.start,zone,now))}, ${esc(timeRange(w,zone,now))}</caption><thead><tr>${headers}</tr></thead><tbody>${w.hours.map(row).join('')}</tbody></table></div></div>`;
-  const content=[...groups.values()].map(group=>`<section class="forecast-window-day"><h3>${esc(dayLabel(group[0].start,zone,now))}</h3>${group.map(period).join('')}</section>`).join('');
-  return `<div class="dialog-eyebrow">${esc(place||'Your location')}</div><h2 id="forecast-window-title">${heading}</h2><p class="forecast-window-intro">All qualifying hourly forecasts in the next 5 days, in local time.${perfect?' Uses the same outdoor feels-like estimate as the hourly forecast.':''} Current-hour entries are forecasts, not current observations.${esc(snapshotNote)}</p>${content||'<p class="forecast-window-empty">No matching hours in the next 5 days. Check again as the forecast updates.</p>'}`;
+  const outlook = h => {
+    if (h.thunder) return 'Thunderstorms possible';
+    if (!finite(h.rainChance)) return 'Unavailable';
+    if (h.rainChance >= 80) return 'High rain likelihood';
+    if (h.rainChance >= 60) return 'Rain likely';
+    if (h.rainChance >= 20) return 'Chance of rain';
+    if (h.rainChance > 0) return 'Low chance';
+    return 'Dry forecast';
+  };
+  const row = h => `<tr data-forecast-hour="${esc(h.forecastTime||h.time)}"><th scope="row">${esc(clock(Date.parse(h.forecastTime||h.time),zone,true))}</th>${perfect ? `<td>${value(h.feels,'°')}</td><td>${value(h.dewpoint,'°')}</td><td>${value(h.cloud,'%')}</td><td>${value(h.rainChance,'%')}</td>` : `<td>${value(h.rainChance,'%')}</td><td>${outlook(h)}</td>`}</tr>`;
+  const table = (hours, caption) => `<div class="forecast-window-table-wrap"><table class="forecast-window-table"><caption class="sr-only">${esc(caption)}</caption><thead><tr>${headers}</tr></thead><tbody>${hours.map(row).join('')}</tbody></table></div>`;
+  let content;
+  if (perfect) {
+    const period = w => `<div class="forecast-window-period"><h4>${esc(timeRange(w,zone,now))}</h4>${table(w.hours,`${heading}: ${dayLabel(w.start,zone,now)}, ${timeRange(w,zone,now)}`)}</div>`;
+    content = [...groups.values()].map(group => `<section class="forecast-window-day"><h3>${esc(dayLabel(group[0].start,zone,now))}</h3>${group.map(period).join('')}</section>`).join('');
+  } else {
+    const days = new Map();
+    const hours = view.rainHours ?? windows.flatMap(window => window.hours);
+    for (const hour of hours) {
+      const time = Date.parse(hour.forecastTime || hour.time);
+      if (!finite(time)) continue;
+      const key = dateKey(time,zone);
+      if (!days.has(key)) days.set(key,{time,hours:[]});
+      days.get(key).hours.push(hour);
+    }
+    content = [...days.values()].map(day => {
+      const label=dayLabel(day.time,zone,now);
+      return `<section class="forecast-window-day"><h3>${esc(label)}</h3><div class="forecast-window-period">${table(day.hours,`${heading}: ${label}`)}</div></section>`;
+    }).join('');
+  }
+  return `<div class="dialog-eyebrow">${esc(place||'Your location')}</div><h2 id="forecast-window-title">${heading}</h2><p class="forecast-window-intro">${perfect?'All qualifying hourly forecasts':'Available hourly forecasts by day'} in the next 5 days, in local time.${perfect?' Uses the same outdoor feels-like estimate as the hourly forecast.':''} Current-hour entries are forecasts, not current observations.${esc(snapshotNote)}</p>${content||'<p class="forecast-window-empty">No matching hours in the next 5 days. Check again as the forecast updates.</p>'}`;
 }
 
 function bindDialog() {

@@ -223,3 +223,39 @@ test('Dew point never exceeds air temperature or the daily low temperature acros
     }
   }
 });
+
+test('Beta lists the exact GEFS and NBM inputs used by the hourly rain forecast', async () => {
+  const {hourlyRainInputsHTML} = await import('../public/weather-fusion/v3/js/hourly-rain.js');
+  const fallback = scoreRainChance100Pt({});
+  const high = reconcileRainLedgerWithCanonical({
+    value:94,
+    sourcePoints:{nws:39,ecmwf:25,nbm:15,gefs:10,wn:5},
+    sourceValues:{nws:98,ecmwf:100,nbm:100,gefs:100,wn:100},
+    sourceKinds:{nws:'probability',nbm:'probability'},
+    sourceAmounts:{nbm:0,gefs:.056,ecmwf:.089,wn:.063}
+  },fallback);
+  const dry = reconcileRainLedgerWithCanonical({
+    value:7,
+    sourcePoints:{nws:0,ecmwf:0,nbm:7.06,gefs:0,wn:0},
+    sourceValues:{nws:0,nbm:48,ecmwf:0,gefs:0,wn:0},
+    sourceKinds:{nws:'probability',nbm:'probability'},
+    sourceAmounts:{nbm:0,gefs:0,ecmwf:0,wn:0}
+  },fallback);
+  for (const [ledger, expected] of [[high,94],[dry,7]]) {
+    const html = hourlyRainInputsHTML(ledger);
+    const points = [...html.matchAll(/data-rain-points="([\d.]+)"/g)].map(m => +m[1]);
+    assert.equal(Math.round(points.reduce((a,b) => a+b,0)),expected);
+    assert.equal(ledger.totalPts,expected);
+    assert.match(html,/GEFS/);
+  }
+  assert.match(hourlyRainInputsHTML(dry),/NBM<\/th><td>48% probability<\/td><td data-rain-points="7\.06">/);
+  const noRain = reconcileRainLedgerWithCanonical({value:7,sourcePoints:{nws:0,nbm:0}},fallback);
+  assert.equal(noRain.totalPts,0);
+  assert.match(hourlyRainInputsHTML(reconcileRainLedgerWithCanonical({value:null},fallback)),/unavailable/);
+});
+
+test('a rounded model contribution cannot shift the shown rain total across a half point', () => {
+  const r = reconcileRainLikelihood({value:84,sourcePoints:{nws:39.496,nbm:15.001,gefs:10,ecmwf:20}});
+  assert.equal(r.value,84);
+  assert.equal(Math.round(r.entries.reduce((sum,e)=>sum+e.shownPoints,0)),84);
+});

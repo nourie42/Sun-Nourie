@@ -57,3 +57,18 @@ button:focus-visible,a:focus-visible{outline:2px solid #d6efff;outline-offset:3p
 @media(max-width:540px){.weather-globe-dialog{max-height:94dvh;border-radius:20px}.globe-expanded-mount{height:46dvh;min-height:290px}.globe-dialog-header p{font-size:11px}.globe-radar-time{gap:8px}.globe-radar-time output{font-size:11px}}
 
 .hero-bg-photo.sky-night-rain{filter:brightness(.48) saturate(.76)}
+
+.beta-location-actions.main-app-return {justify-content:space-between;gap:8px}
+.beta-location-actions [aria-busy="true"] {opacity:.7}
+.beta-location-status {min-height:20px;margin-top:3px;margin-bottom:6px;text-align:center;color:#e0edf7;font-size:13px}
+.beta-hourly-preview .n24-header {margin:0 0 12px}
+.beta-hourly-preview .mode-pill {min-height:36px}
+.beta-hourly-preview .hourly-strip-scroll {margin:0;scroll-snap-type:x proximity;padding-bottom:7px}
+.beta-hourly-preview .hour-tile {flex:0 0 87px;min-width:0;padding:8px 5px;gap:5px;scroll-snap-align:start;font:inherit;color:inherit;cursor:pointer}
+.beta-hourly-preview .hour-tile-time {white-space:nowrap;font-size:12px}
+.beta-hourly-preview .hour-tile-feels,.beta-hourly-preview .hour-qpf-sub {font-size:11px}
+.beta-hourly-preview #main-hourly-trend {margin-top:6px}
+.beta-hour-rain-details {margin:8px 0 12px;padding:8px 10px;border:1px solid #adcde638;border-radius:12px}
+.beta-hour-rain-details summary {cursor:pointer;font-size:13px;font-weight:650;padding:5px 0}
+.rain-inputs-table th[scope="row"] {text-align:left}
+.rain-inputs-table tfoot :is(th,td) {border-top:1px solid #adcde64a;padding-block:8px}

@@ -20,7 +20,7 @@ import {
   currentSample,
   formatRainLikelihoodTooltip,
   reconcileRainLikelihood
-} from '../../weather-display.js?v=rain-reconcile-v2';
+} from '../../weather-display.js?v=rain-reconcile-v3';
 import { displayedFeelsAt } from '../../hourly-feels.js?v=current-rain-20261017-v3';
 import { shadeFeelsLike, thermalComfort } from '../../weather-math.js?v=current-rain-20261017-v3';
 
@@ -339,105 +339,48 @@ export function scoreRainChance100Pt({
     blendedQpfIn: Number(blendedQpf.toFixed(3)),
     wetModelsCount,
     breakdown,
-    entries: rec.entries,
+    entries: rec.entries.map(entry => ({
+      ...entry,
+      amount: entry.id === 'wn' ? qpfMap.weathernext : qpfMap[entry.id] ?? null
+    })),
+    mode: 'blend',
     tooltip: formatRainLikelihoodTooltip(syntheticLikelihood)
   };
 }
 
-export function reconcileRainLedgerWithCanonical(canonRl, fallbackLedger) {
-  if (!canonRl || typeof canonRl !== 'object' || !Number.isFinite(canonRl.value)) {
-    return fallbackLedger;
-  }
-  const rec = reconcileRainLikelihood(canonRl);
-  if (!rec.entries.length) {
-    const val = Math.round(canonRl.value);
-    const bd = structuredClone(fallbackLedger.breakdown);
-    bd.nws = { pts: val, maxPts: 100, pop: val, tier: `${val}% Official NWS PoP`, fraction: `${val}/100 pts` };
-    bd.hrrr.pts = 0;
-    bd.nbm.pts = 0;
-    bd.ecmwf.pts = 0;
-    bd.gefs.pts = 0;
-    bd.weathernext.pts = 0;
-    return {
-      ...fallbackLedger,
-      totalPts: val,
-      rawTotal: val,
-      breakdown: bd,
-      entries: [{ id: 'nws', label: 'NWS base', vote: val, points: val, shownPoints: val, kind: 'probability' }],
-      tooltip: formatRainLikelihoodTooltip(canonRl)
-    };
-  }
+export function reconcileRainLedgerWithCanonical(likelihood, fallbackLedger, fallbackChance = null) {
+  const result = reconcileRainLikelihood(likelihood, fallbackChance);
+  const availableSources = new Map((likelihood?.sources || []).map(source => [source.id, source]));
+  const entries = result.entries.map(entry => ({
+    ...entry,
+    amount: finiteRainValue(likelihood?.sourceAmounts?.[entry.id]),
+    weight: finiteRainValue(availableSources.get(entry.id)?.weight)
+  }));
 
-  const byId = new Map(rec.entries.map((e) => [e.id, e]));
-  const srcById = new Map((canonRl.sources || []).map((s) => [s.id, s]));
-  const amts = canonRl.sourceAmounts || {};
-
-  const buildModelBd = (id, defaultMax) => {
-    const e = byId.get(id);
-    const src = srcById.get(id);
-    const maxPts = Number(((src?.weight ?? defaultMax / 100) * 100).toFixed(2));
-    const pts = e ? e.shownPoints : 0;
-    const qpf = Number.isFinite(amts[id]) ? amts[id] : (fallbackLedger.breakdown[id]?.qpf ?? 0);
-    if (!e) {
-      return { pts: 0, maxPts: 0, qpf, tier: 'Unavailable / Not in period', fraction: '0' };
-    }
-    if (e.kind === 'probability') {
-      return {
-        pts,
-        maxPts,
-        qpf,
-        pop: Math.round(e.vote),
-        tier: `${Math.round(e.vote)}% ${id.toUpperCase()} PoP`,
-        fraction: `${pts}/${maxPts} pts`
-      };
-    }
-    return {
-      pts,
-      maxPts,
-      qpf,
-      tier: pts > 0 ? (pts >= maxPts * 0.9 ? 'Wet signal (Full share)' : 'Trace / Partial signal (1/3 share)') : 'Dry (<0.005")',
-      fraction: pts > 0 ? `${pts}/${maxPts} pts` : '0'
-    };
-  };
-
-  const wnEntry = byId.get('wn');
-  const wn3Entry = byId.get('weathernext3');
-  const wnPts = Number(((wnEntry?.shownPoints || 0) + (wn3Entry?.shownPoints || 0)).toFixed(2));
-  const wnMax = Number((((srcById.get('wn')?.weight || 0) + (srcById.get('weathernext3')?.weight || 0)) * 100).toFixed(2));
-  const nwsE = byId.get('nws');
-  const nwsPts = nwsE ? nwsE.shownPoints : 0;
-  const nwsPop = nwsE ? Math.round(nwsE.vote) : 0;
-
-  const breakdown = {
-    nws: {
-      pts: nwsPts,
-      maxPts: 40,
-      pop: nwsPop,
-      tier: `${nwsPop}% Official PoP`,
-      fraction: `${nwsPts}/40 pts`
-    },
-    hrrr: buildModelBd('hrrr', 30),
-    nbm: buildModelBd('nbm', 20),
-    ecmwf: buildModelBd('ecmwf', 25),
-    gefs: buildModelBd('gefs', 10),
-    weathernext: {
-      pts: wnPts,
-      maxPts: wnMax || 10,
-      qpf: Number.isFinite(amts.wn) ? amts.wn : (fallbackLedger.breakdown.weathernext?.qpf ?? 0),
-      tier: !wnEntry && !wn3Entry ? 'Unavailable' : wnPts > 0 ? 'Wet signal' : 'Dry (<0.005")',
-      fraction: wnPts > 0 ? `${wnPts}/${wnMax || 10} pts` : '0'
-    }
-  };
-
+  const breakdown = Object.fromEntries(['nws','hrrr','nbm','ecmwf','gefs','weathernext'].map(id => {
+    const rows = entries.filter(entry => id === 'weathernext'
+      ? ['wn', 'weathernext3'].includes(entry.id)
+      : entry.id === id);
+    const row = rows[0];
+    return [id, {
+      pts: Number(rows.reduce((sum, entry) => sum + entry.shownPoints, 0).toFixed(2)),
+      maxPts: Number(rows.reduce((sum, entry) => sum + (entry.weight ?? 0) * 100, 0).toFixed(2)),
+      qpf: row?.amount ?? null,
+      pop: row?.kind === 'probability' ? row.vote : null
+    }];
+  }));
   return {
     ...fallbackLedger,
-    totalPts: rec.value,
-    rawTotal: Number(rec.rawTotal.toFixed(2)),
+    totalPts: result.value,
+    rawTotal: result.rawTotal,
     breakdown,
-    entries: rec.entries,
-    tooltip: formatRainLikelihoodTooltip(canonRl)
+    entries,
+    mode: result.mode,
+    tooltip: Number.isFinite(result.value) ? formatRainLikelihoodTooltip(likelihood, fallbackChance) : 'Hourly rain chance unavailable'
   };
 }
+
+const finiteRainValue = value => Number.isFinite(value) ? value : null;
 
 /**
  * Maps WMO weather codes + precipitation/temperature to clean condition labels and icon IDs.
@@ -654,7 +597,8 @@ async function fetchNwsIntelligence(lat, lon) {
 
     if (hourlyJson?.properties?.periods) {
       hourlyJson.properties.periods.forEach((p) => {
-        const hourIso = p.startTime ? p.startTime.slice(0, 13) : null;
+        const t = Date.parse(p.startTime);
+        const hourIso = Number.isFinite(t) ? new Date(t).toISOString().slice(0, 13) : null;
         if (hourIso) {
           result.nwsHourlyMap.set(hourIso, {
             tempF: p.temperature,
@@ -692,7 +636,7 @@ export async function fetchCompleteFusionForecast(locationInput, { forceRefresh 
   // Fetch canonical main-site backend forecast first (exact NDFD/HRRR/NBM/ECMWF/GEFS/WeatherNext blend + WPC/SPC hazards + NWS AFD)
   const canonicalPromise = fetch(
     `/api/weather-fusion/forecast?latitude=${encodeURIComponent(lat)}&longitude=${encodeURIComponent(lon)}${forceRefresh ? `&_t=${Date.now()}` : ''}`,
-    { cache: 'no-store', headers: { Accept: 'application/json' } }
+    { cache: 'no-store', signal: AbortSignal.timeout(45000), headers: { Accept: 'application/json' } }
   )
     .then((r) => (r.ok ? r.json() : null))
     .catch(() => null);
@@ -732,9 +676,9 @@ export async function fetchCompleteFusionForecast(locationInput, { forceRefresh 
   try {
     const [canonRes, baseRes, mmRes, aqiRes] = await Promise.all([
       canonicalPromise,
-      fetch(openMeteoBaseUrl).then((r) => (r.ok ? r.json() : null)).catch(() => null),
-      fetch(multiModelUrl).then((r) => (r.ok ? r.json() : null)).catch(() => null),
-      fetch(aqiUrl).then((r) => (r.ok ? r.json() : null)).catch(() => null)
+      fetch(openMeteoBaseUrl, {signal: AbortSignal.timeout(8000)}).then((r) => (r.ok ? r.json() : null)).catch(() => null),
+      fetch(multiModelUrl, {signal: AbortSignal.timeout(8000)}).then((r) => (r.ok ? r.json() : null)).catch(() => null),
+      fetch(aqiUrl, {signal: AbortSignal.timeout(8000)}).then((r) => (r.ok ? r.json() : null)).catch(() => null)
     ]);
     canonicalData = canonRes;
     baseData = baseRes;
@@ -886,9 +830,7 @@ export function buildUnifiedFusionPayload(loc, baseData, multiModelData, aqiData
   });
 
   const currentHourEpoch = Math.floor(now.getTime() / 3600000) * 3600000;
-  const startEpoch = canonHours.size
-    ? Math.min(currentHourEpoch, ...canonHours.keys())
-    : currentHourEpoch;
+  const startEpoch = currentHourEpoch;
 
   const canonDaysByDate = new Map((canonicalData?.days || []).map((d) => [d.date, d]));
 
@@ -1125,12 +1067,14 @@ export function buildUnifiedFusionPayload(loc, baseData, multiModelData, aqiData
     // Rain Chance & QPF: use exact canonical rainLikelihood & precipitation when available
     const basePop = (bIdx !== undefined ? baseData?.hourly?.precipitation_probability?.[bIdx] : undefined) ?? (cloudCover > 82 ? 65 : cloudCover > 65 ? 25 : 5);
     const baseQpf = (bIdx !== undefined ? baseData?.hourly?.precipitation?.[bIdx] : undefined) ?? (basePop >= 60 ? 0.045 : basePop >= 35 ? 0.008 : 0);
-    const canonRl = cr?.rainLikelihood || ch?.rainLikelihood;
+    // Main's hourly card uses the published hourly row. For longer-range hours
+    // use the matching entry in the published rain timeline.
+    const canonRainRow = ch && (Object.hasOwn(ch, 'rainLikelihood') || Number.isFinite(ch.pop)) ? ch : cr;
+    const canonRl = canonRainRow?.rainLikelihood;
     const canonAmt = cr?.precipitationBlend?.sourceValues || ch?.precipitationBlend?.sourceValues || {};
     const canonPopMap = extractCanonModelMap(csPop);
     const canonQpfMap = extractCanonModelMap(csQpf, cr?.precipitationBlend || ch?.precipitationBlend);
-    const nwsPopReal = ch?.officialPop ?? cr?.officialPop ?? canonPopMap.get('nws') ?? null;
-    const nwsPop = clamp(nwsPopReal ?? basePop, 0, 100);
+    const nwsPopReal = ch?.officialPop ?? cr?.officialPop ?? canonPopMap.get('nws') ?? nwsData.nwsHourlyMap?.get(isoTime.slice(0,13))?.pop ?? null;
 
     const mmNbmQpf = pickMm('precipitation', 'gfs_seamless') ?? pickMm('precipitation', 'best_match');
     const mmEcmwfQpf = pickMm('precipitation', 'ecmwf_ifs025');
@@ -1158,26 +1102,21 @@ export function buildUnifiedFusionPayload(loc, baseData, multiModelData, aqiData
           weathernext: Math.max(0, baseQpf)
         };
 
-    const nbmQpf = Math.max(0, realNbmQpf ?? baseQpf);
-    const ecmwfQpf = Math.max(0, realEcmwfQpf ?? (isLiveApi ? 0 : baseQpf));
-    const gefsQpf = Math.max(0, realGefsQpf ?? (isLiveApi ? 0 : baseQpf * 0.9));
-    const hrrrQpf = i < 48 ? Math.max(0, realHrrrQpf ?? (isLiveApi ? 0 : baseQpf)) : 0;
-    const wnQpf = Math.max(0, realWnQpf ?? (isLiveApi ? 0 : baseQpf));
-
-    const baseRainLedger = scoreRainChance100Pt({
-      nwsPop,
-      hrrrQpf,
-      nbmQpf,
-      ecmwfQpf,
-      gefsQpf,
-      wnQpf,
-      nbmProbability: canonRl?.nbmProbability ?? null,
-      leadHours: i
-    });
-    const rainLedger = reconcileRainLedgerWithCanonical(canonRl, baseRainLedger);
+    const fallbackPop = bIdx === undefined ? null : baseData?.hourly?.precipitation_probability?.[bIdx];
+    const directPop = Number.isFinite(nwsPopReal) ? nwsPopReal : fallbackPop;
+    const directSource = Number.isFinite(nwsPopReal) ? 'nws-fallback' : 'open-meteo';
+    const rainLedger = canonicalData
+      ? reconcileRainLedgerWithCanonical(canonRl, null, canonRainRow?.pop)
+      : reconcileRainLedgerWithCanonical({value:directPop, mode:directSource}, null);
+    if (!canonicalData && Number.isFinite(directPop) && directSource === 'open-meteo') {
+      rainLedger.tooltip = 'Open-Meteo hourly rain probability';
+    }
+    // A published missing value or an unavailable provider is not a dry vote.
+    rainLedger.blendedQpfIn = null;
     const canonPrecipVal = cr?.precipitation ?? ch?.precipitation ?? csQpf?.value;
-    if (typeof canonPrecipVal === 'number' && Number.isFinite(canonPrecipVal)) {
-      rainLedger.blendedQpfIn = Number(canonPrecipVal.toFixed(3));
+    const reportedAmount = canonicalData ? canonPrecipVal : baseData?.hourly?.precipitation?.[bIdx];
+    if (Number.isFinite(reportedAmount)) {
+      rainLedger.blendedQpfIn = Number(reportedAmount.toFixed(3));
     }
 
     const snowfallIn = Number(
@@ -1379,10 +1318,7 @@ export function buildUnifiedFusionPayload(loc, baseData, multiModelData, aqiData
     if (typeof cc.pressure === 'number' && Number.isFinite(cc.pressure)) hours[0].pressureInHg = Number(cc.pressure.toFixed(2));
     if (typeof cc.visibility === 'number' && Number.isFinite(cc.visibility)) hours[0].visibilityMi = Number(cc.visibility.toFixed(1));
 
-    if (mainNowSample?.rainLikelihood && Number.isFinite(mainNowSample.rainLikelihood.value)) {
-      hours[0].rainLedger = reconcileRainLedgerWithCanonical(mainNowSample.rainLikelihood, hours[0].rainLedger);
-      hours[0].rainChance = hours[0].rainLedger.totalPts;
-    }
+    // The hourly rain ledger remains a forecast; current radar is displayed separately.
 
     const curFeelsSeries = canonSeries.feels?.get(startEpoch);
     const curCanonHour = canonHours.get(startEpoch) || canonicalData.hours?.[0];
@@ -1563,7 +1499,7 @@ function buildDailySummaries(hours, dailyApi, canonicalData = null, timeZone = '
     const canonPop = cd?.rainLikelihood?.value ?? cd?.pop;
     const rainChance = typeof canonPop === 'number' && Number.isFinite(canonPop)
       ? Math.round(canonPop)
-      : Math.max(...dayHours.map((h) => h.rainChance));
+      : (dayHours.some(h => Number.isFinite(h.rainChance)) ? Math.max(...dayHours.map(h => h.rainChance).filter(Number.isFinite)) : null);
     const totalQpfIn = typeof cd?.qpf === 'number' && Number.isFinite(cd.qpf)
       ? Number(cd.qpf.toFixed(2))
       : Number(dayHours.reduce((sum, h) => sum + (h.precipIn || 0), 0).toFixed(2));

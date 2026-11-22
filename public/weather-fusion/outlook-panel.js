@@ -1,6 +1,6 @@
 import {activeRiskOutlooks} from './risk-outlooks.js?v=risk-outlooks-v5';
 import {weatherChangeMessages} from './weather-changes.js?v=current-rain-20261017-v3';
-import {buildForecastWindows} from './forecast-windows.js?v=current-rain-20261017-v3';
+import {buildForecastWindows} from './forecast-windows.js?v=daily-hourly-v1';
 const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const icons={risk:'<svg viewBox="0 0 24 24"><path d="M12 22S3 13 3 9a9 9 0 0 1 18 0c0 4-9 13-9 13Z"/><circle cx="12" cy="9" r="3" fill="#153d49"/></svg>',change:'⚡',rain:'🌧',perfect:'🌤'};
 export function outlookItems(data,now=Date.now(),providedView=null){

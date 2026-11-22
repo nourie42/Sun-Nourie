@@ -815,6 +815,7 @@ export function registerWeatherFusionRoutes(app, options = {}) {
     'v3/js/app.js',
     'v3/js/charts.js',
     'v3/js/fusion-engine.js',
+    'v3/js/hourly-rain.js',
     'v3/js/icons.js',
     'v3/js/map.js',
     'v3/js/physics.js',
