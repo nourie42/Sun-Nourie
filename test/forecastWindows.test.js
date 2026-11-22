@@ -309,15 +309,17 @@ test('sunset prevents an hourly perfect window from extending into darkness',()=
   assert.deepEqual(buildForecastWindows(data,Date.parse(data.hours[0].time)).perfect,[]);
 });
 
-test('rain details show one local-date table including dry hours between different risk levels', () => {
+test('rain details group wet hours by local day and omit dry hours and entirely dry dates', () => {
   const now = Date.parse('2026-11-22T11:00:00Z');
   const f = {location:{timeZone:'America/New_York'},assembledAt:new Date(now).toISOString(),
-    rainTimeline:[83,79,0,82].map((value,i)=>({time:new Date(now+i*3600000).toISOString(),rainLikelihood:{value}}))};
+    rainTimeline:[83,79,0,82,...Array(45).fill(0),0.2].map((value,i)=>({
+      time:new Date(now+i*3600000).toISOString(),rainLikelihood:{value}
+    }))};
   const view = buildForecastWindows(f,now);
   assert.equal(view.rain.length,3);
   const html=forecastWindowDetailHTML(view,'rain','Knightdale',now);
-  assert.equal((html.match(/<table /g)||[]).length,1);
+  assert.equal((html.match(/<table /g)||[]).length,2);
   assert.equal((html.match(/data-forecast-hour=/g)||[]).length,4);
-  assert.match(html,/<td>0%<\/td><td>Dry forecast/);
-  assert.doesNotMatch(html,/<h4>/);
+  assert.match(html,/<td>&lt;1%<\/td>/);
+  assert.doesNotMatch(html,/Monday|Dry forecast|<td>0%<\/td>|<h4>/);
 });

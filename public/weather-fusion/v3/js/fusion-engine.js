@@ -22,7 +22,8 @@ import {
   reconcileRainLikelihood
 } from '../../weather-display.js?v=rain-reconcile-v3';
 import { displayedFeelsAt } from '../../hourly-feels.js?v=current-rain-20261017-v3';
-import { shadeFeelsLike, thermalComfort } from '../../weather-math.js?v=current-rain-20261017-v3';
+import { shadeFeelsLike, solarElevation, thermalComfort } from '../../weather-math.js?v=current-rain-20261017-v3';
+import {weatherState} from '../../weather-state.js?v=current-rain-20261017-v3';
 
 const US_STATE_ABBR = {
   Alabama: 'AL', Alaska: 'AK', Arizona: 'AZ', Arkansas: 'AR', California: 'CA',
@@ -906,13 +907,8 @@ export function buildUnifiedFusionPayload(loc, baseData, multiModelData, aqiData
         ? Math.round(cdForHour.low)
         : Math.round(rawBaseTemp);
     let dewPointF = Math.min(Math.round(rawBaseTemp), dayLowBoundForHour, rawDewPointF);
-    const windMph = Math.round(
-      csWind?.value ??
-      ch?.windMph ??
-      parseWindSpeedValue(ch?.wind) ??
-      (bIdx !== undefined ? baseData?.hourly?.wind_speed_10m?.[bIdx] : undefined) ??
-      clamp(7 + Math.sin(i * 0.3) * 5, 2, 24)
-    );
+    const forecastWind = csWind?.value ?? ch?.windMph ?? parseWindSpeedValue(ch?.wind) ?? baseData?.hourly?.wind_speed_10m?.[bIdx];
+    const windMph = Math.round(forecastWind ?? clamp(7 + Math.sin(i * 0.3) * 5, 2, 24));
     const windGustMph = Math.round(
       csGust?.value ??
       ch?.gust ??
@@ -925,13 +921,8 @@ export function buildUnifiedFusionPayload(loc, baseData, multiModelData, aqiData
       (bIdx !== undefined ? baseData?.hourly?.wind_direction_10m?.[bIdx] : undefined) ??
       ((240 + i * 7) % 360)
     );
-    const cloudCover = Math.round(
-      csCloud?.value ??
-      ch?.skyCover ??
-      csFeels?.inputs?.skyCover ??
-      (bIdx !== undefined ? baseData?.hourly?.cloud_cover?.[bIdx] : undefined) ??
-      clamp(45 + Math.cos(i * 0.22) * 40, 5, 100)
-    );
+    const forecastCloud = csCloud?.value ?? ch?.skyCover ?? csFeels?.inputs?.skyCover ?? baseData?.hourly?.cloud_cover?.[bIdx];
+    const cloudCover = Math.round(forecastCloud ?? clamp(45 + Math.cos(i * 0.22) * 40, 5, 100));
     const pressureInHgRaw =
       csPres?.value ??
       (bIdx !== undefined && baseData?.hourly?.surface_pressure?.[bIdx] != null
@@ -1256,10 +1247,12 @@ export function buildUnifiedFusionPayload(loc, baseData, multiModelData, aqiData
       snowfallIn,
       rainLedger,
       windMph,
+      forecastWindMph: Number.isFinite(forecastWind) ? Math.round(forecastWind) : null,
       windGustMph,
       windDirDeg,
       windCardinal: ch?.windDirection || degToCardinal(windDirDeg),
       cloudCover,
+      forecastCloudCover: Number.isFinite(forecastCloud) ? Math.round(forecastCloud) : null,
       pressureHpa,
       pressureInHg,
       visibilityMi,
@@ -1696,6 +1689,20 @@ function buildDailySummaries(hours, dailyApi, canonicalData = null, timeZone = '
   }
 
   return days;
+}
+
+export function nextSunnyBreak({hours48, location}, selectedTime, now = Date.now()) {
+  const selected = Date.parse(selectedTime);
+  const after = Number.isFinite(selected) ? Math.max(now,selected) : now;
+  return hours48.find(hour => {
+    if (!hour.isDay || Date.parse(hour.time) <= after) return false;
+    const {forecastCloudCover:cloud, rainChance:rain, precipIn, condition} = hour;
+    if (!Number.isFinite(cloud) || cloud < 0 || cloud > 62
+      || !Number.isFinite(rain) || rain < 0 || rain >= 25
+      || !Number.isFinite(precipIn) || precipIn < 0 || precipIn >= .01) return false;
+    if (!['clear','partly-cloudy'].includes(weatherState(condition).kind)) return false;
+    return solarElevation(Date.parse(hour.time),location.latitude,location.longitude) > 0;
+  });
 }
 
 function detectForecastWindows(hours48) {

@@ -103,9 +103,9 @@ html body.beta-weather-app #today-forecast .today-weather-card.beta-today-graph 
 }
 .beta-hourly-preview-head {display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:4px 10px;padding:0 2px 3px}
 .beta-hourly-preview-heading {color:#f4fbff;font-size:15px;font-weight:700}
-.beta-hourly-preview-legend {display:flex;gap:10px;color:#d0e9fa;font-size:10px;white-space:nowrap}
-.beta-hourly-preview-legend span::before {content:"";display:inline-block;width:8px;height:3px;border-radius:2px;background:#ffd394;vertical-align:2px;margin-right:4px}
-.beta-hourly-preview-legend span+span::before {background:#79d1ef}
+.beta-hourly-preview-legend {display:flex;flex-wrap:wrap;gap:4px 10px;color:#d0e9fa;font-size:10px;white-space:nowrap}
+.beta-hourly-preview-legend span::before {content:"";display:inline-block;width:8px;height:3px;border-radius:2px;background:var(--series-color);vertical-align:2px;margin-right:4px}
+.beta-hourly-preview-legend [data-metric="cloud"]::before {height:0;border-top:2px dashed var(--series-color);background:none}
 .beta-today-hourly-svg {display:block;width:100%;height:auto;max-height:196px}
 .beta-today-hourly-svg text {fill:#dceffc;font-size:10.5px;font-family:inherit;font-weight:550}
 .beta-today-hourly-svg line {stroke:#c9e8fd45;stroke-width:1}

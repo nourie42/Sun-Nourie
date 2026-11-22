@@ -60,7 +60,8 @@ export function forecastWindowDetailHTML(view, kind, place, now = Date.now()) {
     if (h.rainChance > 0) return 'Low chance';
     return 'Dry forecast';
   };
-  const row = h => `<tr data-forecast-hour="${esc(h.forecastTime||h.time)}"><th scope="row">${esc(clock(Date.parse(h.forecastTime||h.time),zone,true))}</th>${perfect ? `<td>${value(h.feels,'°')}</td><td>${value(h.dewpoint,'°')}</td><td>${value(h.cloud,'%')}</td><td>${value(h.rainChance,'%')}</td>` : `<td>${value(h.rainChance,'%')}</td><td>${outlook(h)}</td>`}</tr>`;
+  const rainPercent = chance => finite(chance) && chance > 0 && Math.round(chance) === 0 ? '&lt;1%' : value(chance,'%');
+  const row = h => `<tr data-forecast-hour="${esc(h.forecastTime||h.time)}"><th scope="row">${esc(clock(Date.parse(h.forecastTime||h.time),zone,true))}</th>${perfect ? `<td>${value(h.feels,'°')}</td><td>${value(h.dewpoint,'°')}</td><td>${value(h.cloud,'%')}</td><td>${value(h.rainChance,'%')}</td>` : `<td>${rainPercent(h.rainChance)}</td><td>${outlook(h)}</td>`}</tr>`;
   const table = (hours, caption) => `<div class="forecast-window-table-wrap"><table class="forecast-window-table"><caption class="sr-only">${esc(caption)}</caption><thead><tr>${headers}</tr></thead><tbody>${hours.map(row).join('')}</tbody></table></div>`;
   let content;
   if (perfect) {
@@ -70,6 +71,7 @@ export function forecastWindowDetailHTML(view, kind, place, now = Date.now()) {
     const days = new Map();
     const hours = view.rainHours ?? windows.flatMap(window => window.hours);
     for (const hour of hours) {
+      if (!hour.thunder && !(finite(hour.rainChance) && hour.rainChance > 0)) continue;
       const time = Date.parse(hour.forecastTime || hour.time);
       if (!finite(time)) continue;
       const key = dateKey(time,zone);
@@ -81,7 +83,7 @@ export function forecastWindowDetailHTML(view, kind, place, now = Date.now()) {
       return `<section class="forecast-window-day"><h3>${esc(label)}</h3><div class="forecast-window-period">${table(day.hours,`${heading}: ${label}`)}</div></section>`;
     }).join('');
   }
-  return `<div class="dialog-eyebrow">${esc(place||'Your location')}</div><h2 id="forecast-window-title">${heading}</h2><p class="forecast-window-intro">${perfect?'All qualifying hourly forecasts':'Available hourly forecasts by day'} in the next 5 days, in local time.${perfect?' Uses the same outdoor feels-like estimate as the hourly forecast.':''} Current-hour entries are forecasts, not current observations.${esc(snapshotNote)}</p>${content||'<p class="forecast-window-empty">No matching hours in the next 5 days. Check again as the forecast updates.</p>'}`;
+  return `<div class="dialog-eyebrow">${esc(place||'Your location')}</div><h2 id="forecast-window-title">${heading}</h2><p class="forecast-window-intro">${perfect?'All qualifying hourly forecasts':'Hours with a rain or thunder chance, grouped by day'} in the next 5 days, in local time.${perfect?' Uses the same outdoor feels-like estimate as the hourly forecast.':''} Current-hour entries are forecasts, not current observations.${esc(snapshotNote)}</p>${content||'<p class="forecast-window-empty">No matching hours in the next 5 days. Check again as the forecast updates.</p>'}`;
 }
 
 function bindDialog() {

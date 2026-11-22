@@ -14,12 +14,12 @@ test('wind interpolation wraps the date line and does not fill missing measureme
 test('higher wind produces more streamlines, calm has none, and vectors travel downwind',()=>{assert.equal(windParticleCount(0),0);assert.ok(windParticleCount(15)>windParticleCount(5));assert.ok(windParticleCount(1000)<=22);const east=advanceWind({latitude:35,longitude:-78},{u:10,v:0},1000);assert.ok(east.longitude>-78);assert.equal(east.latitude,35);const south=advanceWind({latitude:35,longitude:-78},{u:0,v:-10},1000);assert.ok(south.latitude<35);});
 test('the solar terminator follows the current UTC date and time',()=>{const sun=subsolarPoint(now);assert.ok(sun.latitude<0&&sun.latitude>-24);assert.ok(sun.longitude<-130&&sun.longitude>-150);assert.equal(cloudStamp('20261121.200000'),Date.parse('2026-11-21T20:00:00Z'));assert.equal(cloudStamp('bad'),null);});
 function upstream(){const calls=[];const fetchImpl=async url=>{calls.push(String(url));if(String(url).includes('open-meteo'))return Response.json(input());if(String(url).includes('/times'))return Response.json({globalir:['20261121.200000','20261121.220000','20261120.200000']});if(String(url).includes('GetCapabilities'))return new Response('<Dimension name="time">2026-11-21T21:20:00Z,2026-11-21T21:30:00Z</Dimension>');return new Response('not an image',{headers:{'Content-Type':'text/html'}});};return {calls,fetchImpl};}
-test('concurrent globe requests share one fetch per source and preserve actual timestamps',async()=>{const {calls,fetchImpl}=upstream(),service=createGlobeService({fetchImpl,now:()=>now,parseRadarTimes});const [a,b]=await Promise.all([service.metadata(),service.metadata()]);assert.deepEqual(a,b);assert.equal(calls.length,4);assert.equal(a.clouds.validAt,'2026-11-21T20:00:00.000Z');assert.deepEqual(a.radar.frames,['2026-11-21T21:20:00.000Z','2026-11-21T21:30:00.000Z']);await service.metadata();assert.equal(calls.length,4);});
+test('concurrent globe requests share one fetch per source and preserve actual timestamps',async()=>{const {calls,fetchImpl}=upstream(),service=createGlobeService({fetchImpl,now:()=>now,parseRadarTimes});const [a,b]=await Promise.all([service.metadata(),service.metadata()]);assert.deepEqual(a,b);assert.equal(calls.length,5);assert.equal(a.clouds.validAt,'2026-11-21T20:00:00.000Z');assert.deepEqual(a.radar.frames,['2026-11-21T21:20:00.000Z','2026-11-21T21:30:00.000Z']);await service.metadata();assert.equal(calls.length,5);});
 test('failed sources remain unavailable; no stock clouds, synthetic wind or fake radar',async()=>{const service=createGlobeService({fetchImpl:async()=>{throw Error('offline');},now:()=>now,parseRadarTimes});const data=await service.metadata();for(const value of Object.values(data))assert.equal(value.status,'unavailable');assert.ok(!data.wind.vectors);assert.ok(!data.clouds.url);});
-test('image proxy only accepts advertised timestamps and actual PNG data',async()=>{const {fetchImpl,calls}=upstream(),service=createGlobeService({fetchImpl,now:()=>now,parseRadarTimes});await service.metadata();await assert.rejects(service.image('radar','2026-11-21T21:31:00Z'),{status:404});assert.equal(calls.length,4);await assert.rejects(service.image('clouds','2026-11-21T20:00:00Z'),/Invalid globe image type/);await assert.rejects(service.image('https://example.com','2026-11-21T20:00:00Z'),{status:404});});
+test('image proxy only accepts advertised timestamps and actual PNG data',async()=>{const {fetchImpl,calls}=upstream(),service=createGlobeService({fetchImpl,now:()=>now,parseRadarTimes});await service.metadata();await assert.rejects(service.image('radar','2026-11-21T21:31:00Z'),{status:404});assert.equal(calls.length,5);await assert.rejects(service.image('clouds','2026-11-21T20:00:00Z'),/Invalid globe image type/);await assert.rejects(service.image('https://example.com','2026-11-21T20:00:00Z'),{status:404});});
 test('globe feeds and required assets are public while other vendor files and private apps retain their gate',()=>{for(const path of ['/api/weather-fusion/globe','/api/weather-fusion/globe-image','/api/weather-fusion/globe-tile','/weather-fusion/v3/vendor/maplibre-gl.js','/weather-fusion/v3/vendor/maplibre-gl.css','/weather-fusion/v3/vendor/maplibre-license.txt','/weather-fusion/v3/vendor/three.module.min.js','/weather-fusion/v3/textures/earth-day.jpg','/weather-fusion/v3/textures/earth-night.jpg'])assert.equal(isPublicWeatherPath(path),true,path);for(const path of ['/weather-fusion/v3/vendor/private.js','/weather-fusion/v3/textures/clouds-fallback.png','/weather-fusion/experimental-weather.html'])assert.equal(isPublicWeatherPath(path),false,path);assert.equal(isPublicWeatherPath('/api/weather-fusion/globe','POST'),false);});
 
-test('failed optional sources cool down instead of repeating requests for every visitor',async()=>{let count=0;const service=createGlobeService({fetchImpl:async()=>{count++;throw Error('offline');},now:()=>now,parseRadarTimes});await service.metadata();await service.metadata();assert.equal(count,4);});
+test('failed optional sources cool down instead of repeating requests for every visitor',async()=>{let count=0;const service=createGlobeService({fetchImpl:async()=>{count++;throw Error('offline');},now:()=>now,parseRadarTimes});await service.metadata();await service.metadata();assert.equal(count,5);});
 
 test('a response crossing the UTC hour keeps the actual requested wind valid time',async()=>{let clock=Date.parse('2026-11-21T21:59:59Z');const base=upstream();const service=createGlobeService({fetchImpl:async(url,options)=>{const response=await base.fetchImpl(url,options);if(String(url).includes('open-meteo'))clock=Date.parse('2026-11-21T22:00:01Z');return response;},now:()=>clock,parseRadarTimes});const data=await service.metadata();assert.equal(data.wind.status,'ready');assert.equal(data.wind.validAt,'2026-11-21T21:00:00.000Z');});
 
@@ -42,6 +42,27 @@ test('global and regional NOAA requests deduplicate and reuse regional cells for
 test('a temporary provider failure retains a recent real field and identifies its old timestamp',async()=>{
  let clock=now,offline=false;const base=upstream();const service=createGlobeService({now:()=>clock,parseRadarTimes,fetchImpl:async(u,o)=>{if(String(u).includes('pacioos')){if(offline)throw Error('offline');return Response.json(gfsTable());}return base.fetchImpl(u,o);}});
  const before=await service.metadata();offline=true;clock+=3*3600000;const after=await service.metadata();assert.equal(after.wind.status,'stale');assert.equal(after.wind.validAt,before.wind.validAt);assert.equal(after.wind.updateDelayed,true);assert.deepEqual(after.wind.vectors,before.wind.vectors);
+});
+test('a cold start with a delayed GFS update retrieves the last verified global and regional fields',async()=>{
+ const clock=Date.parse('2026-11-22T00:27:00Z');
+ const previous='2026-11-21T21:00:00Z',current='2026-11-22T00:00:00Z';
+ const calls=[];
+ const service=createGlobeService({now:()=>clock,parseRadarTimes,fetchImpl:async input=>{
+  const url=decodeURI(String(input));
+  calls.push(url);
+  if(!url.includes('pacioos')||url.includes(current))return new Response('',{status:404});
+  assert.ok(url.includes(previous));
+  return Response.json(gfsTable(previous,!url.includes(':10:')));
+ }});
+ const place={latitude:35.7798,longitude:-78.5356};
+ const data=await service.metadata(place);
+ assert.equal(data.wind.status,'stale');
+ assert.equal(data.wind.updateDelayed,true);
+ assert.equal(data.wind.validAt,previous.replace('Z','.000Z'));
+ assert.equal(data.wind.regional.validAt,data.wind.validAt);
+ assert.ok(sampleWindField(data.wind,place.latitude,place.longitude)?.speed>0);
+ assert.equal(calls.filter(url=>url.includes('pacioos')).length,4);
+ assert.ok(!calls.some(url=>url.includes('open-meteo')));
 });
 test('weather tile bounds are exact Web Mercator and reject out of range coordinates',()=>{
  assert.deepEqual(globeTileBounds(0,0,0),[-20037508.342789244,-20037508.342789244,20037508.342789244,20037508.342789244]);assert.equal(globeTileBounds(1,1,0)[0],0);assert.equal(globeTileBounds(1,1,0)[1],0);for(const v of [[11,0,0],[2,-1,0],[2,4,0],[1.5,0,0],[2,0,NaN]])assert.throws(()=>globeTileBounds(...v),{status:400});

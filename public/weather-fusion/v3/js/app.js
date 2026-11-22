@@ -5,9 +5,10 @@
 import { clamp, computePavementProfile, pavementDayPeak } from './physics.js?v=v3-pet-day-6';
 import {
   fetchCompleteFusionForecast,
+  nextSunnyBreak,
   searchLocations
-} from './fusion-engine.js?v=local-hourly-v1';
-import {todayHourlyPreview} from './today-preview.js?v=1';
+} from './fusion-engine.js?v=sky-wind-hourly-v1';
+import {todayHourlyPreview} from './today-preview.js?v=sky-wind-hourly-v1';
 import {hourlyRainInputsHTML, rainPercent} from './hourly-rain.js?v=local-hourly-v1';
 import { getLunarPhaseFraction, renderWeatherIconSvg } from './icons.js?v=v3-sky-8';
 import {
@@ -23,8 +24,8 @@ import {
 import { dogWalkerScene, referenceScene } from '../../exposure-scene.js?v=true-night-art-v6';
 import { danCard, danOverview, danTakeDisplay } from '../../dans-summary.js?v=afd-discussion-section-v1';
 import { activeRiskOutlooks, outlookDetailHTML } from '../../risk-outlooks.js?v=risk-outlooks-v5';
-import { forecastWindowDetailHTML } from '../../forecast-window-banners.js?v=daily-hourly-v1';
-import {GlobePanel} from './globe-panel.js?v=smooth-radar-v1';
+import { forecastWindowDetailHTML } from '../../forecast-window-banners.js?v=rain-hours-only-v1';
+import {GlobePanel} from './globe-panel.js?v=wind-visibility-v1';
 import {outlookItems,renderOutlookPanel,openOutlookNote} from '../../outlook-panel.js?v=daily-hourly-v1';
 import { todayForecastHTML, todayRainDisplay } from '../../today-card.js?v=radar-parity-v3';
 import {applyLocalRadar, displayedRainChance, observedRainLabel} from '../../rain-display.js?v=local-radar-v2';
@@ -1390,7 +1391,10 @@ function renderOutdoorExposureCards(f) {
       : formatZonedHourStamp(cur, hIdx, tz);
   }
 
-  const sunWindow = f.windows?.sunHours?.[0];
+  const sunWindow = nextSunnyBreak(f, cur.time);
+  const sunTime = sunWindow ? new Intl.DateTimeFormat('en-US',{
+    timeZone:tz, weekday:'short', month:'short', day:'numeric', hour:'numeric', minute:'2-digit'
+  }).format(new Date(sunWindow.time)) : null;
   const sceneCtx = { pop: cur.rainChance, rainExpected: isRaining, snowExpected: /snow|flurr/i.test(cur.condition || '') };
 
   const shadeSvg = referenceScene(0, Boolean(cur.isDay), cur.condition || 'Overcast', cur.shadeFeelsF, sceneCtx);
@@ -1462,8 +1466,8 @@ function renderOutdoorExposureCards(f) {
         <p style="font-size:13px;color:var(--muted);margin:0;line-height:1.45;">
           ${
             sunWindow
-              ? `Next bright sunny break around <strong>${sunWindow.hourLabel}</strong> (${fmtTemp(sunWindow.tempF)}).`
-              : 'Cloud cover keeps glare low for outdoor plans.'
+              ? `Next sunny break forecast for <strong><time datetime="${escapeAttr(sunWindow.time)}">${escapeAttr(sunTime)}</time></strong>.`
+              : 'No sunny break in the remaining hourly forecast.'
           }
         </p>
       `

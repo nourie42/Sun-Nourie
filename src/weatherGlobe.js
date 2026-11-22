@@ -2,6 +2,7 @@ import {PNG} from 'pngjs';
 /* Isolated globe feeds: observed MRMS, timestamped satellite IR and GFS winds.
  * These layers never feed back into Weather Nourie's forecast calculations. */
 const HOUR=3600000,MINUTE=60000;
+const GFS_STEP=3*HOUR,GFS_MAX_AGE=4*HOUR;
 export const GLOBE_GRID={nx:20,ny:10,lon0:-171,lat0:-81,dx:18,dy:18};
 export const GLOBE_RADAR_URL='https://opengeo.ncep.noaa.gov/geoserver/conus/conus_bref_qcd/ows';
 export const GLOBE_RADAR_BOUNDS=[-130,20,-60,55];
@@ -66,17 +67,39 @@ export function createGlobeService({fetchImpl=globalThis.fetch,now=Date.now,pars
   const wind=normalizeGlobeWind(await request('https://api.open-meteo.com/v1/forecast?'+q),requestedAt);if(wind.status!=='ready')throw Object.assign(Error('No current wind field'),{code:'WIND_DATA_INVALID'});lastWind.set('open-meteo',wind);return wind;
  });}
  async function gfs(region=null){
-  const validAt=new Date(Math.floor(now()/(3*HOUR))*3*HOUR).toISOString(),lat=Number(region?.latitude),lon=Number(region?.longitude),local=finite(lat)&&finite(lon)&&Math.abs(lat)<=85&&Math.abs(lon)<=180;
+  const slot=Math.floor(now()/GFS_STEP)*GFS_STEP,lat=Number(region?.latitude),lon=Number(region?.longitude),local=finite(lat)&&finite(lon)&&Math.abs(lat)<=85&&Math.abs(lon)<=180;
   const south=local?Math.max(-90,Math.min(80,Math.floor(lat/10)*10)):-90,north=local?south+10:90,west=local?Math.floor(((lon%360+360)%360)/10)*10:0,east=local?Math.min(359.5,west+10):359.5,stride=local?1:10;
-  const place=local?`${south}:${west}`:'global',key=`gfs:${validAt}:${place}`;
-  try{return await memo(key,30*MINUTE,async()=>{
-   const slice=`[(${validAt.replace('.000Z','Z')})][(${north}):${stride}:(${south})][(${west}):${stride}:(${east})]`;
-   const q=`ugrd10m${slice},vgrd10m${slice}`;
-   // NOAA's CoastWatch endpoint redirects this dataset to its PacIOOS host.
-   const grid=normalizeGfsGrid(await request('https://pae-paha.pacioos.hawaii.edu/erddap/griddap/ncep_global.json?'+encodeURI(q)),validAt);
-   lastWind.set(place,grid);while(lastWind.size>9)lastWind.delete([...lastWind.keys()].find(k=>k!=='global')||lastWind.keys().next().value);
-   const keys=[...cache.keys()].filter(k=>k.startsWith('gfs:'));while(keys.length>=12)cache.delete(keys.shift());return grid;
-  });}catch(error){const known=lastWind.get(place);if(known&&now()-Date.parse(known.validAt)<4*HOUR)return {...known,status:'stale',updateDelayed:true};if(local)throw error;try{return await winds();}catch(fallback){const old=lastWind.get('open-meteo');if(old&&now()-Date.parse(old.validAt)<4*HOUR)return {...old,status:'stale',maxAgeMinutes:240,updateDelayed:true};throw fallback;}}
+  const place=local?`${south}:${west}`:'global';
+  const load = time => {
+   const validAt=new Date(time).toISOString();
+   return memo(`gfs:${validAt}:${place}`,30*MINUTE,async()=>{
+    const slice=`[(${validAt.replace('.000Z','Z')})][(${north}):${stride}:(${south})][(${west}):${stride}:(${east})]`;
+    const q=`ugrd10m${slice},vgrd10m${slice}`;
+    // NOAA's CoastWatch endpoint redirects this dataset to its PacIOOS host.
+    const grid=normalizeGfsGrid(await request('https://pae-paha.pacioos.hawaii.edu/erddap/griddap/ncep_global.json?'+encodeURI(q)),validAt);
+    if(!lastWind.has(place)||validAt>=lastWind.get(place).validAt)lastWind.set(place,grid);
+    while(lastWind.size>9)lastWind.delete([...lastWind.keys()].find(k=>k!=='global')||lastWind.keys().next().value);
+    const keys=[...cache.keys()].filter(k=>k.startsWith('gfs:'));while(keys.length>=12)cache.delete(keys.shift());return grid;
+   });
+  };
+  const recent = grid => grid && now()-Date.parse(grid.validAt)<GFS_MAX_AGE;
+  const delayed = grid => ({...grid,status:'stale',updateDelayed:true});
+  try{return await load(slot);}catch(error){
+   const known=lastWind.get(place);
+   if(recent(known))return delayed(known);
+   // On a cold start the new valid time may not be published yet. Try the
+   // previous timestamp only while that real model field is still recent.
+   const previous=slot-GFS_STEP;
+   if(now()-previous<GFS_MAX_AGE){
+    try{const grid=await load(previous);if(recent(grid))return delayed(grid);}catch{}
+   }
+   if(local)throw error;
+   try{return await winds();}catch(fallback){
+    const old=lastWind.get('open-meteo');
+    if(recent(old))return delayed({...old,maxAgeMinutes:GFS_MAX_AGE/MINUTE});
+    throw fallback;
+   }
+  }
  }
  async function clouds(){return memo('cloud-info',10*MINUTE,async()=>{
   const data=await request('https://realearth.ssec.wisc.edu/api/times?products=globalir');
