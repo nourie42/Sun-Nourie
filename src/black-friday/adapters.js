@@ -204,6 +204,10 @@ function makeDealFingerprint(retailerId, canonicalKey, sourceId, title) {
 export function normalizeRssItemToDeal(rawItem, source, nowIso) {
   if (!rawItem?.title || !rawItem.link) return null;
 
+  // Skip announcement / live-thread posts that are not a product at all
+  // (e.g. "KOHLS Live 11/22 1AM CT ...", "KOHLS REWARDS as low as $79.99ac (TBD)").
+  if (/\(TBD\)/i.test(rawItem.title) || /^\s*(?:kohls|kohl's)\s+(?:live|rewards)\b/i.test(rawItem.title)) return null;
+
   const fullText = `${rawItem.title}\n${rawItem.contentText || rawItem.descriptionText || ''}`;
   const { retailerUrl, dealPageUrl, isDirectProductUrl, isMerchantJumpUrl } = pickDirectRetailerUrl(rawItem, source.id);
 

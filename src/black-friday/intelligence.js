@@ -376,8 +376,18 @@ export function parseDealPricingFromText({ title = '', description = '', priceTa
       .replace(/\b(?:free\s+(?:shipping|s&h|delivery)|ships?\s+free)\s*(?:w\/|with|on(?:\s+orders)?(?:\s+of|\s+over)?)\s*\$[\d,]+(?:\.\d{1,2})?\+?/gi, ' free shipping ')
       .replace(/\b(?:orders?\s+(?:of|over|above)|spend|min(?:imum)?(?:\s+order)?)\s*\$[\d,]+(?:\.\d{1,2})?\+?/gi, ' ');
 
-  const cleanTitle = stripThresholds(title);
-  const cleanDesc = stripThresholds(description);
+  // Strip reward-money amounts (Kohl's Cash, KCASH, cash back, bonus cash):
+  // they are never the item price, but a naive first-$ match grabs them —
+  // e.g. "Ninja CREAMi + $20 Kohl's Cash" was priced at $20 (Daniel, 2026-11-22).
+  // Also strip multi-item totals ("2 for $43.18") — not a single-item price.
+  const stripRewards = (s) =>
+    String(s || '')
+      .replace(/\+?\s*\$[\d,]+(?:\.\d{1,2})?\s*(?:in\s+)?(?:kohl'?s\s*cash|kcash|kohls\s*cash|cash\s*back|bonus\s*cash)\b/gi, ' ')
+      .replace(/\b(?:earn|get|receive|plus)\s+\$[\d,]+(?:\.\d{1,2})?\s*(?:in\s+)?(?:kohl'?s\s*cash|kcash|cash\s*back|bonus\s*cash|rewards?\s*cash)\b/gi, ' ')
+      .replace(/\b\d+\s+for\s+\$[\d,]+(?:\.\d{1,2})?/gi, ' ');
+
+  const cleanTitle = stripRewards(stripThresholds(title));
+  const cleanDesc = stripRewards(stripThresholds(description));
   const full = `${cleanTitle}\n${cleanDesc}`;
 
   // Detect storewide / multi-item event roundups ("Up to 80% off", "Black Friday Sale: ...") without an exact single-item price in the title
