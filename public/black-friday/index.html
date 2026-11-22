@@ -114,6 +114,17 @@
 
         <!-- ==================== 1. HOME PAGE (3 CLEAR SECTIONS REQUESTED BY USER) ==================== -->
         <section id="view-command-center" class="view-panel is-active" aria-label="Family Shopping HQ">
+          <!-- SECTION 0A: BEFORE YOU BUY — PRICE CHECK (Daniel, 2026-11-22) -->
+          <div class="glass-panel" id="home-price-check-panel">
+            <div class="section-kicker">Before You Buy</div>
+            <h2 style="margin:2px 0 8px;">🔍 Check: is it the lowest price?</h2>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+              <input id="pc-query" type="search" placeholder="Type the item — name or model (e.g. Ninja CREAMi NC301)" style="flex:2 1 240px;" />
+              <input id="pc-price" type="number" min="0" step="0.01" placeholder="Price you found $ (optional)" style="flex:1 1 150px;" />
+              <button class="btn btn-primary" id="pc-btn" type="button">Check the Price</button>
+            </div>
+            <div id="pc-results" style="margin-top:10px;"></div>
+          </div>
           <!-- SECTION 0: YOUR 10 PRIORITY STORES — FIRST, NO LONG SCROLL -->
           <div class="glass-panel" id="home-bf-sales-panel">
             <div class="section-head">

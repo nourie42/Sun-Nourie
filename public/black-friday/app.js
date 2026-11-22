@@ -2294,6 +2294,42 @@ function bindEvents() {
     const el = $(id);
     if (el) el.addEventListener(id === 'filter-q' || id === 'filter-max-price' ? 'input' : 'change', syncFilters);
   }
+  // Before-you-buy price check
+  const runPriceCheck = async () => {
+    const query = $('pc-query').value.trim();
+    const myPrice = parseFloat($('pc-price').value) || null;
+    const host = $('pc-results');
+    if (query.length < 3) { host.innerHTML = '<div class="small muted">Type the item name or model number first.</div>'; return; }
+    host.innerHTML = '<div class="small muted">Searching live deals and the web…</div>';
+    $('pc-btn').disabled = true;
+    try {
+      const out = await api('/api/black-friday/price-check', { method: 'POST', body: { query, myPrice } });
+      if (!out.ok) { host.innerHTML = `<div class="banner-notice">${esc(out.error || 'Price check failed.')}</div>`; return; }
+      const rows = (out.offers || []).map((o) => `
+        <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;padding:7px 0;border-bottom:1px solid var(--border);">
+          <div style="min-width:0;">
+            <strong>${esc(o.retailer)}</strong> <span class="small muted">· ${esc(o.source)}</span>
+            <div class="small muted" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(o.title || '')}</div>
+          </div>
+          <div style="text-align:right;flex-shrink:0;">
+            <div style="font-weight:800;">${money(o.price)}</div>
+            <a class="btn btn-sm" href="${esc(o.url)}" target="_blank" rel="noopener noreferrer">View →</a>
+          </div>
+        </div>`).join('');
+      host.innerHTML = `
+        <div style="font-weight:700;margin-bottom:4px;">${esc(out.verdict || '')}</div>
+        ${rows || '<div class="small muted">No offers found.</div>'}
+        <div class="small muted" style="margin-top:6px;">${esc(out.sourcesNote || '')}</div>`;
+    } catch (e) {
+      host.innerHTML = `<div class="banner-notice">${esc(e.message)}</div>`;
+    } finally {
+      $('pc-btn').disabled = false;
+    }
+  };
+  $('pc-btn').addEventListener('click', runPriceCheck);
+  $('pc-query').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); runPriceCheck(); } });
+  $('pc-price').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); runPriceCheck(); } });
+
   $('filter-reset-btn').addEventListener('click', () => {
     appState.filters = { q: '', tier: 'all', retailer: 'all', category: 'all', sort: 'score', maxPrice: '', freeShip: false, newOnly: false, localOnly: false, favOnly: true };
     appState.quickFilter = 'all';

@@ -23,6 +23,7 @@ import {
   parseMoney,
 } from './wishlistParser.js';
 import { deliverAlertExternally, getChannelStatus } from './notifications.js';
+import { priceCheck } from './pricecheck.js';
 
 const PUBLIC_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'public', 'black-friday');
 
@@ -103,6 +104,22 @@ export function registerBlackFridayRoutes(app, {
   // 1. Immediate cached bootstrap
   api.get('/bootstrap', (_req, res) => {
     res.json(engine.buildDashboardPayload());
+  });
+
+  // 1b. "Before you buy" price check (Daniel, 2026-11-22): search the site's
+  // live deals + a fresh Slickdeals search for the lowest price on anything.
+  api.post('/price-check', async (req, res) => {
+    const query = String(req.body?.query || '').trim().slice(0, 120);
+    const myPriceRaw = Number(req.body?.myPrice);
+    const myPrice = Number.isFinite(myPriceRaw) && myPriceRaw > 0 ? myPriceRaw : null;
+    if (query.length < 3) return res.status(400).json({ ok: false, error: 'Type at least a few letters of the product name.' });
+    try {
+      const dash = engine.buildDashboardPayload();
+      const out = await priceCheck({ query, myPrice }, { deals: dash.deals || [] });
+      res.json(out);
+    } catch (e) {
+      res.status(500).json({ ok: false, error: `Price check failed: ${e?.message || e}` });
+    }
   });
 
   // 2. Real-time SSE stream
