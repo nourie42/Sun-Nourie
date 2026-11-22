@@ -63,6 +63,41 @@ test('standing-person solar load fades smoothly with cloud and solar elevation',
  assert.ok(Math.abs(before.rawOutdoors-after.rawOutdoors)<1,'solar load fades near the horizon');
 });
 
+test('Knightdale drizzle retains diffuse model light without projecting it as direct sun',()=>{
+ const place={latitude:35.7798,longitude:-78.5356,timeZone:'America/New_York'};
+ const time='2026-11-22T14:00:00.000Z',epoch=Date.parse(time);
+ const input={temperature:60,dewpoint:59.2,wind:7.9,skyCover:95.3114,solarRadiation:91.9,condition:'Light Rain'};
+ const comfort=thermalComfort(input,place,epoch);
+ assert.equal(comfort.outdoors,56);
+ assert.equal(comfort.rawOutdoors,comfort.rawShade);
+ assert.equal(comfort.sun,null);
+ assert.equal(comfort.inputEvidence.solarScale,0);
+ assert.equal(comfort.inputEvidence.solarRadiationWm2,91.9);
+ assert.equal(comfort.inputEvidence.windMph,7.9);
+ assert.ok(thermalComfort({...input,wind:0},place,epoch).rawOutdoors>comfort.rawOutdoors);
+ const rows=value=>[{time,value}];
+ const forecast={location:place,assembledAt:new Date(epoch+37*60000).toISOString(),current:{...input,type:'observation',time},
+  hours:[{time,condition:input.condition}],metricForecasts:{notes:{},series:{
+   temperature:rows(input.temperature),dewpoint:rows(input.dewpoint),wind:rows(input.wind)}}};
+ rebuildHourlyFeels(forecast,{now:epoch+37*60000,temperatureAt:()=>null,humidityAt:()=>null,
+  skyAt:()=>input.skyCover,solarAt:()=>input.solarRadiation});
+ assert.equal(forecast.metricForecasts.series.feels[0].value,56.2);
+ assert.equal(forecastSample(forecast,time).feels,56.2);
+});
+
+test('direct-sun scale stays continuous with model radiation at the overcast bounds',()=>{
+ const place={latitude:35.7798,longitude:-78.5356};
+ const time=Date.parse('2026-11-22T16:00:00Z');
+ const input={temperature:60,dewpoint:59.2,wind:7.9,solarRadiation:400,condition:'Cloudy'};
+ for(const boundary of [62,90]){
+  const before=thermalComfort({...input,skyCover:boundary-.001},place,time);
+  const after=thermalComfort({...input,skyCover:boundary+.001},place,time);
+  assert.ok(Math.abs(before.rawOutdoors-after.rawOutdoors)<.01);
+ }
+ const covered=thermalComfort({...input,condition:'Overcast'},place,time);
+ assert.equal(covered.rawOutdoors,covered.rawShade);
+});
+
 test('hourly rebuild carries timestamp-matched model radiation into the canonical feels series',()=>{
  const time='2026-10-20T18:00:00.000Z',epoch=Date.parse(time),point={time};
  const forecast={location:{latitude:35.787,longitude:-78.4806},current:null,
