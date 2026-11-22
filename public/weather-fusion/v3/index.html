@@ -4,8 +4,16 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="theme-color" content="#071324" />
-  <title>Weather Nourie · Beta</title>
-  <link rel="icon" href="/weather-fusion/logo.svg" type="image/svg+xml" />
+  <title>Weather Nourie</title>
+  <link rel="icon" href="/weather-fusion/pwa-192x192.png?v=ice-glass" type="image/png" />
+  <link rel="manifest" href="/weather-fusion/manifest.webmanifest" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Weather Nourie" />
+  <link rel="apple-touch-icon" href="/weather-fusion/apple-touch-icon.png?v=ice-glass" />
+  <link rel="stylesheet" href="/weather-fusion/pwa-bridge.css?v=main-v3" />
+  <script defer src="/weather-fusion/pwa-bridge.js?v=main-v3"></script>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
   <link rel="stylesheet" href="/weather-fusion/car-wash.css?v=center-answer-v43" />
   <link rel="stylesheet" href="/weather-fusion/risk-outlooks.css?v=risk-outlooks-v5" />
@@ -63,7 +71,7 @@
 
     <nav class="shell main-app-return beta-location-actions" aria-label="Location and app navigation">
       <button id="locate-btn" class="main-app-button" type="button"><span aria-hidden="true">⌖</span> Use my location</button>
-      <a id="main-app-link" class="main-app-button" href="/weather-fusion/"><span aria-hidden="true">←</span> Main app</a>
+      <a id="old-app-link" class="main-app-button" href="/weather-fusion/old/">Old App</a>
     </nav>
 
     <p class="shell beta-location-status" id="location-status" role="status" hidden></p>
@@ -71,7 +79,7 @@
     <!-- Slide-Down Menu Drawer (All Clickable Tools) -->
     <div id="tools-strip" class="tools-strip">
       <div class="shell tools-strip-inner">
-        <div class="pill-scroll-row">
+        <div class="pill-scroll-row" data-wn-install-slot>
           <button class="mode-pill" id="unit-toggle" type="button" title="Toggle Fahrenheit / Celsius" aria-label="Toggle Fahrenheit or Celsius">°F / °C</button>
           <button class="mode-pill" id="open-carwash-menu" type="button">🚗 Car Wash</button>
           <button class="mode-pill" id="open-rankings-modal" type="button">🏆 Accuracy Rankings</button>
@@ -451,6 +459,6 @@
   </footer>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
-  <script type="module" src="/weather-fusion/v3/js/app.js?v=today-graph-v1"></script>
+  <script type="module" src="/weather-fusion/v3/js/app.js?v=promoted-v3"></script>
 </body>
 </html>

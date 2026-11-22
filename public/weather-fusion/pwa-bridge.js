@@ -7,8 +7,7 @@
     (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) ||
     window.navigator.standalone === true;
 
-  // Keep the installed standalone PWA app strictly on the main /weather-fusion/ site.
-  // If an installed app instance lands on experimental-weather.html, redirect automatically.
+  // Existing standalone installs always launch the main page.
   if (isInstalled && /\/weather-fusion\/experimental-weather\.html\/?$/i.test(window.location.pathname || '')) {
     window.location.replace('/weather-fusion/');
     return;
@@ -31,6 +30,7 @@
 
   var ua = (window.navigator.userAgent || '').toLowerCase();
   var isIOS = /iphone|ipad|ipod/.test(ua);
+  var isAndroid = /android/.test(ua);
   var isSafariMac =
     /safari/.test(ua) && !/chrome|chromium|crios|edg|opr|fxios|firefox/.test(ua) && !isIOS;
 
@@ -70,6 +70,12 @@
         '<li>Open this page in <strong>Safari</strong> on your iPhone or iPad.</li>' +
         '<li>Tap the <strong>Share</strong> button at the bottom of Safari.</li>' +
         '<li>Scroll down and tap <strong>Add to Home Screen</strong>, then tap <strong>Add</strong>.</li>'
+      );
+    }
+    if (isAndroid) {
+      return (
+        '<li>Open Weather Nourie in Chrome or Samsung Internet.</li>' +
+        '<li>Open the browser menu and tap <strong>Install app</strong> or <strong>Add to Home screen</strong>.</li>'
       );
     }
     if (isSafariMac) {
@@ -150,8 +156,12 @@
       }
     });
 
+    var installSlot = document.querySelector('[data-wn-install-slot]');
     var topbar = document.querySelector('header.topbar');
-    if (topbar && topbar.parentNode) {
+    if (installSlot) {
+      installBtn.classList.add('mode-pill');
+      installSlot.appendChild(installBtn);
+    } else if (topbar && topbar.parentNode) {
       var bar = document.createElement('div');
       bar.id = 'wn-pwa-install-bar';
       bar.className = 'wn-pwa-install-bar';
@@ -171,7 +181,7 @@
       '<div class="wn-pwa-modal" role="dialog" aria-modal="true" aria-labelledby="wn-pwa-modal-title">' +
       '<div class="wn-pwa-modal-head">' +
       '<div class="wn-pwa-modal-brand">' +
-      '<img src="/weather-fusion/pwa-192x192.png" alt="Weather Nourie icon" />' +
+      '<img src="/weather-fusion/pwa-192x192.png?v=ice-glass" alt="Weather Nourie icon" />' +
       '<div>' +
       '<h2 id="wn-pwa-modal-title">Install Weather Nourie</h2>' +
       '<p class="wn-pwa-modal-sub">Add Weather Nourie to your Home Screen or Desktop</p>' +

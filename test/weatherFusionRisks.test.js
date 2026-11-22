@@ -149,7 +149,6 @@ test('outlook detail API scopes the map and discussion to the selected place',as
 test('weather fusion registers the outlooks page and outlook API',()=>{
  const routes=[];
  registerWeatherFusionRoutes({get:(...args)=>routes.push(args)},{env:{},fetchImpl:async()=>{throw new Error('not called');}});
- const pages=routes.find(([path])=>Array.isArray(path))?.[0]||[];
- assert.ok(pages.includes('/weather-fusion/outlooks'));
+ assert.ok(routes.some(([path])=>Array.isArray(path)&&path.includes('/weather-fusion/outlooks')));
  assert.ok(routes.some(([path])=>path==='/api/weather-fusion/outlook'));
 });

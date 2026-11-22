@@ -896,8 +896,8 @@ function renderHeroAndBriefing(f) {
     }).format(cur.dateObj);
   }
   if (cityEl) cityEl.textContent = f.location.name;
-  const mainLink = document.getElementById('main-app-link');
-  if (mainLink && f.canonical) mainLink.href = '/weather-fusion/?' + new URLSearchParams({
+  const oldAppLink = document.getElementById('old-app-link');
+  if (oldAppLink) oldAppLink.href = '/weather-fusion/old/?' + new URLSearchParams({
     latitude:f.location.latitude,longitude:f.location.longitude,name:f.location.name
   });
   const observedRain = f.canonical && currentWeatherDisplay(f.canonical).currentPrecipitation.label === 'Rain now';

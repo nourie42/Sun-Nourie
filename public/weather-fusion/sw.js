@@ -1,10 +1,11 @@
-const CACHE_NAME = 'weather-nourie-render-v4';
+const CACHE_PREFIX = 'weather-nourie-render-';
+const CACHE_NAME = CACHE_PREFIX + 'v5';
 const STATIC_SHELL = [
   '/weather-fusion/manifest.webmanifest',
-  '/weather-fusion/pwa-192x192.png',
-  '/weather-fusion/pwa-512x512.png',
-  '/weather-fusion/pwa-maskable-512x512.png',
-  '/weather-fusion/apple-touch-icon.png',
+  '/weather-fusion/pwa-192x192.png?v=ice-glass',
+  '/weather-fusion/pwa-512x512.png?v=ice-glass',
+  '/weather-fusion/pwa-maskable-512x512.png?v=ice-glass',
+  '/weather-fusion/apple-touch-icon.png?v=ice-glass',
 ];
 
 self.addEventListener('install', (event) => {
@@ -22,7 +23,7 @@ self.addEventListener('activate', (event) => {
     caches
       .keys()
       .then((keys) =>
-        Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))
+        Promise.all(keys.filter((k) => k.startsWith(CACHE_PREFIX) && k !== CACHE_NAME).map((k) => caches.delete(k)))
       )
       .then(() => self.clients.claim())
   );

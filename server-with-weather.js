@@ -14,7 +14,6 @@ weather.disable('x-powered-by');
 registerWeatherSiteAccess(weather);
 registerWeatherComparisonRoutes(weather);
 registerWeatherFusionRoutes(weather);
-weather.get('/weather-fusion/index.html', (_req, res) => res.redirect(302, '/weather-fusion/'));
 weather.use((_req, res) => res.status(404).json({ error: 'Weather Fusion route not found.' }));
 const gateway = createWeatherGateway({ sitePort, weatherHandler: weather });
 

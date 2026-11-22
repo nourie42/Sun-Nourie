@@ -785,28 +785,23 @@ export function registerWeatherFusionRoutes(app, options = {}) {
     try { return res.json(await handler(req.query || {})); }
     catch (e) { return res.status(e.status || 503).json({ error: e.status === 400 || e.status === 409 ? e.message : 'Weather data is temporarily unavailable. Please retry.' }); }
   };
-  app.get(['/weather', '/weather-fusion', '/weather-fusion/', '/weather-fusion/experimental-weather.html', '/weather-fusion/outlooks'], (req, res) => {
+  const weatherPage = (...file) => (_req, res) => {
     res.setHeader('Cache-Control', 'no-store, no-cache, max-age=0, must-revalidate');
     res.setHeader('Pragma', 'no-cache');
     res.setHeader('Expires', '0');
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-    res.sendFile(path.join(PUBLIC_DIR, 'index.html'));
-  });
-  app.get('/weather-fusion/ai-rankings.html', (req, res) => {
-    res.setHeader('Cache-Control', 'no-store, no-cache, max-age=0, must-revalidate');
-    res.setHeader('X-Content-Type-Options', 'nosniff');
-    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-    res.sendFile(path.join(PUBLIC_DIR, 'ai-rankings.html'));
-  });
-  app.get(['/weather-fusion/v3', '/weather-fusion/v3/', '/weather-fusion/v3/index.html', '/weather-fusion/v3/experimental-weather.html'], (req, res) => {
-    res.setHeader('Cache-Control', 'no-store, no-cache, max-age=0, must-revalidate');
-    res.setHeader('Pragma', 'no-cache');
-    res.setHeader('Expires', '0');
-    res.setHeader('X-Content-Type-Options', 'nosniff');
-    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-    res.sendFile(path.join(PUBLIC_DIR, 'v3', 'index.html'));
-  });
+    res.sendFile(path.join(PUBLIC_DIR, ...file));
+  };
+  app.get([
+    '/weather', '/weather-fusion', '/weather-fusion/', '/weather-fusion/index.html',
+    '/weather-fusion/v3', '/weather-fusion/v3/', '/weather-fusion/v3/index.html', '/weather-fusion/v3/experimental-weather.html',
+  ], weatherPage('v3', 'index.html'));
+  app.get([
+    '/weather-fusion/old', '/weather-fusion/old/',
+    '/weather-fusion/experimental-weather.html', '/weather-fusion/outlooks',
+  ], weatherPage('index.html'));
+  app.get('/weather-fusion/ai-rankings.html', weatherPage('ai-rankings.html'));
   for (const v3Asset of [
     'v3/css/styles.css',
     'v3/css/people-globe.css',

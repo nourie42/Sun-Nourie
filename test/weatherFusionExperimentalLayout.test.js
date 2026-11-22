@@ -2,14 +2,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {existsSync,readFileSync,statSync} from 'node:fs';
 import {registerWeatherFusionRoutes} from '../src/weatherFusion.js';
-import {PET_WALKER_FILES} from '../public/weather-fusion/exposure-scene.js';
 
 const read = name => readFileSync(new URL(`../public/weather-fusion/${name}`,import.meta.url),'utf8');
 const html = read('index.html');
 const app = read('app.js');
 const carWashCss = read('car-wash.css');
 const dewpoint = read('dewpoint-meter.js');
-const serverSource = readFileSync(new URL('../src/weatherFusion.js',import.meta.url),'utf8');
 
 test('main HTML ships radar only while experimental mode adds every model control',()=>{
   const staticLayers = [...html.matchAll(/data-layer="([^"]+)"/g)].map(match => match[1]);
@@ -29,19 +27,30 @@ test('main and experimental weather share five-day sun-based forecast windows',(
   assert.match(app,/resetForecastWindowBanners\(\)/);
 });
 
-test('main and experimental URLs are served by one shared app shell',()=>{
+test('main and old weather routes serve their respective app shells',()=>{
   const routes = [];
   registerWeatherFusionRoutes({get:(...args)=>routes.push(args)},{env:{},fetchImpl:async()=>{throw new Error('not called');}});
-  const [paths,handler] = routes.find(([path]) => Array.isArray(path));
-  assert.ok(paths.includes('/weather-fusion/'));
-  assert.ok(paths.includes('/weather-fusion/experimental-weather.html'));
-  assert.ok(paths.includes('/weather-fusion/outlooks'));
-  const headers = {},sent = [];
-  handler({}, {setHeader:(name,value)=>{headers[name]=value;},sendFile:file=>sent.push(file)});
-  assert.equal(sent.length,1);
-  assert.match(sent[0].split(String.fromCharCode(92)).join('/'),/public\/weather-fusion\/index\.html$/);
-  assert.equal(headers['Cache-Control'],'no-cache');
+  const serve = route => {
+    const [,handler] = routes.find(([paths]) => Array.isArray(paths) && paths.includes(route));
+    const headers = {};
+    let file;
+    handler({}, {setHeader:(name,value)=>{headers[name]=value;},sendFile:sent=>{file=sent;}});
+    assert.match(headers['Cache-Control'], /no-store/);
+    return readFileSync(file,'utf8');
+  };
+  const main = serve('/weather-fusion/');
+  assert.match(main,/id="old-app-link"[^>]*href="\/weather-fusion\/old\/">Old App/);
+  assert.match(main,/rel="manifest" href="\/weather-fusion\/manifest.webmanifest"/);
+  assert.match(main,/href="\/weather-fusion\/apple-touch-icon.png\?v=ice-glass"/);
+  for (const alias of ['/weather-fusion','/weather-fusion/index.html','/weather-fusion/v3/']) assert.equal(serve(alias),main);
+  assert.match(serve('/weather-fusion/old/'),/id="main-app-link"[^>]*href="\/weather-fusion\/">Main App/);
+  for (const alias of ['/weather-fusion/experimental-weather.html','/weather-fusion/outlooks']) assert.equal(serve(alias),html);
   assert.match(html,/href="\/weather-fusion\/experimental-weather\.html" aria-label="Open Experimental Weather"/);
+  const manifest=JSON.parse(read('manifest.webmanifest'));
+  assert.equal(manifest.id,'/weather-fusion/');
+  assert.equal(manifest.start_url,'/weather-fusion/');
+  assert.equal(manifest.scope,'/weather-fusion/');
+  assert.ok(manifest.icons.some(icon=>icon.purpose==='maskable'));
 });
 
 test('car-wash panel is below real-feel cards and the Gross Meter anchors below it',()=>{
@@ -85,11 +94,10 @@ test('generated car background is a real lightweight WebP served as a static ass
 });
 
 test('the explicit server allowlist covers the weather shell dependency closure',()=>{
-  const routeList = serverSource.match(/for \(const name of \[([\s\S]*?)\]\) app\.get\(`\/weather-fusion\/\$\{name\}`/);
-  assert.ok(routeList,'weather assets must use an auditable explicit route list');
-  const allowed = new Set([...routeList[1].matchAll(/'([^']+)'/g)].map(match=>match[1]));
-  // Replacement dog-walker pictures are registered from the manifest by this spread.
-  if(/\.\.\.PET_WALKER_FILES/.test(routeList[1]))for(const name of PET_WALKER_FILES)allowed.add(name);
+  const allowed = new Set();
+  registerWeatherFusionRoutes({get(route) {
+    if (typeof route === 'string' && route.startsWith('/weather-fusion/')) allowed.add(route.slice('/weather-fusion/'.length));
+  }}, {env:{},fetchImpl:async()=>{throw new Error('not called');}});
   const required = new Set();
   const pending = [];
   const supported = /\.(?:js|css|png|webp|jpe?g|svg)$/i;

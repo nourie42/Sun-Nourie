@@ -153,7 +153,9 @@ test('weather routes register without changing any existing route', () => {
   const routes = []; registerWeatherFusionRoutes({ get: (...args) => routes.push(args) }, { env: {}, fetchImpl: mockFetch });
   const pageRoute = routes.find(([p]) => Array.isArray(p) && p.includes('/weather-fusion'));
   assert.ok(pageRoute);
-  assert.ok(pageRoute[0].includes('/weather-fusion/experimental-weather.html'));
+  assert.ok(pageRoute[0].includes('/weather-fusion/v3/'));
+  const oldPageRoute = routes.find(([p]) => Array.isArray(p) && p.includes('/weather-fusion/old/'));
+  assert.ok(oldPageRoute?.[0].includes('/weather-fusion/experimental-weather.html'));
   assert.ok(routes.some(([p]) => p === '/api/weather-fusion/forecast'));
   assert.ok(!routes.some(([p]) => p === '/'));
 });

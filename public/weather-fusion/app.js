@@ -208,8 +208,8 @@ function render(data) {
   document.body.dataset.sky = forecastSky(data).state;
   lastHeroCondition = heroCondition;
   $('city-name').textContent = data.location.name || place?.name || 'Your location';
-  const beta = $('try-beta-link');
-  if (beta) beta.href = '/weather-fusion/v3/?' + new URLSearchParams({
+  const mainAppLink = $('main-app-link');
+  if (mainAppLink) mainAppLink.href = '/weather-fusion/?' + new URLSearchParams({
     latitude:data.location.latitude, longitude:data.location.longitude, name:$('city-name').textContent
   });
   if(place?.source?.startsWith('device'))setDeviceLocationLabel(`${place.source==='device-cache'?'Last device location':'Device location'} · ${data.location.name||'current position'}`);

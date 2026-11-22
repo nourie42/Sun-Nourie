@@ -1,6 +1,6 @@
 /* Weather Nourie Native PWA App Enhancements */
 @media (display-mode: standalone) {
-  body {
+  body.weather-main {
     padding-top: env(safe-area-inset-top);
     padding-bottom: env(safe-area-inset-bottom);
   }
@@ -15,7 +15,7 @@
   box-sizing: border-box;
 }
 
-.wn-pwa-install-bar[hidden] {
+.wn-pwa-install-bar[hidden], .wn-pwa-install-btn[hidden] {
   display: none !important;
 }
 
