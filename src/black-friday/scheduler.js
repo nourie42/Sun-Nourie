@@ -309,6 +309,39 @@ export function createBlackFridayEngine({
         const aiReport = await cleanDealsWithAi(allFetchedDeals, { fetchImpl }).catch(() => null);
         if (aiReport) state.aiCleanup = { at: startedIso, ...aiReport };
 
+        // 3.75 Store-page price check for direct retailer links: a price read
+        // off the store's own product page beats the deal post's claim.
+        // Best effort — many retailers block bots; failures are silent.
+        try {
+          const RETAIL_HOST = /(kohls\.com|target\.com|bestbuy\.com|walmart\.com|homedepot\.com|lowes\.com|amazon\.com|academy\.com|cabelas\.com|barnesandnoble\.com)/i;
+          const candidates = allFetchedDeals
+            .filter((d) => d.url && RETAIL_HOST.test(d.url) && d.currentPrice > 0)
+            .sort((a, b) => ((b.reportedRegularPrice || 0) - (b.currentPrice || 0)) - ((a.reportedRegularPrice || 0) - (a.currentPrice || 0)))
+            .slice(0, 10);
+          await Promise.all(candidates.map(async (d) => {
+            try {
+              const res = await fetchImpl(d.url, {
+                headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36', Accept: 'text/html' },
+                signal: AbortSignal.timeout(8000),
+              });
+              if (!res.ok) return;
+              const html = await res.text();
+              let price = null;
+              const ld = html.match(/"offers"\s*:\s*\{[^}]*?"price"\s*:\s*"?([\d,]+\.\d{2})"?/);
+              const meta = html.match(/property="product:price:amount"\s+content="([\d,]+\.\d{2})"/);
+              const sale = html.match(/\$([\d,]+\.\d{2})\s*Sale/i);
+              if (ld) price = Number(ld[1].replace(/,/g, ''));
+              else if (meta) price = Number(meta[1].replace(/,/g, ''));
+              else if (sale) price = Number(sale[1].replace(/,/g, ''));
+              if (Number.isFinite(price) && price > 0) {
+                d.storeCheckedPrice = price;
+                const reg = html.match(/\$([\d,]+\.\d{2})\s*Reg/i);
+                if (reg) d.storeCheckedRegularPrice = Number(reg[1].replace(/,/g, ''));
+              }
+            } catch { /* store check is best-effort */ }
+          }));
+        } catch { /* never fail the sweep over store checks */ }
+
         // 4. Merge deals & record real price history
         const previousDealsById = store.mergeDeals(allFetchedDeals, startedIso);
         const observationsAdded = store.recordPriceObservations(allFetchedDeals, startedAt.getTime());
@@ -722,7 +755,20 @@ export function createBlackFridayEngine({
       favoriteStores: favoriteStoresList,
       storesDirectory,
       sourceHealth: sourceHealthList,
-      alerts: state.alerts.slice(0, 100),
+      alerts: (() => {
+        // Collapse same-item, same-minute alert piles (older runs could fire
+        // target + historical-low + better-price alerts for one event).
+        const PRIO = { back_in_stock: 0, price_drop: 1, target_price_reached: 2, historical_low: 3, wishlist_discount: 4, better_retailer: 5, major_coupon: 6, local_pickup: 7, expiring_soon: 8, exceptional_deal: 9 };
+        const byKey = new Map();
+        for (const a of state.alerts || []) {
+          const key = a.wishlistItemId ? `${a.wishlistItemId}|${String(a.triggeredAt || '').slice(0, 16)}` : a.id;
+          const prev = byKey.get(key);
+          if (!prev || (PRIO[a.type] ?? 9) < (PRIO[prev.type] ?? 9)) byKey.set(key, a);
+        }
+        return [...byKey.values()]
+          .sort((x, y) => String(y.triggeredAt || '').localeCompare(String(x.triggeredAt || '')))
+          .slice(0, 100);
+      })(),
       alertChannels: getChannelStatus({ env, settings: state.settings }),
       scheduler: state.scheduler,
       settings: state.settings,

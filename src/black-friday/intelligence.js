@@ -698,15 +698,25 @@ export function extractDealTextFacts(deal) {
   const title = String(deal?.title || '');
   const text = `${title} ${String(deal?.description || '')}`;
 
-  let statedRegularPrice = null;
-  const regularPatterns = [
-    /\$([\d,]+\.\d{2})\s*[-–]\s*\$[\d,]+(?:\.\d{2})?\s*(?:when|with|after|using|in cart)/i,
-    /(?:was|reg(?:ular)?(?:\s*price)?|list(?:\s*price)?|msrp|originally|retails?(?:\s*for)?)\s*:?\s*\$([\d,]+\.\d{2})/i,
-  ];
-  for (const re of regularPatterns) {
-    const m = text.match(re);
-    if (m) { statedRegularPrice = Number(m[1].replace(/,/g, '')); break; }
+  // Coupon math in a post ("$199.99 - $64 when you enter promo codes ... =
+  // $135.99") does NOT state a regular price: $199.99 is the price BEFORE
+  // coupons and $135.99 is only reachable if the codes work on that item —
+  // Kohl's excludes many products (the CREAMi included). Capture both
+  // numbers separately so the card can price the deal at what you actually
+  // pay and label the coupon price as conditional.
+  let preCouponPrice = null;
+  let afterCouponPrice = null;
+  const couponMath = text.match(/\$([\d,]+\.\d{2})\s*[-–]\s*\$[\d,]+(?:\.\d{2})?\s*(?:when|with|after|using|in cart)[\s\S]{0,90}?=\s*\*?\$([\d,]+\.\d{2})/i);
+  if (couponMath) {
+    preCouponPrice = Number(couponMath[1].replace(/,/g, ''));
+    afterCouponPrice = Number(couponMath[2].replace(/,/g, ''));
+    if (!Number.isFinite(preCouponPrice) || preCouponPrice <= 0) preCouponPrice = null;
+    if (!Number.isFinite(afterCouponPrice) || afterCouponPrice <= 0) afterCouponPrice = null;
   }
+
+  let statedRegularPrice = null;
+  const regMatch = text.match(/(?:was|reg(?:ular)?(?:\s*price)?|list(?:\s*price)?|msrp|originally|retails?(?:\s*for)?)\s*:?\s*\$([\d,]+\.\d{2})/i);
+  if (regMatch) statedRegularPrice = Number(regMatch[1].replace(/,/g, ''));
   if (!Number.isFinite(statedRegularPrice) || statedRegularPrice <= 0) statedRegularPrice = null;
 
   const codes = new Set();
@@ -730,7 +740,7 @@ export function extractDealTextFacts(deal) {
     if (generic) storeCash = { amount: Number(generic[1]), label: `${generic[2].trim()} cash` };
   }
 
-  return { statedRegularPrice, couponCodes: [...codes], storeCash };
+  return { statedRegularPrice, couponCodes: [...codes], storeCash, preCouponPrice, afterCouponPrice };
 }
 
 export function evaluateDeal(deal, {
@@ -747,9 +757,29 @@ export function evaluateDeal(deal, {
     discount: 25, history: 20, quality: 15, relevance: 15, allInCost: 10, availability: 10, confidence: 5,
   };
 
-  const currentPrice = roundMoney(deal.currentPrice);
+  let currentPrice = roundMoney(deal.currentPrice);
   const textFacts = extractDealTextFacts(deal);
-  const statedRegularPrice = deal.reportedRegularPrice > 0 ? deal.reportedRegularPrice : textFacts.statedRegularPrice;
+  // A price read off the retailer's own product page beats the deal post.
+  const storeCheckedPrice = deal.storeCheckedPrice > 0 ? roundMoney(deal.storeCheckedPrice) : null;
+  if (storeCheckedPrice !== null) currentPrice = storeCheckedPrice;
+  // Coupon-dependent price: the feed price is only reachable if promo codes
+  // work on this item (Kohl's excludes many, the CREAMi included). Price the
+  // deal at what you actually pay without codes; keep the claimed coupon
+  // price as a labeled extra.
+  let couponDependent = false;
+  let afterCouponPrice = null;
+  if (
+    storeCheckedPrice === null &&
+    textFacts.preCouponPrice && textFacts.couponCodes.length > 0 &&
+    currentPrice !== null && currentPrice < textFacts.preCouponPrice - 1
+  ) {
+    couponDependent = true;
+    afterCouponPrice = textFacts.afterCouponPrice ?? currentPrice;
+    currentPrice = roundMoney(textFacts.preCouponPrice);
+  }
+  const statedRegularPrice = deal.storeCheckedRegularPrice > 0
+    ? roundMoney(deal.storeCheckedRegularPrice)
+    : (deal.reportedRegularPrice > 0 ? deal.reportedRegularPrice : textFacts.statedRegularPrice);
   const couponCode = textFacts.couponCodes.length ? textFacts.couponCodes.join(' + ') : (deal.couponCode || null);
   const storeCash = textFacts.storeCash;
   const shippingCost = deal.shippingFree ? 0 : roundMoney(deal.shippingCost);
@@ -907,6 +937,13 @@ export function evaluateDeal(deal, {
     observedMedian,
     historyCount: histPrices.length,
     competitorMin,
+    competitorBestName: (() => {
+      const best = competitorDeals
+        .filter((c) => c.id !== deal.id && c.currentPrice > 0)
+        .sort((a, b) => a.currentPrice - b.currentPrice)[0];
+      return best?.retailerName || null;
+    })(),
+    retailerTiming: RETAILER_BY_ID[deal.retailerId]?.dealTiming || null,
     shippingFree: deal.shippingFree,
     cashbackPercent,
     wishlistMatches,
@@ -925,7 +962,8 @@ export function evaluateDeal(deal, {
   if (deal.mentionsAllTimeLow || (observedMin !== null && currentPrice !== null && currentPrice <= observedMin && histPrices.length >= 2)) {
     whyParts.push('Matches or beats lowest observed price');
   }
-  if (couponCode) whyParts.push(`Extra savings with promo code ${couponCode}`);
+  if (couponDependent) whyParts.push(`The post claims $${afterCouponPrice?.toFixed(2)} with promo codes, but codes do not work on every item — priced here at the $${currentPrice.toFixed(2)} you pay without them`);
+  else if (couponCode) whyParts.push(`Extra savings with promo code ${couponCode}`);
   if (storeCash) whyParts.push(`Earns $${storeCash.amount} ${storeCash.label}`);
   if (deal.shippingFree) whyParts.push('Free shipping included');
   if (cashbackPercent) whyParts.push(`Stackable with ~${cashbackPercent}% cashback (${cashbackPortal})`);
@@ -954,6 +992,9 @@ export function evaluateDeal(deal, {
     couponCode,
     storeCash,
     statedRegularPrice,
+    couponDependent,
+    afterCouponPrice,
+    storeCheckedPrice,
     finalAllInTotal,
     effectiveAfterCashback,
     freshness,
@@ -990,6 +1031,8 @@ export function computeDecisionScore({
   observedMedian,
   historyCount,
   competitorMin,
+  competitorBestName = null,
+  retailerTiming = null,
   shippingFree,
   cashbackPercent,
   wishlistMatches,
@@ -1148,9 +1191,15 @@ export function computeDecisionScore({
     reasons.push(`It costs $${currentPrice.toFixed(2)}, which is over your max of $${wishMax.toFixed(2)} for this item.`);
   } else {
     action = 'WAIT';
+    // Daniel asked to be told when a product is already advertised for less,
+    // or when waiting is smart — lead with the cheaper store when one exists.
+    if (competitorMin !== null && currentPrice !== null && competitorMin < currentPrice - 1) {
+      reasons.push(`${competitorBestName || 'Another store'} already has it for $${competitorMin.toFixed(2)} — cheaper there right now.`);
+    }
     if (verifiedDiscountPct === null) reasons.push('No regular price found yet, so the discount cannot be verified. Waiting is safer.');
     else if (verifiedDiscountPct <= 0) reasons.push('It is at (or above) the typical price right now — no real discount yet.');
     else reasons.push(`Only ${verifiedDiscountPct}% off — your bar is 25%, so wait for a bigger drop.`);
+    if (retailerTiming) reasons.push(`Best time at ${deal.retailerName || 'this store'}: ${retailerTiming}`);
   }
 
   return {

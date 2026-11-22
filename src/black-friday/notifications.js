@@ -102,9 +102,33 @@ export function evaluateSmartAlerts({
   const seenDedupKeys = new Set(existingAlerts.map((a) => a.dedupKey));
   const newAlerts = [];
 
-  const pushIfNew = (alert) => {
-    if (seenDedupKeys.has(alert.dedupKey)) return;
-    seenDedupKeys.add(alert.dedupKey);
+  // ONE alert per wish-list item per check (Daniel, 2026-11-22: the same
+  // CREAMi fired target-price + historical-low + better-price alerts in the
+  // same minute). Wishlist alerts are collected per item and only the most
+  // important one is emitted. Across checks, an item is not re-alerted
+  // until its price beats the lowest price already alerted.
+  const ALERT_PRIORITY = {
+    back_in_stock: 0, price_drop: 1, target_price_reached: 2, historical_low: 3,
+    wishlist_discount: 4, better_retailer: 5, major_coupon: 6, local_pickup: 7,
+    expiring_soon: 8, exceptional_deal: 9,
+  };
+  const pendingByItem = new Map();
+  const lowestAlertedPrice = new Map();
+  const priceOfAlert = (a) => {
+    if (Number.isFinite(a?.price)) return a.price;
+    const parts = String(a?.dedupKey || '').split(':');
+    const last = Number(parts[parts.length - 1]);
+    return Number.isFinite(last) && last > 0 ? last : null;
+  };
+  for (const a of existingAlerts) {
+    if (!a?.wishlistItemId) continue;
+    const p = priceOfAlert(a);
+    if (p !== null && (!lowestAlertedPrice.has(a.wishlistItemId) || p < lowestAlertedPrice.get(a.wishlistItemId))) {
+      lowestAlertedPrice.set(a.wishlistItemId, p);
+    }
+  }
+
+  const emit = (alert) => {
     newAlerts.push({
       id: `al_${crypto.randomBytes(6).toString('hex')}`,
       triggeredAt: nowIso,
@@ -113,6 +137,34 @@ export function evaluateSmartAlerts({
       channelsDelivered: ['in_dashboard'],
       ...alert,
     });
+  };
+
+  const pushIfNew = (alert) => {
+    if (seenDedupKeys.has(alert.dedupKey)) return;
+    seenDedupKeys.add(alert.dedupKey);
+    if (alert.wishlistItemId) {
+      const list = pendingByItem.get(alert.wishlistItemId) || [];
+      list.push(alert);
+      pendingByItem.set(alert.wishlistItemId, list);
+      return;
+    }
+    emit(alert);
+  };
+
+  const flushPendingAlerts = () => {
+    for (const [itemId, candidates] of pendingByItem) {
+      candidates.sort((a, b) => (ALERT_PRIORITY[a.type] ?? 9) - (ALERT_PRIORITY[b.type] ?? 9));
+      const chosen = candidates[0];
+      if (!chosen) continue;
+      const alreadyLow = lowestAlertedPrice.get(itemId);
+      const chosenPrice = priceOfAlert(chosen);
+      if (
+        chosen.type !== 'back_in_stock' &&
+        alreadyLow !== undefined && chosenPrice !== null && chosenPrice >= alreadyLow - 0.01
+      ) continue; // already told him about a price this good — stay quiet
+      emit(chosen);
+    }
+    pendingByItem.clear();
   };
 
   const activeWish = wishlist.filter((w) => !['purchased', 'no_longer_interested'].includes(w.status));
@@ -136,6 +188,7 @@ export function evaluateSmartAlerts({
         message: `${best.retailerName} has "${best.title}" at $${best.currentPrice.toFixed(2)} (est. $${best.finalAllInTotal?.toFixed(2)} all-in), ${best.verifiedDiscountPct}% below $${best.normalPrice?.toFixed(2)} (${best.baselineLabel}).`,
         wishlistItemId: item.id,
         dealId: best.id,
+        price: best.currentPrice,
         retailerUrl: best.retailerUrl,
       });
     }
@@ -147,9 +200,10 @@ export function evaluateSmartAlerts({
         type: 'target_price_reached',
         severity: 'high',
         title: `Target Price Reached: ${item.name}`,
-        message: `Verified at $${best.currentPrice.toFixed(2)} at ${best.retailerName} — meets or beats your $${item.preferredPrice.toFixed(2)} target.`,
+        message: `Verified at $${best.currentPrice.toFixed(2)} at ${best.retailerName} — at or below the $${item.preferredPrice.toFixed(2)} price on your wish list.`,
         wishlistItemId: item.id,
         dealId: best.id,
+        price: best.currentPrice,
         retailerUrl: best.retailerUrl,
       });
     }
@@ -164,6 +218,7 @@ export function evaluateSmartAlerts({
         message: `$${best.currentPrice.toFixed(2)} at ${best.retailerName} matches or beats the lowest recorded price.`,
         wishlistItemId: item.id,
         dealId: best.id,
+        price: best.currentPrice,
         retailerUrl: best.retailerUrl,
       });
     }
@@ -181,6 +236,7 @@ export function evaluateSmartAlerts({
           message: `${best.retailerName} is $${best.currentPrice.toFixed(2)} vs $${second.currentPrice.toFixed(2)} at ${second.retailerName}.`,
           wishlistItemId: item.id,
           dealId: best.id,
+        price: best.currentPrice,
           retailerUrl: best.retailerUrl,
         });
       }
@@ -196,6 +252,7 @@ export function evaluateSmartAlerts({
         message: `${best.retailerName} now reports "${best.title}" back in stock at $${best.currentPrice.toFixed(2)}.`,
         wishlistItemId: item.id,
         dealId: best.id,
+        price: best.currentPrice,
         retailerUrl: best.retailerUrl,
       });
     }
@@ -212,6 +269,7 @@ export function evaluateSmartAlerts({
           message: `Fell from $${prev.currentPrice.toFixed(2)} to $${best.currentPrice.toFixed(2)} at ${best.retailerName}.`,
           wishlistItemId: item.id,
           dealId: best.id,
+        price: best.currentPrice,
           retailerUrl: best.retailerUrl,
         });
       }
@@ -227,6 +285,7 @@ export function evaluateSmartAlerts({
         message: `Apply code ${best.couponCode} at ${best.retailerName} for $${best.currentPrice.toFixed(2)}.`,
         wishlistItemId: item.id,
         dealId: best.id,
+        price: best.currentPrice,
         retailerUrl: best.retailerUrl,
       });
     }
@@ -241,6 +300,7 @@ export function evaluateSmartAlerts({
         message: `${best.retailerName} verified local pickup availability at $${best.currentPrice.toFixed(2)}.`,
         wishlistItemId: item.id,
         dealId: best.id,
+        price: best.currentPrice,
         retailerUrl: best.retailerUrl,
       });
     }
@@ -257,6 +317,7 @@ export function evaluateSmartAlerts({
           message: `"${best.title}" at ${best.retailerName} ($${best.currentPrice.toFixed(2)}) expires ${best.expiresAt.slice(0, 10)}.`,
           wishlistItemId: item.id,
           dealId: best.id,
+        price: best.currentPrice,
           retailerUrl: best.retailerUrl,
         });
       }
@@ -277,6 +338,7 @@ export function evaluateSmartAlerts({
     });
   }
 
+  flushPendingAlerts();
   return newAlerts;
 }
 

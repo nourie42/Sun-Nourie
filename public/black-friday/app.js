@@ -291,7 +291,7 @@ function renderProductCardHtml(deal, recMeta = null) {
           </span>
           <span class="badge ${deal.decision?.action === 'BUY NOW' ? 'badge-buy' : 'badge-wait'}">${esc(deal.decision?.action || 'WAIT')}</span>
         </div>
-        ${deal.decision?.reasons?.length ? `<div class="deal-verdict-reason"><strong>${deal.decision.action === 'BUY NOW' ? 'Buy now — ' : deal.decision.action === 'WAIT' ? 'Wait — ' : 'Look elsewhere — '}</strong>${esc(deal.decision.reasons[0])}</div>` : ''}
+        ${deal.decision?.reasons?.length ? `<div class="deal-verdict-reason"><strong>${deal.decision.action === 'BUY NOW' ? 'Buy now — ' : deal.decision.action === 'WAIT' ? 'Wait — ' : 'Look elsewhere — '}</strong>${esc(deal.decision.reasons.slice(0, 2).join(' '))}</div>` : ''}
 
         <h3 class="deal-title" title="${esc(deal.title)}">${esc(deal.displayTitle || deal.title)}</h3>
         ${deal.aiSummary ? `<div class="deal-summary">${esc(deal.aiSummary)}</div>` : ''}
@@ -313,13 +313,13 @@ function renderProductCardHtml(deal, recMeta = null) {
             ${deal.estimatedCashback > 0 ? `<span>Cash back: <strong>−${money(deal.estimatedCashback)} (~${esc(deal.cashbackPercent)}%)</strong> → ${money(deal.effectiveAfterCashback)} after cash back</span>` : ''}
           </div>
           ${deal.storeCash ? `<span class="deal-chip">Earns ${money(deal.storeCash.amount)} ${esc(deal.storeCash.label)}</span>` : ''}
-          ${deal.couponCode ? `<span class="deal-chip">Coupon: ${esc(deal.couponCode)}</span>` : ''}
+          ${deal.couponDependent ? `<span class="deal-chip">⚠ Post claims ${money(deal.afterCouponPrice)} with codes — codes don't work on every item</span>` : (deal.couponCode ? `<span class="deal-chip">Coupon: ${esc(deal.couponCode)}</span>` : '')}
         </div>
 
         ${recExplanationHtml}
 
         <div class="deal-verify-line tabular">
-          <span>${deal.isDirectProductUrl ? 'Price checked' : 'Price from deal post'} ${esc(timeAgo(deal.verifiedAt))} · ${esc(deal.sourceName)}</span>
+          <span>${deal.storeCheckedPrice ? 'Price checked at the store' : deal.isDirectProductUrl ? 'Price checked' : 'Price from deal post'} ${esc(timeAgo(deal.verifiedAt))} · ${esc(deal.sourceName)}</span>
           <span>${deal.isDirectProductUrl ? 'Direct Product Link' : 'Deal Post Page'}</span>
         </div>
 
@@ -1520,6 +1520,21 @@ function renderSidebarBadges() {
   $('sidebar-scheduler-line').textContent = d.kpis.lastSuccessfulUpdate
     ? `Checked ${timeAgo(d.kpis.lastSuccessfulUpdate)} · Next ${formatClock(d.kpis.nextScheduledUpdate)}`
     : 'Monitor initializing…';
+  renderSidebarStores(d);
+}
+
+// The 10 priority stores live in the sidebar — one tap, no scrolling.
+function renderSidebarStores(d) {
+  const el = $('sidebar-stores-list');
+  if (!el) return;
+  const stats = new Map((d.mainStoreStats || []).map((s) => [s.id, s]));
+  const stores = (d.favoriteStores || []).map((s) => ({ id: s.id, name: s.name, live: stats.get(s.id)?.verifiedDealsCount ?? 0 }));
+  if (!stores.length) { el.innerHTML = ''; return; }
+  el.innerHTML = stores.map((s) => `
+    <button class="sidebar-store-row ${appState.homeSelectedStore === s.id ? 'is-active' : ''}" data-sidebar-store="${esc(s.id)}" type="button">
+      <span class="sidebar-store-name">${esc(s.name)}</span>
+      <span class="sidebar-store-count tabular">${s.live} deals</span>
+    </button>`).join('');
 }
 
 function renderActiveView() {
@@ -1658,6 +1673,18 @@ function bindEvents() {
   document.addEventListener('click', async (e) => {
     const gotoBtn = e.target.closest('[data-goto]');
     if (gotoBtn) return switchView(gotoBtn.dataset.goto);
+
+    const sbStore = e.target.closest('[data-sidebar-store]');
+    if (sbStore) {
+      appState.homeSelectedStore = sbStore.dataset.sidebarStore;
+      switchView('command-center');
+      renderHomePage();
+      renderSidebarStores(appState.data);
+      $('sidebar').classList.remove('is-open');
+      $('sidebar-scrim').classList.remove('is-open');
+      document.getElementById('home-main-deals-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      return;
+    }
 
     const pickStore = e.target.closest('[data-pick-store]');
     if (pickStore) {

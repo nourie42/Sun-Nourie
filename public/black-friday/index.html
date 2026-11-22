@@ -77,6 +77,12 @@
         </button>
       </nav>
 
+      <div class="sidebar-stores">
+        <div class="sidebar-stores-title">⭐ Your Priority Stores</div>
+        <div id="sidebar-stores-list" class="sidebar-stores-list"></div>
+        <div class="sidebar-stores-note">Tap a store to see its deals.</div>
+      </div>
+
       <div class="sidebar-footer">
         <a class="back-exp-link" href="/weather-fusion/experimental-weather.html">← Experimental Weather</a>
         <div class="small muted tabular" id="sidebar-scheduler-line">Monitor: initializing…</div>
@@ -108,12 +114,24 @@
 
         <!-- ==================== 1. HOME PAGE (3 CLEAR SECTIONS REQUESTED BY USER) ==================== -->
         <section id="view-command-center" class="view-panel is-active" aria-label="Family Shopping HQ">
+          <!-- SECTION 0: YOUR 10 PRIORITY STORES — FIRST, NO LONG SCROLL -->
+          <div class="glass-panel" id="home-bf-sales-panel">
+            <div class="section-head">
+              <div>
+                <div class="section-kicker">Official Deal Pages · Best Sale Days &amp; Times</div>
+                <h2>Your 10 Priority Stores</h2>
+              </div>
+              <button class="btn btn-sm" data-goto="black-friday-live" type="button">Event Timeline &amp; Countdowns →</button>
+            </div>
+            <div id="home-bf-store-sales" class="stores-grid"></div>
+          </div>
+
           <!-- SECTION 1: ALL MAIN STORES LIVE DEALS WITH IMAGES, DIRECT LINKS & STORE PICKER -->
           <div class="glass-panel" id="home-main-deals-panel">
             <div class="section-head">
               <div>
                 <div class="section-kicker">Pick Any Major Store Below · Live Deals With Product Images &amp; Direct Links</div>
-                <h2>1. Main Stores Live Deals</h2>
+                <h2>Main Stores Live Deals</h2>
               </div>
               <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
                 <button class="btn btn-sm" id="home-recheck-live-btn" type="button">↻ Pull Latest Deals</button>
@@ -146,7 +164,7 @@
             <div class="section-head">
               <div>
                 <div class="section-kicker">Uploaded Spreadsheets (.xlsx / .csv), Screenshots, PDFs, Word Docs &amp; URLs</div>
-                <h2>2. Our Wish Lists &amp; Uploaded Deals</h2>
+                <h2>Our Wish Lists &amp; Uploaded Deals</h2>
               </div>
               <button class="btn btn-sm" data-goto="wishlists" type="button">Full Wish Lists View →</button>
             </div>
@@ -207,7 +225,7 @@
             <div class="section-divider-banner">
               <div>
                 <div class="section-kicker">Your 10 Priority Stores Update First · Tap Any Logo to Visit the Official Store Directly</div>
-                <h2 style="margin:0;font-size:20px;">3. All Stores &amp; Main Black Friday Deals</h2>
+                <h2 style="margin:0;font-size:20px;">All Stores &amp; Main Black Friday Deals</h2>
               </div>
               <button class="btn btn-primary btn-sm" data-goto="all-stores" type="button" id="home-view-all-stores-btn">Browse All 97 Retailers →</button>
             </div>
@@ -224,17 +242,6 @@
                 </div>
               </div>
               <div id="home-favorite-stores-rail" class="store-rail-wrap"></div>
-            </div>
-
-            <div class="glass-panel" id="home-bf-sales-panel">
-              <div class="section-head">
-                <div>
-                  <div class="section-kicker">Official Deal Pages · Best Sale Days &amp; Times</div>
-                  <h2>Your 10 Priority Stores</h2>
-                </div>
-                <button class="btn btn-sm" data-goto="black-friday-live" type="button">Event Timeline &amp; Countdowns →</button>
-              </div>
-              <div id="home-bf-store-sales" class="stores-grid"></div>
             </div>
 
             <div class="glass-panel" id="home-local-panel">
