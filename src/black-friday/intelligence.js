@@ -779,7 +779,12 @@ export function evaluateDeal(deal, {
   }
   const statedRegularPrice = deal.storeCheckedRegularPrice > 0
     ? roundMoney(deal.storeCheckedRegularPrice)
-    : (deal.reportedRegularPrice > 0 ? deal.reportedRegularPrice : textFacts.statedRegularPrice);
+    : (deal.reportedRegularPrice > 0
+      ? deal.reportedRegularPrice
+      : (deal.aiRegularPrice > 0 ? roundMoney(deal.aiRegularPrice) : textFacts.statedRegularPrice));
+  const statedSource = deal.storeCheckedRegularPrice > 0
+    ? 'store page'
+    : (deal.aiRegularPrice > 0 && !(deal.reportedRegularPrice > 0) && !textFacts.statedRegularPrice ? 'deal post (AI-read, verified in the text)' : 'deal post');
   const couponCode = textFacts.couponCodes.length ? textFacts.couponCodes.join(' + ') : (deal.couponCode || null);
   const storeCash = textFacts.storeCash;
   const shippingCost = deal.shippingFree ? 0 : roundMoney(deal.shippingCost);
@@ -840,7 +845,19 @@ export function evaluateDeal(deal, {
   } else if (statedRegularPrice > 0 && currentPrice !== null && statedRegularPrice > currentPrice) {
     normalPrice = statedRegularPrice;
     baselineType = 'editorial_regular';
-    baselineLabel = `Regular price stated in the deal post (${deal.sourceName || 'source'})`;
+    baselineLabel = `Regular price from the ${statedSource} (${deal.sourceName || 'source'})`;
+  } else if (currentPrice !== null && wishlistMatches.some((w) => w.preferredPrice > currentPrice)) {
+    // The owner's own wish list carries a price for this item (2,946 of
+    // 3,069 items) — use it as the base price for matched deals.
+    normalPrice = roundMoney(Math.max(...wishlistMatches.map((w) => w.preferredPrice || 0)));
+    baselineType = 'wishlist_list';
+    baselineLabel = 'Regular price from your wish list';
+  } else if (currentPrice !== null && competitorDeals.some((c) => c.id !== deal.id && (c.reportedRegularPrice || c.aiRegularPrice || 0) > currentPrice)) {
+    normalPrice = roundMoney(Math.max(...competitorDeals
+      .filter((c) => c.id !== deal.id)
+      .map((c) => c.reportedRegularPrice || c.aiRegularPrice || 0)));
+    baselineType = 'cross_retailer_regular';
+    baselineLabel = 'Regular price stated for the same product at another store';
   } else if (compPrices.length >= 2 && competitorMedian > 0 && currentPrice !== null && competitorMedian > currentPrice) {
     normalPrice = competitorMedian;
     baselineType = 'cross_retailer_median';

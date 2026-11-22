@@ -28,6 +28,7 @@ import {
   matchWishlistToDeal,
   normalizeProductIdentity,
   discoverAlternatives,
+  extractDealTextFacts,
   runDealHunter,
   buildPersonalizedRecommendations,
   findSimilarOrCheaper,
@@ -38,7 +39,7 @@ import {
   deliverAlertExternally,
   getChannelStatus,
 } from './notifications.js';
-import { cleanDealsWithAi, judgeWishlistMatches } from './ai.js';
+import { cleanDealsWithAi, judgeWishlistMatches, extractPriceFactsWithAi } from './ai.js';
 
 export function createBlackFridayEngine({
   store,
@@ -308,6 +309,19 @@ export function createBlackFridayEngine({
         // 3.5 Optional AI cleanup of feed titles (no-op without GEMINI_API_KEY)
         const aiReport = await cleanDealsWithAi(allFetchedDeals, { fetchImpl }).catch(() => null);
         if (aiReport) state.aiCleanup = { at: startedIso, ...aiReport };
+
+        // 3.6 AI price-fact extraction: most deal posts state a regular price
+        // somewhere in their text; read the ones the regexes missed so more
+        // deals can show a real discount (Daniel, 2026-11-22: only ~18% of
+        // deals had a verified discount). Numbers are validated against the
+        // post text inside the extractor — nothing is invented.
+        try {
+          const needFacts = allFetchedDeals.filter((d) => d.currentPrice > 0 && !(d.reportedRegularPrice > 0) && !extractDealTextFacts(d).statedRegularPrice);
+          if (needFacts.length) {
+            const factsReport = await extractPriceFactsWithAi(needFacts, { fetchImpl }).catch(() => null);
+            if (factsReport) state.aiPriceFacts = { at: startedIso, ...factsReport };
+          }
+        } catch { /* optional step */ }
 
         // 3.75 Store-page price check for direct retailer links: a price read
         // off the store's own product page beats the deal post's claim.

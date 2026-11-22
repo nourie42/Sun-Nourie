@@ -1189,13 +1189,14 @@ function renderAllStoresView() {
           </div>
           <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
             ${linkBadge(s.linkVerification)}
-            ${s.verifiedDealsCount > 0 ? `<span class="badge badge-good tabular">${s.verifiedDealsCount} tracked ${s.verifiedDealsCount === 1 ? 'deal' : 'deals'}</span>` : ''}
+            ${s.verifiedDealsCount > 0 ? `<button class="badge badge-good tabular" data-store-deals="${esc(s.id)}" type="button" style="cursor:pointer;" title="See these deals inside the app">${s.verifiedDealsCount} tracked ${s.verifiedDealsCount === 1 ? 'deal' : 'deals'} — see them →</button>` : ''}
             ${s.cashback ? `<span class="badge badge-exceptional tabular">Up to ${s.cashback.percent}% CB</span>` : ''}
             ${s.localPresence ? '<span class="badge badge-local">📍 NC Local</span>' : ''}
           </div>
           ${s.dealTiming ? `<div class="small" style="color:var(--text-secondary);line-height:1.45;">🕒 <strong>Best times:</strong> ${esc(s.dealTiming)}</div>` : ''}
           <div class="store-links">
-            <a class="btn btn-sm btn-primary" href="${esc(s.blackFridayUrl || s.dealsUrl || s.url)}" target="_blank" rel="noopener noreferrer">${s.hasDedicatedBlackFridayUrl ? `Open ${esc(s.name)} Black Friday Deals ↗` : `Open ${esc(s.name)} Deals ↗`}</a>
+            ${s.verifiedDealsCount > 0 ? `<button class="btn btn-sm btn-primary" data-store-deals="${esc(s.id)}" type="button">See ${esc(s.name)} Deals Here →</button>` : ''}
+            <a class="btn btn-sm ${s.verifiedDealsCount > 0 ? '' : 'btn-primary'}" href="${esc(s.blackFridayUrl || s.dealsUrl || s.url)}" target="_blank" rel="noopener noreferrer">${s.hasDedicatedBlackFridayUrl ? `Open ${esc(s.name)} Black Friday Deals ↗` : `Open ${esc(s.name)} Deals ↗`}</a>
             ${s.blackFridayUrl !== s.dealsUrl ? `<a class="btn btn-sm" href="${esc(s.dealsUrl)}" target="_blank" rel="noopener noreferrer">All Sales ↗</a>` : ''}
             <a class="btn btn-sm" href="${esc(s.url)}" target="_blank" rel="noopener noreferrer">Store Home ↗</a>
             ${s.storeFinderUrl ? `<a class="btn btn-sm" href="${esc(s.storeFinderUrl)}" target="_blank" rel="noopener noreferrer">27545 Stores ↗</a>` : ''}
@@ -1673,6 +1674,20 @@ function bindEvents() {
   document.addEventListener('click', async (e) => {
     const gotoBtn = e.target.closest('[data-goto]');
     if (gotoBtn) return switchView(gotoBtn.dataset.goto);
+
+    const storeDealsBtn = e.target.closest('[data-store-deals]');
+    if (storeDealsBtn) {
+      const storeId = storeDealsBtn.dataset.storeDeals;
+      appState.filters = { ...appState.filters, retailer: storeId, favOnly: false };
+      const retailerSel = $('filter-retailer');
+      if (retailerSel) retailerSel.value = storeId;
+      const favChk = $('filter-fav-only');
+      if (favChk) favChk.checked = false;
+      savePrefs();
+      switchView('best-deals');
+      renderBestDealsView();
+      return;
+    }
 
     const sbStore = e.target.closest('[data-sidebar-store]');
     if (sbStore) {

@@ -134,6 +134,69 @@ export async function judgeWishlistMatches(pairs, { fetchImpl = fetch } = {}) {
   return verdicts;
 }
 
+const priceFactCache = new Map();
+
+// Read deal-post text with the AI to find the regular (pre-sale) price the
+// regexes miss. Strict anti-invention rule: the returned number must appear
+// literally in the post text, must exceed the sale price, and must be less
+// than 4x it — otherwise it is discarded.
+export async function extractPriceFactsWithAi(deals, { fetchImpl = fetch } = {}) {
+  const report = { checked: 0, found: 0, enabled: aiEnabled() };
+  if (!aiEnabled() || !Array.isArray(deals) || deals.length === 0) return report;
+  const MAX_PER_SWEEP = 120;
+  const BUDGET_MS = 75_000;
+  const startedAt = Date.now();
+  const pending = [];
+  for (const deal of deals) {
+    if (!deal || !(deal.currentPrice > 0) || deal.aiRegularPrice) continue;
+    const key = `${deal.id}|${deal.title}`;
+    if (priceFactCache.has(key)) {
+      const cached = priceFactCache.get(key);
+      if (cached) deal.aiRegularPrice = cached;
+      continue;
+    }
+    pending.push(deal);
+    if (pending.length >= MAX_PER_SWEEP) break;
+  }
+  const BATCH = 10;
+  for (let i = 0; i < pending.length; i += BATCH) {
+    if (Date.now() - startedAt > BUDGET_MS) break;
+    const batch = pending.slice(i, i + BATCH);
+    const list = batch.map((d, j) => {
+      const text = `${d.title} — ${String(d.description || '').slice(0, 400)}`;
+      return `${j}. SALE PRICE: $${d.currentPrice}\n   POST: ${text}`;
+    }).join('\n');
+    const prompt = [
+      'For each deal post, find the product\'s REGULAR price (the normal, non-sale price: list price, MSRP, "was", "reg", original price) exactly as stated in the post text.',
+      'Rules: only report a price that is literally written in the post. Never guess or estimate. The sale price is NOT the regular price. If the post states no regular price, answer null. Ignore Kohl\'s Cash / rewards amounts — those are not prices.',
+      'Answer with a JSON array only: [{"i":0,"regular":229.99}] or [{"i":0,"regular":null}]',
+      '',
+      list,
+    ].join('\n');
+    try {
+      const arr = await geminiJson(prompt, fetchImpl);
+      if (!Array.isArray(arr)) continue;
+      for (const row of arr) {
+        const deal = batch[Number(row?.i)];
+        if (!deal) continue;
+        report.checked += 1;
+        const reg = Number(row?.regular);
+        const text = `${deal.title} ${deal.description || ''}`;
+        const appears = Number.isFinite(reg) && (text.includes(reg.toFixed(2)) || text.includes(String(Math.round(reg))));
+        if (appears && reg > deal.currentPrice && reg < deal.currentPrice * 4) {
+          deal.aiRegularPrice = reg;
+          priceFactCache.set(`${deal.id}|${deal.title}`, reg);
+          report.found += 1;
+        } else {
+          priceFactCache.set(`${deal.id}|${deal.title}`, null);
+        }
+      }
+    } catch { /* skip batch */ }
+    await new Promise((r) => setTimeout(r, 800));
+  }
+  return report;
+}
+
 export async function cleanDealsWithAi(deals, { fetchImpl = fetch } = {}) {
   if (!aiEnabled() || !Array.isArray(deals) || deals.length === 0) return { cleaned: 0, enabled: aiEnabled() };
 
