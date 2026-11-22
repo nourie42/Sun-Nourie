@@ -879,18 +879,16 @@ export function buildUnifiedFusionPayload(loc, baseData, multiModelData, aqiData
       typeof cdForHour?.high === 'number' && typeof cdForHour?.low === 'number'
         ? (cdForHour.high + cdForHour.low) / 2 + ((cdForHour.high - cdForHour.low) / 2) * diurnalUnit
         : undefined;
+    const forecastTemp = csTemp?.value ?? ch?.temperature ?? baseData?.hourly?.temperature_2m?.[bIdx];
     const rawBaseTemp =
-      csTemp?.value ??
-      ch?.temperature ??
-      (bIdx !== undefined ? baseData?.hourly?.temperature_2m?.[bIdx] : undefined) ??
+      forecastTemp ??
       canonDayAnchoredTemp ??
       (seedBaseTemp + diurnalWave + synopticWave);
 
+    const forecastHumidity = csHum?.value ?? ch?.humidity ?? baseData?.hourly?.relative_humidity_2m?.[bIdx];
     const rh = clamp(
       Math.round(
-        csHum?.value ??
-        ch?.humidity ??
-        (bIdx !== undefined ? baseData?.hourly?.relative_humidity_2m?.[bIdx] : undefined) ??
+        forecastHumidity ??
         clamp(68 - diurnalWave * 1.8, 28, 96)
       ),
       1,
@@ -1229,17 +1227,19 @@ export function buildUnifiedFusionPayload(loc, baseData, multiModelData, aqiData
       dayKey: toZonedDayKey(dt, timeZone),
       isDay,
       tempF: tempFusion.blendedF,
+      forecastTempF: Number.isFinite(forecastTemp) ? tempFusion.blendedF : null,
       rawBlendedF: tempFusion.rawBlendedF,
       feelsLikeF,
+      forecastFeelsLikeF: mainPageHourlyFeels ?? csFeels?.value ?? ch?.feelsLike ?? null,
       shadeFeelsF,
       sunFeelsF,
       hasDirectSun,
-      rainFeelsF: comfort.rainFeelsF,
       sunDeltaF,
       shortwaveWm2: comfort.shortwaveWm2,
       wetBulbF: comfort.wetBulbF,
       comfortCategory: comfort.category,
       humidity: rh,
+      forecastHumidity: Number.isFinite(forecastHumidity) ? rh : null,
       dewPointF,
       indoorRh70F: calcIndoorRhAt70F(dewPointF),
       rainChance: rainLedger.totalPts,
@@ -1260,6 +1260,7 @@ export function buildUnifiedFusionPayload(loc, baseData, multiModelData, aqiData
       aqi: aqiHour,
       wmoCode,
       condition: condLabel,
+      forecastCondition: (ch?.condition || cr?.condition || Number.isFinite(baseData?.hourly?.weather_code?.[bIdx])) ? condLabel : null,
       icon: condIcon,
       skyMood: condSky,
       nwsPopReal,
@@ -1689,6 +1690,17 @@ function buildDailySummaries(hours, dailyApi, canonicalData = null, timeZone = '
   }
 
   return days;
+}
+
+/** Present the same outdoor apparent temperature in every human view.
+ * A separate shade comparison is useful only with a supported solar gain. */
+export function outdoorExposureReadings(hour, observedRain = false) {
+  const sky = weatherState(hour.condition);
+  const wet = observedRain || (!sky.chance && ['rain','storm'].includes(sky.kind)) || hour.rainChance >= 50 || hour.precipIn >= .01;
+  const outdoor = Number.isFinite(hour.feelsLikeF) ? hour.feelsLikeF : null;
+  const shade = hour.shadeFeelsF;
+  const compareSun = !wet && hour.isDay && hour.hasDirectSun && Number.isFinite(shade) && outdoor !== null && outdoor > shade;
+  return {wet, outdoor, shade:compareSun ? shade : outdoor, compareSun, solarGain:compareSun ? outdoor-shade : 0};
 }
 
 export function nextSunnyBreak({hours48, location}, selectedTime, now = Date.now()) {

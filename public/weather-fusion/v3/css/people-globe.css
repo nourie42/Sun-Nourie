@@ -144,3 +144,28 @@ html body.beta-weather-app #today-forecast .beta-today-graph :is(.today-sky,.tod
   .beta-hourly-table :is(th,td) {padding-inline:3px}
   .beta-hourly-table button {gap:3px}
 }
+
+.hero-day-summary {
+  order:-2;
+  max-width:34ch;
+  margin:0 0 5px;
+  color:#e0edf8;
+  font-size:clamp(13px,3.45vw,16px);
+  font-weight:520;
+  line-height:1.35;
+  text-wrap:balance;
+  text-shadow:0 1px 6px #112842;
+}
+#today-hourly {scroll-margin-top:18px}
+.beta-today-hourly-svg[role="slider"] {cursor:crosshair;touch-action:pan-y}
+.beta-today-hourly-svg:focus-visible {outline:2px solid #caeaff;outline-offset:2px;border-radius:7px}
+.beta-today-hourly-svg .today-hour-cursor {stroke:#f0faff;stroke-dasharray:3 3;opacity:.85;pointer-events:none}
+.today-hour-cursor[hidden],.today-hour-details[hidden] {display:none}
+.today-hour-details {margin:6px 0 3px;padding:9px 10px;background:#10284080;border-radius:10px;font-size:12px}
+.today-hour-details strong {color:#f1f8ff}
+.today-hour-details dl {display:grid;grid-template-columns:repeat(auto-fit,minmax(65px,1fr));gap:8px 6px;margin:7px 0 0}
+.today-hour-details dt {font-size:10px;color:#c8deef}
+.today-hour-details dd {margin:2px 0 0;color:#fff;font-weight:700;font-variant-numeric:tabular-nums}
+html body.beta-weather-app #today-forecast .today-weather-card.beta-today-graph {cursor:default}
+html body.beta-weather-app #today-forecast .beta-today-graph button.today-more {font-family:inherit;cursor:pointer;min-height:40px}
+#skin-exposure .person-card-reading>.pet-surface-status {font-size:clamp(20px,5vw,30px);letter-spacing:0;font-weight:700}

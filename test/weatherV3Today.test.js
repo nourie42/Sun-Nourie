@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {nextSunnyBreak} from '../public/weather-fusion/v3/js/fusion-engine.js';
-import {todayHourlyPreview} from '../public/weather-fusion/v3/js/today-preview.js';
+import {nextSunnyBreak,outdoorExposureReadings} from '../public/weather-fusion/v3/js/fusion-engine.js';
+import {todayHourlyPreview,todaySummary} from '../public/weather-fusion/v3/js/today-preview.js';
 
 const location={latitude:35.7798,longitude:-78.5356};
 const hour = (time,override={}) => ({
@@ -42,4 +42,28 @@ test('Today shows published cloud and wind readings, including calm and clear, a
   assert.match(html,/<g data-today-series="cloud"><path d="M43\.0,112\.0 M322\.0,83\.0 /);
   assert.match(html,/Cloud cover/);
   assert.doesNotMatch(todayHourlyPreview([readings[1]],'America/New_York'),/Cloud cover|>Wind</);
+});
+
+test('rain and overcast share the human outdoor reading and a verified sunny comparison uses the same model',()=>{
+  const sun = {feelsLikeF:65,shadeFeelsF:55,isDay:true,hasDirectSun:true,condition:'Sunny'};
+  assert.deepEqual(outdoorExposureReadings(sun),{wet:false,outdoor:65,shade:55,compareSun:true,solarGain:10});
+  const rainy={...sun,feelsLikeF:55,shadeFeelsF:57,rainFeelsF:50,condition:'Light Rain'};
+  assert.deepEqual(outdoorExposureReadings(rainy),{wet:true,outdoor:55,shade:55,compareSun:false,solarGain:0});
+  for (const hour of [{...sun,hasDirectSun:false},{...sun,isDay:false},{...sun,shadeFeelsF:72}]) {
+    assert.equal(outdoorExposureReadings(hour).shade,65);
+    assert.equal(outdoorExposureReadings(hour).compareSun,false);
+  }
+  assert.equal(outdoorExposureReadings(sun,true).compareSun,false);
+  assert.equal(outdoorExposureReadings({...rainy,feelsLikeF:null}).outdoor,null);
+});
+
+test('the daily headline follows supported forecast weather, wind and high temperature',()=>{
+  const wet={isDay:true,forecastCondition:'Light Rain',forecastCloudCover:95,rainChance:87,precipIn:.02,forecastWindMph:10};
+  assert.equal(todaySummary([wet,wet],64),'Rainy and cool today, with a chilly breeze');
+  const sun={isDay:true,forecastCondition:'Mostly Sunny',forecastCloudCover:16,rainChance:0,precipIn:0,forecastWindMph:5};
+  assert.equal(todaySummary([sun,sun],39),'Sunny today but cold');
+  assert.match(todaySummary([sun,wet,wet],71),/^Rainy and mild/);
+  const overcast={...sun,forecastCondition:'Overcast',forecastCloudCover:97};
+  assert.equal(todaySummary([overcast,overcast],56),'Cloudy and cool today');
+  assert.equal(todaySummary([{}],null),'');
 });

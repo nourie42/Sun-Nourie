@@ -134,7 +134,7 @@ export function todayRainDisplay(forecast, now=Date.now()){
  const timing=rainTiming(forecast,0,p.tonight,now);
  return {...displayedRainChance(forecast,timing?timing.value:p.pop,{now}),timing};
 }
-export function todayForecastHTML(forecast,now=Date.now()){
+export function todayForecastHTML(forecast,now=Date.now(),{interactive=true}={}){
  const day=forecast.days?.[0];if(!day)return '<p class="muted">Daily forecast is unavailable.</p>';
  const p=dailyDisplay(day,0,now,forecast.location.timeZone,forecast),feel=dailyFeels(forecast,0,now),stats=periodWeatherStats(forecast,now);
  const rain=todayRainDisplay(forecast,now),{timing}=rain,shownPop=rain.value,shownCondition=rain.observed?'Rain now':rainAwareCondition(p.condition,shownPop,day,false,dailySkyCover(forecast,day,0,now));
@@ -155,10 +155,12 @@ export function todayForecastHTML(forecast,now=Date.now()){
     ? '<em data-rain-trend>↔ 0 pts · unchanged</em>'
     : `<em data-rain-trend>${rt.direction==='up'?'↑ +':'↓ −'}${Math.round(rt.change)} pts${hideLowRainChance(rt.from)?'':` · was ${Math.round(rt.from)}%`}</em>`;
  const banner=confidenceBannerHTML(day);
- return `${banner}<button type="button" class="today-weather-card ${p.night?'today-night':p.remainder?'today-remainder':''}" data-today-forecast aria-haspopup="dialog" aria-label="${esc(p.label)}, ${esc(shownCondition)}, ${p.primaryLabel} ${reading(p.primary)} degrees${finite(p.secondary)?`, low ${reading(p.secondary)} degrees`:''}. ${rain.observed?'Rain is observed now at this location.':hideLowRainChance(shownPop)?'':finite(shownPop)?`Rain chance ${reading(shownPop)} percent.`:'Rain chance unavailable.'} ${forecastConfidenceLabel(day.confidence)} ${esc(confidence)}. Open details.">
+ const tag=interactive?'button':'div';
+ const action=interactive?` type="button" data-today-forecast aria-haspopup="dialog" aria-label="${esc(p.label)}, ${esc(shownCondition)}, ${p.primaryLabel} ${reading(p.primary)} degrees${finite(p.secondary)?`, low ${reading(p.secondary)} degrees`:''}. ${rain.observed?'Rain is observed now at this location.':hideLowRainChance(shownPop)?'':finite(shownPop)?`Rain chance ${reading(shownPop)} percent.`:'Rain chance unavailable.'} ${forecastConfidenceLabel(day.confidence)} ${esc(confidence)}. Open details."`:'';
+ return `${banner}<${tag} class="today-weather-card ${p.night?'today-night':p.remainder?'today-remainder':''}"${action}>
  ${todaySkySceneHTML(profile,now)}<span class="today-scene-shade"></span><span class="today-copy"><span class="day-name">${esc(p.label)}</span><span class="today-condition" title="${esc(shownCondition)}">${esc(shortForecastCondition(shownCondition))}</span><span class="today-temperatures">${p.tonight?'':`<span class="today-low"><strong>${degrees(p.secondary)}</strong><small>Low</small></span><i>—</i>`}<span class="today-high"><strong>${degrees(p.primary)}</strong><small>${p.primaryLabel}</small></span></span><span class="today-feels">Peak forecast feels like <b>${degrees(feelValue)}</b><small>${esc(feelNote)}</small></span></span>
  <span class="today-symbol">${weatherIcon(shownCondition,!p.night,80)}${hideLowRainChance(shownPop)?'':`<strong>${reading(shownPop,'%')}</strong><small>${rain.observed?esc(observedRainLabel(rain)):!peakTime&&peakNote?`${rainLabel} · ${esc(peakNote)}`:rainLabel}</small>${rain.observed?'':peakTime}${trend}`}</span>
- <span class="today-metrics">${metric('wind',reading(stats.wind,' mph'),'Avg wind','Average available wind forecast for this period')}${metric('eye',reading(aqi),'AQI now',finite(aqi)?'Current modeled local air quality index.':'Current air-quality data is unavailable.')}${metric('sun',`${uv.value===null?'—':uv.index}`,'Peak UV','Peak UV forecast for the entire local calendar day, including elapsed hours')}</span><span class="today-more">Tap for more details</span></button>${rainTimingHTML(timing)}`;
+ <span class="today-metrics">${metric('wind',reading(stats.wind,' mph'),'Avg wind','Average available wind forecast for this period')}${metric('eye',reading(aqi),'AQI now',finite(aqi)?'Current modeled local air quality index.':'Current air-quality data is unavailable.')}${metric('sun',`${uv.value===null?'—':uv.index}`,'Peak UV','Peak UV forecast for the entire local calendar day, including elapsed hours')}</span>${interactive?'<span class="today-more">Tap for more details</span>':''}</${tag}>${rainTimingHTML(timing)}`;
 }
 
 export function confidenceBannerHTML(day={}){

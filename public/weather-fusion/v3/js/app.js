@@ -6,9 +6,10 @@ import { clamp, computePavementProfile, pavementDayPeak } from './physics.js?v=v
 import {
   fetchCompleteFusionForecast,
   nextSunnyBreak,
+  outdoorExposureReadings,
   searchLocations
-} from './fusion-engine.js?v=sky-wind-hourly-v1';
-import {todayHourlyPreview} from './today-preview.js?v=sky-wind-hourly-v1';
+} from './fusion-engine.js?v=hour-details-v1';
+import {bindTodayHourPicker,todayHourlyPreview,todaySummary} from './today-preview.js?v=hour-details-v1';
 import {hourlyRainInputsHTML, rainPercent} from './hourly-rain.js?v=local-hourly-v1';
 import { getLunarPhaseFraction, renderWeatherIconSvg } from './icons.js?v=v3-sky-8';
 import {
@@ -27,7 +28,7 @@ import { activeRiskOutlooks, outlookDetailHTML } from '../../risk-outlooks.js?v=
 import { forecastWindowDetailHTML } from '../../forecast-window-banners.js?v=rain-hours-only-v1';
 import {GlobePanel} from './globe-panel.js?v=wind-visibility-v1';
 import {outlookItems,renderOutlookPanel,openOutlookNote} from '../../outlook-panel.js?v=daily-hourly-v1';
-import { todayForecastHTML, todayRainDisplay } from '../../today-card.js?v=radar-parity-v3';
+import { todayForecastHTML, todayRainDisplay } from '../../today-card.js?v=hour-details-v1';
 import {applyLocalRadar, displayedRainChance, observedRainLabel} from '../../rain-display.js?v=local-radar-v2';
 import {currentWeatherDisplay} from '../../current-weather.js?v=local-radar-v2';
 import { dayGraphHTML, installDayGraph } from '../../day-graph.js?v=hourly-rain-v5';
@@ -98,6 +99,7 @@ const state = {
   skyOverride: 'auto',
   activeViewMode: 'experimental',
   selectedHourIdx: 0,
+  todayHourTime: null,
   feelsHourIdx: 0,
   expandedExposureIds: new Set(),
   selectedMetricId: 'temp',
@@ -225,10 +227,15 @@ async function refreshLocalRadar(loc, token) {
   }
 }
 
+function hasObservedRain(f) {
+  return Boolean(f.canonical && currentWeatherDisplay(f.canonical).currentPrecipitation.label === 'Rain now');
+}
+
 function updateObservedRain(f) {
   updateSkyAtmosphere(f);
   renderHeroAndBriefing(f);
   renderBetaTodayCard(f);
+  if (!state.feelsHourIdx) renderOutdoorExposureCards(f);
   renderTopCompactPills(f);
   renderSevenDayForecast(f);
 }
@@ -247,7 +254,10 @@ async function loadLocationForecast(loc, { forceRefresh = false } = {}) {
     state.forecast.location.latitude !== loc.latitude || state.forecast.location.longitude !== loc.longitude;
   state.location = loc;
   if (changingPoint) {
+    state.todayHourTime = null;
     state.forecast = null;
+    const daySummary = document.getElementById('hero-day-summary');
+    if (daySummary) daySummary.hidden = true;
     setAwaitingLocationUi(true, false);
     const cityName = document.getElementById('city-name');
     if (cityName) cityName.textContent = loc.name || 'Your local weather';
@@ -350,18 +360,22 @@ function isSkyCloudyOrWet(f) {
   return (cur.precipIn || 0) >= 0.02 || (cur.rainChance || 0) >= 60;
 }
 
+function todayHours(f) {
+  return f.hours48.filter(hour=>hour.dayKey===f.days[0]?.dayKey);
+}
+
 function renderBetaTodayCard(f) {
   const host = document.getElementById('today-forecast');
   if (!host) return;
   if (f?.canonical?.days?.length) {
     host.hidden = false;
-    host.innerHTML = todayForecastHTML(f.canonical, Date.now());
+    host.innerHTML = todayForecastHTML(f.canonical, Date.now(), {interactive:false});
   } else if (f?.days?.length) {
     const d = f.days[0];
     const cur = f.current;
     host.hidden = false;
     host.innerHTML = `
-      <button type="button" class="today-weather-card today-remainder" data-today-forecast>
+      <div class="today-weather-card today-remainder">
         <span class="today-copy">
           <span class="day-name">Remainder of Today</span>
           <span class="today-condition">${escapeAttr(d.condition || cur.condition)}</span>
@@ -381,40 +395,32 @@ function renderBetaTodayCard(f) {
           <span class="today-metric"><span><strong>${Math.round(f.airQuality?.currentAqi ?? 42)}</strong><small>AQI now</small></span></span>
           <span class="today-metric"><span><strong>${Math.round(d.maxUvIndex ?? cur.uvIndex ?? 0)}</strong><small>Peak UV</small></span></span>
         </span>
-        <span class="today-more">Tap for more details</span>
-      </button>
+      </div>
     `;
   } else {
     host.hidden = true;
   }
 
-  const button = host.querySelector('.today-weather-card');
-  if (button) {
-    button.classList.add('beta-today-graph');
-    const dayKey = f.days[0]?.dayKey;
-    const hours = f.hours48.filter(hour => hour.dayKey === dayKey);
-    button.querySelector('.today-metrics').insertAdjacentHTML(
+  const tile = host.querySelector('.today-weather-card');
+  if (tile) {
+    const hours = todayHours(f);
+    tile.classList.add('beta-today-graph');
+    tile.querySelector('.today-metrics').insertAdjacentHTML(
       'beforebegin', todayHourlyPreview(hours, f.timeZone, state.useCelsius)
     );
-    button.querySelector('.today-more').textContent = 'View 48-hour forecast ›';
-    const summary = button.getAttribute('aria-label')?.replace(/ Open details\.$/, '') || 'Today.';
-    button.setAttribute('aria-label', summary + ' View the 48-hour hourly forecast.');
+    bindTodayHourPicker(tile,hours,{
+      timeZone:f.timeZone,useCelsius:state.useCelsius,selectedTime:state.todayHourTime,
+      onSelect:time=>{state.todayHourTime=time;}
+    });
+    tile.insertAdjacentHTML('beforeend','<button class="today-more" type="button" aria-haspopup="dialog">View 48-hour graph ›</button>');
+    tile.querySelector('.today-more').onclick = () => {
+      state.selectedHourIdx = 0;
+      state.selectedMetricId = 'temp';
+      open48hExplorerModal(f);
+    };
   }
   for (const control of host.querySelectorAll('[data-today-forecast]')) {
-    control.onclick = () => openMainDayDetailModal(f, 0);
-  }
-}
-
-function openMainDayDetailModal(f, dayIndex = 0) {
-  if (dayIndex === 0) {
-    state.selectedHourIdx = 0;
-    state.selectedMetricId = 'temp';
-    open48hExplorerModal(f);
-    return;
-  }
-  const d = f?.days?.[dayIndex] || f?.days?.[0];
-  if (d) {
-    openDayHourlyModal(d, f);
+    control.onclick = () => openDayHourlyModal(f.days[0],f);
   }
 }
 
@@ -465,7 +471,7 @@ function applyBackdropPhotoForSky(f) {
   } else if (state.skyOverride === 'sunset') {
     photo = { src: '/weather-fusion/today-sky-sunset.jpg', cls: 'sky-sunset' };
   } else {
-    photo = f.canonical && currentWeatherDisplay(f.canonical).currentPrecipitation.label === 'Rain now'
+    photo = hasObservedRain(f)
       ? { src: '/weather-fusion/today-sky-rain.webp', cls: f.current.isDay ? '' : 'sky-night-rain' }
       : selectHeroBackdropPhoto(f.current, f.canonical);
   }
@@ -484,7 +490,7 @@ function applyBackdropPhotoForSky(f) {
 }
 
 function updateSkyAtmosphere(f) {
-  const observed = f.canonical && currentWeatherDisplay(f.canonical).currentPrecipitation.label === 'Rain now';
+  const observed = hasObservedRain(f);
   const cloudyOrWet = isSkyCloudyOrWet(f);
   const autoMood = observed ? 'rain' : cloudyOrWet
     ? ((f.current?.rainChance >= 60 || (f.current?.precipIn || 0) >= 0.02) ? 'rain' : 'cloudy')
@@ -901,7 +907,12 @@ function renderHeroAndBriefing(f) {
   if (oldAppLink) oldAppLink.href = '/weather-fusion/old/?' + new URLSearchParams({
     latitude:f.location.latitude,longitude:f.location.longitude,name:f.location.name
   });
-  const observedRain = f.canonical && currentWeatherDisplay(f.canonical).currentPrecipitation.label === 'Rain now';
+  const observedRain = hasObservedRain(f);
+  const summary = document.getElementById('hero-day-summary');
+  if (summary) {
+    summary.textContent = todaySummary(todayHours(f),f.canonical?.days?.[0]?.high,{observedRain});
+    summary.hidden = !summary.textContent;
+  }
   if (sceneEl) sceneEl.innerHTML = renderWeatherIconSvg(observedRain ? 'rain' : cur.icon, 68);
   if (tempEl) tempEl.textContent = fmtTemp(cur.tempF);
   if (condEl) condEl.textContent = observedRain ? 'Rain now' : cur.condition;
@@ -1375,11 +1386,9 @@ function renderOutdoorExposureCards(f) {
   const pave = computePavementProfile(allHours, hIdx, f.location.latitude, f.location.longitude, Math.max(hIdx + 1, dayEnd));
   const peak = pavementDayPeak(pave.series, cur.time, tz);
   const peakLabel = peak.isToday ? 'Today peak' : `${peak.dayLabel} peak`;
-  const isRaining = cur.rainChance >= 50 || cur.precipIn >= 0.01;
-  const isCloudyNoSun =
-    !isRaining &&
-    cur.isDay &&
-    (!cur.hasDirectSun || (cur.cloudCover || 0) >= 70 || /overcast|mostly cloudy|\bcloudy\b|fog/i.test(cur.condition || ''));
+  const observedRain = hIdx === 0 && hasObservedRain(f);
+  const {wet:isRaining, shade, outdoor, compareSun, solarGain} = outdoorExposureReadings(cur,observedRain);
+  const isCloudyNoSun = !isRaining && cur.isDay && !compareSun;
   const titleEl = document.getElementById('exposure-section-title');
   if (titleEl) {
     titleEl.textContent = hIdx === 0 ? 'How it feels outside' : 'Outside Forecast';
@@ -1397,10 +1406,10 @@ function renderOutdoorExposureCards(f) {
   }).format(new Date(sunWindow.time)) : null;
   const sceneCtx = { pop: cur.rainChance, rainExpected: isRaining, snowExpected: /snow|flurr/i.test(cur.condition || '') };
 
-  const shadeSvg = referenceScene(0, Boolean(cur.isDay), cur.condition || 'Overcast', cur.shadeFeelsF, sceneCtx);
-  const sunTileFeels = isRaining ? cur.rainFeelsF : isCloudyNoSun || !cur.isDay ? cur.feelsLikeF : cur.sunFeelsF;
-  const sunSvg = referenceScene(1, Boolean(cur.isDay), cur.condition || 'Overcast', sunTileFeels, sceneCtx);
-  const petsSvg = dogWalkerScene(Boolean(cur.isDay), cur.condition || 'Overcast', cur.feelsLikeF, sceneCtx);
+  const condition = observedRain ? 'Rain now' : cur.condition;
+  const shadeSvg = referenceScene(0, Boolean(cur.isDay), condition || 'Overcast', shade, sceneCtx);
+  const sunSvg = referenceScene(1, Boolean(cur.isDay), condition || 'Overcast', outdoor, sceneCtx);
+  const petsSvg = dogWalkerScene(Boolean(cur.isDay), condition || 'Overcast', outdoor, sceneCtx);
 
   const concretePct = clamp(((pave.concreteTempF - 30) / 120) * 100, 8, 100);
   const asphaltPct = clamp(((pave.asphaltTempF - 30) / 120) * 100, 8, 100);
@@ -1408,59 +1417,43 @@ function renderOutdoorExposureCards(f) {
   const items = [
     {
       id: 'shade',
-      title: 'In the Shade',
-      shortLine: cur.shadeFeelsF < cur.tempF
-        ? `Breeze cools shade by ${Math.round(cur.tempF - cur.shadeFeelsF)}°`
-        : 'Calm shaded outdoor air',
-      badgeVal: fmtTemp(cur.shadeFeelsF),
+      badgeVal: fmtTemp(shade),
       badgeColor: '#ffffff',
       svg: shadeSvg,
       detailsHtml: `
         <div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:6px;">
-          <span class="exposure-big-temp">${fmtTemp(cur.shadeFeelsF)}</span>
+          <span class="exposure-big-temp">${fmtTemp(shade)}</span>
           <span class="wfo-pill">Air ${fmtTemp(cur.tempF)}</span>
         </div>
         <div style="font-size:14.5px;font-weight:700;color:#ffffff;margin-bottom:4px;">
-          ${cur.shadeFeelsF < cur.tempF ? `Breeze cools shade by ${Math.round(cur.tempF - cur.shadeFeelsF)}°` : 'Calm air in the shade'}
+          ${compareSun ? 'Feels like in shade' : 'Same outdoor feels-like estimate'}
         </div>
         <p style="font-size:13px;color:var(--muted);margin:0;line-height:1.45;">
-          With ${cur.windMph} mph breeze and ${cur.humidity}% humidity, shaded outdoor air feels ${getFeelsVerdict(cur.shadeFeelsF, isRaining).label.toLowerCase()}.
+          ${compareSun ? 'The shade estimate uses the same air temperature, humidity and wind as the sunny estimate.' : 'A separate shade temperature is shown only when the forecast supports a direct-sun comparison.'}
         </p>
       `
     },
     {
       id: 'sun',
-      title: isRaining ? 'In the Rain' : !cur.isDay ? 'Evening Air' : isCloudyNoSun ? 'Under Clouds' : 'In Direct Sun',
-      shortLine: isRaining
-        ? `${rainPercent(cur.rainChance)} rain risk · Damp outdoor chill`
-        : !cur.isDay
-        ? 'No direct sunlight outdoors'
-        : isCloudyNoSun
-        ? 'Overcast sky — no direct sun'
-        : cur.sunDeltaF >= 3
-        ? `Sunlight adds +${cur.sunDeltaF}° warmth`
-        : 'Filtered sunlight outdoors',
-      badgeVal: fmtTemp(sunTileFeels),
+      badgeVal: fmtTemp(outdoor),
       badgeColor: isRaining ? '#7ac6ff' : isCloudyNoSun || !cur.isDay ? '#bae6fd' : '#ffd470',
       svg: sunSvg,
       detailsHtml: `
         <div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:6px;">
           <span class="exposure-big-temp" style="color:${isRaining ? '#7ac6ff' : isCloudyNoSun || !cur.isDay ? '#bae6fd' : '#ffd470'};">
-            ${fmtTemp(sunTileFeels)}
+            ${fmtTemp(outdoor)}
           </span>
-          <span class="wfo-pill">${isRaining ? `${rainPercent(cur.rainChance)} Rain` : !cur.isDay ? 'After Dusk' : isCloudyNoSun ? `${Math.round(cur.cloudCover || 85)}% Clouds` : `UV ${cur.uvIndex}`}</span>
+          <span class="wfo-pill">${observedRain ? 'Rain now' : isRaining ? `Rain chance ${rainPercent(cur.rainChance)}` : !cur.isDay ? 'Night' : isCloudyNoSun ? (Number.isFinite(cur.cloudCover) ? `${cur.cloudCover}% clouds` : 'Cloud cover unavailable') : `UV ${cur.uvIndex}`}</span>
         </div>
         <div style="font-size:14.5px;font-weight:700;color:#ffffff;margin-bottom:4px;">
           ${
             isRaining
-              ? 'Damp breeze makes it feel cooler outside'
+              ? 'Outdoor feels-like during rainy weather'
               : !cur.isDay
-              ? 'Cooler evening temperatures settling in'
+              ? 'Outdoor feels-like at night'
               : isCloudyNoSun
-              ? 'Cloud cover blocks direct sunlight'
-              : cur.sunDeltaF >= 3
-              ? `Sunlight adds +${cur.sunDeltaF}° warmth`
-              : 'Mild filtered sunlight outdoors'
+              ? 'Outdoor feels-like under clouds'
+              : `In sun · ${Math.round(solarGain * (state.useCelsius ? 5/9 : 1))}° warmer than shade`
           }
         </div>
         <p style="font-size:13px;color:var(--muted);margin:0;line-height:1.45;">
@@ -1474,20 +1467,17 @@ function renderOutdoorExposureCards(f) {
     },
     {
       id: 'pets',
-      title: '🐾 For Pets',
-      shortLine: `${pave.pawSafety.label} · Sidewalk ${fmtTemp(pave.concreteTempF)} · Street ${fmtTemp(pave.asphaltTempF)}`,
-      badgeVal: pave.asphaltTempF >= 135 ? 'HOT!' : pave.asphaltTempF >= 120 ? 'WARM' : 'SAFE',
+      badgeVal: pave.pawSafety.level === 'danger' ? 'Hot' : pave.pawSafety.level === 'caution' ? 'Warm' : (pave.isWetSurface || observedRain) ? 'Wet' : 'Low risk',
       badgeColor: pave.pawSafety.color,
       svg: petsSvg,
       detailsHtml: `
         <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;">
-          <strong style="font-size:15px;color:${pave.pawSafety.color};">🐾 Paw Safety: ${pave.pawSafety.label}</strong>
-          <span class="wfo-pill">Air ${fmtTemp(cur.tempF)}</span>
+          <strong style="font-size:15px;color:${pave.pawSafety.color};">Estimated pavement temperatures</strong>
         </div>
         <div class="pavement-compare-bars">
           <div class="pave-row">
             <div class="pave-row-head">
-              <span>Light Concrete Sidewalk</span>
+              <span>Light concrete sidewalk</span>
               <strong>${fmtTemp(pave.concreteTempF)} (${peakLabel} ${fmtTemp(peak.concreteF)})</strong>
             </div>
             <div class="pave-progress-bg">
@@ -1496,7 +1486,7 @@ function renderOutdoorExposureCards(f) {
           </div>
           <div class="pave-row">
             <div class="pave-row-head">
-              <span>Dark Asphalt Street</span>
+              <span>Dark asphalt street</span>
               <strong style="color:${pave.asphaltTempF >= 135 ? '#ff6b6b' : pave.asphaltTempF >= 120 ? '#ffd166' : '#5ce0a0'};">
                 ${fmtTemp(pave.asphaltTempF)} (${peakLabel} ${fmtTemp(peak.asphaltF)})
               </strong>
@@ -1508,21 +1498,22 @@ function renderOutdoorExposureCards(f) {
         </div>
         <p class="pavement-peak-note">${peak.hours ? `Peak for ${peak.dateLabel} · ${peak.hours} available forecast hours` : 'Peak estimate unavailable for the selected day.'}</p>
         <p style="font-size:12.5px;color:var(--muted);margin:8px 0 0;line-height:1.45;">
-          ${pave.pawSafety.advice}
+          ${pave.pawSafety.level === 'safe' && observedRain ? 'Rain can leave pavement wet. These estimates describe the surfaces your pet walks on.' : pave.pawSafety.advice}
         </p>
       `
     }
   ];
 
   const contextEl=document.getElementById('exposure-weather-context');
-  if(contextEl)contextEl.textContent=`Air ${fmtTemp(cur.tempF)} · ${cur.condition} · Wind ${Number.isFinite(cur.windMph)?Math.round(cur.windMph)+' mph':'unavailable'}`;
+  if(contextEl)contextEl.textContent=`Air ${fmtTemp(cur.tempF)} · ${condition} · Wind ${Number.isFinite(cur.windMph)?Math.round(cur.windMph)+' mph':'unavailable'}`;
   const titles={shade:'Shade',sun:isRaining?'Rain':!cur.isDay?'Night':isCloudyNoSun?'Day':'Sun',pets:'For Pets'};
   container.innerHTML=items.map(item=>{
     const isOpen=state.expandedExposureIds.has(item.id),pets=item.id==='pets';
-    const value=pets?fmtTemp(pave.concreteTempF):item.badgeVal;
-    const subtitle=pets?pave.pawSafety.label:!Number.isFinite(item.id==='shade'?cur.shadeFeelsF:sunTileFeels)?'Estimate unavailable':item.id==='shade'?getFeelsVerdict(cur.shadeFeelsF,isRaining).label:getFeelsVerdict(sunTileFeels,isRaining).label;
-    const caption=pets?`Concrete · Asphalt ${fmtTemp(pave.asphaltTempF)}`:item.id==='shade'?'Feels like in shade':!cur.isDay?'Feels like at night':isRaining||isCloudyNoSun?'Feels like outdoors':'Feels like in sun';
-    return `<article class="glass exposure-person-card" data-exp-card="${item.id}"><button type="button" class="exposure-person-button" data-exp-toggle="${item.id}" aria-expanded="${isOpen}" aria-controls="exposure-detail-${item.id}"><span class="person-card-title">${titles[item.id]}</span><span class="person-card-scene">${item.svg}</span><span class="person-card-reading"><strong>${value}</strong><span>${caption}</span></span><span class="person-card-description"${pets?` style="color:${pave.pawSafety.color}"`:''}>${subtitle}</span><small class="person-card-detail-hint">${isOpen?'Close details':'Details'} ›</small></button></article>`;
+    const value=item.badgeVal;
+    const humanFeels=item.id==='shade'?shade:outdoor;
+    const subtitle=pets?'Paw heat safety':Number.isFinite(humanFeels)?getFeelsVerdict(humanFeels,isRaining).label:'Estimate unavailable';
+    const caption=pets?'Pavement conditions':item.id==='shade'?(compareSun?'Feels like in shade':'Same outdoor estimate'):!cur.isDay&&!isRaining?'Feels like at night':compareSun?'Feels like in sun':'Feels like outdoors';
+    return `<article class="glass exposure-person-card" data-exp-card="${item.id}"><button type="button" class="exposure-person-button" data-exp-toggle="${item.id}" aria-expanded="${isOpen}" aria-controls="exposure-detail-${item.id}"><span class="person-card-title">${titles[item.id]}</span><span class="person-card-scene">${item.svg}</span><span class="person-card-reading"><strong${pets?' class="pet-surface-status"':''}>${value}</strong><span>${caption}</span></span><span class="person-card-description"${pets?` style="color:${pave.pawSafety.color}"`:''}>${subtitle}</span><small class="person-card-detail-hint">${isOpen?'Close details':'Details'} ›</small></button></article>`;
   }).join('')+items.filter(item=>state.expandedExposureIds.has(item.id)).map(item=>`<section class="exposure-expanded-body" id="exposure-detail-${item.id}" data-exp-id="${item.id}" aria-label="${titles[item.id]} details">${item.detailsHtml}</section>`).join('');
 
   container.querySelectorAll('[data-exp-toggle]').forEach((btn) => {
@@ -1927,7 +1918,7 @@ function renderAqiAndGlanceTiles(f) {
         val: fmtTemp(cur.feelsLikeF),
         badge: `Air ${fmtTemp(cur.tempF)}`,
         visual: `<div class="apple-meter-track"><div class="apple-meter-fill" style="width:${clamp(((cur.feelsLikeF - 15) / 85) * 100, 8, 100).toFixed(0)}%;background:linear-gradient(90deg,#38bdf8,#f59e0b);"></div></div>`,
-        sub: `Shade ${fmtTemp(cur.shadeFeelsF)} · ${cur.hasDirectSun ? `Sun ${fmtTemp(cur.sunFeelsF)}` : `Clouds ${fmtTemp(cur.feelsLikeF)}`}`
+        sub: outdoorExposureReadings(cur, hasObservedRain(f)).compareSun ? `Shade ${fmtTemp(cur.shadeFeelsF)} · Sun ${fmtTemp(cur.feelsLikeF)}` : 'Outdoor feels-like estimate'
       },
       {
         id: 'humidity',
@@ -2174,7 +2165,6 @@ function initHeaderControls() {
   const unitBtn = document.getElementById('unit-toggle');
   const refreshBtn = document.getElementById('refresh-btn');
   const skySelect = document.getElementById('sky-mood-select');
-  const heroTemp = document.getElementById('temperature');
 
   // Press '/' anywhere to focus city search
   window.addEventListener('keydown', (e) => {
@@ -2267,11 +2257,6 @@ function initHeaderControls() {
   skySelect?.addEventListener('change', () => {
     state.skyOverride = skySelect.value;
     if (state.forecast) updateSkyAtmosphere(state.forecast);
-  });
-
-  heroTemp?.addEventListener('click', () => {
-    state.selectedMetricId = 'temp';
-    if (state.forecast) open48hExplorerModal(state.forecast);
   });
 
   // Mobile Tools Drawer Toggle
@@ -2368,10 +2353,6 @@ function initBottomNavDock() {
     item.addEventListener('click', (e) => {
       items.forEach((i) => i.classList.remove('active'));
       item.classList.add('active');
-      if (item.dataset.bnav === 'hourly' && state.forecast) {
-        e.preventDefault();
-        openMainDayDetailModal(state.forecast);
-      }
       if (item.dataset.bnav === 'compare') {
         e.preventDefault();
         setCompareExpanded(true, { scroll: true });
@@ -2741,7 +2722,7 @@ function openWardrobeModal(f) {
           <div class="wardrobe-badge">${advice.title}</div>
           <div style="font-size:28px;font-weight:800;line-height:1.1;margin:6px 0;">Feels Like ${fmtTemp(cur.feelsLikeF)}</div>
           <div style="font-size:13.5px;color:var(--muted);margin-bottom:10px;">
-            Air ${fmtTemp(cur.tempF)} · Shade ${fmtTemp(cur.shadeFeelsF)} · ${cur.hasDirectSun ? `Sun ${fmtTemp(cur.sunFeelsF)}` : `Under Clouds ${fmtTemp(cur.feelsLikeF)}`} · Wind ${cur.windMph} mph · Rain ${rainPercent(cur.rainChance)} · Air feels <strong>${dpDesc.toLowerCase()}</strong>
+            Air ${fmtTemp(cur.tempF)}${outdoorExposureReadings(cur, idx === 0 && hasObservedRain(f)).compareSun ? ` · Shade ${fmtTemp(cur.shadeFeelsF)}` : ''} · Wind ${cur.windMph} mph · Rain ${rainPercent(cur.rainChance)} · Air feels <strong>${dpDesc.toLowerCase()}</strong>
           </div>
           <ul class="wardrobe-list">
             ${advice.items.map((item) => `<li>✓ ${item}</li>`).join('')}
