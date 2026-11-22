@@ -29,6 +29,7 @@ import {
   normalizeProductIdentity,
   discoverAlternatives,
   extractDealTextFacts,
+  isVideoGameDeal,
   runDealHunter,
   buildPersonalizedRecommendations,
   findSimilarOrCheaper,
@@ -316,7 +317,7 @@ export function createBlackFridayEngine({
         // deals had a verified discount). Numbers are validated against the
         // post text inside the extractor — nothing is invented.
         try {
-          const needFacts = allFetchedDeals.filter((d) => d.currentPrice > 0 && !(d.reportedRegularPrice > 0) && !extractDealTextFacts(d).statedRegularPrice);
+          const needFacts = allFetchedDeals.filter((d) => d.currentPrice > 0 && !(d.reportedRegularPrice > d.currentPrice) && !extractDealTextFacts(d).statedRegularPrice);
           if (needFacts.length) {
             const factsReport = await extractPriceFactsWithAi(needFacts, { fetchImpl }).catch(() => null);
             if (factsReport) state.aiPriceFacts = { at: startedIso, ...factsReport };
@@ -608,7 +609,7 @@ export function createBlackFridayEngine({
       isBought: boughtIds.has(d.id),
     }));
 
-    const visibleDeals = enrichedActiveDeals.filter((d) => !d.isRejected);
+    const visibleDeals = enrichedActiveDeals.filter((d) => !d.isRejected && !isVideoGameDeal(d));
 
     const enrichedWishlist = (state.wishlist || []).map((item) => {
       const aiVerdicts = state.aiMatchVerdicts || {};
@@ -727,6 +728,7 @@ export function createBlackFridayEngine({
     return {
       version: BLACK_FRIDAY_VERSION,
       aiCleanup: state.aiCleanup || null,
+      aiPriceFacts: state.aiPriceFacts || null,
       generatedAt: now().toISOString(),
       location: state.settings.location || PRIMARY_LOCATION,
       persistence: store.getPersistenceInfo(),
@@ -780,6 +782,7 @@ export function createBlackFridayEngine({
           if (!prev || (PRIO[a.type] ?? 9) < (PRIO[prev.type] ?? 9)) byKey.set(key, a);
         }
         return [...byKey.values()]
+          .filter((a) => !isVideoGameDeal({ title: a.title || a.message || '', category: '' }))
           .sort((x, y) => String(y.triggeredAt || '').localeCompare(String(x.triggeredAt || '')))
           .slice(0, 100);
       })(),

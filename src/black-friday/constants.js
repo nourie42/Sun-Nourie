@@ -9,7 +9,7 @@
  * - urlStatus tracks verified browser/HTTP verification ('verified' | 'bot_protected' | 'unverified').
  */
 
-export const BLACK_FRIDAY_VERSION = '2.2.14-bf2026.18';
+export const BLACK_FRIDAY_VERSION = '2.2.15-bf2026.19';
 export const SCHEMA_VERSION = 2;
 
 export const PRIMARY_LOCATION = Object.freeze({

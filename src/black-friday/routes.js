@@ -442,7 +442,7 @@ export function registerBlackFridayRoutes(app, {
   api.get('/deals/:id', (req, res) => {
     const dash = engine.buildDashboardPayload();
     const deal = dash.deals.find((d) => d.id === req.params.id) || dash.archivedDeals.find((d) => d.id === req.params.id);
-    if (!deal) return res.status(404).json({ error: 'Deal not found.' });
+    if (!deal) return res.status(404).json({ error: 'That deal is not in the current list anymore — tap Refresh and try again.' });
     const history = store.getState().priceHistory[deal.canonicalKey] || [];
     const competitors = dash.deals.filter((d) => d.canonicalKey === deal.canonicalKey && d.id !== deal.id);
     res.json({ deal, history, competitors });
@@ -450,7 +450,7 @@ export function registerBlackFridayRoutes(app, {
 
   api.get('/deals/:id/compare', (req, res) => {
     const out = engine.compareDealOffers(req.params.id);
-    if (!out) return res.status(404).json({ error: 'Deal not found.' });
+    if (!out) return res.status(404).json({ error: 'That deal is not in the current list anymore — tap Refresh and try again.' });
     res.json(out);
   });
 

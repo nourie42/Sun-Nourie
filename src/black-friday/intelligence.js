@@ -694,6 +694,22 @@ export function matchWishlistToDeal(item, deal) {
 // them makes the discount math real instead of leaning on medians of other
 // sale prices, and keeps store-cash earnings visible instead of cleaned away.
 const COUPON_STOPWORDS = new Set(['FREE', 'SHIPPING', 'CODE', 'CODES', 'PROMO', 'COUPON', 'EXTRA', 'WITH', 'WHEN', 'ENTER', 'APPLY', 'CART', 'STORE', 'PICKUP', 'SALE', 'DEAL', 'SAVE', 'TODAY', 'ONLY']);
+// Video-game deal detector (Daniel, 2026-11-22: no games on this site).
+// Conservative: the gaming feed category, a parenthesized console/PC
+// platform tag in the title (the deal-post style for game listings), or a
+// "for PS5/Xbox/..." phrasing. Game hardware ("Nintendo Switch OLED
+// console") and board games are NOT matched.
+export function isVideoGameDeal(deal) {
+  if (!deal) return false;
+  const cat = String(deal.category || '').toLowerCase();
+  if (cat.includes('pc & gaming') || cat.includes('video game')) return true;
+  const t = String(deal.title || deal.name || '');
+  if (/\((?:PS5|PS4|PlayStation|Xbox(?: Series [XS]| One)?|PC Digital|Nintendo Switch|Steam)\)/i.test(t)) return true;
+  if (/\bfor (?:PS5|PS4|PlayStation|Xbox|Nintendo Switch)\b/i.test(t)) return true;
+  if (/\b(?:PC Digital|Steam Key|Epic Games Store|GOG)\b/i.test(t)) return true;
+  return false;
+}
+
 export function extractDealTextFacts(deal) {
   const title = String(deal?.title || '');
   const text = `${title} ${String(deal?.description || '')}`;
@@ -1012,6 +1028,7 @@ export function evaluateDeal(deal, {
     couponDependent,
     afterCouponPrice,
     storeCheckedPrice,
+    aiRegularPrice: deal.aiRegularPrice > 0 ? roundMoney(deal.aiRegularPrice) : null,
     finalAllInTotal,
     effectiveAfterCashback,
     freshness,

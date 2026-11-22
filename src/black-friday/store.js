@@ -129,6 +129,7 @@ export function createBlackFridayStore({
   const uploadsDir = path.join(resolvedDir, 'uploads');
   let state = loadSync();
   seedWishlistFromRepoFile();
+  seedDealsFromRepoFile();
 
   // Durability: local disk state does not survive git redeploys on Render
   // (no persistent disk / Supabase configured). The family's wish list is
@@ -230,6 +231,24 @@ export function createBlackFridayStore({
       scheduler: { ...init.scheduler, ...(raw.scheduler || {}), running: false },
       settings: mergeSettings(raw.settings),
     };
+  }
+
+  // Same durability pattern as the wish list: after a redeploy the deals
+  // state is empty until the next Refresh, which made every card button
+  // (Find Similar / Find Cheaper / Compare) answer "Deal not found".
+  // Restore the last good deals snapshot from the repo seed so the site is
+  // never empty; prices still only UPDATE when Daniel clicks Refresh.
+  function seedDealsFromRepoFile() {
+    try {
+      if (state.deals && Object.keys(state.deals).length) return;
+      const seedPath = path.join(path.dirname(fileURLToPath(import.meta.url)), 'deals-seed.json');
+      if (!fsSync.existsSync(seedPath)) return;
+      const seed = JSON.parse(fsSync.readFileSync(seedPath, 'utf8'));
+      const list = Array.isArray(seed?.deals) ? seed.deals : [];
+      if (!list.length) return;
+      state.deals = {};
+      for (const d of list) if (d && d.id) state.deals[d.id] = d;
+    } catch { /* seed is best-effort */ }
   }
 
   function loadSync() {

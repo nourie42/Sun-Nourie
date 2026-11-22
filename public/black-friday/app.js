@@ -47,6 +47,7 @@ const appState = {
   homeDealsImgOnly: true,
   homeDealsLimit: 9999,
   homeRecipient: 'all',
+  quickFilter: 'all',
   homeWlSearch: '',
   homeWlStore: 'all',
   homeWlFilter: 'all',
@@ -1368,9 +1369,71 @@ function renderAlertsView() {
   $('alerts-feed').innerHTML = d.alerts?.length ? d.alerts.map((a) => `<div class="alert-card ${a.read ? '' : 'is-unread'}"><div><strong>${esc(a.title)}</strong><div class="small">${esc(a.message)}</div><div class="small muted tabular">${esc(formatClock(a.triggeredAt))}</div></div>${a.retailerUrl ? `<a class="btn btn-sm btn-primary" href="${esc(a.retailerUrl)}" ${a.retailerUrl.startsWith('http') ? 'target="_blank" rel="noopener noreferrer"' : ''}>Open ↗</a>` : ''}</div>`).join('') : '<div class="small muted">No alerts triggered yet.</div>';
 }
 
+/* ==================== QUICK FILTERS (Daniel, 2026-11-22) ====================
+   One-tap chips at the top of Browse All Feeds: narrow by person (deals
+   matched to their wish list), Main Gifts, Level 1 / Level 2 list tiers,
+   or price (under $20 / under $10). Main Gifts = each person's known main
+   gift (Kish: Ray-Ban Meta glasses; Bear: crossover toolbox) or, where no
+   pick is recorded, their highest-priced Level 1 item. */
+const QUICK_FILTERS = [
+  { id: 'all', label: 'All Deals' },
+  { id: 'kish', label: 'Kish', recipient: 'Kish' },
+  { id: 'angel', label: 'Angel', recipient: 'Angel' },
+  { id: 'bear', label: 'Bear', recipient: 'Bear' },
+  { id: 'family', label: 'Family', recipient: 'Family' },
+  { id: 'ali', label: 'Ali', recipient: 'Ali' },
+  { id: 'main', label: '⭐ Main Gifts' },
+  { id: 'level1', label: 'Level 1', tierPrefix: 'Level 1' },
+  { id: 'level2', label: 'Level 2', tierPrefix: 'Level 2' },
+  { id: 'under20', label: 'Under $20', maxPrice: 20 },
+  { id: 'under10', label: 'Under $10', maxPrice: 10 },
+];
+const MAIN_GIFT_PATTERNS = { Kish: /ray-ban meta/i, Bear: /crossover toolbox/i };
+
+function mainGiftItemIds() {
+  const items = appState.data?.wishlist || [];
+  const ids = new Set();
+  const recipients = [...new Set(items.map((w) => w.recipient).filter(Boolean))];
+  for (const r of recipients) {
+    const mine = items.filter((w) => w.recipient === r);
+    const pat = MAIN_GIFT_PATTERNS[r];
+    const known = pat ? mine.filter((w) => pat.test(w.name || '')) : [];
+    if (known.length) { known.forEach((w) => ids.add(w.id)); continue; }
+    const lvl1 = mine.filter((w) => String(w.tier || '').startsWith('Level 1') && w.preferredPrice > 0)
+      .sort((a, b) => (b.preferredPrice || 0) - (a.preferredPrice || 0));
+    if (lvl1[0]) ids.add(lvl1[0].id);
+  }
+  return ids;
+}
+
+function quickFilterTest(deal, qf, itemMap, mainIds) {
+  if (!qf || qf === 'all') return true;
+  const def = QUICK_FILTERS.find((x) => x.id === qf);
+  if (!def) return true;
+  if (def.maxPrice) return (deal.currentPrice ?? Infinity) < def.maxPrice;
+  const matched = (deal.matchedWishlistIds || []).map((id) => itemMap.get(id)).filter(Boolean);
+  if (def.recipient) return matched.some((w) => w.recipient === def.recipient);
+  if (def.tierPrefix) return matched.some((w) => String(w.tier || '').startsWith(def.tierPrefix));
+  if (qf === 'main') return (deal.matchedWishlistIds || []).some((id) => mainIds.has(id));
+  return true;
+}
+
+function renderQuickFilterBar() {
+  const host = $('quick-filter-bar');
+  if (!host || !appState.data) return;
+  const deals = appState.data.deals || [];
+  const itemMap = new Map((appState.data.wishlist || []).map((w) => [w.id, w]));
+  const mainIds = mainGiftItemIds();
+  host.innerHTML = QUICK_FILTERS.map((def) => {
+    const n = def.id === 'all' ? deals.length : deals.filter((dl) => quickFilterTest(dl, def.id, itemMap, mainIds)).length;
+    return `<button type="button" class="qf-chip ${appState.quickFilter === def.id ? 'is-active' : ''}" data-quick-filter="${def.id}">${esc(def.label)} <span class="tabular">${n}</span></button>`;
+  }).join('');
+}
+
 function renderBestDealsView() {
   const d = appState.data;
   if (!d) return;
+  renderQuickFilterBar();
   const retSel = $('filter-retailer');
   const activeRetMap = new Map();
   for (const deal of d.deals) activeRetMap.set(deal.retailerId, deal.retailerName);
@@ -1378,6 +1441,11 @@ function renderBestDealsView() {
   retSel.value = activeRetMap.has(appState.filters.retailer) ? appState.filters.retailer : 'all';
 
   let list = [...d.deals];
+  if (appState.quickFilter && appState.quickFilter !== 'all') {
+    const itemMap = new Map((d.wishlist || []).map((w) => [w.id, w]));
+    const mainIds = mainGiftItemIds();
+    list = list.filter((dl) => quickFilterTest(dl, appState.quickFilter, itemMap, mainIds));
+  }
   const f = appState.filters;
   const favStoreIds = new Set((d.favoriteStores || []).map((s) => s.id));
   if (f.favOnly !== false && favStoreIds.size) list = list.filter((x) => favStoreIds.has(x.retailerId));
@@ -1674,6 +1742,13 @@ function bindEvents() {
   document.addEventListener('click', async (e) => {
     const gotoBtn = e.target.closest('[data-goto]');
     if (gotoBtn) return switchView(gotoBtn.dataset.goto);
+
+    const qfBtn = e.target.closest('[data-quick-filter]');
+    if (qfBtn) {
+      appState.quickFilter = qfBtn.dataset.quickFilter;
+      renderBestDealsView();
+      return;
+    }
 
     const storeDealsBtn = e.target.closest('[data-store-deals]');
     if (storeDealsBtn) {
@@ -2221,6 +2296,7 @@ function bindEvents() {
   }
   $('filter-reset-btn').addEventListener('click', () => {
     appState.filters = { q: '', tier: 'all', retailer: 'all', category: 'all', sort: 'score', maxPrice: '', freeShip: false, newOnly: false, localOnly: false, favOnly: true };
+    appState.quickFilter = 'all';
     savePrefs();
     renderBestDealsView();
   });

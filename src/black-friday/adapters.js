@@ -58,7 +58,7 @@ export const SOURCE_CATALOG = Object.freeze([
   { id: '9to5toys', name: '9to5Toys Deals', kind: 'rss', category: 'Tech, Apple & LEGO', url: 'https://9to5toys.com/feed/', maxItems: 40 },
   { id: 'dealcatcher', name: 'Dealcatcher Today', kind: 'rss', category: 'General Deals', url: 'https://www.dealcatcher.com/rss', maxItems: 40 },
   { id: 'dansdeals', name: 'DansDeals', kind: 'rss', category: 'General & Travel', url: 'https://www.dansdeals.com/feed/', maxItems: 35 },
-  { id: 'cheapshark', name: 'CheapShark Gaming API', kind: 'json_api', category: 'PC & Gaming', url: 'https://www.cheapshark.com/api/1.0/deals?pageSize=25&onSale=1', maxItems: 25 },
+  // CheapShark removed 2026-11-22 (Daniel): no video-game deals on this site.
   { id: 'cashbackmonitor', name: 'Cashback Monitor', kind: 'cashback', category: 'Cashback Portals', url: 'https://www.cashbackmonitor.com/', maxItems: 60 },
   { id: 'bestbuy_api', name: 'Best Buy Official API (Knightdale 27545)', kind: 'official_api', category: 'Direct Retailer + Local Pickup', envRequired: ['BESTBUY_API_KEY'] },
   { id: 'ebay_api', name: 'eBay Official Browse API', kind: 'official_api', category: 'Direct Retailer API', envRequired: ['EBAY_CLIENT_ID', 'EBAY_CLIENT_SECRET'] },
@@ -856,7 +856,7 @@ export async function runAllAdapters({
     const batchOut = await Promise.all(
       batch.map(async (source) => {
         if (source.kind === 'rss') return runRssSource(source, { fetchImpl, nowIso });
-        if (source.id === 'cheapshark') return runCheapSharkSource(source, { fetchImpl, nowIso });
+        // cheapshark source removed — see DEAL_SOURCES note.
         if (source.id === 'cashbackmonitor') return runCashbackMonitorSource(source, { fetchImpl, nowIso });
         if (source.id === 'bestbuy_api') return runBestBuyApiSource(source, { env, fetchImpl, nowIso });
         if (source.id === 'ebay_api') return runEbayApiSource(source, { env, fetchImpl, nowIso });
