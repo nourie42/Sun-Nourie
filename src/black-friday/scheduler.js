@@ -26,6 +26,7 @@ import {
 import {
   evaluateDeal,
   matchWishlistToDeal,
+  normalizeProductIdentity,
   discoverAlternatives,
   runDealHunter,
   buildPersonalizedRecommendations,
@@ -81,6 +82,35 @@ export function createBlackFridayEngine({
     const nowMs = now().getTime();
     const rawDeals = Object.values(state.deals || {});
     const activeWish = (state.wishlist || []).filter((w) => !['purchased', 'no_longer_interested'].includes(w.status));
+
+    // Perf: matchWishlistToDeal() reuses a cached `identity` when present.
+    // Compute each identity ONCE here instead of once per wishlist×deal pair
+    // (with thousands of wish-list items that pair loop is millions of
+    // regex-heavy normalizations per evaluation and saturates the server).
+    for (const w of activeWish) {
+      if (!w.identity) {
+        try {
+          w.identity = normalizeProductIdentity({
+            title: `${w.brand || ''} ${w.name || ''} ${w.modelNumber || ''}`,
+            brand: w.brand,
+            modelNumber: w.modelNumber,
+            url: w.sourceUrl,
+          });
+        } catch { /* leave unset; matcher will compute it */ }
+      }
+    }
+    for (const d of rawDeals) {
+      if (!d.identity) {
+        try {
+          d.identity = normalizeProductIdentity({
+            title: d.title,
+            brand: d.brand,
+            modelNumber: d.modelNumber,
+            url: d.retailerUrl,
+          });
+        } catch { /* leave unset; matcher will compute it */ }
+      }
+    }
 
     const byCanonical = new Map();
     for (const d of rawDeals) {
