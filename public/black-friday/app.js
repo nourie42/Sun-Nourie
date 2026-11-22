@@ -44,14 +44,14 @@ const appState = {
   homeDealsSearch: '',
   homeDealsSort: 'score',
   homeDeals25Plus: false,
-  homeDealsImgOnly: false,
-  homeDealsLimit: 18,
+  homeDealsImgOnly: true,
+  homeDealsLimit: 9999,
   homeRecipient: 'all',
   homeWlSearch: '',
   homeWlStore: 'all',
   homeWlFilter: 'all',
   homeWlSort: 'discount',
-  homeWlLimit: 24,
+  homeWlLimit: 60,
   uploadType: 'wishlist', // 'wishlist' | 'deal'
   uploadMode: 'file',     // 'file' | 'bulk' | 'urls' | 'manual'
   uploadPreview: null,    // { uploadType, suggestedUploadType, uploadFileId, uploadFileIds, parseWarning, items: [...] }
@@ -1597,10 +1597,10 @@ function bindEvents() {
   });
 
   // Home Section 1: Store Picker & Live Deals filters
-  $('home-deals-search')?.addEventListener('input', (e) => { appState.homeDealsSearch = e.target.value; appState.homeDealsLimit = 18; renderHomePage(); });
+  $('home-deals-search')?.addEventListener('input', (e) => { appState.homeDealsSearch = e.target.value; appState.homeDealsLimit = 9999; renderHomePage(); });
   $('home-deals-sort')?.addEventListener('change', (e) => { appState.homeDealsSort = e.target.value; renderHomePage(); });
-  $('home-deals-25plus')?.addEventListener('change', (e) => { appState.homeDeals25Plus = e.target.checked; appState.homeDealsLimit = 18; renderHomePage(); });
-  $('home-deals-img-only')?.addEventListener('change', (e) => { appState.homeDealsImgOnly = e.target.checked; appState.homeDealsLimit = 18; renderHomePage(); });
+  $('home-deals-25plus')?.addEventListener('change', (e) => { appState.homeDeals25Plus = e.target.checked; appState.homeDealsLimit = 9999; renderHomePage(); });
+  $('home-deals-img-only')?.addEventListener('change', (e) => { appState.homeDealsImgOnly = e.target.checked; appState.homeDealsLimit = 9999; renderHomePage(); });
   $('home-main-deals-more')?.addEventListener('click', () => { appState.homeDealsLimit += 24; renderHomePage(); });
 
   // Home Section 2: Uploaded Wish Lists & Deals filters
@@ -1639,7 +1639,7 @@ function bindEvents() {
     const pickStore = e.target.closest('[data-pick-store]');
     if (pickStore) {
       appState.homeSelectedStore = pickStore.dataset.pickStore;
-      appState.homeDealsLimit = 18;
+      appState.homeDealsLimit = 9999;
       renderHomePage();
       return;
     }

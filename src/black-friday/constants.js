@@ -9,7 +9,7 @@
  * - urlStatus tracks verified browser/HTTP verification ('verified' | 'bot_protected' | 'unverified').
  */
 
-export const BLACK_FRIDAY_VERSION = '2.1.0-bf2026.3';
+export const BLACK_FRIDAY_VERSION = '2.2.0-bf2026.4';
 export const SCHEMA_VERSION = 2;
 
 export const PRIMARY_LOCATION = Object.freeze({
@@ -324,9 +324,9 @@ export const LOCAL_STORES_KNIGHTDALE = Object.freeze([
   { id: 'macys-crabtree', retailerId: 'macys', retailerName: "Macy's", branchName: "Macy's Crabtree Valley Mall", area: 'Raleigh', address: '4325 Glenwood Ave, Raleigh, NC 27612', distanceMiles: 12.1, pickup: true, sameDayDelivery: true, warehouseClub: false, storeUrl: 'https://www.macys.com/stores/', clearanceUrl: 'https://www.macys.com/shop/sale/clearance-closeout' },
   { id: 'apple-crabtree', retailerId: 'apple', retailerName: 'Apple', branchName: 'Apple Crabtree Valley Mall', area: 'Raleigh', address: '4325 Glenwood Ave, Raleigh, NC 27612', distanceMiles: 12.1, pickup: true, sameDayDelivery: true, warehouseClub: false, storeUrl: 'https://www.apple.com/retail/crabtreevalleymall/', clearanceUrl: 'https://www.apple.com/shop/refurbished' },
   { id: 'lego-crabtree', retailerId: 'lego', retailerName: 'LEGO Store', branchName: 'LEGO Store Crabtree Valley Mall', area: 'Raleigh', address: '4325 Glenwood Ave, Raleigh, NC 27612', distanceMiles: 12.1, pickup: false, sameDayDelivery: false, warehouseClub: false, storeUrl: 'https://www.lego.com/en-us/stores/store/crabtree-valley-mall', clearanceUrl: 'https://www.lego.com/en-us/categories/sales-and-deals' },
-  { id: 'cabelas-garner', retailerId: 'cabelas', retailerName: "Cabela's", branchName: "Cabela's Garner (White Oak)", area: 'Garner', address: '201 Cabela Dr, Garner, NC 27529', distanceMiles: 11.8, pickup: true, sameDayDelivery: false, warehouseClub: false, storeUrl: 'https://stores.cabelas.com/us/nc/garner/201-cabela-dr.html', clearanceUrl: 'https://www.cabelas.com/shop/en/bargain-cave' },
+  { id: 'cabelas-garner', retailerId: 'cabelas', retailerName: "Cabela's", branchName: "Cabela's Garner (White Oak)", area: 'Garner', address: '201 Cabela Dr, Garner, NC 27529', distanceMiles: 11.8, pickup: true, sameDayDelivery: false, warehouseClub: false, storeUrl: 'https://stores.basspro.com/us/nc/garner/201-cabela-drive.html', clearanceUrl: 'https://www.cabelas.com/shop/en/bargain-cave' },
   { id: 'golfgalaxy-raleigh', retailerId: 'golfgalaxy', retailerName: 'Golf Galaxy', branchName: 'Golf Galaxy Cary / Raleigh', area: 'Cary', address: 'Crossroads Plaza, Cary, NC 27518', distanceMiles: 14.5, pickup: true, sameDayDelivery: false, warehouseClub: false, storeUrl: 'https://www.golfgalaxy.com/s/store-locator', clearanceUrl: 'https://www.golfgalaxy.com/f/golf-deals' },
-  { id: 'academy-apex', retailerId: 'academy', retailerName: 'Academy Sports', branchName: 'Academy Sports + Outdoors Apex', area: 'Cary', address: '1011 Beaver Creek Commons Dr, Apex, NC 27502', distanceMiles: 18.4, pickup: true, sameDayDelivery: true, warehouseClub: false, storeUrl: 'https://www.academy.com/store-locator', clearanceUrl: 'https://www.academy.com/c/clearance' },
+  { id: 'academy-apex', retailerId: 'academy', retailerName: 'Academy Sports', branchName: 'Academy Sports + Outdoors Apex', area: 'Cary', address: '1011 Beaver Creek Commons Dr, Apex, NC 27502', distanceMiles: 18.4, pickup: true, sameDayDelivery: true, warehouseClub: false, storeUrl: 'https://www.academy.com/storelocator', clearanceUrl: 'https://www.academy.com/c/clearance' },
 ]);
 
 function mkStore(id, name, category, domain, {
@@ -449,10 +449,10 @@ export const RETAILER_DIRECTORY = Object.freeze([
 
   // 7. Sporting Goods (7)
   mkStore('dicks', "Dick's Sporting Goods", 'Sporting Goods', 'dickssportinggoods.com', { dealsUrl: 'https://www.dickssportinggoods.com/f/clearance-deals', blackFridayUrl: 'https://www.dickssportinggoods.com/s/black-friday', storeFinderUrl: 'https://stores.dickssportinggoods.com/nc/raleigh/', localPresence: true, accent: '#10b981', monogram: 'DS', aliases: ['dicks sporting goods'] }),
-  mkStore('academy', 'Academy Sports', 'Sporting Goods', 'academy.com', { dealsUrl: 'https://www.academy.com/c/clearance', storeFinderUrl: 'https://www.academy.com/store-locator', localPresence: true, accent: '#0284c7', monogram: 'AS', aliases: ['academy sports + outdoors'] }),
+  mkStore('academy', 'Academy Sports', 'Sporting Goods', 'academy.com', { dealsUrl: 'https://www.academy.com/c/clearance', storeFinderUrl: 'https://www.academy.com/storelocator', localPresence: true, accent: '#0284c7', monogram: 'AS', aliases: ['academy sports + outdoors'] }),
   mkStore('rei', 'REI', 'Sporting Goods', 'rei.com', { dealsUrl: 'https://www.rei.com/rei-garage', storeFinderUrl: 'https://www.rei.com/stores/raleigh', localPresence: true, accent: '#22c55e', monogram: 'RI', aliases: ['rei co-op'] }),
   mkStore('basspro', 'Bass Pro Shops', 'Sporting Goods', 'basspro.com', { dealsUrl: 'https://www.basspro.com/shop/en/bargain-cave', storeFinderUrl: 'https://stores.basspro.com/', localPresence: true, accent: '#f59e0b', monogram: 'BP' }),
-  mkStore('cabelas', "Cabela's", 'Sporting Goods', 'cabelas.com', { dealsUrl: 'https://www.cabelas.com/shop/en/bargain-cave', storeFinderUrl: 'https://stores.cabelas.com/us/nc/garner/201-cabela-dr.html', localPresence: true, accent: '#84cc16', monogram: 'CB', aliases: ['cabelas'] }),
+  mkStore('cabelas', "Cabela's", 'Sporting Goods', 'cabelas.com', { dealsUrl: 'https://www.cabelas.com/shop/en/bargain-cave', storeFinderUrl: 'https://stores.basspro.com/us/nc/garner/201-cabela-drive.html', localPresence: true, accent: '#84cc16', monogram: 'CB', aliases: ['cabelas'] }),
   mkStore('scheels', 'Scheels', 'Sporting Goods', 'scheels.com', { dealsUrl: 'https://www.scheels.com/c/sale', storeFinderUrl: 'https://www.scheels.com/stores', accent: '#ef4444', monogram: 'SH' }),
   mkStore('golfgalaxy', 'Golf Galaxy', 'Sporting Goods', 'golfgalaxy.com', { dealsUrl: 'https://www.golfgalaxy.com/f/golf-deals', storeFinderUrl: 'https://www.golfgalaxy.com/s/store-locator', localPresence: true, accent: '#38bdf8', monogram: 'GG' }),
 
