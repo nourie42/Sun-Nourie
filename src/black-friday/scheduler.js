@@ -128,8 +128,59 @@ export function createBlackFridayEngine({
       byCanonical.set(d.canonicalKey, list);
     }
 
+    // Perf: candidate pre-filter for the wishlist×deal matcher. Running the
+    // full matcher on every pair (3,069 items × ~850 deals ≈ 2.6M calls)
+    // saturates/kills the server. The full matcher can only return a match
+    // when a pair shares (a) an exact identifier, (b) the item's model number
+    // in the deal's model/title, or (c) enough identity tokens (>=2 shared,
+    // or the item's single token). Index items by token/model/identifier and
+    // run the full matcher only on pairs that pass — results are unchanged.
+    const itemTokensList = activeWish.map((w) => [...new Set((w.identity?.tokens || []).filter((t) => t.length >= 2))]);
+    const tokenIndex = new Map();
+    itemTokensList.forEach((toks, i) => {
+      for (const t of toks) {
+        const arr = tokenIndex.get(t) || [];
+        arr.push(i);
+        tokenIndex.set(t, arr);
+      }
+    });
+    const modelItems = [];
+    const idItems = [];
+    activeWish.forEach((w, i) => {
+      const model = String(w.modelNumber || w.identity?.modelNumber || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+      if (model && model.length >= 4) modelItems.push({ i, model });
+      const ids = [w.upc || w.identity?.identifiers?.upc, w.gtin || w.identity?.identifiers?.gtin, w.asin || w.identity?.identifiers?.asin, w.tcin || w.identity?.identifiers?.tcin, w.sku || w.identity?.identifiers?.sku].filter(Boolean).map((x) => String(x).toUpperCase());
+      if (ids.length) idItems.push({ i, ids });
+    });
+
     const evaluated = rawDeals.map((deal) => {
-      const wishlistMatches = activeWish.filter((w) => matchWishlistToDeal(w, deal).matched);
+      const candIdx = new Set();
+      const dealTokens = new Set(deal.identity?.tokens || []);
+      const sharedCounts = new Map();
+      for (const t of dealTokens) {
+        for (const i of tokenIndex.get(t) || []) sharedCounts.set(i, (sharedCounts.get(i) || 0) + 1);
+      }
+      for (const [i, c] of sharedCounts) {
+        if (c >= 2 || (c === 1 && itemTokensList[i].length === 1)) candIdx.add(i);
+      }
+      if (modelItems.length) {
+        const dealModel = String(deal.modelNumber || deal.identity?.modelNumber || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+        const dealTitleCompact = String(deal.title || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+        for (const { i, model } of modelItems) {
+          if ((dealModel && dealModel === model) || dealTitleCompact.includes(model)) candIdx.add(i);
+        }
+      }
+      if (idItems.length) {
+        const dealIds = new Set([deal.identifiers?.upc, deal.identifiers?.gtin, deal.identifiers?.asin, deal.identifiers?.tcin, deal.identifiers?.sku].filter(Boolean).map((x) => String(x).toUpperCase()));
+        if (dealIds.size) {
+          for (const { i, ids } of idItems) {
+            if (ids.some((x) => dealIds.has(x))) candIdx.add(i);
+          }
+        }
+      }
+      const wishlistMatches = [...candIdx]
+        .map((i) => activeWish[i])
+        .filter((w) => matchWishlistToDeal(w, deal).matched);
       const historyEntries = state.priceHistory[deal.canonicalKey] || [];
       const competitorDeals = byCanonical.get(deal.canonicalKey) || [];
       return evaluateDeal(deal, {
