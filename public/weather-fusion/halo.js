@@ -147,7 +147,10 @@ export function smoothPath(xy) {
   let d = `M${xy[0][0].toFixed(1)} ${xy[0][1].toFixed(1)}`;
   for (let i = 0; i < xy.length - 1; i++) {
     const p0 = xy[Math.max(0, i - 1)], p1 = xy[i], p2 = xy[i + 1], p3 = xy[Math.min(xy.length - 1, i + 2)];
-    d += `C${(p1[0] + (p2[0] - p0[0]) / 6).toFixed(1)} ${(p1[1] + (p2[1] - p0[1]) / 6).toFixed(1)} ${(p2[0] - (p3[0] - p1[0]) / 6).toFixed(1)} ${(p2[1] - (p3[1] - p1[1]) / 6).toFixed(1)} ${p2[0].toFixed(1)} ${p2[1].toFixed(1)}`;
+    const between = v => Math.min(Math.max(p1[1],p2[1]), Math.max(Math.min(p1[1],p2[1]), v));
+    const y1 = between(p1[1] + (p2[1] - p0[1]) / 6);
+    const y2 = between(p2[1] - (p3[1] - p1[1]) / 6);
+    d += `C${(p1[0] + (p2[0] - p0[0]) / 6).toFixed(1)} ${y1.toFixed(1)} ${(p2[0] - (p3[0] - p1[0]) / 6).toFixed(1)} ${y2.toFixed(1)} ${p2[0].toFixed(1)} ${p2[1].toFixed(1)}`;
   }
   return d;
 }
@@ -399,7 +402,7 @@ function smoothSvgPolyline(d) {
 
 function chartSVG(L, spec, def) {
   const id = `c${++uid}`;
-  const isExp = typeof document !== 'undefined' && document.documentElement?.dataset?.weatherPage === 'experimental';
+  const isExp = spec.glow || (typeof document !== 'undefined' && document.documentElement?.dataset?.weatherPage === 'experimental');
   const tempLike = def.color === 'temp';
   const solid = def.color === 'uv' ? '#f2d94e' : def.color;
   const color = tempLike ? `url(#${id}-line)` : solid;
@@ -440,28 +443,31 @@ function chartSVG(L, spec, def) {
 
 export function mountChart(el, spec, def, onScrub) {
   const draw = () => {
-    const width = Math.max(260, el.clientWidth), height = el.classList.contains('tall') ? 260 : 210;
+    const width = Math.max(150, el.clientWidth), height = el.classList.contains('tall') ? 260 : 210;
     const L = layoutChart({ ...spec, width, height, domain: def.domain, min0: def.min0 });
     el.innerHTML = chartSVG(L, spec, def);
     if (!L.vals.length) el.insertAdjacentHTML('beforeend', '<p class="c-empty">No forecast data for this period yet</p>');
     const svg = el.querySelector('svg'), g = svg.querySelector('.c-scrub'), line = g.querySelector('line'), dot = g.querySelector('circle');
-    const pick = (ev) => {
-      if (!L.vals.length) return;
-      const r = svg.getBoundingClientRect(), px = ((ev.clientX - r.left) / r.width) * L.W;
-      let best = L.vals[0];
-      for (const p of L.vals) if (Math.abs(L.x(p.t) - px) < Math.abs(L.x(best.t) - px)) best = p;
+    const select = (best) => {
+      if (!best) return;
       const cx = L.x(best.t), cy = def.kind === 'bars' ? L.y(Math.max(L.lo, best.v)) : L.y(best.v);
       line.setAttribute('x1', cx); line.setAttribute('x2', cx); dot.setAttribute('cx', cx); dot.setAttribute('cy', cy);
       dot.setAttribute('fill', def.color === 'temp' ? tempColor(best.v) : def.color === 'uv' ? uvColor(best.v) : def.color);
       g.setAttribute('visibility', 'visible');
       onScrub?.(best, (spec.extra || []).find((p) => p.t === best.t));
     };
-    const end = () => { g.setAttribute('visibility', 'hidden'); onScrub?.(null); };
+    const pick = (ev) => {
+      const r = svg.getBoundingClientRect(), px = ((ev.clientX - r.left) / r.width) * L.W;
+      select(L.vals.reduce((best, p) => !best || Math.abs(L.x(p.t) - px) < Math.abs(L.x(best.t) - px) ? p : best, null));
+    };
+    el.selectChartTime = time => select(L.vals.find(p => p.t === time));
+    const end = () => { if (!spec.keepSelection) {g.setAttribute('visibility', 'hidden'); onScrub?.(null);} };
     svg.addEventListener('pointerdown', (e) => { svg.setPointerCapture?.(e.pointerId); pick(e); });
-    svg.addEventListener('pointermove', pick);
+    svg.addEventListener('pointermove', e => {if(e.pointerType==='mouse'||svg.hasPointerCapture(e.pointerId))pick(e);});
     svg.addEventListener('pointerup', end);
     svg.addEventListener('pointerleave', end);
     svg.addEventListener('pointercancel', end);
+
   };
   el._redraw = draw;
   draw();

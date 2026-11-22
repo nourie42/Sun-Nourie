@@ -4,9 +4,9 @@ export class GlobePanel{
   this.panel=document.getElementById('weather-globe-panel');this.preview=document.getElementById('globe-preview-mount');this.dialog=document.getElementById('weather-globe-dialog');this.expandedMount=document.getElementById('globe-expanded-mount');this.status=document.getElementById('globe-layer-status');this.reduced=matchMedia('(prefers-reduced-motion: reduce)');this.motion=!this.reduced.matches&&!navigator.connection?.saveData;this.visible=false;this.layers={radar:true,clouds:true,wind:true};
   this.observer=new IntersectionObserver(entries=>{this.visible=entries.some(e=>e.isIntersecting);if(this.visible&&this.forecast?.canonical&&!navigator.connection?.saveData)void this.ensure();this.activity();},{rootMargin:'50px'});this.observer.observe(this.panel);
   document.getElementById('open-weather-globe').addEventListener('click',()=>this.open());document.getElementById('close-weather-globe').addEventListener('click',()=>this.dialog.close());
-  this.dialog.addEventListener('close',()=>{clearInterval(this.radarTimer);this.radarTimer=null;this.updatePlayButton(false);this.renderer?.move(this.preview,false);this.activity();if(history.state?.weatherGlobe)history.back();});
+  this.dialog.addEventListener('close',()=>{this.stopRadar();this.renderer?.move(this.preview,false);this.activity();if(history.state?.weatherGlobe)history.back();});
   addEventListener('popstate',()=>{if(this.dialog.open)this.dialog.close();});
-  document.addEventListener('visibilitychange',()=>{if(document.hidden){clearInterval(this.radarTimer);this.radarTimer=null;this.updatePlayButton(false);}this.activity();});
+  document.addEventListener('visibilitychange',()=>{if(document.hidden){this.stopRadar();}this.activity();});
   this.reduced.addEventListener('change',()=>{if(this.reduced.matches){this.motion=false;this.applyMotion();}});
   for(const button of this.dialog.querySelectorAll('[data-globe-layer]'))button.addEventListener('click',()=>{const k=button.dataset.globeLayer;this.layers[k]=!this.layers[k];button.classList.toggle('active',this.layers[k]);button.setAttribute('aria-pressed',String(this.layers[k]));this.renderer?.setLayer(k,this.layers[k]);});
   document.getElementById('globe-recenter').addEventListener('click',()=>this.renderer?.center(this.forecast.location,true));
@@ -14,8 +14,16 @@ export class GlobePanel{
   document.getElementById('globe-refresh').addEventListener('click',()=>{if(this.renderer)void this.refreshFeeds();else void this.ensure();});
   document.getElementById('globe-basemap').addEventListener('click',e=>{this.street=!this.street;this.renderer?.setBasemap(this.street);e.currentTarget.textContent=this.street?'Satellite map':'Street map';e.currentTarget.setAttribute('aria-pressed',String(this.street));});
   document.getElementById('globe-motion').addEventListener('click',()=>{this.motion=!this.motion;this.applyMotion();});
-  document.getElementById('globe-radar-time').addEventListener('input',e=>{clearInterval(this.radarTimer);this.radarTimer=null;this.updatePlayButton(false);void this.radarFrame(Number(e.target.value));});
-  document.getElementById('globe-radar-play').addEventListener('click',()=>{if(this.radarTimer){clearInterval(this.radarTimer);this.radarTimer=null;this.updatePlayButton(false);return;}if(!this.feeds?.radar.frames?.length)return;this.updatePlayButton(true);this.radarTimer=setInterval(()=>{if(!this.radarBusy)void this.radarFrame(((this.frameIndex||0)+1)%this.feeds.radar.frames.length);},1500);});
+  document.getElementById('globe-radar-time').addEventListener('input',e=>{this.stopRadar();void this.radarFrame(Number(e.target.value));});
+  document.getElementById('globe-radar-play').addEventListener('click',()=>{
+   if(this.radarPlaying){this.stopRadar();return;}
+   if((this.feeds?.radar?.frames?.length||0)<2)return;
+   this.radarPlaying=true;
+   this.radarPlayback={};
+   this.updatePlayButton(true);
+   this.warmRadar();
+   this.scheduleRadar(250);
+  });
   document.getElementById('globe-open-radar-map').addEventListener('click',()=>{this.dialog.close();document.getElementById('map-panel').scrollIntoView({behavior:this.reduced.matches?'instant':'smooth'});});
   this.applyMotion();
  }
@@ -30,7 +38,7 @@ export class GlobePanel{
   const rect=this.panel.getBoundingClientRect();if(!this.dialog.open&&(rect.top>innerHeight+50||rect.bottom< -50))return;
   if(this.pending)return this.pending;if(this.renderer){if(Date.now()-(this.checkedAt||0)>10*60000)void this.refreshFeeds();return;}
   this.pending=(async()=>{try{
-   const {WeatherGlobeRenderer}=await import('./globe-renderer.js?v=tiled-v3');this.renderer=await WeatherGlobeRenderer.create(this.dialog.open?this.expandedMount:this.preview);this.renderer.setInteractive(this.dialog.open);this.renderer.onViewportChange=view=>{if(this.dialog.open&&view.zoom>=3){const key=Math.floor(view.latitude/10)+','+Math.floor(view.longitude/10);if(key!==this.viewKey){this.viewKey=key;clearTimeout(this.viewRefresh);this.viewRefresh=setTimeout(()=>void this.refreshFeeds(),300);}}};this.renderer.center(this.forecast.location);this.renderer.move(this.dialog.open?this.expandedMount:this.preview,this.dialog.open);this.renderer.setMotion(this.motion);this.renderer.canvas.dataset.latitude=this.forecast.location.latitude;this.renderer.canvas.dataset.longitude=this.forecast.location.longitude;document.getElementById('globe-loading').hidden=true;this.activity();await this.refreshFeeds();
+   const {WeatherGlobeRenderer}=await import('./globe-renderer.js?v=smooth-radar-v1');this.renderer=await WeatherGlobeRenderer.create(this.dialog.open?this.expandedMount:this.preview);this.renderer.setInteractive(this.dialog.open);this.renderer.onViewportChange=view=>{if(this.dialog.open&&view.zoom>=3){const key=Math.floor(view.latitude/10)+','+Math.floor(view.longitude/10);if(key!==this.viewKey){this.viewKey=key;clearTimeout(this.viewRefresh);this.viewRefresh=setTimeout(()=>void this.refreshFeeds(),300);}}};this.renderer.center(this.forecast.location);this.renderer.move(this.dialog.open?this.expandedMount:this.preview,this.dialog.open);this.renderer.setMotion(this.motion);this.renderer.canvas.dataset.latitude=this.forecast.location.latitude;this.renderer.canvas.dataset.longitude=this.forecast.location.longitude;document.getElementById('globe-loading').hidden=true;this.activity();await this.refreshFeeds();
   }catch{document.getElementById('globe-loading').textContent='Globe unavailable · Open local radar';this.status.textContent='The 3D globe is unavailable on this device. Detailed local radar remains available below.';this.expandedMount.textContent='Use the local radar map below.';}finally{this.pending=null;}})();return this.pending;
  }
  async open(){if(!this.forecast)return;if(!this.dialog.open){history.pushState({...history.state,weatherGlobe:true},'');this.dialog.showModal();}this.renderer?.move(this.expandedMount,true);this.activity();await this.ensure();this.renderer?.resize();}
@@ -43,12 +51,46 @@ export class GlobePanel{
    if(data.clouds?.status==='ready'){
     try{if(this.cloudTime!==data.clouds.validAt||!this.renderer.cloudsMesh)await this.renderer.setWeatherTiles('clouds',data.clouds.validAt);this.cloudTime=data.clouds.validAt;this.renderer.setLayer('clouds',this.layers.clouds);descriptions.push('Satellite IR · '+stamp(data.clouds.validAt));}catch{this.renderer.clearLayer('clouds');descriptions.push('Satellite image unavailable');}
    }else{this.renderer.clearLayer('clouds');descriptions.push('Satellite image unavailable');}
-   if(data.radar?.status==='ready'&&data.radar.frames?.length){document.getElementById('globe-radar-time').max=data.radar.frames.length-1;await this.radarFrame(data.radar.frames.length-1);descriptions.push('Radar · NOAA MRMS · '+stamp(data.radar.validAt));}else{this.renderer.clearLayer('radar');document.getElementById('globe-radar-stamp').textContent='Radar unavailable';descriptions.push('Radar unavailable');}
+   if(data.radar?.status==='ready'&&data.radar.frames?.length){document.getElementById('globe-radar-time').max=data.radar.frames.length-1;if(this.radarPlaying){const current=data.radar.frames.indexOf(this.radarShownTime);this.frameIndex=current<0?-1:current;this.warmRadar();}else await this.radarFrame(data.radar.frames.length-1);descriptions.push('Radar · NOAA MRMS · '+stamp(data.radar.validAt));}else{this.renderer.clearLayer('radar');document.getElementById('globe-radar-stamp').textContent='Radar unavailable';descriptions.push('Radar unavailable');}
    this.status.textContent=descriptions.join('\n');this.renderer.canvas.dataset.windParticles=this.renderer.particles.length;this.renderer.canvas.dataset.windTime=data.wind?.validAt||'';
   }catch{this.status.textContent='Weather layers are temporarily unavailable. The Earth view and detailed local radar remain accessible.';}finally{this.feedPending=null;refresh.disabled=false;refresh.removeAttribute('aria-busy');}})();return this.feedPending;
  }
  async radarFrame(index){if(!this.feeds?.radar.frames?.[index]||!this.renderer)return;const token=(this.radarGeneration||0)+1;this.radarGeneration=token;this.radarBusy=true;const time=this.feeds.radar.frames[index];try{
-  const shown=this.radarShownTime===time&&this.renderer.radarMesh?true:await this.renderer.setWeatherTiles('radar',time);if(token!==this.radarGeneration||!shown)return;this.radarShownTime=time;this.renderer.setLayer('radar',this.layers.radar);this.frameIndex=index;document.getElementById('globe-radar-time').value=index;document.getElementById('globe-radar-stamp').textContent=new Intl.DateTimeFormat('en-US',{timeZone:this.forecast.timeZone||'America/New_York',hour:'numeric',minute:'2-digit',timeZoneName:'short'}).format(new Date(time));
- }catch{if(token===this.radarGeneration)document.getElementById('globe-radar-stamp').textContent=this.radarShownTime?new Intl.DateTimeFormat('en-US',{hour:'numeric',minute:'2-digit'}).format(new Date(this.radarShownTime))+' · next frame delayed':'Radar frame loading delayed';}finally{if(token===this.radarGeneration)this.radarBusy=false;}}
+  const shown=this.radarShownTime===time&&this.renderer.radarMesh?true:await this.renderer.setWeatherTiles('radar',time);if(token!==this.radarGeneration||!shown)return;this.radarShownTime=time;this.renderer.setLayer('radar',this.layers.radar);this.frameIndex=index;if(!this.radarPlaying){for(const old of this.renderer.radarBuffer?.keys()||[])if(old!==time)this.renderer.discardRadar(old);}document.getElementById('globe-radar-time').value=index;document.getElementById('globe-radar-stamp').textContent=new Intl.DateTimeFormat('en-US',{timeZone:this.forecast.timeZone||'America/New_York',hour:'numeric',minute:'2-digit',timeZoneName:'short'}).format(new Date(time));
+ }catch{if(token===this.radarGeneration&&this.radarPlaying)this.frameIndex=index;if(token===this.radarGeneration)document.getElementById('globe-radar-stamp').textContent=this.radarShownTime?new Intl.DateTimeFormat('en-US',{hour:'numeric',minute:'2-digit'}).format(new Date(this.radarShownTime))+' · next frame delayed':'Radar frame loading delayed';}finally{if(token===this.radarGeneration)this.radarBusy=false;}}
+ warmRadar(){
+  const times=this.feeds?.radar?.frames;
+  if(!times?.length||!this.renderer)return;
+  const index=this.frameIndex??times.length-1;
+  const nearby=[this.radarShownTime,...[1,2].map(offset=>times[(index+offset)%times.length])];
+  for(const time of this.renderer.radarBuffer?.keys()||[]){
+   if(!nearby.includes(time))this.renderer.discardRadar(time);
+  }
+  for(const time of new Set(nearby.slice(1))){
+   void this.renderer.prepareRadar(time).then(entry=>entry.promise).catch(()=>{});
+  }
+ }
+ scheduleRadar(delay){
+  clearTimeout(this.radarTimer);
+  const playback=this.radarPlayback;
+  this.radarTimer=setTimeout(async()=>{
+   if(!this.radarPlaying||this.radarPlayback!==playback)return;
+   const frames=this.feeds?.radar?.frames;
+   if(!frames?.length){this.stopRadar();return;}
+   const next=((this.frameIndex??-1)+1)%frames.length;
+   await this.radarFrame(next);
+   if(!this.radarPlaying||this.radarPlayback!==playback)return;
+   this.warmRadar();
+   this.scheduleRadar(next===frames.length-1?700:330);
+  },delay);
+ }
+ stopRadar(){
+  this.radarPlaying=false;
+  this.radarPlayback=null;
+  clearTimeout(this.radarTimer);
+  this.radarTimer=null;
+  this.updatePlayButton(false);
+  for(const time of this.renderer?.radarBuffer?.keys()||[])if(time!==this.radarShownTime)this.renderer.discardRadar(time);
+ }
  updatePlayButton(playing){const b=document.getElementById('globe-radar-play');b.textContent=playing?'Pause radar':'Play radar';b.setAttribute('aria-pressed',String(playing));}
 }

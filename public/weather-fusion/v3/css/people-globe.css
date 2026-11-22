@@ -55,3 +55,5 @@ button:focus-visible,a:focus-visible{outline:2px solid #d6efff;outline-offset:3p
 .globe-map-shell .maplibregl-ctrl-attrib{font-size:9px;background:#e6f2f0cc}.globe-map-shell .maplibregl-ctrl-bottom-right{bottom:0;right:0}
 .globe-view-controls{margin-top:8px}.globe-layer-status{line-height:1.4;margin:9px 0;font-size:11px}.globe-attribution{margin:8px 0;font-size:9px}
 @media(max-width:540px){.weather-globe-dialog{max-height:94dvh;border-radius:20px}.globe-expanded-mount{height:46dvh;min-height:290px}.globe-dialog-header p{font-size:11px}.globe-radar-time{gap:8px}.globe-radar-time output{font-size:11px}}
+
+.hero-bg-photo.sky-night-rain{filter:brightness(.48) saturate(.76)}

@@ -16,7 +16,7 @@ export function currentWeatherDisplay(forecast,now=Date.now()){
  // Radar refreshes independently from station and forecast clocks. Fresh rain
  // evidence survives an expired thermal reading; an old radar image does not.
  const radar=current.radarPrecipitation,radarTime=Date.parse(radar?.observedAt);
- const radarFresh=Object.hasOwn(radar||{},'observedAt')?finite(radarTime)&&now-radarTime<=20*60000&&radarTime-now<=5*60000:fresh&&!freshness.expired;
+ const radarFresh=Object.hasOwn(radar||{},'observedAt')?finite(radarTime)&&now-radarTime<=15*60000&&radarTime-now<=5*60000:fresh&&!freshness.expired;
  const radarReady=radar?.status==='ready'&&radarFresh;
  const radarHere=radarReady&&radar.atLocation===true;
  const radarClose=radarReady&&(radar.close===true||(radar.close==null&&finite(radar.nearestRainMiles)&&radar.nearestRainMiles<=5));

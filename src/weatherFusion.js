@@ -686,7 +686,7 @@ export function createWeatherService({ fetchImpl = globalThis.fetch, env = proce
   const radarCache = new Cache(120, now);
   async function radar(query = {}) {
     const location = coordinates(query);
-    const cacheKey = `${location.latitude.toFixed(3)},${location.longitude.toFixed(3)}`;
+    const cacheKey = `${location.latitude.toFixed(4)},${location.longitude.toFixed(4)}`;
     return radarCache.get(cacheKey, 90 * 1000, async () => {
     const pointUrl=`https://api.weather.gov/points/${location.latitude},${location.longitude}`;
     const [result,pointResult] = await Promise.all([
@@ -878,7 +878,7 @@ export function registerWeatherFusionRoutes(app, options = {}) {
     'experience.js','exposure-scene.js','comfort-clothing.js','snow-outlook.js','winter-outlook.css','forecast-cards.css','forecast-confidence.js','forecast-layout.css','forecast-story.js','outlook-details.js',
     'frame-player.js','hero-mode.js','hourly-feels.js','hourly-feels.css','nav.js','outdoor-feels.js','pavement.js',
     'personal-details.js','personal-details.css','render-safety.js','risk-outlooks.js','risk-outlooks.css','scenario-layout.css','style.css','thermal-risk.js',
-    'forecast-consistency.js','today-card.js','rain-display.js','rain-trend.js','utci.js','weather-display.js','weather-math.js','weather-polish.css','weather-repair.css','weather-state.js','whats-up-classify.js',
+    'forecast-consistency.js','today-card.js','rain-display.js','radar-playback.js','rain-trend.js','utci.js','weather-display.js','weather-math.js','weather-polish.css','weather-repair.css','weather-state.js','whats-up-classify.js',
     'comfort-reference-scenes.png','comfort-reference-scenes.webp','comfort-reference-scenes-cold.webp',
     'comfort-reference-scenes-carry-umbrella.svg',
     'comfort-reference-scenes-dawn.webp','comfort-reference-scenes-fog.webp','comfort-reference-scenes-hot.webp',

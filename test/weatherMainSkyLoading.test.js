@@ -4,6 +4,8 @@ import vm from 'node:vm';
 import {readFile,access} from 'node:fs/promises';
 import {forecastSky,classifySky} from '../public/weather-fusion/sky-display.js';
 import {fixture} from '../scripts/weatherNourieFixture.js';
+import {applyLocalRadar} from "../public/weather-fusion/rain-display.js";
+import {todayRainDisplay} from "../public/weather-fusion/today-card.js";
 const noon=Date.parse('2026-09-05T22:00:00Z');
 function skyFixture(condition='Mostly Cloudy',cloud=94,now=noon){
  const f=fixture('knightdale',now);
@@ -53,4 +55,22 @@ test('startup never invents a fallback city or prefetches invalid stored coordin
 });
 test('a main request already in progress prevents a late startup script from duplicating it',async()=>{
  const {calls}=await boot({'weather-fusion-device-place':JSON.stringify({latitude:35.787,longitude:-78.4806})},{__weatherNourieForecastStarted:true});assert.equal(calls.length,0);
+});
+
+test('fresh rain over this point switches a sunny estimate to rain artwork in daylight and before sunrise',()=>{
+ for(const now of [noon,noon+11*3600000]){
+  const f=skyFixture('Sunny',1,now);
+  const data={location:{...f.location},precipitation:{status:'ready',observedAt:new Date(now-60000).toISOString(),atLocation:true}};
+  const before=todayRainDisplay(f,now);
+  assert.equal(applyLocalRadar(f,{...data,location:{...f.location,latitude:f.location.latitude+.01}},now),false);
+  assert.equal(applyLocalRadar(f,data,now),true);
+  const sky=forecastSky(f,now),rain=todayRainDisplay(f,now);
+  assert.equal(sky.kind,'rain');
+  assert.equal(sky.image,'today-sky-rain.webp');
+  assert.equal(sky.header,now===noon?'rain':'night-rain');
+  assert.equal(rain.value,100);
+  assert.equal(rain.forecastValue,before.forecastValue);
+  assert.equal(applyLocalRadar(f,{...data,precipitation:{...data.precipitation,atLocation:false,observedAt:new Date(now-120000).toISOString()}},now),false);
+  assert.equal(todayRainDisplay(f,now+16*60000).observed,false);
+ }
 });

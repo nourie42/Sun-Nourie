@@ -11,31 +11,29 @@ import {
 } from './fusion-engine.js?v=v3-all-16';
 import { getLunarPhaseFraction, renderWeatherIconSvg } from './icons.js?v=v3-sky-8';
 import {
-  COMPARE_MODELS,
-  COMPARE_VARIABLES,
   HOURLY_METRICS,
-  extractDayModelCompareValue,
   extractHourMetricValue,
   renderDewPointFeelChart,
   renderHourlyExplorerChart,
-  renderModelCompareChart,
   renderNext24HoursSplineChart,
   renderSevenDayDualSplineChart
-} from './charts.js?v=v3-all-16';
+} from './charts.js?v=smooth-trend-v4';
 import {
   WeatherMapController
-} from './map.js?v=v3-all-13';
+} from './map.js?v=smooth-radar-v1';
 import { dogWalkerScene, referenceScene } from '../../exposure-scene.js?v=true-night-art-v6';
 import { danCard, danOverview, danTakeDisplay } from '../../dans-summary.js?v=afd-discussion-section-v1';
 import { activeRiskOutlooks, outlookDetailHTML } from '../../risk-outlooks.js?v=risk-outlooks-v5';
 import { forecastWindowDetailHTML } from '../../forecast-window-banners.js?v=current-rain-20261017-v3';
-import {GlobePanel} from './globe-panel.js?v=tiled-v3';
+import {GlobePanel} from './globe-panel.js?v=smooth-radar-v1';
 import {outlookItems,renderOutlookPanel,openOutlookNote} from '../../outlook-panel.js?v=compact-v1';
-import { todayForecastHTML } from '../../today-card.js?v=glass-today-v2';
+import { todayForecastHTML, todayRainDisplay } from '../../today-card.js?v=radar-parity-v3';
+import {applyLocalRadar, displayedRainChance, observedRainLabel} from '../../rain-display.js?v=local-radar-v2';
+import {currentWeatherDisplay} from '../../current-weather.js?v=local-radar-v2';
 import { dayGraphHTML, installDayGraph } from '../../day-graph.js?v=hourly-rain-v5';
 import { dewpointFeelLevel, renderDewpointMeter } from '../../dewpoint-meter.js?v=air-moisture-v2';
 import { TREND_METRICS, mainTrendSeries, trendReading } from '../../main-hourly-trend.js?v=beta-glass-48h-v2';
-import { mountChart, solarDays, nightBands, fmt as haloFmt, H as HALO_H } from '../../halo.js?v=shared-chart-v3';
+import { mountChart, solarDays, nightBands, fmt as haloFmt, H as HALO_H } from '../../halo.js?v=smooth-trend-v4';
 
 const LEGACY_LOC_KEY = 'weather-nourie-v3-location';
 const SAVED_LOC_KEY = 'weather-nourie-v3-gps-location';
@@ -115,10 +113,6 @@ const state = {
   sevenDayActiveCurve: null,
   explanationPeriod: 'all',
   compareExpanded: false,
-  compareVariableId: 'highTemp',
-  compareHorizonDays: 5,
-  highlightedCompareModelId: null,
-  enabledCompareModels: new Set(['blend', 'nws', 'hrrr', 'nbm', 'ecmwf', 'gefs', 'weathernext']),
   accuracyCache: new Map(),
   dewPointRangeHours: 48,
   selectedDewPointIdx: 0,
@@ -246,6 +240,44 @@ function initBrandIcon() {
   // The header reuses the main app’s actual Weather Nourie artwork.
 }
 
+let localRadarRequest;
+let latestLocalRadar;
+async function refreshLocalRadar(loc, token) {
+  const coordinates = new URLSearchParams({latitude: loc.latitude, longitude: loc.longitude});
+  const key = coordinates.toString();
+  if (localRadarRequest?.key === key && localRadarRequest.token === token) return;
+  const request = {key, token};
+  localRadarRequest = request;
+  try {
+    const response = await fetch('/api/weather-fusion/radar?' + coordinates, {cache: 'no-store'});
+    if (!response.ok || token !== state.loadToken) return;
+    const data = await response.json();
+    if (token !== state.loadToken) return;
+    latestLocalRadar = {token, data};
+    const f = state.forecast;
+    if (f && applyLocalRadar(f.canonical, data)) updateObservedRain(f);
+  } catch {
+    // Keep the previous valid observation until its timestamp expires.
+  } finally {
+    if (localRadarRequest === request) localRadarRequest = null;
+  }
+}
+
+function updateObservedRain(f) {
+  updateSkyAtmosphere(f);
+  renderHeroAndBriefing(f);
+  renderBetaTodayCard(f);
+  renderTopCompactPills(f);
+  renderSevenDayForecast(f);
+}
+
+setInterval(() => {
+  if (!document.hidden && state.forecast?.canonical) {
+    updateObservedRain(state.forecast);
+    void refreshLocalRadar(state.location, state.loadToken);
+  }
+}, 120000);
+
 async function loadLocationForecast(loc, { forceRefresh = false } = {}) {
   if (!loc || !isValidCoordPair(Number(loc.latitude), Number(loc.longitude))) return;
   const token = ++state.loadToken;
@@ -256,6 +288,7 @@ async function loadLocationForecast(loc, { forceRefresh = false } = {}) {
   } catch {}
   state.liveAlerts = null;
   state.liveBriefing = null;
+  void refreshLocalRadar(loc, token);
 
   const [liveForecast, alertsRes] = await Promise.all([
     fetchCompleteFusionForecast(loc, { forceRefresh }),
@@ -270,6 +303,7 @@ async function loadLocationForecast(loc, { forceRefresh = false } = {}) {
     if (alertsRes.alerts.length) liveForecast.alerts = alertsRes.alerts;
   }
 
+  if (latestLocalRadar?.token === token) applyLocalRadar(liveForecast.canonical, latestLocalRadar.data);
   state.forecast = liveForecast;
   state.location = liveForecast.location;
   state.selectedHourIdx = 0;
@@ -440,7 +474,9 @@ function applyBackdropPhotoForSky(f) {
   } else if (state.skyOverride === 'sunset') {
     photo = { src: '/weather-fusion/today-sky-sunset.jpg', cls: 'sky-sunset' };
   } else {
-    photo = selectHeroBackdropPhoto(f.current, f.canonical);
+    photo = f.canonical && currentWeatherDisplay(f.canonical).currentPrecipitation.label === 'Rain now'
+      ? { src: '/weather-fusion/today-sky-rain.webp', cls: f.current.isDay ? '' : 'sky-night-rain' }
+      : selectHeroBackdropPhoto(f.current, f.canonical);
   }
   const targetCls = photo.cls ? `hero-bg-photo ${photo.cls}` : 'hero-bg-photo';
   if (heroBg.getAttribute('src') !== photo.src) {
@@ -457,8 +493,9 @@ function applyBackdropPhotoForSky(f) {
 }
 
 function updateSkyAtmosphere(f) {
+  const observed = f.canonical && currentWeatherDisplay(f.canonical).currentPrecipitation.label === 'Rain now';
   const cloudyOrWet = isSkyCloudyOrWet(f);
-  const autoMood = cloudyOrWet
+  const autoMood = observed ? 'rain' : cloudyOrWet
     ? ((f.current?.rainChance >= 60 || (f.current?.precipIn || 0) >= 0.02) ? 'rain' : 'cloudy')
     : (f.current?.skyMood || (f.current?.isDay ? 'day' : 'night'));
   const mood = state.skyOverride === 'auto' ? autoMood : state.skyOverride;
@@ -869,9 +906,14 @@ function renderHeroAndBriefing(f) {
     }).format(cur.dateObj);
   }
   if (cityEl) cityEl.textContent = f.location.name;
-  if (sceneEl) sceneEl.innerHTML = renderWeatherIconSvg(cur.icon, 68);
+  const mainLink = document.getElementById('main-app-link');
+  if (mainLink && f.canonical) mainLink.href = '/weather-fusion/?' + new URLSearchParams({
+    latitude:f.location.latitude,longitude:f.location.longitude,name:f.location.name
+  });
+  const observedRain = f.canonical && currentWeatherDisplay(f.canonical).currentPrecipitation.label === 'Rain now';
+  if (sceneEl) sceneEl.innerHTML = renderWeatherIconSvg(observedRain ? 'rain' : cur.icon, 68);
   if (tempEl) tempEl.textContent = fmtTemp(cur.tempF);
-  if (condEl) condEl.textContent = cur.condition;
+  if (condEl) condEl.textContent = observedRain ? 'Rain now' : cur.condition;
   if (feelsLineEl) feelsLineEl.textContent = `Feels Like ${fmtTemp(cur.feelsLikeF)}`;
   if (hiloEl) {
     hiloEl.innerHTML = `High <strong>${fmtTemp(today.highF)}</strong> &nbsp;|&nbsp; Low <strong>${fmtTemp(today.lowF)}</strong>`;
@@ -917,8 +959,11 @@ function renderHeroAndBriefing(f) {
   const meterSubEl = document.getElementById('qs-meter-sub');
 
   if (rainEl) {
-    rainEl.textContent = `${Math.round(today.rainChance ?? cur.rainChance ?? 0)}%`;
-    rainEl.title = cur.rainLedger?.tooltip || '';
+    const rain = f.canonical ? todayRainDisplay(f.canonical) : {value: today.rainChance ?? cur.rainChance};
+    rainEl.textContent = Number.isFinite(rain.value) ? `${Math.round(rain.value)}%` : '—';
+    rainEl.title = observedRainLabel(rain) || cur.rainLedger?.tooltip || '';
+    const rainCaption = document.getElementById('qs-rain-caption');
+    if (rainCaption) rainCaption.textContent = rain.observed ? 'Rain now' : 'Today';
   }
   if (precipEl) precipEl.textContent = `${next24Precip.toFixed(2)}"`;
   if (aqiValEl) {
@@ -1132,6 +1177,10 @@ function openDayHourlyModal(day, f) {
 function renderSevenDayForecast(f) {
   const dualStage = document.getElementById('seven-day-dual-stage');
   const days7 = f.days.slice(0, 7);
+  if (f.canonical && days7[0]) {
+    const rain = displayedRainChance(f.canonical, days7[0].rainChance);
+    days7[0] = {...days7[0], rainChance:rain.value, rainObserved:rain.observed};
+  }
   const selIdx = clamp(state.selectedDayIdx, 0, Math.max(0, days7.length - 1));
   const d = days7[selIdx] || days7[0];
   const isExpanded = Boolean(state.sevenDayDetailExpanded);
@@ -1802,270 +1851,20 @@ function setCompareExpanded(expanded, { scroll = false } = {}) {
   }
 }
 
-function renderCompareModelsSection(f) {
+let betaComparison;
+async function renderCompareModelsSection(f) {
   if (!state.compareExpanded || !f) return;
-  const varTabs = document.getElementById('compare-var-tabs');
-  const modelToggles = document.getElementById('compare-model-toggles');
-  const chartStage = document.getElementById('compare-chart-stage');
-  const breakdownEl = document.getElementById('compare-day-breakdown');
-
-  const visibleCount = clamp(state.compareHorizonDays, 3, f.days.length);
-  const visibleDays = f.days.slice(0, visibleCount);
-
-  if (varTabs) {
-    varTabs.innerHTML = COMPARE_VARIABLES.map(
-      (v) => `
-      <button class="metric-tab-btn ${v.id === state.compareVariableId ? 'active' : ''}" data-comp-var="${v.id}" type="button">
-        ${v.label}
-      </button>
-    `
-    ).join('');
-
-    varTabs.querySelectorAll('[data-comp-var]').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        state.compareVariableId = btn.dataset.compVar;
-        renderCompareModelsSection(f);
-      });
+  const host = document.getElementById('beta-model-comparison');
+  if (!host) return;
+  betaComparison ??= import('../../wn-blend.js?v=shared-model-comparison-v1')
+    .then(({mountModelComparison}) => mountModelComparison(host))
+    .catch(() => {
+      betaComparison = null;
+      host.textContent = 'Comparison is temporarily unavailable. Close and reopen Compare to retry.';
+      return null;
     });
-  }
-
-  const availableModels = COMPARE_MODELS.filter(
-    (m) =>
-      m.alwaysOn ||
-      visibleDays.some((d) => {
-        const v = extractDayModelCompareValue(d, m.id, state.compareVariableId, state.useCelsius);
-        return typeof v === 'number' && !Number.isNaN(v);
-      })
-  );
-
-  if (modelToggles) {
-    modelToggles.innerHTML = availableModels.map((m) => {
-      const isOn = state.enabledCompareModels.has(m.id) || m.alwaysOn;
-      return `
-        <button class="mode-pill ${isOn ? 'active' : ''}" data-comp-model="${m.id}" type="button" style="border-color:${isOn ? m.color : 'rgba(255,255,255,0.16)'};">
-          <span style="display:inline-block;width:10px;height:3px;border-radius:2px;background:${m.color};"></span>
-          <span>${m.label}</span>
-        </button>
-      `;
-    }).join('');
-
-    modelToggles.querySelectorAll('[data-comp-model]').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const id = btn.dataset.compModel;
-        if (id === 'blend') return;
-        if (state.enabledCompareModels.has(id)) {
-          state.enabledCompareModels.delete(id);
-        } else {
-          state.enabledCompareModels.add(id);
-        }
-        renderCompareModelsSection(f);
-      });
-    });
-  }
-
-function openCompareDayModelsModal(dayIdx, f) {
-  const visibleCount = clamp(state.compareHorizonDays, 3, f.days.length);
-  const visibleDays = f.days.slice(0, visibleCount);
-  const drawDayModal = (idx) => {
-    const safeIdx = clamp(idx, 0, visibleDays.length - 1);
-    const d = visibleDays[safeIdx];
-    const variable = COMPARE_VARIABLES.find((v) => v.id === state.compareVariableId) || COMPARE_VARIABLES[0];
-    const fmtCmp = (val) => {
-      if (val === null || val === undefined || Number.isNaN(val)) return '—';
-      return `${variable.decimals ? Number(val).toFixed(variable.decimals) : Math.round(val)}${variable.unit}`;
-    };
-    const wnVal = extractDayModelCompareValue(d, 'blend', state.compareVariableId, state.useCelsius);
-    const rows = COMPARE_MODELS.map((m) => {
-      const val = extractDayModelCompareValue(d, m.id, state.compareVariableId, state.useCelsius);
-      const diff =
-        m.id !== 'blend' && typeof val === 'number' && typeof wnVal === 'number' && !Number.isNaN(val) && !Number.isNaN(wnVal)
-          ? val - wnVal
-          : null;
-      const diffStr =
-        diff === null
-          ? (m.id === 'blend' ? 'Consensus' : '—')
-          : Math.abs(diff) < (variable.decimals ? 0.01 : 0.5)
-          ? 'Matches'
-          : `${diff > 0 ? '+' : ''}${variable.decimals ? diff.toFixed(variable.decimals) : Math.round(diff)}${variable.unit}`;
-      return { m, val, diffStr };
-    }).filter((r) => r.m.id === 'blend' || (typeof r.val === 'number' && !Number.isNaN(r.val)));
-
-    const bodyEl = document.getElementById('modal-body');
-    const titleEl = document.getElementById('modal-title');
-    if (titleEl) titleEl.textContent = `${d.dayName} (${d.dateLabel}) · All Models (${variable.label})`;
-    if (!bodyEl) return;
-
-    bodyEl.innerHTML = `
-      <div class="pill-scroll-row" style="margin-bottom:12px;">
-        ${visibleDays
-          .map(
-            (day, i) =>
-              `<button class="mode-pill ${i === safeIdx ? 'active' : ''}" data-cmp-modal-day="${i}" type="button">${day.shortWeekday} ${day.dateLabel.replace(/^[A-Za-z]+\s+/, '')}</button>`
-          )
-          .join('')}
-      </div>
-      <div style="display:grid;gap:7px;">
-        ${rows
-          .map(
-            ({ m, val, diffStr }) => `
-          <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 13px;border-radius:13px;background:${m.id === 'blend' ? 'rgba(56,189,248,0.16)' : 'rgba(255,255,255,0.06)'};border:1px solid ${m.id === 'blend' ? 'rgba(125,211,252,0.55)' : 'rgba(255,255,255,0.14)'};">
-            <div style="display:flex;align-items:center;gap:9px;min-width:0;">
-              <span style="width:12px;height:3.5px;border-radius:2px;background:${m.color};flex-shrink:0;"></span>
-              <strong style="font-size:14px;color:${m.id === 'blend' ? '#ffffff' : m.color};">${m.id === 'blend' ? 'Weather Nourie' : m.label}</strong>
-            </div>
-            <div style="display:flex;align-items:baseline;gap:10px;flex-shrink:0;">
-              <span style="font-size:12px;color:var(--muted);">${diffStr}</span>
-              <strong style="font-size:16px;color:#ffffff;font-variant-numeric:tabular-nums;">${fmtCmp(val)}</strong>
-            </div>
-          </div>
-        `
-          )
-          .join('')}
-      </div>
-    `;
-
-    bodyEl.querySelectorAll('[data-cmp-modal-day]').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const nextIdx = Number(btn.dataset.cmpModalDay) || 0;
-        state.selectedDayIdx = nextIdx;
-        renderSevenDayForecast(f);
-        renderCompareModelsSection(f);
-        drawDayModal(nextIdx);
-      });
-    });
-  };
-
-  openModal('All Models Comparison', '<div></div>');
-  drawDayModal(dayIdx);
-}
-
-  renderModelCompareChart({
-    containerEl: chartStage,
-    days: f.days,
-    horizonDays: state.compareHorizonDays,
-    variableId: state.compareVariableId,
-    enabledModels: state.enabledCompareModels,
-    selectedDayIdx: state.selectedDayIdx,
-    highlightedModelId: state.highlightedCompareModelId,
-    useCelsius: state.useCelsius,
-    onSelectDay: (dIdx) => {
-      state.selectedDayIdx = dIdx;
-      renderSevenDayForecast(f);
-      renderCompareModelsSection(f);
-    },
-    onSelectModel: (mId, dIdx) => {
-      if (typeof dIdx === 'number') state.selectedDayIdx = dIdx;
-      state.highlightedCompareModelId = state.highlightedCompareModelId === mId ? null : mId;
-      renderSevenDayForecast(f);
-      renderCompareModelsSection(f);
-    }
-  });
-
-  if (breakdownEl) {
-    const variable = COMPARE_VARIABLES.find((v) => v.id === state.compareVariableId) || COMPARE_VARIABLES[0];
-    const fmtCmp = (val) => {
-      if (val === null || val === undefined || Number.isNaN(val)) return '—';
-      return `${variable.decimals ? Number(val).toFixed(variable.decimals) : Math.round(val)}${variable.unit}`;
-    };
-    const activeModels = availableModels.filter((m) => state.enabledCompareModels.has(m.id) || m.alwaysOn);
-    const selDayIdx = clamp(state.selectedDayIdx, 0, visibleDays.length - 1);
-    const selDay = visibleDays[selDayIdx] || visibleDays[0];
-    const wnVal = extractDayModelCompareValue(selDay, 'blend', state.compareVariableId, state.useCelsius);
-
-    const inlineDiffChips = activeModels
-      .map((m) => {
-        const val = extractDayModelCompareValue(selDay, m.id, state.compareVariableId, state.useCelsius);
-        if (val === null || val === undefined || Number.isNaN(val)) return '';
-        const diff =
-          m.id !== 'blend' && typeof wnVal === 'number' && !Number.isNaN(wnVal)
-            ? val - wnVal
-            : null;
-        const diffBadge =
-          m.id === 'blend'
-            ? 'Consensus'
-            : diff === null
-            ? ''
-            : Math.abs(diff) < (variable.decimals ? 0.01 : 0.5)
-            ? 'Matches'
-            : `${diff > 0 ? '+' : ''}${variable.decimals ? diff.toFixed(variable.decimals) : Math.round(diff)}${variable.unit}`;
-        const isModelFocused = state.highlightedCompareModelId === m.id;
-        return `
-          <button type="button" data-cmp-focus-model="${m.id}" style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 10px;border-radius:11px;background:${isModelFocused ? 'rgba(56,189,248,0.26)' : m.id === 'blend' ? 'rgba(56,189,248,0.18)' : 'rgba(255,255,255,0.07)'};border:1px solid ${isModelFocused ? m.color : m.id === 'blend' ? 'rgba(125,211,252,0.52)' : 'rgba(255,255,255,0.16)'};font-family:inherit;color:inherit;cursor:pointer;text-align:left;">
-            <span style="display:inline-flex;align-items:center;gap:6px;min-width:0;">
-              <i style="width:10px;height:3px;border-radius:2px;background:${m.color};display:inline-block;flex-shrink:0;"></i>
-              <strong style="font-size:12.5px;color:${m.id === 'blend' ? '#ffffff' : m.color};white-space:nowrap;">${m.id === 'blend' ? 'Weather Nourie' : m.label}</strong>
-            </span>
-            <span style="display:inline-flex;align-items:baseline;gap:6px;flex-shrink:0;">
-              <small style="font-size:11px;color:var(--muted);">${diffBadge}</small>
-              <strong style="font-size:13.5px;color:#ffffff;font-variant-numeric:tabular-nums;">${fmtCmp(val)}</strong>
-            </span>
-          </button>
-        `;
-      })
-      .filter(Boolean)
-      .join('');
-
-    breakdownEl.innerHTML = `
-      <div class="compare-inline-day-diff" style="margin-bottom:10px;padding:10px 12px;border-radius:14px;background:rgba(12,26,48,0.32);border:1px solid rgba(210,235,255,0.24);">
-        <div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:8px;flex-wrap:wrap;">
-          <strong style="font-size:13.5px;color:#ffffff;">${selDay.dayName} (${selDay.dateLabel}) · ${variable.label} Differences</strong>
-          <span style="font-size:11.5px;color:var(--muted);">Tap any day on the graph or table to compare</span>
-        </div>
-        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(165px,1fr));gap:6px;">
-          ${inlineDiffChips}
-        </div>
-      </div>
-      <div class="compare-table-wrap">
-        <table class="compare-days-table" aria-label="Day by day forecast comparison table">
-          <thead>
-            <tr>
-              <th>Day</th>
-              ${activeModels
-                .map(
-                  (m) =>
-                    `<th class="${m.id === 'blend' ? 'col-wn' : ''}" style="color:${m.color};">${m.id === 'blend' ? 'Weather Nourie' : m.label}</th>`
-                )
-                .join('')}
-            </tr>
-          </thead>
-          <tbody>
-            ${visibleDays
-              .map(
-                (d, idx) => `
-              <tr class="${idx === selDayIdx ? 'active-day-row' : ''}" data-cmp-row="${idx}" style="cursor:pointer;">
-                <td>${d.shortWeekday} <span style="font-size:11px;color:var(--muted);font-weight:500;">${d.dateLabel}</span></td>
-                ${activeModels
-                  .map((m) => {
-                    const val = extractDayModelCompareValue(d, m.id, state.compareVariableId, state.useCelsius);
-                    return `<td class="${m.id === 'blend' ? 'col-wn' : ''}">${fmtCmp(val)}</td>`;
-                  })
-                  .join('')}
-              </tr>
-            `
-              )
-              .join('')}
-          </tbody>
-        </table>
-      </div>
-    `;
-
-    breakdownEl.querySelectorAll('[data-cmp-focus-model]').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const mId = btn.dataset.cmpFocusModel;
-        state.highlightedCompareModelId = state.highlightedCompareModelId === mId ? null : mId;
-        renderCompareModelsSection(f);
-      });
-    });
-
-    breakdownEl.querySelectorAll('[data-cmp-row]').forEach((row) => {
-      row.addEventListener('click', () => {
-        const nextIdx = Number(row.dataset.cmpRow) || 0;
-        state.selectedDayIdx = nextIdx;
-        renderSevenDayForecast(f);
-        renderCompareModelsSection(f);
-      });
-    });
-  }
+  const comparison = await betaComparison;
+  if (state.compareExpanded && state.forecast === f) comparison?.update(f.canonical);
 }
 
 function renderBestTimesHeatmap(f) {
@@ -2346,7 +2145,7 @@ function renderAqiAndGlanceTiles(f) {
     metricsGrid.querySelectorAll('.apple-tile').forEach((tile) => {
       tile.addEventListener('click', () => {
         const metricId = tile.dataset.jumpMetric || 'temp';
-        if (metricId === 'humidity' || metricId === 'dewPoint') {
+        if (metricId === 'dewPoint') {
           openDewPointFeelMeterModal(f);
           return;
         }
@@ -2731,17 +2530,6 @@ function initHeaderControls() {
     const drawer = document.getElementById('aqi-expand-drawer');
     if (drawer) drawer.hidden = true;
     document.getElementById('qs-aqi-btn')?.setAttribute('aria-expanded', 'false');
-  });
-
-  // Compare horizon pills (5 Days zoomed vs 7 Days vs 10 Days)
-  document.querySelectorAll('[data-cmp-days]').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('[data-cmp-days]').forEach((b) => b.classList.remove('active'));
-      btn.classList.add('active');
-      state.compareHorizonDays = Number(btn.dataset.cmpDays) || 5;
-      if (state.selectedDayIdx >= state.compareHorizonDays) state.selectedDayIdx = 0;
-      if (state.forecast) renderCompareModelsSection(state.forecast);
-    });
   });
 
   // Dew Point Feel Meter Card -> Open Main-Site Dew Point Feel Meter Modal
@@ -3324,13 +3112,15 @@ function open48hExplorerModal(f) {
   openModal(
     `Next 48 Hours · ${f.location.name}`,
     `
+      <section class="beta-hourly-trend">
       <div id="modal-hourly-tabs" class="main-trend-tabs" role="tablist" aria-label="Hourly graph weather variable"></div>
       <div class="main-trend-reading" aria-live="polite" style="margin:10px 0 8px;">
         <strong id="modal-main-trend-value">—</strong>
         <span id="modal-main-trend-time">Now · drag across the graph</span>
       </div>
-      <div id="modal-hourly-chart" class="chart tall" style="min-height:220px;"></div>
+      <div id="modal-hourly-chart" class="chart tall" tabindex="0" role="tabpanel"></div>
       <div id="modal-hourly-strip" class="hourly-strip-scroll" style="margin-top:12px;"></div>
+      </section>
     `
   );
 
@@ -3341,12 +3131,13 @@ function open48hExplorerModal(f) {
   const stripWrap = document.getElementById('modal-hourly-strip');
   let activeTrendKey = mapV3MetricToMainTrend(state.selectedMetricId);
 
+  let plottedHours = [];
   const drawModalHourly = () => {
-    if (tabsWrap) {
+    if (tabsWrap && !tabsWrap.children.length) {
       tabsWrap.innerHTML = Object.entries(TREND_METRICS)
         .map(
           ([id, d]) =>
-            `<button type="button" role="tab" aria-selected="${id === activeTrendKey}" data-m-trend="${id}">${d.label}</button>`
+            `<button type="button" role="tab" id="beta-trend-tab-${id}" aria-controls="modal-hourly-chart" aria-selected="${id === activeTrendKey}" data-m-trend="${id}">${d.label}</button>`
         )
         .join('');
       tabsWrap.querySelectorAll('[data-m-trend]').forEach((btn) => {
@@ -3357,16 +3148,31 @@ function open48hExplorerModal(f) {
       });
     }
 
+    for (const tab of tabsWrap.querySelectorAll('[data-m-trend]')) {
+      tab.setAttribute('aria-selected', String(tab.dataset.mTrend === activeTrendKey));
+    }
+    chartStage.setAttribute('aria-labelledby', 'beta-trend-tab-' + activeTrendKey);
     if (f.canonical && chartStage) {
       const series = mainTrendSeries(f.canonical);
       const start = Math.floor(Date.now() / HALO_H) * HALO_H;
       const end = start + 48 * HALO_H;
       const def = TREND_METRICS[activeTrendKey] || TREND_METRICS.temperature;
-      const points = series[activeTrendKey] || [];
+      const rawPoints = series[activeTrendKey] || [];
+      const points = state.useCelsius && def.unit === '°'
+        ? rawPoints.map(p => ({...p,v:Number.isFinite(p.v) ? (p.v-32)*5/9 : null}))
+        : rawPoints;
       const available = points.filter((p) => p.t >= start && p.t <= end && typeof p.v === 'number' && Number.isFinite(p.v));
+      plottedHours = available;
       const tz = f.canonical.location?.timeZone || f.timeZone || 'America/New_York';
       const showPoint = (p) => {
         if (valEl) valEl.textContent = trendReading(activeTrendKey, p);
+        if (p) {
+          for (const tile of stripWrap.querySelectorAll('[data-time]')) {
+            const selected = +tile.dataset.time === p.t;
+            tile.classList.toggle('active', selected);
+            tile.setAttribute('aria-pressed', String(selected));
+          }
+        }
         if (timeEl) {
           timeEl.textContent = p
             ? haloFmt(p.t, tz, { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
@@ -3383,40 +3189,54 @@ function open48hExplorerModal(f) {
           tz,
           nowT: null,
           nights: nightBands(solarDays(f.canonical), start, end),
-          multiDay: true
+          multiDay: true,
+          keepSelection: true,
+          glow: !state.useCelsius
         },
         def,
         (p) => showPoint(p || available[0])
       );
-      showPoint(available[0]);
+      chartStage.selectChartTime(available.find(p => p.t === Date.parse(f.hours48[state.selectedHourIdx]?.time))?.t ?? available[0]?.t);
+      if (!available.length) showPoint(null);
     } else if (chartStage) {
       renderHourlyExplorerChart({
         containerEl: chartStage,
         hours48: f.hours48,
-        metricId: state.selectedMetricId,
+        metricId: HOURLY_METRICS.find(m => mapV3MetricToMainTrend(m.id) === activeTrendKey)?.id || 'temp',
         selectedHourIdx: state.selectedHourIdx,
         useCelsius: state.useCelsius
       });
     }
 
-    if (stripWrap) {
-      stripWrap.innerHTML = (f.hours48 || []).slice(0, 24).map((hr, idx) => `
-        <div class="hour-tile ${idx === state.selectedHourIdx ? 'active' : ''}" data-m-h="${idx}" title="${escapeAttr(hr.rainLedger?.tooltip || '')}">
+    if (stripWrap && !stripWrap.children.length) {
+      stripWrap.innerHTML = (f.hours48 || []).map((hr, idx) => `
+        <button type="button" class="hour-tile ${idx === state.selectedHourIdx ? 'active' : ''}" data-m-h="${idx}" data-time="${Date.parse(hr.time)}" aria-pressed="${idx === state.selectedHourIdx}" title="${escapeAttr(hr.rainLedger?.tooltip || '')}">
           <span class="hour-tile-time">${hr.hourLabel}</span>
           <div>${renderWeatherIconSvg(hr.icon, 28)}</div>
           <span class="hour-tile-temp">${fmtTemp(hr.tempF)}</span>
           <span class="hour-pop-pill" title="${escapeAttr(hr.rainLedger?.tooltip || '')}">💧 ${hr.rainChance}%</span>
-          <span style="font-size:10.5px;color:var(--blue);font-weight:600;">${Number(hr.precipIn || 0).toFixed(2)}"</span>
-        </div>
+          ${hr.precipIn>=.01 ? `<span style="font-size:10.5px;color:var(--blue);font-weight:600;">${hr.precipIn.toFixed(2)}"</span>` : ''}
+        </button>
       `).join('');
       stripWrap.querySelectorAll('[data-m-h]').forEach((el) => {
         el.addEventListener('click', () => {
           state.selectedHourIdx = Number(el.dataset.mH) || 0;
-          drawModalHourly();
+          if (f.canonical) chartStage.selectChartTime(+el.dataset.time);
+          else drawModalHourly();
         });
       });
     }
   };
+  chartStage.addEventListener('keydown', event => {
+    if (!['ArrowLeft','ArrowRight','Home','End'].includes(event.key) || !plottedHours.length) return;
+    event.preventDefault();
+    const current = plottedHours.findIndex(p => p.t === Date.parse(f.hours48[state.selectedHourIdx]?.time));
+    const index = event.key === 'Home' ? 0 : event.key === 'End' ? plottedHours.length-1
+      : clamp(current + (event.key === 'ArrowRight' ? 1 : -1), 0, plottedHours.length-1);
+    const time = plottedHours[index].t;
+    state.selectedHourIdx = Math.max(0, f.hours48.findIndex(h => Date.parse(h.time) === time));
+    chartStage.selectChartTime(time);
+  });
   drawModalHourly();
 }
 

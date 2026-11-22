@@ -57,9 +57,10 @@ export function buildSmoothSvgPath(points, tension = 0.22) {
     const p3 = points[Math.min(points.length - 1, i + 2)];
 
     const cp1x = p1.x + (p2.x - p0.x) * tension;
-    const cp1y = p1.y + (p2.y - p0.y) * tension;
+    const limitY = value => clamp(value, Math.min(p1.y,p2.y), Math.max(p1.y,p2.y));
+    const cp1y = limitY(p1.y + (p2.y - p0.y) * tension);
     const cp2x = p2.x - (p3.x - p1.x) * tension;
-    const cp2y = p2.y - (p3.y - p1.y) * tension;
+    const cp2y = limitY(p2.y - (p3.y - p1.y) * tension);
 
     d += ` C ${cp1x.toFixed(1)} ${cp1y.toFixed(1)}, ${cp2x.toFixed(1)} ${cp2y.toFixed(1)}, ${p2.x.toFixed(1)} ${p2.y.toFixed(1)}`;
   }
@@ -961,14 +962,9 @@ export function renderNext24HoursSplineChart({
     svg.addEventListener('pointerdown', (e) => {
       dragging = true;
       updateVisualScrub(idxFromClientX(e.clientX), false);
-      window.addEventListener(
-        'pointerup',
-        () => {
-          dragging = false;
-        },
-        { once: true, passive: true }
-      );
+      svg.setPointerCapture?.(e.pointerId);
     });
+    for (const event of ['pointerup','pointercancel','lostpointercapture']) svg.addEventListener(event, () => { dragging=false; });
     svg.addEventListener('pointermove', (e) => {
       if (dragging || e.pointerType === 'mouse') {
         updateVisualScrub(idxFromClientX(e.clientX), false);
@@ -1009,12 +1005,12 @@ export function renderSevenDayDualSplineChart({
       ? d.dewPointF
       : Number.isFinite(d.maxDewPointF)
       ? d.maxDewPointF
-      : (d.lowF ?? 50) - 2;
-    return Math.min(lows[i], convT(rawDp));
+      : null;
+    return Number.isFinite(rawDp) ? Math.min(lows[i], convT(rawDp)) : null;
   });
 
-  let minVal = Math.floor(Math.min(...lows, ...dewPoints) - 3);
-  let maxVal = Math.ceil(Math.max(...highs, ...dewPoints) + 3);
+  let minVal = Math.floor(Math.min(...lows, ...dewPoints.filter(Number.isFinite)) - 3);
+  let maxVal = Math.ceil(Math.max(...highs, ...dewPoints.filter(Number.isFinite)) + 3);
   if (maxVal - minVal < 12) {
     minVal -= 3;
     maxVal += 3;
@@ -1036,11 +1032,17 @@ export function renderSevenDayDualSplineChart({
 
   const hiPts = highs.map((v, i) => ({ x: xForIdx(i), y: yForVal(v), val: v }));
   const loPts = lows.map((v, i) => ({ x: xForIdx(i), y: yForVal(v), val: v }));
-  const dpPts = dewPoints.map((v, i) => ({ x: xForIdx(i), y: yForVal(v), val: v }));
+  const dpPts = dewPoints.map((v, i) => Number.isFinite(v) ? { x: xForIdx(i), y: yForVal(v), val: v } : null);
 
   const hiPath = buildSmoothSvgPath(hiPts, 0.22);
   const loPath = buildSmoothSvgPath(loPts, 0.22);
-  const dpPath = buildSmoothSvgPath(dpPts, 0.22);
+  const dpSegments = [];
+  let segment = [];
+  for (const point of [...dpPts,null]) {
+    if (point) segment.push(point);
+    else if (segment.length) { dpSegments.push(segment); segment = []; }
+  }
+  const dpPath = dpSegments.map(points => buildSmoothSvgPath(points, 0.22)).join(' ');
 
   // Shaded band between High and Low curves
   const bandPts = [
@@ -1060,7 +1062,8 @@ export function renderSevenDayDualSplineChart({
   const activeIdx = hasActive ? clamp(selectedDayIdx, 0, days.length - 1) : -1;
   const readoutIdx = activeIdx >= 0 ? activeIdx : 0;
   const rDay = days[readoutIdx] || days[0];
-  const dpFeeling = dewPoints[readoutIdx] < 50 ? 'Crisp & Dry' : dewPoints[readoutIdx] < 60 ? 'Comfortable' : dewPoints[readoutIdx] < 66 ? 'Humid' : 'Muggy';
+  const dewF = rDay.dewPointF ?? rDay.maxDewPointF;
+  const dpFeeling = dewF < 50 ? 'Crisp & Dry' : dewF < 60 ? 'Comfortable' : dewF < 66 ? 'Humid' : 'Muggy';
 
   const hiActive = !activeCurveId || activeCurveId === 'high';
   const loActive = !activeCurveId || activeCurveId === 'low';
@@ -1073,7 +1076,7 @@ export function renderSevenDayDualSplineChart({
           <strong>${rDay.shortWeekday} (${rDay.dateLabel}):</strong>
           <span style="color:#eab38c;font-weight:700;">High ${highs[readoutIdx]}°</span> ·
           <span style="color:#96c7ec;font-weight:700;">Low ${lows[readoutIdx]}°</span> ·
-          <span style="color:#5eead4;font-weight:700;">Dew Pt ${dewPoints[readoutIdx]}° (${dpFeeling})</span>
+          <span style="color:#5eead4;font-weight:700;">Dew Pt ${Number.isFinite(dewPoints[readoutIdx]) ? `${dewPoints[readoutIdx]}° (${dpFeeling})` : "—"}</span>
         </span>
         <span style="display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap;">
           <button type="button" data-d7-curve="high" style="display:inline-flex;align-items:center;gap:5px;padding:3px 8px;border-radius:999px;border:1px solid ${activeCurveId === 'high' ? '#e39c74' : 'rgba(255,255,255,0.2)'};background:${activeCurveId === 'high' ? 'rgba(227,156,116,0.22)' : 'rgba(255,255,255,0.06)'};color:#ffffff;font:600 11px inherit;cursor:pointer;">
@@ -1141,11 +1144,11 @@ export function renderSevenDayDualSplineChart({
             const lp = loPts[idx];
             const dp = dpPts[idx];
             const isSel = idx === activeIdx;
-            const dpBelowLow = dp.y >= lp.y;
+            const dpBelowLow = dp && dp.y >= lp.y;
             const loLblY = dpBelowLow && Math.abs(dp.y - lp.y) < 14
               ? Math.max(hp.y + 13, lp.y - 7)
               : Math.min(H - 6, lp.y + 15);
-            const dpLblY = dpBelowLow
+            const dpLblY = !dp ? 0 : dpBelowLow
               ? Math.min(H - 4, Math.max(dp.y + 14, loLblY + 11))
               : Math.max(hp.y + 13, Math.min(dp.y - 7, lp.y - 10));
             return `
@@ -1154,8 +1157,8 @@ export function renderSevenDayDualSplineChart({
                 <text x="${hp.x.toFixed(1)}" y="${Math.max(15, hp.y - 9).toFixed(1)}" text-anchor="middle" fill="#ffffff" font-size="12" font-weight="700" opacity="${hiActive ? '1' : '0.4'}">${hp.val}°</text>
                 <circle cx="${lp.x.toFixed(1)}" cy="${lp.y.toFixed(1)}" r="${isSel ? '4.0' : '2.8'}" fill="#ffffff" stroke="#7eb8e6" stroke-width="1.4" opacity="${loActive ? '1' : '0.35'}"/>
                 <text x="${lp.x.toFixed(1)}" y="${loLblY.toFixed(1)}" text-anchor="middle" fill="#d0e5f8" font-size="11.5" font-weight="600" opacity="${loActive ? '1' : '0.4'}">${lp.val}°</text>
-                <circle cx="${dp.x.toFixed(1)}" cy="${dp.y.toFixed(1)}" r="${isSel ? '3.8' : '2.5'}" fill="#0b2038" stroke="#5eead4" stroke-width="1.5" opacity="${dpActive ? '1' : '0.35'}"/>
-                <text x="${dp.x.toFixed(1)}" y="${dpLblY.toFixed(1)}" text-anchor="middle" fill="#7ef4df" font-size="10.5" font-weight="700" opacity="${dpActive ? '1' : '0.4'}">${dp.val}°</text>
+                ${dp ? `<circle cx="${dp.x.toFixed(1)}" cy="${dp.y.toFixed(1)}" r="${isSel ? '3.8' : '2.5'}" fill="#0b2038" stroke="#5eead4" stroke-width="1.5" opacity="${dpActive ? '1' : '0.35'}"/>
+                <text x="${dp.x.toFixed(1)}" y="${dpLblY.toFixed(1)}" text-anchor="middle" fill="#7ef4df" font-size="10.5" font-weight="700" opacity="${dpActive ? '1' : '0.4'}">${dp.val}°</text>` : ""}
               </g>
             `;
           })
@@ -1170,7 +1173,7 @@ export function renderSevenDayDualSplineChart({
             <span class="d7-col-icon">${typeof renderIconFn === 'function' ? renderIconFn(d.icon, 26) : ''}</span>
             <span class="d7-col-day">${d.shortWeekday}</span>
             <span class="d7-col-date">${d.dateLabel}</span>
-            <span class="d7-col-rain ${d.rainChance >= 35 ? 'wet' : ''}">💧 ${d.rainChance}%</span>
+            <span class="d7-col-rain ${d.rainChance >= 35 ? 'wet' : ''}">${d.rainObserved ? "Rain now" : Number.isFinite(d.rainChance) ? `💧 ${d.rainChance}%` : "—"}</span>
           </button>
         `
           )
@@ -1202,7 +1205,7 @@ export function renderSevenDayDualSplineChart({
       const dayIdx = clamp(Math.floor((relX - padL) / colW), 0, days.length - 1);
       const dHi = Math.abs(hiPts[dayIdx].y - relY);
       const dLo = Math.abs(loPts[dayIdx].y - relY);
-      const dDp = Math.abs(dpPts[dayIdx].y - relY);
+      const dDp = dpPts[dayIdx] ? Math.abs(dpPts[dayIdx].y - relY) : Infinity;
       const minD = Math.min(dHi, dLo, dDp);
       let curve = null;
       if (minD < 26) {

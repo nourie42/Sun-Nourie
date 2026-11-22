@@ -34,6 +34,20 @@ export function dailySkyCover(forecast={},day={},index=0,now=Date.now()){
  return values.length?values.reduce((sum,value)=>sum+value,0)/values.length:null;
 }
 
+// Accept point observations only for the forecast's coordinates. Preserve a
+// newer observation if a refresh returns an older image or a temporary error.
+export function applyLocalRadar(forecast, radar, now=Date.now()){
+ const point=forecast?.location, reported=radar?.location, sample=radar?.precipitation;
+ if(!forecast?.current||!point||!reported||!sample||
+    !['latitude','longitude'].every(key=>finite(point[key])&&finite(reported[key])&&Math.abs(point[key]-reported[key])<.00011))return false;
+ const time=Date.parse(sample.observedAt), previous=forecast.current.radarPrecipitation;
+ const oldTime=Date.parse(previous?.observedAt);
+ if(sample.status!=='ready'||!finite(time)||time>now+5*60000||now-time>15*60000||time<oldTime)return false;
+ if(previous?.observedAt===sample.observedAt&&previous?.atLocation===sample.atLocation&&previous?.close===sample.close&&previous?.nearestRainMiles===sample.nearestRainMiles&&previous?.approaching===sample.approaching)return false;
+ forecast.current.radarPrecipitation=sample;
+ return true;
+}
+
 export function rainObservedNow(forecast,now=Date.now(),maxAgeMs=15*60*1000){
  const radar=forecast?.current?.radarPrecipitation;
  if(radar?.status!=='ready'||radar.atLocation!==true)return false;

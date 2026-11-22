@@ -76,3 +76,8 @@ html[data-hdr=night-cloudy]{--hdr-c1:#263343;--hdr-c2:#1d2939}
 body[data-sky=unknown],body[data-sky=cloudy],body[data-sky=fog]{background:#46576f}
 body:is([data-sky=unknown],[data-sky=cloudy],[data-sky=fog],[data-sky=snow]) .atmosphere .sky-glow,
 body:is([data-sky=unknown],[data-sky=cloudy],[data-sky=fog],[data-sky=snow]) .atmosphere .stars{opacity:0}
+
+.sky-header[data-hdr="night-rain"]{background-image:linear-gradient(#07132288,#07132288),url(/weather-fusion/header-rain.webp)}
+html[data-hdr="night-rain"]{--hdr-c1:#344354;--hdr-c2:#142234}
+
+body[data-sky="rain"] .atmosphere .sky-glow,html[data-hdr="night-rain"] .atmosphere .sky-glow{opacity:0}

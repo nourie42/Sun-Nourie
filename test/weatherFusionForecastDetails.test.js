@@ -152,8 +152,10 @@ test('experimental weather has a top back button while the main page keeps it hi
  assert.match(app,/const back=\$\('experimental-back'\);if\(back\)back\.hidden=!experimentalPage/);
  const style=read('style.css');assert.match(style,/\.experimental-back\{[^}]*display:inline-flex/);
 });
-test('both page modes merge fresh observed radar into Now without changing forecast percentages',()=>{
- assert.match(app,/api\('radar',query\(\)\)/);assert.match(app,/forecast\.current\.radarPrecipitation=data\.precipitation;render\(forecast\)/);
- assert.match(app,/if\(sameRadarPlace&&radarMeta\?\.precipitation&&radarAge>=0&&radarAge<=10\*60000\)data\.current\.radarPrecipitation=radarMeta\.precipitation/);
+test('main and Beta merge point radar through the same display helper',()=>{
+ assert.match(app,/api\('radar',query\(\)\)/);
+ assert.match(app,/applyLocalRadar\(forecast,data\)/);
+ assert.match(app,/if\(radarMeta\)applyLocalRadar\(data,radarMeta\)/);
+ assert.match(read('v3/js/app.js'),/applyLocalRadar\(f.canonical, data\)/);
  assert.match(app,/lastRadarFetch=0/);
 });

@@ -127,11 +127,17 @@ export function todaySkySceneHTML(profile,epoch=Date.now()){
  const src=asset==='night'?'/weather-fusion/today-sky-night-v2.webp':`/weather-fusion/today-sky-${asset}.webp`;
  return `<img class="today-sky" data-scene="${scene}" src="${src}" alt="" aria-hidden="true">${night&&!rainyNight?moonPhaseHTML(epoch):''}`;
 }
+export function todayRainDisplay(forecast, now=Date.now()){
+ const day=forecast?.days?.[0];
+ if(!day)return displayedRainChance(forecast,null,{now});
+ const p=dailyDisplay(day,0,now,forecast.location?.timeZone||'America/New_York',forecast);
+ const timing=rainTiming(forecast,0,p.tonight,now);
+ return {...displayedRainChance(forecast,timing?timing.value:p.pop,{now}),timing};
+}
 export function todayForecastHTML(forecast,now=Date.now()){
  const day=forecast.days?.[0];if(!day)return '<p class="muted">Daily forecast is unavailable.</p>';
  const p=dailyDisplay(day,0,now,forecast.location.timeZone,forecast),feel=dailyFeels(forecast,0,now),stats=periodWeatherStats(forecast,now);
- const timing=rainTiming(forecast,0,p.tonight,now);
- const rain=displayedRainChance(forecast,timing?timing.value:p.pop,{now}),shownPop=rain.value,shownCondition=rain.observed?'Rain now':rainAwareCondition(p.condition,shownPop,day,false,dailySkyCover(forecast,day,0,now));
+ const rain=todayRainDisplay(forecast,now),{timing}=rain,shownPop=rain.value,shownCondition=rain.observed?'Rain now':rainAwareCondition(p.condition,shownPop,day,false,dailySkyCover(forecast,day,0,now));
  const uv=uvCategory(day.uvMax),confidence=displayForecastConfidence(day.confidence)?.label||'Unavailable',aqi=currentAirQuality(forecast,now)?.aqi;
  const metric=(kind,value,label,note)=>`<span class="today-metric" title="${esc(note)}">${weatherMetricIcon(kind)}<span><strong>${value}</strong><small>${label}</small></span></span>`;
  const baseProfile=todaySkyProfileForForecast(forecast,day,{...p,pop:shownPop,condition:shownCondition},now),profile=rain.observed?{...baseProfile,scene:'overcast-rain',state:'rain'}:baseProfile,feelPeak=feel.high?.high,feelValue=feelPeak?.value;

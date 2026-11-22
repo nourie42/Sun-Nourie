@@ -16,7 +16,6 @@ const VARIABLES = {
   snow:     { label: 'Snow',          unit: 'in',  fmt: (v) => `${v.toFixed(1)}"` },
   aqi:      { label: 'AQI',           unit: '',    fmt: (v) => `${Math.round(v)}` },
 };
-let curVar = 'temp';
 
 export const COLORS = {
   nourie: '#ffffff',
@@ -505,7 +504,7 @@ export function renderChart(container, built, varDef, varId) {
     + `<div class="wn-chart-wrap" style="position:relative;touch-action:pan-y">`
     + `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" style="width:100%;height:auto;display:block;cursor:crosshair" role="img" aria-label="${varId==='temp'?'Daily high temperature':varDef.label} comparison chart">${areaGradient}${ylabels}${labels}${nourieArea}${lines}${dots}`
     + `<line class="wn-cross" x1="0" x2="0" y1="${PT - 10}" y2="${H - PB}" stroke="#fff" stroke-width="1.5" stroke-dasharray="3,3" opacity="0"/><g class="wn-cross-dots"></g></svg>`
-    + `<div class="wn-tip" role="status" aria-live="polite" style="position:absolute;top:4px;display:none;min-width:130px;max-width:calc(100% - 8px);padding:8px 10px;border-radius:12px;background:rgba(10,20,40,.88);border:1px solid rgba(255,255,255,.22);color:#fff;font-size:12px;line-height:1.45;white-space:nowrap;pointer-events:none;box-shadow:0 6px 18px rgba(0,0,0,.35)"><button type="button" class="wn-tip-close" aria-label="Close model values" style="position:absolute;top:3px;right:3px;width:32px;height:32px;border:0;border-radius:6px;background:transparent;color:#fff;font-size:24px;line-height:1;cursor:pointer;pointer-events:auto">×</button><div class="wn-tip-content"></div></div></div>${note}${sourceNote}${coverageNote}`;
+    + `<div class="wn-tip" role="status" aria-live="polite" style="position:absolute;top:4px;display:none;min-width:130px;max-width:calc(100% - 8px);padding:8px 10px;border-radius:12px;background:rgba(10,20,40,.88);border:1px solid rgba(255,255,255,.22);color:#fff;font-size:12px;line-height:1.45;overflow-wrap:anywhere;pointer-events:none;box-shadow:0 6px 18px rgba(0,0,0,.35)"><button type="button" class="wn-tip-close" aria-label="Close model values" style="position:absolute;top:3px;right:3px;width:32px;height:32px;border:0;border-radius:6px;background:transparent;color:#fff;font-size:24px;line-height:1;cursor:pointer;pointer-events:auto">×</button><div class="wn-tip-content"></div></div></div>${note}${sourceNote}${coverageNote}`;
   container.querySelectorAll('button.wn-chip').forEach((b) => b.addEventListener('click', () => {
     const id = b.dataset.model; if (hiddenModels.has(id)) hiddenModels.delete(id); else hiddenModels.add(id);
     rememberComparison('weather-comparison-hidden-v2',[...hiddenModels]);
@@ -532,7 +531,7 @@ export function renderChart(container, built, varDef, varId) {
     const partial=built.partialDays?.[i];
     const partialNote=partial?`<span style="display:block;margin-bottom:3px">Partial day · ${Number(partial.availableHours)%1?Number(partial.availableHours).toFixed(1):Number(partial.availableHours)} of ${Number(partial.expectedHours)%1?Number(partial.expectedHours).toFixed(1):Number(partial.expectedHours)} hours</span>`:'';
     tipContent.innerHTML = `<b style="display:block;margin-bottom:3px;padding-right:30px">${dayName(days[i], i, true)}${partial?' · partial':''}</b>${partialNote}${varId==='temp'?'<b style="display:block;margin-bottom:3px">Daily highs (°F)</b>':''}`
-      + (rows.length ? rows.map(([id, v]) => `<span data-tip-series="${id}" style="display:flex;justify-content:space-between;gap:10px;white-space:nowrap"><span style="white-space:nowrap"><i style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${COLORS[id]};margin-right:5px"></i>${displayName(id) || varDef.label}${varId==='temp'&&id!=='nourie'&&finite(v)&&!Object.hasOwn(built.contributingHighs?.[i]||{},id)?' (comparison only)':''}</span><b>${escapeHTML(comparisonReading(varId,id,v,built.modelKinds?.[i]?.[id],varId==='temp'&&finite(v)?value=>value.toFixed(precision)+'°':varDef.fmt))}</b></span>`).join('') : '<span>No model data</span>')
+      + (rows.length ? rows.map(([id, v]) => `<span data-tip-series="${id}" style="display:flex;justify-content:space-between;gap:8px"><span style="min-width:0"><i style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${COLORS[id]};margin-right:5px"></i>${displayName(id) || varDef.label}${varId==='temp'&&id!=='nourie'&&finite(v)&&!Object.hasOwn(built.contributingHighs?.[i]||{},id)?' (comparison only)':''}</span><b>${escapeHTML(comparisonReading(varId,id,v,built.modelKinds?.[i]?.[id],varId==='temp'&&finite(v)?value=>value.toFixed(precision)+'°':varDef.fmt))}</b></span>`).join('') : '<span>No model data</span>')
       +(comparison?range(comparison.published,'All published model highs')+(hasComparisonOnly?range(comparison.contributing,'Contributing model highs'):'')+'<small style="display:block">Ranges exclude the blended forecast and include hidden models.</small>':'');
     tip.style.display = 'block';
     const px = (x / W) * r.width, tw = tip.offsetWidth;
@@ -572,121 +571,121 @@ export function renderChart(container, built, varDef, varId) {
   container._wnShow = show;
 }
 
-let forecastCache = null, wnCache = null, varId = 'temp';
-
-async function render() {
-  const chartEl = document.getElementById('wn-compare-chart');
-  if (!chartEl || !forecastCache || chartEl.closest('section')?.hidden) return;
-  varId = curVar;
-  const varDef = VARIABLES[varId];
-  const built = buildSeries(forecastCache, wnCache, varId);
-  built.days=built.days.slice(0,comparisonDays);
-  const title = document.getElementById('wn-compare-title');
-  if (title) title.textContent = `${varDef.label} — ${comparisonDays}-day comparison`;
-  renderChart(chartEl, built, varDef, varId);
-
-  const oldWarn = document.getElementById('wn-stale-warn');
-  if (oldWarn) oldWarn.remove();
-  if (varId !== 'pop' && varId !== 'snow' && varId !== 'uv' && varId !== 'aqi' && wnCache?.ageDays != null && wnCache.ageDays > 2) {
-    const warn = document.createElement('p');
-    warn.id = 'wn-stale-warn';
-    warn.style.cssText = 'font-size:13px;color:#ffb47d;margin:10px 0 0';
-    warn.textContent = `⚠ WeatherNext data is ${Math.round(wnCache.ageDays)} days old — WN line may not align.`;
-    chartEl.appendChild(warn);
-  }
-}
-
-async function init() {
-  if (!document.querySelector('.hero')) return;
-  const hero = document.querySelector('.hero');
-  if (!hero || document.getElementById('wn-compare-section')) return;
-
-  const expAuto = document.documentElement?.dataset?.weatherPage === 'experimental';
-  const section = document.createElement('section');
-  section.id = 'wn-compare-section';
-  section.hidden = !expAuto;
-  section.style.marginTop = '16px';
-  section.style.marginBottom = '16px';
-  section.className = 'glass wn-blend-compare';
-  section.style.padding = '18px';
-  section.style.overflow = 'hidden';
-  section.setAttribute('aria-label', 'Forecast model comparison');
-  section.innerHTML = `
+/** Shared comparison controls and chart for the main app and Beta. */
+export function mountModelComparison(host) {
+  let forecast = null, weatherNext = null, feedRequest = null, variable = 'temp';
+  host.innerHTML = `
     <div class="section-top" style="border:0;padding-bottom:10px">
-      <h2 id="wn-compare-title">FORECAST COMPARISON</h2>
+      <h2 id="wn-compare-title">Forecast comparison</h2>
     </div>
     <label>Forecast period <select id="comparison-days"><option value="7">7 days</option><option value="10">10 days</option></select></label>
     <div id="wn-var-picker" role="group" aria-label="Pick a variable" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
-      ${Object.entries(VARIABLES).map(([id, v]) =>
-        `<button data-var="${id}" aria-pressed="${id === curVar}" style="background:${id === curVar ? 'rgba(127,212,255,.22)' : 'rgba(255,255,255,.07)'};border:1px solid rgba(255,255,255,.16);color:#fff;border-radius:999px;padding:6px 12px;font-size:13px;font-weight:600;cursor:pointer">${v.label}</button>`).join('')}
+      ${Object.entries(VARIABLES).map(([id,v]) =>
+        `<button type="button" data-var="${id}" style="border:1px solid rgba(255,255,255,.16);color:#fff;border-radius:999px;padding:6px 12px;min-height:38px;font-size:13px;font-weight:600;cursor:pointer">${v.label}</button>`).join('')}
     </div>
-    <div id="wn-compare-chart"><p class="muted" style="font-size:14px">Loading comparison…</p></div>`;
-  hero.after(section);
-  const range=document.getElementById('comparison-days');
-  range.value=String(comparisonDays);
-  range.onchange=()=>{comparisonDays=Number(range.value);rememberComparison('weather-comparison-days',comparisonDays);render();};
+    <div id="wn-compare-chart"><p class="muted">Loading comparison…</p></div>`;
+  const chart = host.querySelector('#wn-compare-chart');
+  const title = host.querySelector('#wn-compare-title');
+  const range = host.querySelector('#comparison-days');
+  const tabs = host.querySelectorAll('[data-var]');
+  range.value = String(comparisonDays);
 
-  // Toggle like Car Wash
-  const compareBtn = document.getElementById('open-compare');
-  if (compareBtn) {
-    if (expAuto) compareBtn.setAttribute('aria-expanded', 'true');
-    compareBtn.onclick = () => {
-      const isHidden = section.hidden;
-      section.hidden = !isHidden;
-      compareBtn.setAttribute('aria-expanded', String(isHidden));
-      if (isHidden) section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  function render() {
+    const def = VARIABLES[variable];
+    title.textContent = `${def.label} — ${comparisonDays}-day comparison`;
+    for (const tab of tabs) {
+      const selected = tab.dataset.var === variable;
+      tab.setAttribute('aria-pressed', String(selected));
+      tab.style.background = selected ? 'rgba(127,212,255,.22)' : 'rgba(255,255,255,.07)';
+    }
+    if (!forecast?.days?.length) {
+      chart._wnTooltipAbort?.abort();
+      chart.textContent = 'Forecast comparison is unavailable until the weather forecast loads.';
+      return;
+    }
+    if (!chart.clientWidth) return;
+    const wn = weatherNext && pickWN(weatherNext, forecast);
+    const built = buildSeries(forecast, wn, variable);
+    built.days = built.days.slice(0, comparisonDays);
+    renderChart(chart, built, def, variable);
+
+    if (!['pop','snow','uv','aqi'].includes(variable) && wn?.ageDays > 2) {
+      const warning = document.createElement('p');
+      warning.className = 'wn-source-availability';
+      warning.textContent = `WeatherNext was updated ${Math.round(wn.ageDays)} days ago. Its forecast may cover different dates.`;
+      chart.append(warning);
+    }
+  }
+
+  range.addEventListener('change', () => {
+    comparisonDays = Number(range.value);
+    rememberComparison('weather-comparison-days', comparisonDays);
+    render();
+  });
+  for (const tab of tabs) tab.addEventListener('click', () => { variable = tab.dataset.var; render(); });
+  let width;
+  const observer = new ResizeObserver(([entry]) => {
+    const newWidth = Math.round(entry.contentRect.width);
+    if (!newWidth || width === newWidth) return;
+    width = newWidth;
+    render();
+  });
+  observer.observe(host);
+
+  return {
+    update(data) {
+      forecast = data;
+      render();
+      if (forecast && !feedRequest && !weatherNext) {
+        feedRequest = loadWNFeed().then(feed => {
+          weatherNext = feed;
+          feedRequest = null;
+          if (feed) render();
+        });
+      }
+    }
+  };
+}
+
+function init() {
+  const hero = document.querySelector('.hero');
+  if (!hero || document.getElementById('wn-compare-section')) return;
+  const expAuto = document.documentElement.dataset.weatherPage === 'experimental';
+  const section = document.createElement('section');
+  section.id = 'wn-compare-section';
+  section.hidden = !expAuto;
+  section.className = 'glass wn-blend-compare';
+  section.style.cssText = 'margin:16px 0;padding:18px;overflow:hidden';
+  section.setAttribute('aria-label', 'Forecast model comparison');
+  hero.after(section);
+
+  const comparison = mountModelComparison(section);
+  let forecast = globalThis.__weatherNourieForecast || null;
+  document.addEventListener('weather-nourie:forecast', event => {
+    forecast = event.detail;
+    if (!section.hidden) comparison.update(forecast);
+  });
+  document.addEventListener('weather-nourie:location-changing', () => {
+    forecast = null;
+    if (!section.hidden) comparison.update(null);
+  });
+
+  const button = document.getElementById('open-compare');
+  if (button) {
+    button.setAttribute('aria-expanded', String(expAuto));
+    button.onclick = () => {
+      section.hidden = !section.hidden;
+      button.setAttribute('aria-expanded', String(!section.hidden));
+      if (!section.hidden) {
+        comparison.update(forecast);
+        section.scrollIntoView({behavior:'smooth', block:'start'});
+      }
     };
   }
-
-  document.getElementById('wn-var-picker').onclick = (e) => {
-    const b = e.target.closest('button');
-    if (!b) return;
-    curVar = b.dataset.var;
-    document.querySelectorAll('#wn-var-picker button').forEach((x) => {
-      const on = x.dataset.var === curVar;
-      x.style.background = on ? 'rgba(127,212,255,.22)' : 'rgba(255,255,255,.07)';
-      x.setAttribute('aria-pressed', on);
-    });
-    render();
-  };
-
-  forecastCache=globalThis.__weatherNourieForecast || null;
-  let feedRequest=null;
-  const triggerWNFeed = () => {
-    if(!feedRequest)feedRequest=loadWNFeed().then(wn=>{
-      wnFeed=wn; wnCache=pickWN(wn,forecastCache); render();
-      if(!wn)feedRequest=null;
-    });
-  };
-  if (expAuto) {
-    render();
-    triggerWNFeed();
-  }
-  compareBtn?.addEventListener('click',()=>{
-    if(section.hidden)return;
-    render();
-    triggerWNFeed();
-  });
-  document.addEventListener('weather-nourie:location-changing',()=>{
-    forecastCache=null;wnCache=null;
-    document.getElementById('wn-compare-chart').textContent='Loading comparison…';
-  });
-  let resizeTimer;
-  window.addEventListener('resize',()=>{clearTimeout(resizeTimer);resizeTimer=setTimeout(render,200);});
+  if (expAuto) comparison.update(forecast);
 }
 
-// Reload the comparison whenever the page loads a forecast for a (new) location.
-let wnFeed = null;
 if (typeof document !== 'undefined') {
-document.addEventListener('weather-nourie:forecast', (e) => {
-  const fx = e.detail; if (!fx?.days) return;
-  forecastCache = fx;
-  if (wnFeed) wnCache = pickWN(wnFeed, fx);
-  try { render(); } catch {}
-});
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', init);
-} else {
-  init();
-}
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+  else init();
 }

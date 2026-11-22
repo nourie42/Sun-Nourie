@@ -1,3 +1,5 @@
+import {RadarTileBuffer, RADAR_STEP_MS, RADAR_LATEST_HOLD_MS} from './radar-playback.js?v=1';
+import {applyLocalRadar} from './rain-display.js?v=local-radar-v2';
 import {confidenceDetailsHTML} from './forecast-confidence.js?v=ensemble-confidence-v1';
 import {rainTiming,rainTimingHTML} from './rain-timing.js?v=current-rain-20261017-v3';
 import {DAN_TAKE_VERSION,visibleDanTakeItems,danTakeText,rebindDanTake} from './dans-take.js?v=audit-20261017-v1';
@@ -9,7 +11,7 @@ import {weatherIcon,renderHourlyWeather,currentSample} from './weather-display.j
 import {dayGraphHTML,dayGraphPoints,installDayGraph} from './day-graph.js?v=hourly-rain-v3';
 import {degrees,feelsAt,GUSTY_FEELS_DISPLAY_MPH} from './hourly-feels.js?v=current-rain-20261017-v3';
 import {createFramePlayer} from './frame-player.js';
-import {dailyConfidenceNoticeHTML,renderComfort,selectComfortHour,renderDailyRows,renderMetricTiles,resetExperience,installExperience} from './experience.js?v=comparison-chart-v3';
+import {dailyConfidenceNoticeHTML,renderComfort,selectComfortHour,renderDailyRows,renderMetricTiles,resetExperience,installExperience} from './experience.js?v=radar-parity-v3-comparison-chart-v3';
 import {dailyDisplay,solarElevation} from './weather-math.js?v=current-rain-20261017-v3';
 import {conditionForRainChance,conditionForDaylight} from './weather-state.js?v=current-rain-20261017-v3';
 import {currentHero} from './current-temperature.js?v=current-rain-20261017-v3';
@@ -32,7 +34,7 @@ import {renderForecastWindowBanners,resetForecastWindowBanners,currentForecastWi
 import {createSevenDayCarousel} from './seven-day.js?v=low-rain-display-v1';
 import {forecastSourceHealth} from './forecast-status.js?v=source-health-v1';
 import {forecastRefreshDue} from './forecast-refresh.js?v=coverage-recovery-v2';
-import {forecastSky} from './sky-display.js?v=local-observation-v2';
+import {forecastSky} from './sky-display.js?v=radar-sky-v5-local-observation-v2';
 import {outlookItems,renderOutlookPanel,openOutlookNote} from './outlook-panel.js?v=compact-v1';
 /* Weather Nourie browser client. Forecast values never originate in AI prose. */
 const $ = (id) => document.getElementById(id);
@@ -52,7 +54,7 @@ const inches = (n) => finite(n) ? `${n.toFixed(2)} in` : 'Unavailable';
 const percent = (n) => finite(n) ? `${Math.round(n)}%` : '—';
 function renderWeatherChanges(data){const root=$('weather-change-banner');if(!root)return;const messages=weatherChangeMessages(data);root.hidden=!messages.length;root.innerHTML=messages.length?`<strong>${WEATHER_CHANGE_TITLE}</strong><br>${messages.map(esc).join('<br>')}`:'';}
 let place = null, forecast = null, generation = 0, busy = false, searchGeneration = 0;
-let map = null, baseLayer = null, radarLayer = null, warningLayer = null, marker = null;
+let map = null, baseLayer = null, radarTiles = null, warningLayer = null, marker = null;
 let frames = [], frameIndex = 0, radarTimer = null, selectedLayer = 'radar', radarMeta = null, radarGeneration = 0;
 let modelCatalog = null, modelFetched = 0, modelFrames = [], modelIndex = 0, modelLayer = null, mapSelectionToken = 0, modelFrameToken = 0;
 let framePlayer=null;
@@ -206,6 +208,10 @@ function render(data) {
   document.body.dataset.sky = forecastSky(data).state;
   lastHeroCondition = heroCondition;
   $('city-name').textContent = data.location.name || place?.name || 'Your location';
+  const beta = $('try-beta-link');
+  if (beta) beta.href = '/weather-fusion/v3/?' + new URLSearchParams({
+    latitude:data.location.latitude, longitude:data.location.longitude, name:$('city-name').textContent
+  });
   if(place?.source?.startsWith('device'))setDeviceLocationLabel(`${place.source==='device-cache'?'Last device location':'Device location'} · ${data.location.name||'current position'}`);
   $('hero-date').textContent = new Intl.DateTimeFormat('en-US', { timeZone: data.location.timeZone, weekday: 'long', month: 'long', day: 'numeric' }).format(new Date()).toUpperCase();
   const currentDay = dailyDisplay(d, 0, Date.now(), data.location.timeZone,data);
@@ -358,9 +364,7 @@ async function load({ moveMap = false, refreshModels = false, briefingRetry = 0 
     const data = await api('forecast', query(), requestController.signal);
     if (id !== generation) return;
     receivedForecast = true;
-    const radarAge=Date.now()-Date.parse(radarMeta?.precipitation?.observedAt);
-    const sameRadarPlace=finite(radarMeta?.location?.latitude)&&finite(radarMeta?.location?.longitude)&&Math.abs(radarMeta.location.latitude-place.latitude)<.00011&&Math.abs(radarMeta.location.longitude-place.longitude)<.00011;
-    if(sameRadarPlace&&radarMeta?.precipitation&&radarAge>=0&&radarAge<=10*60000)data.current.radarPrecipitation=radarMeta.precipitation;
+    if(radarMeta)applyLocalRadar(data,radarMeta);
     render(data);
     // Official notices are rendered synchronously; AI explanations never delay them.
     api('bulletins', query({ signature: data.signature }), requestController.signal).then((bulletins) => {
@@ -421,7 +425,7 @@ function chooseLocation(value,{rememberDevice=false}={}) {
   if(compareLink){
     compareLink.href='/weathernext/?'+new URLSearchParams({latitude:value.latitude,longitude:value.longitude,name:value.name||'Selected location'});
   }
-  stopRadar();framePlayer?.clear();++modelFrameToken;++mapSelectionToken;++radarGeneration;lastRadarFetch=0;
+  stopRadar();radarTiles?.clear();framePlayer?.clear();++modelFrameToken;++mapSelectionToken;++radarGeneration;lastRadarFetch=0;
   currentBriefing = null;
   resetExperience();
   resetSnowOutlook();
@@ -583,30 +587,71 @@ async function loadRadar() {
     const data = await api('radar',query());
     if (id !== radarGeneration) return;
     radarMeta = data; frames = data.frames || [];
+    if(radarPlayback&&frames.length>1)return;
     frameIndex = Math.max(0, frames.length-1);
-    const samePlace=finite(data.location?.latitude)&&finite(data.location?.longitude)&&Math.abs(data.location.latitude-place.latitude)<.00011&&Math.abs(data.location.longitude-place.longitude)<.00011;
-    if(forecast&&samePlace){forecast.current.radarPrecipitation=data.precipitation;render(forecast);}
+    const expired = Date.now() - Date.parse(forecast?.current?.radarPrecipitation?.observedAt) > 15*60000;
+    if(applyLocalRadar(forecast,data)||expired)render(forecast);
     if (selectedLayer !== 'radar') return;
     configureFrames(frames.length,frameIndex);
-    if (!frames.length) { if(radarLayer){map?.removeLayer(radarLayer);radarLayer=null;} $('radar-stamp').textContent='Unavailable'; mapMessage(data.message); return; }
+    if (!frames.length) { radarTiles?.clear(); $('radar-stamp').textContent='Unavailable'; mapMessage(data.message); return; }
     showFrame(frameIndex);
   } catch { if(id===radarGeneration && selectedLayer==='radar'){stopRadar();mapMessage('Radar timestamps could not be verified. Check the official radar link.');} }
 }
 function configureFrames(count,index=0) {
   $('radar-time').max=String(Math.max(0,count-1));$('radar-time').value=String(index);$('radar-time').disabled=!count;$('radar-play').disabled=count<2;
 }
-function showFrame(index) {
-  if(selectedLayer!=='radar'||!map||!window.L||!radarMeta||!frames[index])return;
-  frameIndex=index;
-  if(radarLayer){map.removeLayer(radarLayer);radarLayer.off();}
-  const expected=frames[index];
-  radarLayer=window.L.tileLayer.wms(radarMeta.url,{pane:'weather-radar',layers:radarMeta.layer,format:'image/png',transparent:true,version:'1.1.1',opacity:.82,time:expected,attribution:'Observed radar © NOAA / NWS',updateWhenIdle:true,keepBuffer:3}).addTo(map);
-  $('radar-time').value=String(index);$('radar-stamp').textContent=`${clock(expected)} · loading`;
-  const activeRadar=radarLayer;
-  radarLayer.on('load',()=>{if(radarLayer===activeRadar&&selectedLayer==='radar'&&frames[frameIndex]===expected){$('radar-stamp').textContent=clock(expected);mapMessage(radarMeta.status==='stale'?'Radar is stale; check its timestamp.':'');}});
-  radarLayer.on('tileerror',()=>{if(radarLayer===activeRadar&&selectedLayer==='radar'){stopRadar();mapMessage('A radar tile failed to load. Blank areas do not establish clear weather.');}});
+function makeRadarLayer(time) {
+  return window.L.tileLayer.wms(radarMeta.url, {
+    pane:'weather-radar', layers:radarMeta.layer, format:'image/png', transparent:true,
+    version:'1.1.1', time, attribution:'Observed radar © NOAA / NWS', updateWhenIdle:true, keepBuffer:1
+  });
 }
-function stopRadar(){if(radarTimer)clearInterval(radarTimer);radarTimer=null;$('radar-play').textContent='▶';$('radar-play').setAttribute('aria-label','Play map animation');}
+async function showFrame(index) {
+  const expected = frames[index];
+  if (selectedLayer!=='radar'||!map||!window.L||!radarMeta||!expected) return;
+  radarTiles ??= new RadarTileBuffer(map, .82);
+  const shown = await radarTiles.show(expected, () => makeRadarLayer(expected));
+  if (selectedLayer!=='radar') return;
+  if (shown) {
+    frameIndex = index;
+    $('radar-time').value = String(index);
+    $('radar-stamp').textContent = clock(expected);
+    mapMessage(radarMeta.status==='stale'?'Radar is stale; check its timestamp.':'');
+  } else if (!radarTiles.active) {
+    $('radar-stamp').textContent = 'Unavailable';
+    mapMessage('Radar tiles could not load. Try another time or open Official radar.');
+  }
+  if (!radarTimer) radarTiles.trim();
+}
+let radarPlayback;
+function stopRadar(){
+  clearInterval(radarTimer);
+  radarTimer=null;
+  radarPlayback=null;
+  radarTiles?.trim();
+  $('radar-play').textContent='▶';
+  $('radar-play').setAttribute('aria-label','Play map animation');
+}
+function playObservedRadar(){
+  if (!radarTiles) return;
+  const playback=radarPlayback={};
+  let index=frameIndex;
+  const warm=()=>{
+    const next=[1,2].map(offset=>frames[(index+offset)%frames.length]).filter(Boolean);
+    radarTiles.trim(next);
+    for (const time of new Set(next)) radarTiles.prepare(time,()=>makeRadarLayer(time));
+  };
+  const advance=async()=>{
+    if(radarPlayback!==playback||frames.length<2)return;
+    index=(index+1)%frames.length;
+    await showFrame(index);
+    if(radarPlayback!==playback)return;
+    warm();
+    radarTimer=setTimeout(advance,index===frames.length-1?RADAR_LATEST_HOLD_MS:RADAR_STEP_MS);
+  };
+  warm();
+  radarTimer=setTimeout(advance,RADAR_STEP_MS);
+}
 function modelCaption(layer,frame){
   const type=selectedLayer==='hrrr'?'Forecast reflectivity (not observed radar)':selectedLayer==='ecmwf'?'Accumulated precipitation since initialization':selectedLayer==='nbm'?'Interval precipitation':selectedLayer==='temperature'?'2 m temperature':selectedLayer==='wind'?'10 m wind speed':'Total cloud cover';
   const pointRun=forecast?.modelContributions?.find(m=>m.id===layer.model)?.runAt;
@@ -666,7 +711,7 @@ function selectLayer(layer){
   selectedLayer=layer;stopRadar();++mapSelectionToken;++modelFrameToken;
   const freshness=$('model-freshness');if(freshness){freshness.hidden=layer==='radar';freshness.textContent=layer==='radar'?'':'Checking the latest published run…';freshness.dataset.delayed='false';}
   document.querySelectorAll('[data-layer]').forEach(button=>{const active=button.dataset.layer===layer;button.classList.toggle('selected',active);button.setAttribute('aria-pressed',String(active));});
-  if(radarLayer){map?.removeLayer(radarLayer);radarLayer.off();radarLayer=null;}framePlayer?.clear();
+  radarTiles?.clear();framePlayer?.clear();
   $('radar-map').hidden=false;$('radar-map').style.display='';$('model-map').hidden=true;$('radar-controls').hidden=false;$('radar-controls').style.display='';$('radar-legend').hidden=false;$('radar-legend').style.display='';
   const official=$('model-official-source');if(official)official.hidden=true;
   mapMessage('');if(!map)initMap();map?.invalidateSize();
@@ -695,6 +740,7 @@ $('radar-play').addEventListener('click', () => {
   if (radarTimer) return stopRadar();
   if ((selectedLayer==='radar'?frames:modelFrames).length < 2) return;
   $('radar-play').textContent = 'Ⅱ'; $('radar-play').setAttribute('aria-label', 'Pause radar animation');
+  if(selectedLayer==='radar'){playObservedRadar();return;}
   radarTimer = setInterval(() => { const count=(selectedLayer==='radar'?frames:modelFrames).length; const index=selectedLayer==='radar'?frameIndex:modelIndex; if(count&&!framePlayer?.loading)showSelectedFrame((index+1)%count); }, 1600);
 });
 $('fullscreen').addEventListener('click', async () => {
@@ -724,6 +770,11 @@ let locationRequest=0;
 function startDeviceLocation({explicit=false}={}){
  const cached=readDeviceLocation();
  if (!explicit) {
+   const params=new URLSearchParams(location.search);
+   if(params.has('latitude')&&params.has('longitude')){
+    const selected={latitude:Number(params.get('latitude')),longitude:Number(params.get('longitude')),name:params.get('name')||'Selected location'};
+    if(validPlace(selected)){chooseLocation(selected);return;}
+   }
    const previous=savedCity();
    if (previous) { chooseLocation(previous); return; }
    if (!cached) return;
@@ -774,7 +825,7 @@ if(compare && !document.querySelector('script[src*="/wn-blend.js"]')) {
     if(document.getElementById('wn-compare-section')){compare.removeEventListener('click',openCompare);return;}
     compare.disabled=true;
     try {
-      await import('./wn-blend.js?v=exp-compare-v1');
+      await import('./wn-blend.js?v=shared-model-comparison-v1');
       compare.removeEventListener('click',openCompare);
       compare.disabled=false; compare.click();
     } catch {

@@ -1,4 +1,4 @@
-import {confidenceNotice,todayForecastHTML} from './today-card.js?v=low-rain-display-v1';
+import {confidenceNotice,todayForecastHTML} from './today-card.js?v=radar-parity-v3';
 import {FORECAST_CONFIDENCE_VERSION,confidenceMeterPosition,displayForecastConfidence,forecastConfidenceLabel} from './forecast-confidence.js?v=ensemble-confidence-v1';
 import {dailyUvHTML} from './daily-uv.js?v=weather-art-labels-v10';
 import {pavementEstimate,pavementHTML,pavementDetailsHTML} from './pavement.js?v=current-rain-20261017-v3';

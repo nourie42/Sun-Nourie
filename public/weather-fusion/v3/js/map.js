@@ -9,6 +9,8 @@
  * - Multi-frame Timeline Playback & Fullscreen Mode
  */
 
+import {RadarTileBuffer, RADAR_STEP_MS, RADAR_LATEST_HOLD_MS} from '../../radar-playback.js?v=1';
+
 export const MAP_LAYERS = [
   {
     id: 'radar',
@@ -29,7 +31,6 @@ export class WeatherMapController {
     this.onFrameChange = onFrameChange;
     this.map = null;
     this.baseTileLayer = null;
-    this.weatherTileLayers = [];
     this.canvasOverlay = null;
     this.locationGroup = null;
     this.alertsGroup = null;
@@ -175,13 +176,14 @@ export class WeatherMapController {
     this.activeLayerId = 'radar';
     this.stopPlayback();
 
-    this.weatherTileLayers.forEach((l) => this.map.removeLayer(l));
-    this.weatherTileLayers = [];
+    this.radarTiles?.clear();
+    this.radarTiles = new RadarTileBuffer(this.map, .78);
 
+    const timeFormat = {timeZone:this.currentForecast?.timeZone||'America/New_York',hour:'numeric',minute:'2-digit'};
     this.frames = (this.rainViewerFrames || []).map((f) => ({
       label: f.isLive
-        ? `${new Date(f.time).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })} (Live Radar)`
-        : new Date(f.time).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
+        ? `${new Date(f.time).toLocaleTimeString('en-US', timeFormat)} (Live Radar)`
+        : new Date(f.time).toLocaleTimeString('en-US', timeFormat),
       isoTime: f.isoTime,
       tileUrl: f.tileUrl,
       timestamp: f.time
@@ -191,60 +193,48 @@ export class WeatherMapController {
     this.applyCurrentFrame();
   }
 
-  applyCurrentFrame() {
-    if (!this.map || typeof window.L === 'undefined') return;
-    const L = window.L;
-    const frame = this.frames[this.currentFrameIdx];
-
-    this.weatherTileLayers.forEach((l) => this.map.removeLayer(l));
-    this.weatherTileLayers = [];
-
-    if (frame?.isoTime && this.radarSource?.type === 'wms') {
-      const wms = L.tileLayer.wms(this.radarSource.url, {
-        pane: 'weather-radar',
-        layers: this.radarSource.layer,
-        format: 'image/png',
-        transparent: true,
-        version: '1.1.1',
-        time: frame.isoTime,
-        opacity: 0.78,
-        updateWhenIdle: false,
-        keepBuffer: 3,
-        className: 'radar-crisp-layer'
-      });
-      wms.on('tileerror', () => {
-        // Silently avoid glitchy broken tile icons
-      });
-      wms.addTo(this.map);
-      this.weatherTileLayers.push(wms);
-    } else if (frame?.tileUrl) {
-      const tl = L.tileLayer(frame.tileUrl, {
-        pane: 'weather-radar',
-        opacity: 0.78,
-        maxZoom: 12,
-        updateWhenIdle: true,
-        keepBuffer: 2,
-        className: 'radar-crisp-layer'
-      });
-      tl.on('tileerror', () => {});
-      tl.addTo(this.map);
-      this.weatherTileLayers.push(tl);
-    }
-
-    if (typeof this.onFrameChange === 'function') {
-      this.onFrameChange({
-        frameIdx: this.currentFrameIdx,
-        totalFrames: this.frames.length,
-        label: frame?.label || 'Radar unavailable',
-        layer: MAP_LAYERS[0]
+  radarLayer(frame) {
+    const options = {pane:'weather-radar', updateWhenIdle:true, keepBuffer:1, className:'radar-crisp-layer'};
+    if (frame.isoTime && this.radarSource?.type === 'wms') {
+      return window.L.tileLayer.wms(this.radarSource.url, {
+        ...options, layers:this.radarSource.layer, format:'image/png', transparent:true,
+        version:'1.1.1', time:frame.isoTime
       });
     }
+    return window.L.tileLayer(frame.tileUrl, {...options, maxNativeZoom:12});
   }
 
-  setFrameIndex(idx) {
-    if (!this.frames.length) return;
-    this.currentFrameIdx = ((idx % this.frames.length) + this.frames.length) % this.frames.length;
-    this.applyCurrentFrame();
+  reportFrame(index, label) {
+    this.onFrameChange?.({frameIdx:index, totalFrames:this.frames.length, label, layer:MAP_LAYERS[0]});
+  }
+
+  async applyCurrentFrame(index = this.currentFrameIdx) {
+    if (!this.radarTiles) return;
+    const frame = this.frames[index];
+    if (!frame) {
+      this.reportFrame(index, 'Radar unavailable');
+      return;
+    }
+    const buffer = this.radarTiles;
+    const shown = await buffer.show(frame.timestamp, () => this.radarLayer(frame));
+    if (this.radarTiles !== buffer) return;
+    if (shown) {
+      this.currentFrameIdx = index;
+      this.reportFrame(index, frame.label);
+    } else if (!this.isPlaying && !buffer.active) {
+      this.reportFrame(index, 'Radar frame unavailable');
+    }
+    if (!this.isPlaying) buffer.trim();
+  }
+
+  warmFrames(index) {
+    const next = [1, 2].map(offset => this.frames[(index + offset) % this.frames.length]);
+    this.radarTiles.trim(next.map(frame => frame.timestamp));
+    for (const frame of new Set(next)) this.radarTiles.prepare(frame.timestamp, () => this.radarLayer(frame));
+  }
+
+  setFrameIndex(index) {
+    if (this.frames[index]) void this.applyCurrentFrame(index);
   }
 
   togglePlayback() {
@@ -259,17 +249,26 @@ export class WeatherMapController {
   startPlayback() {
     if (this.frames.length <= 1) return;
     this.isPlaying = true;
-    this.playTimer = setInterval(() => {
-      this.setFrameIndex(this.currentFrameIdx + 1);
-    }, 850);
+    const playback = this.playback = {};
+    let index = this.currentFrameIdx;
+    this.warmFrames(index);
+    const advance = async () => {
+      if (this.playback !== playback) return;
+      index = (index + 1) % this.frames.length;
+      await this.applyCurrentFrame(index);
+      if (this.playback !== playback) return;
+      this.warmFrames(index);
+      this.playTimer = setTimeout(advance, index === this.frames.length - 1 ? RADAR_LATEST_HOLD_MS : RADAR_STEP_MS);
+    };
+    this.playTimer = setTimeout(advance, RADAR_STEP_MS);
   }
 
   stopPlayback() {
     this.isPlaying = false;
-    if (this.playTimer) {
-      clearInterval(this.playTimer);
-      this.playTimer = null;
-    }
+    this.playback = null;
+    clearTimeout(this.playTimer);
+    this.playTimer = null;
+    this.radarTiles?.trim();
   }
 
   renderLocationAndProximityRings(forecast) {

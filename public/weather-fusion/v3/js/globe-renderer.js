@@ -47,18 +47,87 @@ export class WeatherGlobeRenderer{
  setActive(value){this.active=value;if(!value){cancelAnimationFrame(this.frame);this.frame=null;this.map.stop();}else if(this.motion&&this.frame==null)this.loop(performance.now());else this.drawArrows();}
  setMotion(value){this.motion=value;if(!value){cancelAnimationFrame(this.frame);this.frame=null;this.clearTrails();this.drawArrows();}else if(this.active&&this.frame==null)this.loop(performance.now());}
  setLayer(kind,value){this.layers[kind]=value;if(kind==='wind'){this.clearTrails();if(value&&!this.motion)this.drawArrows();}const id=this.weather[kind]?.id;if(id&&this.map.getLayer(id))this.map.setLayoutProperty(id,'visibility',value?'visible':'none');}
- clearLayer(kind,{invalidate=true}={}){if(invalidate)this.layerTokens[kind]=(this.layerTokens[kind]||0)+1;const record=this.weather[kind];if(record){if(this.map.getLayer(record.id))this.map.removeLayer(record.id);if(this.map.getSource(record.id))this.map.removeSource(record.id);delete this.weather[kind];}this[kind+'Mesh']=null;}
+ clearLayer(kind){
+  this.layerTokens[kind]=(this.layerTokens[kind]||0)+1;
+  const record=this.weather[kind];
+  delete this.weather[kind];
+  this[kind+'Mesh']=null;
+  if(kind==='radar'){
+   for(const time of this.radarBuffer?.keys()||[])this.discardRadar(time);
+  }else if(record)this.removeWeatherTiles(record.id);
+ }
+ async prepareRadar(time){
+  if(this.weather.radar?.time===time)return this.weather.radar;
+  this.radarBuffer??=new Map();
+  const existing=this.radarBuffer.get(time);
+  if(existing)return existing;
+  const entry={time,id:`nourie-radar-${++this.token}`,ready:false};
+  this.radarBuffer.set(time,entry);
+  entry.promise=this.loadWeatherTiles('radar',entry).then(()=>{
+   entry.ready=true;
+   return entry;
+  }).catch(error=>{
+   if(this.radarBuffer.get(time)===entry)this.radarBuffer.delete(time);
+   throw error;
+  });
+  return entry;
+ }
+ discardRadar(time){
+  const entry=this.radarBuffer?.get(time);
+  if(!entry||this.weather.radar===entry)return;
+  if(this.radarBuffer.get(time)===entry)this.radarBuffer.delete(time);
+  if(entry.ready)this.removeWeatherTiles(entry.id);
+  else void entry.promise.then(()=>this.removeWeatherTiles(entry.id)).catch(()=>{});
+ }
+ removeWeatherTiles(id){
+  if (this.map.getLayer(id)) this.map.removeLayer(id);
+  if (this.map.getSource(id)) this.map.removeSource(id);
+ }
  async setWeatherTiles(kind,time){
-  await this.ready;if(this.weather[kind]?.time===time)return true;
-  const generation=(this.layerTokens[kind]||0)+1;this.layerTokens[kind]=generation;const id=`nourie-${kind}-${++this.token}`,q=new URLSearchParams({layer:kind,time}),tiles=`${location.origin}/api/weather-fusion/globe-tile?${q}&z={z}&x={x}&y={y}`;
+  if(this.weather[kind]?.time===time)return true;
+  const generation=(this.layerTokens[kind]||0)+1;
+  this.layerTokens[kind]=generation;
+  const entry=kind==='radar'
+   ? await this.prepareRadar(time)
+   : {time,id:`nourie-clouds-${++this.token}`};
+  if(kind==='radar')await entry.promise;
+  else await this.loadWeatherTiles(kind,entry);
+  if(generation!==this.layerTokens[kind]){
+   if(kind!=='radar')this.removeWeatherTiles(entry.id);
+   return false;
+  }
+
+  const previous=this.weather[kind];
+  if(previous?.id!==entry.id&&previous){
+   if(kind==='radar'){
+    this.map.setPaintProperty(previous.id,'raster-opacity',0);
+    this.map.setLayoutProperty(previous.id,'visibility','visible');
+   }else this.removeWeatherTiles(previous.id);
+  }
+  this.weather[kind]=entry;
+  this[kind+'Mesh']=true;
+  this.map.setPaintProperty(entry.id,'raster-opacity',kind==='radar'?['interpolate',['linear'],['zoom'],0,.82,10,.75,15,.45]:['interpolate',['linear'],['zoom'],0,.85,6,.7,10,.22,14,.06]);
+  this.map.setLayoutProperty(entry.id,'visibility',this.layers[kind]?'visible':'none');
+  return true;
+ }
+ async loadWeatherTiles(kind,{id,time}){
+  await this.ready;
+  const q=new URLSearchParams({layer:kind,time}),tiles=`${location.origin}/api/weather-fusion/globe-tile?${q}&z={z}&x={x}&y={y}`;
   this.map.addSource(id,{type:'raster',tiles:[tiles],tileSize:256,minzoom:0,maxzoom:kind==='clouds'?5:10,...(kind==='radar'?{bounds:[-130,20,-60,55]}:{})});
-  this.map.addLayer({id,type:'raster',source:id,paint:{'raster-opacity':0,'raster-fade-duration':0,'raster-resampling':kind==='radar'?'nearest':'linear'}},'places');
+  this.map.addLayer({id,type:'raster',source:id,paint:{'raster-opacity':0,...(kind==='radar'?{'raster-opacity-transition':{duration:0}}:{}),'raster-fade-duration':0,'raster-resampling':kind==='radar'?'nearest':'linear'}},'places');
   try{
-   await new Promise((resolve,reject)=>{let timer;const clean=()=>{clearTimeout(timer);this.map.off('sourcedata',loaded);this.map.off('error',failed);};const loaded=e=>{if(e.sourceId===id&&this.map.isSourceLoaded(id)){clean();resolve();}};const failed=e=>{if(e.sourceId===id){clean();reject(Error('Weather tiles unavailable'));}};this.map.on('sourcedata',loaded);this.map.on('error',failed);timer=setTimeout(()=>{clean();reject(Error('Weather tiles still loading'));},16000);if(this.map.isSourceLoaded(id)){clean();resolve();}});
-   if(generation!==this.layerTokens[kind]){if(this.map.getLayer(id))this.map.removeLayer(id);if(this.map.getSource(id))this.map.removeSource(id);return false;}
-   this.clearLayer(kind,{invalidate:false});this.weather[kind]={id,time};this[kind+'Mesh']=true;
-   this.map.setPaintProperty(id,'raster-opacity',kind==='radar'?['interpolate',['linear'],['zoom'],0,.82,10,.75,15,.45]:['interpolate',['linear'],['zoom'],0,.85,6,.7,10,.22,14,.06]);this.map.setLayoutProperty(id,'visibility',this.layers[kind]?'visible':'none');return true;
-  }catch(e){if(this.map.getLayer(id))this.map.removeLayer(id);if(this.map.getSource(id))this.map.removeSource(id);throw e;}
+   await new Promise((resolve,reject)=>{
+    const clean=()=>{clearTimeout(timer);this.map.off('sourcedata',loaded);this.map.off('error',failed);};
+    const loaded=e=>{if(e.sourceId===id&&this.map.isSourceLoaded(id)){clean();resolve();}};
+    const failed=e=>{if(e.sourceId===id){clean();reject(Error('Weather tiles unavailable'));}};
+    const timer=setTimeout(()=>{clean();reject(Error('Weather tiles still loading'));},12000);
+    this.map.on('sourcedata',loaded);this.map.on('error',failed);
+    if(this.map.isSourceLoaded(id)){clean();resolve();}
+   });
+  }catch(error){
+   this.removeWeatherTiles(id);
+   throw error;
+  }
  }
  setWind(grid){this.grid=grid;this.buildFlow();this.seed();this.clearTrails();this.canvas.dataset.windParticles=this.particles.length;if(!this.motion)this.drawArrows();}
  surface(x,y){
