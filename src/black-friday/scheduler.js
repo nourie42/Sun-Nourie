@@ -50,6 +50,8 @@ export function createBlackFridayEngine({
   let timer = null;
   let activeSweepPromise = null;
   let lastManualRefreshMs = 0;
+  let payloadCache = null;
+  let payloadCacheFingerprint = '';
 
   function isBlackFridayPeakWindow(date = now()) {
     const m = date.getUTCMonth();
@@ -68,6 +70,12 @@ export function createBlackFridayEngine({
 
   function scheduleNext() {
     if (timer) clearTimeout(timer);
+    // Click-only mode (Daniel, 2026-11-22): prices update only when he clicks
+    // Refresh. Automatic sweeps stay off unless monitoring.autoUpdate is set.
+    if (store.getState().settings?.monitoring?.autoUpdate !== true) {
+      store.getState().scheduler.nextScheduledRunAt = null;
+      return;
+    }
     const mins = nextCadenceMinutes();
     const nextIso = new Date(now().getTime() + mins * 60000).toISOString();
     store.getState().scheduler.nextScheduledRunAt = nextIso;
@@ -436,6 +444,26 @@ export function createBlackFridayEngine({
 
   function buildDashboardPayload() {
     const state = store.getState();
+    // Perf: with thousands of wish-list items a full rebuild costs seconds of
+    // CPU. Rebuild only when the underlying state actually changed (every
+    // mutation bumps state.updatedAt via persist); otherwise serve the cache.
+    const fingerprint = [
+      state.updatedAt || '',
+      (state.wishlist || []).length,
+      (state.savedDeals || []).length,
+      (state.profiles || []).length,
+      Object.keys(state.deals || {}).length,
+      (state.alerts || []).length,
+      state.scheduler?.lastSuccessfulRunAt || '',
+    ].join('|');
+    if (payloadCache && payloadCacheFingerprint === fingerprint) return payloadCache;
+    const payload = buildDashboardPayloadUncached(state);
+    payloadCache = payload;
+    payloadCacheFingerprint = fingerprint;
+    return payload;
+  }
+
+  function buildDashboardPayloadUncached(state) {
     const evaluatedAll = evaluateAllDeals();
     const activeDeals = evaluatedAll.filter((d) => !d.archived);
     const archivedDeals = evaluatedAll.filter((d) => d.archived);
@@ -630,6 +658,10 @@ export function createBlackFridayEngine({
       await store.hydrateFromSupabase().catch(() => {});
       await store.syncFromGitHubWorker().catch(() => {});
       const state = store.getState();
+      if (state.settings?.monitoring?.autoUpdate !== true) {
+        console.log('[black-friday] Auto-update is off — prices refresh only on manual Refresh clicks.');
+        return;
+      }
       const lastOk = Date.parse(state.scheduler.lastSuccessfulRunAt || 0) || 0;
       const ageMin = (now().getTime() - lastOk) / 60000;
       if (Object.keys(state.deals || {}).length === 0 || ageMin >= 20) {
