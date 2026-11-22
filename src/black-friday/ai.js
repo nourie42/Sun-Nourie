@@ -12,9 +12,9 @@
 
 const MODEL = process.env.GEMINI_MODEL || 'gemini-3-flash-preview';
 const API_BASE = 'https://generativelanguage.googleapis.com/v1beta';
-const BATCH_SIZE = 20;
+const BATCH_SIZE = 10;
 const MAX_TITLES_PER_SWEEP = 240;
-const SWEEP_BUDGET_MS = 75_000;
+const SWEEP_BUDGET_MS = 150_000;
 
 // Titles repeat across sweeps; cache by normalized raw title for the life of
 // the process so repeat refreshes do not pay for the same cleanup twice.
@@ -61,7 +61,7 @@ async function cleanBatch(titles, fetchImpl) {
       contents: [{ parts: [{ text: prompt }] }],
       generationConfig: { responseMimeType: 'application/json', temperature: 0.1 },
     }),
-    signal: AbortSignal.timeout(30_000),
+    signal: AbortSignal.timeout(45_000),
   });
   if (!res.ok) throw new Error(`gemini http ${res.status}`);
   const data = await res.json();
@@ -109,24 +109,31 @@ export async function cleanDealsWithAi(deals, { fetchImpl = fetch } = {}) {
 
     const pending = [...wanted.values()].slice(0, MAX_TITLES_PER_SWEEP);
     const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    let consecutiveFailures = 0;
     for (let i = 0; i < pending.length; i += BATCH_SIZE) {
       if (Date.now() - started > SWEEP_BUDGET_MS) break;
+      if (consecutiveFailures >= 3) break; // Key or API is down; stop burning time.
       const batch = pending.slice(i, i + BATCH_SIZE);
       let results = null;
       try {
         results = await cleanBatch(batch, fetchImpl);
       } catch {
-        // Rate limits bite when batches fire back to back (first live sweep
-        // cleaned exactly one batch, then stopped). Wait and retry once.
+        // A slow or throttled batch must not end the run (the first live
+        // sweeps stopped after one batch). Wait, retry once, then move on.
         await sleep(4000);
         try {
           results = await cleanBatch(batch, fetchImpl);
         } catch {
-          break; // Still failing: stop politely; the cache keeps progress.
+          results = null;
         }
       }
-      if (results) for (const [key, value] of results) cache.set(key, value);
-      await sleep(1200); // Pace requests under the key's per-minute limit.
+      if (results) {
+        consecutiveFailures = 0;
+        for (const [key, value] of results) cache.set(key, value);
+      } else {
+        consecutiveFailures++;
+      }
+      await sleep(800); // Light pacing between batches.
     }
 
     for (const deal of deals) {
