@@ -1493,11 +1493,16 @@ function renderQuickFilterBar() {
   const deals = favOnly ? allDeals.filter((dl) => favIds.has(dl.retailerId)) : allDeals;
   const itemMap = new Map((appState.data.wishlist || []).map((w) => [w.id, w]));
   const mainIds = mainGiftItemIds();
+  // Counts are PRODUCTS (unique canonicalKey), matching the grid, which
+  // collapses duplicate offers of the same product into one card. Counting
+  // offers here while the grid counted products left Family at chip 2 vs
+  // 1 card (Bot 1 click-through, 2026-11-22).
+  const productCount = (subset) => new Set(subset.map((dl) => dl.canonicalKey || dl.id)).size;
   host.innerHTML = QUICK_FILTERS.map((def) => {
     // Main Gifts shows products, not deals — its count is the product count.
-    const n = def.id === 'all' ? deals.length
+    const n = def.id === 'all' ? productCount(deals)
       : def.id === 'main' ? mainIds.size
-      : deals.filter((dl) => quickFilterTest(dl, def.id, itemMap, mainIds)).length;
+      : productCount(deals.filter((dl) => quickFilterTest(dl, def.id, itemMap, mainIds)));
     return `<button type="button" class="qf-chip ${appState.quickFilter === def.id ? 'is-active' : ''}" data-quick-filter="${def.id}">${esc(def.label)} <span class="tabular">${n}</span></button>`;
   }).join('');
 }
