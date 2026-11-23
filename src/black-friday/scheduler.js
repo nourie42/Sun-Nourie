@@ -7,6 +7,7 @@
  */
 
 import { EventEmitter } from 'node:events';
+import zlib from 'node:zlib';
 import {
   BLACK_FRIDAY_VERSION,
   RETAILER_DIRECTORY,
@@ -593,6 +594,65 @@ export function createBlackFridayEngine({
     return payload;
   }
 
+  // Wire slimming (2026-11-22): the full dashboard payload is ~11 MB of JSON.
+  // The browser never reads deal identity/priceStats/reviewData, the full
+  // matchedOffers arrays, or most of bestOffer. Serving the slim copy (plus
+  // gzip in routes.js) is the fix for the small Render instance tipping into
+  // 502s under ordinary page loads. Internal consumers keep the full object.
+  const WIRE_DEAL_DROP = new Set(['identity', 'priceStats', 'reviewData']);
+  function stripDealForWire(d) {
+    if (!d || typeof d !== 'object') return d;
+    const out = {};
+    for (const [k, v] of Object.entries(d)) if (!WIRE_DEAL_DROP.has(k)) out[k] = v;
+    return out;
+  }
+  function projectOfferForWire(d) {
+    if (!d || typeof d !== 'object') return null;
+    return {
+      id: d.id, canonicalKey: d.canonicalKey, title: d.title,
+      currentPrice: d.currentPrice, normalPrice: d.normalPrice,
+      verifiedDiscountPct: d.verifiedDiscountPct, finalAllInTotal: d.finalAllInTotal,
+      retailerName: d.retailerName, retailerUrl: d.retailerUrl, dealPageUrl: d.dealPageUrl,
+      imageUrl: d.imageUrl, tier: d.tier, isDirectProductUrl: d.isDirectProductUrl,
+    };
+  }
+  function stripDealsDeep(value, depth) {
+    if (!value || typeof value !== 'object' || depth > 3) return value;
+    if (Array.isArray(value)) return value.map((v) => stripDealsDeep(v, depth + 1));
+    if (value.canonicalKey && 'currentPrice' in value) return stripDealForWire(value);
+    const out = {};
+    for (const [k, v] of Object.entries(value)) out[k] = (v && typeof v === 'object') ? stripDealsDeep(v, depth + 1) : v;
+    return out;
+  }
+  let wireCache = { source: null, slim: null, json: null, gzip: null };
+  function slimDashboardForWire(payload) {
+    if (!payload || typeof payload !== 'object') return payload;
+    if (wireCache.source === payload) return wireCache.slim;
+    const slim = {
+      ...payload,
+      deals: (payload.deals || []).map(stripDealForWire),
+      archivedDeals: (payload.archivedDeals || []).map(stripDealForWire),
+      bestDealsRightNow: (payload.bestDealsRightNow || []).map(stripDealForWire),
+      personalized: stripDealsDeep(payload.personalized, 0),
+      hunter: stripDealsDeep(payload.hunter, 0),
+      wishlist: (payload.wishlist || []).map((item) => {
+        if (!item || typeof item !== 'object') return item;
+        const { identity, matchedOffers, bestOffer, ...rest } = item;
+        return { ...rest, bestOffer: bestOffer ? projectOfferForWire(bestOffer) : null, matchedOffers: [] };
+      }),
+    };
+    wireCache = { source: payload, slim, json: null, gzip: null };
+    return slim;
+  }
+  function dashboardWireBuffers(slim) {
+    if (!slim || wireCache.slim !== slim) return null;
+    if (!wireCache.json) {
+      wireCache.json = JSON.stringify(slim);
+      wireCache.gzip = zlib.gzipSync(Buffer.from(wireCache.json));
+    }
+    return { json: wireCache.json, gzip: wireCache.gzip };
+  }
+
   function buildDashboardPayloadUncached(state) {
     const evaluatedAll = evaluateAllDeals();
     const activeDeals = evaluatedAll.filter((d) => !d.archived);
@@ -833,6 +893,8 @@ export function createBlackFridayEngine({
     verifyStores,
     evaluateAllDeals,
     buildDashboardPayload,
+    slimDashboardForWire,
+    dashboardWireBuffers,
     canManualRefresh: () => Date.now() - lastManualRefreshMs >= 6000,
     markManualRefresh: () => { lastManualRefreshMs = Date.now(); },
     discoverAlternativesForItem: (itemId) => {

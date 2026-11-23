@@ -1385,6 +1385,8 @@ const QUICK_FILTERS = [
   { id: 'main', label: '⭐ Main Gifts' },
   { id: 'level1', label: 'Level 1', tierPrefix: 'Level 1' },
   { id: 'level2', label: 'Level 2', tierPrefix: 'Level 2' },
+  { id: 'level3', label: 'Level 3', tierPrefix: 'Level 3' },
+  { id: 'stocking', label: 'Stocking Stuffers', tierPrefix: 'Stocking' },
   { id: 'under20', label: 'Under $20', maxPrice: 20 },
   { id: 'under10', label: 'Under $10', maxPrice: 10 },
 ];

@@ -4,6 +4,7 @@
  */
 
 import express from 'express';
+import zlib from 'node:zlib';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
@@ -98,6 +99,42 @@ export function registerBlackFridayRoutes(app, {
   api.use(express.json({ limit: '25mb' }));
   api.use((_req, res, next) => {
     setPrivateHeaders(res, false);
+    next();
+  });
+  // Wire slimming + gzip (2026-11-22): dashboard responses were ~11 MB of raw
+  // JSON; a few at once tipped the small Render instance into 502s. Every
+  // res.json on this router swaps any embedded dashboard for the slim wire
+  // copy and gzips large bodies when the client accepts it. Any failure falls
+  // back to the original response untouched.
+  api.use((req, res, next) => {
+    const origJson = res.json.bind(res);
+    res.json = (body) => {
+      try {
+        let out = body;
+        if (out && typeof out === 'object') {
+          if (out.dashboard && typeof out.dashboard === 'object') {
+            out = { ...out, dashboard: engine.slimDashboardForWire(out.dashboard) };
+          } else if (out.wishlist && out.deals) {
+            out = engine.slimDashboardForWire(out);
+          }
+        }
+        const accept = String(req.headers['accept-encoding'] || '');
+        if (out && typeof out === 'object' && /\bgzip\b/.test(accept)) {
+          const buffers = (out.wishlist && out.deals) ? engine.dashboardWireBuffers(out) : null;
+          const text = buffers ? buffers.json : JSON.stringify(out);
+          if (text && text.length > 100000) {
+            const buf = buffers ? buffers.gzip : zlib.gzipSync(Buffer.from(text));
+            res.set('Content-Encoding', 'gzip');
+            res.set('Content-Type', 'application/json; charset=utf-8');
+            res.set('Vary', 'Accept-Encoding');
+            return res.send(buf);
+          }
+        }
+        return origJson(out);
+      } catch {
+        return origJson(body);
+      }
+    };
     next();
   });
 
