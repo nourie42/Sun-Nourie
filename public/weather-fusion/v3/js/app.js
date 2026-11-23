@@ -26,6 +26,7 @@ import { dogWalkerScene, referenceScene } from '../../exposure-scene.js?v=true-n
 import { danCard, danOverview, danTakeDisplay } from '../../dans-summary.js?v=afd-discussion-section-v1';
 import { activeRiskOutlooks, outlookDetailHTML } from '../../risk-outlooks.js?v=risk-outlooks-v5';
 import { forecastWindowBannerHTML, forecastWindowDetailHTML } from '../../forecast-window-banners.js?v=rain-hours-only-v1';
+import {confidenceWarningHTML,lowConfidenceWarning} from '../../confidence-bar.js?v=plain-language-v1';
 import {GlobePanel} from './globe-panel.js?v=wind-visibility-v1';
 import {outlookItems,renderOutlookPanel,openOutlookNote} from '../../outlook-panel.js?v=daily-hourly-v1';
 import { todayForecastHTML, todayRainDisplay } from '../../today-card.js?v=hour-details-v1';
@@ -370,6 +371,8 @@ function renderBetaTodayCard(f) {
   if (f?.canonical?.days?.length) {
     host.hidden = false;
     host.innerHTML = todayForecastHTML(f.canonical, Date.now(), {interactive:false});
+    // V3 presents the conditional confidence warning once at the top of the page.
+    host.querySelector('.today-confidence-banner')?.remove();
   } else if (f?.days?.length) {
     const d = f.days[0];
     const cur = f.current;
@@ -424,6 +427,14 @@ function renderBetaTodayCard(f) {
   }
 }
 
+function renderForecastConfidenceBar(f){
+  const host=document.getElementById('forecast-confidence-bar');
+  if(!host)return;
+  const warning=lowConfidenceWarning(f?.canonical?.days);
+  host.hidden=!warning;
+  host.innerHTML=confidenceWarningHTML(warning);
+}
+
 function renderAll() {
   const f = state.forecast;
   if (!f) return;
@@ -438,6 +449,7 @@ function renderAll() {
   updateSkyAtmosphere(f);
   renderStatusAndAlerts(f);
   renderWeatherHazards(f);
+  renderForecastConfidenceBar(f);
   renderHeroAndBriefing(f);
   renderTopCompactPills(f);
   renderBetaTodayCard(f);
