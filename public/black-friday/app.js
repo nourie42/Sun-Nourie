@@ -1843,7 +1843,7 @@ function bindEvents() {
         b.textContent = wasFavorite ? '☆' : '★';
       });
       try {
-        const out = await api('/api/black-friday/stores/favorite', { method: 'POST', body: { storeId } });
+        const out = await api('/api/black-friday/stores/favorite', { method: 'POST', body: { storeId, isFavorite: !wasFavorite } });
         const favIds = new Set(out.favoriteStoreIds || []);
         if (appState.data) {
           if (appState.data.settings) appState.data.settings.favoriteStores = [...favIds];

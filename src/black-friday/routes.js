@@ -182,7 +182,13 @@ export function registerBlackFridayRoutes(app, {
     if (!RETAILER_BY_ID[storeId]) return res.status(400).json({ error: 'Unknown retailer ID.' });
     const state = store.getState();
     const list = new Set(state.settings.favoriteStores || []);
-    if (list.has(storeId)) list.delete(storeId);
+    // Explicit set wins when the client sends the desired state (idempotent —
+    // a bare toggle raced when two calls landed together, 2026-11-22 bot
+    // check); a body without isFavorite keeps the old toggle behavior.
+    if (typeof req.body?.isFavorite === 'boolean') {
+      if (req.body.isFavorite) list.add(storeId);
+      else list.delete(storeId);
+    } else if (list.has(storeId)) list.delete(storeId);
     else list.add(storeId);
     state.settings.favoriteStores = [...list];
     await store.persist();
