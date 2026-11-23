@@ -26,7 +26,7 @@ import { dogWalkerScene, referenceScene } from '../../exposure-scene.js?v=true-n
 import { danCard, danOverview, danTakeDisplay } from '../../dans-summary.js?v=afd-discussion-section-v1';
 import { activeRiskOutlooks, outlookDetailHTML } from '../../risk-outlooks.js?v=risk-outlooks-v5';
 import { forecastWindowBannerHTML, forecastWindowDetailHTML } from '../../forecast-window-banners.js?v=rain-hours-only-v1';
-import {confidenceWarningHTML,lowConfidenceWarning} from '../../confidence-bar.js?v=plain-language-v1';
+import {confidenceWarningDetailHTML,confidenceWarningHTML,lowConfidenceWarning} from '../../confidence-bar.js?v=impact-days-v2';
 import {GlobePanel} from './globe-panel.js?v=wind-visibility-v1';
 import {outlookItems,renderOutlookPanel,openOutlookNote} from '../../outlook-panel.js?v=daily-hourly-v1';
 import { todayForecastHTML, todayRainDisplay } from '../../today-card.js?v=hour-details-v1';
@@ -431,8 +431,12 @@ function renderForecastConfidenceBar(f){
   const host=document.getElementById('forecast-confidence-bar');
   if(!host)return;
   const warning=lowConfidenceWarning(f?.canonical?.days);
+  const slot=host.closest('.hero-confidence-slot');
   host.hidden=!warning;
+  if(slot)slot.hidden=!warning;
   host.innerHTML=confidenceWarningHTML(warning);
+  const button=host.querySelector('.forecast-confidence-button');
+  if(button&&warning)button.onclick=()=>openModal(`Forecast confidence · ${warning.dayLabel}`,confidenceWarningDetailHTML(warning));
 }
 
 function renderAll() {
