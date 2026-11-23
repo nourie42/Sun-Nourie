@@ -28,7 +28,8 @@ test('Deal Lens opens without a password while other sites keep their existing g
     assert.equal(isProtectedWeatherPath(p),false);
     const r=await fetch(base+p);assert.equal(r.status,200,p);assert.equal(r.headers.get('cache-control'),'private, no-store');
   }
-  for(const p of ['/weather-fusion/experimental-weather.html','/weathernext/','/whats-up/','/deal-intelligence/']){
+  assert.equal(isPublicWeatherPath('/whats-up/'),true);
+  for(const p of ['/weather-fusion/experimental-weather.html','/weathernext/','/deal-intelligence/']){
     assert.equal(isProtectedWeatherPath(p),true);assert.equal(isPublicWeatherPath(p),false);
     const r=await fetch(base+p);assert.equal(r.status,401,p);assert.match(await r.text(),/Nourie Weather/);
   }

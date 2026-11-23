@@ -14,23 +14,25 @@ const LOGIN = '/weather-fusion/login';
 const LOGOUT = '/weather-fusion/logout';
 const HOME = '/weather-fusion/';
 const SESSION_MS = 12 * 60 * 60 * 1000;
-// The main weather app, its V3 aliases and the old weather app are public. Other experimental pages,
-// WeatherNext, What's Up, Deal Intelligence and compare tools retain their gate.
+// The main weather app, its V3 aliases, the old weather app and What's Up are public.
+// Other experimental pages, WeatherNext, Deal Intelligence and compare tools retain their gate.
 // Set WEATHER_FUSION_PUBLIC=0 to re-lock public weather access.
 const PUBLIC_PAGES = new Set([
   '/weather-fusion', '/weather-fusion/', '/weather-fusion/index.html',
   '/weather-fusion/v3', '/weather-fusion/v3/', '/weather-fusion/v3/index.html',
   '/weather-fusion/old', '/weather-fusion/old/',
+  '/whats-up', '/whats-up/', '/whatsup',
 ]);
 const PUBLIC_ASSET = /^\/weather-fusion\/[a-z0-9][a-z0-9._-]*\.(?:js|css|webp|png|jpe?g|svg|json|webmanifest|ico)$/;
+const PUBLIC_TRACKER_ASSET = /^\/whats-up\/tracker\.(?:js|css)$/;
 const PUBLIC_BETA_ASSET = /^\/weather-fusion\/v3\/(?:js\/[a-z0-9][a-z0-9._-]*\.js|css\/[a-z0-9][a-z0-9._-]*\.css|vendor\/(?:three\.module\.min\.js|maplibre-gl\.(?:js|css)|maplibre-license\.txt)|textures\/earth-(?:day|night)\.jpg)$/;
-const PUBLIC_APIS = new Set(['forecast', 'alerts', 'briefing', 'bulletins', 'outlook', 'search', 'radar', 'models', 'winter-map', 'accuracy', 'globe', 'globe-image', 'globe-tile'].map(name => `/api/weather-fusion/${name}`));
+const PUBLIC_APIS = new Set([...['forecast', 'alerts', 'briefing', 'bulletins', 'outlook', 'search', 'radar', 'models', 'winter-map', 'accuracy', 'globe', 'globe-image', 'globe-tile'].map(name => `/api/weather-fusion/${name}`), '/api/whats-up/tracker']);
 export function isPublicWeatherPath(url, method = 'GET') {
   const upperMethod = String(method).toUpperCase();
   let pathname;
   try { pathname = canonicalPath(url); } catch { return false; }
   if (!['GET', 'HEAD'].includes(upperMethod)) return false;
-  return PUBLIC_PAGES.has(pathname) || PUBLIC_ASSET.test(pathname) || PUBLIC_BETA_ASSET.test(pathname) || PUBLIC_APIS.has(pathname);
+  return PUBLIC_PAGES.has(pathname) || PUBLIC_ASSET.test(pathname) || PUBLIC_TRACKER_ASSET.test(pathname) || PUBLIC_BETA_ASSET.test(pathname) || PUBLIC_APIS.has(pathname);
 }
 // Deal Lens is public; its access policy is independent of the weather sites.
 const PREFIXES = ['/weather', '/weather-fusion', '/weathernext', '/api/weather-fusion', '/whats-up', '/whatsup', '/api/whats-up', '/deal-intelligence', '/api/deal-intelligence', '/black-friday', '/api/black-friday'];
