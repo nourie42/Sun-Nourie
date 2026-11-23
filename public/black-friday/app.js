@@ -64,6 +64,7 @@ const appState = {
   selectedProfileId: 'all',
   wishlistStatusFilter: 'all',
   wishlistLimit: WISHLIST_PAGE_SIZE,
+  browseLimit: WISHLIST_PAGE_SIZE,
   bfSubtab: 'all',
   localTab: 'all',
   historyKey: '',
@@ -415,7 +416,20 @@ function renderHomePage() {
   // ---- SECTION 1: MAIN STORES LIVE DEALS WITH STORE PICKER ----
   const mainStats = d.mainStoreStats || [];
   const mainStoreIdSet = new Set(mainStats.map((s) => s.id));
-  const mainLiveWithPrice = (d.deals || []).filter((x) => x.currentPrice > 0 && x.availabilityStatus !== 'out_of_stock' && mainStoreIdSet.has(x.retailerId));
+  const dealQuery = appState.homeDealsSearch.trim().toLowerCase();
+  const storeOffers = new Map();
+  for (const deal of d.deals || []) {
+    if (deal.currentPrice <= 0 || deal.currentPrice == null || deal.availabilityStatus === 'out_of_stock' || !mainStoreIdSet.has(deal.retailerId)) continue;
+    if (appState.homeDealsImgOnly && !secureImageUrl(deal.imageUrl)) continue;
+    if (appState.homeDeals25Plus && !(deal.verifiedDiscountPct >= 25)) continue;
+    if (dealQuery && !`${deal.title} ${deal.brand || ''} ${deal.modelNumber || ''} ${deal.retailerName || ''}`.toLowerCase().includes(dealQuery)) continue;
+    const key = `${deal.retailerId}|${deal.canonicalKey || deal.id}`;
+    const current = storeOffers.get(key);
+    if (!current || (deal.finalAllInTotal ?? deal.currentPrice) < (current.finalAllInTotal ?? current.currentPrice)) storeOffers.set(key, deal);
+  }
+  const mainLiveWithPrice = [...storeOffers.values()];
+  const storeCounts = new Map();
+  for (const deal of mainLiveWithPrice) storeCounts.set(deal.retailerId, (storeCounts.get(deal.retailerId) || 0) + 1);
   if (appState.homeSelectedStore !== 'all' && !mainStoreIdSet.has(appState.homeSelectedStore)) appState.homeSelectedStore = 'all';
   const storePickerEl = $('home-store-picker');
   if (storePickerEl) {
@@ -425,29 +439,14 @@ function renderHomePage() {
         <button class="store-pick-pill ${appState.homeSelectedStore === st.id ? 'is-active' : ''}" data-pick-store="${esc(st.id)}" type="button">
           ${renderStoreAvatar(st, true)}
           <span>${esc(st.name)}</span>
-          <span class="store-pick-count tabular">${st.verifiedDealsCount}</span>
+          <span class="store-pick-count tabular">${storeCounts.get(st.id) || 0}</span>
         </button>`),
     ].join('');
     storePickerEl.innerHTML = pickerHtml;
   }
 
   // The home grid is main stores ONLY — other stores live under Retailer Deals.
-  let liveFiltered = [...mainLiveWithPrice];
-  if (appState.homeSelectedStore !== 'all') {
-    liveFiltered = liveFiltered.filter((x) => x.retailerId === appState.homeSelectedStore);
-  }
-  if (appState.homeDealsSearch.trim()) {
-    const q = appState.homeDealsSearch.trim().toLowerCase();
-    liveFiltered = liveFiltered.filter((x) =>
-      `${x.title} ${x.brand || ''} ${x.modelNumber || ''} ${x.retailerName || ''}`.toLowerCase().includes(q)
-    );
-  }
-  if (appState.homeDeals25Plus) {
-    liveFiltered = liveFiltered.filter((x) => x.verifiedDiscountPct !== null && x.verifiedDiscountPct >= 25);
-  }
-  if (appState.homeDealsImgOnly) {
-    liveFiltered = liveFiltered.filter((x) => Boolean(x.imageUrl));
-  }
+  const liveFiltered = appState.homeSelectedStore === 'all' ? mainLiveWithPrice : mainLiveWithPrice.filter((deal) => deal.retailerId === appState.homeSelectedStore);
 
   if (appState.homeDealsSort === 'discount') {
     liveFiltered.sort((a, b) => (b.verifiedDiscountPct ?? -1) - (a.verifiedDiscountPct ?? -1) || (b.imageUrl ? 1 : 0) - (a.imageUrl ? 1 : 0));
@@ -1487,10 +1486,14 @@ function renderCatalogInto(grid, label, def) {
     const ao = a.bestOffer?.currentPrice != null ? 0 : 1;
     const bo = b.bestOffer?.currentPrice != null ? 0 : 1;
     if (ao !== bo) return ao - bo;
+    const hasPhoto = (item) => Boolean(secureImageUrl(item.imageUrl || item.bestOffer?.imageUrl || item.screenshotThumbnail));
+    const photoDelta = Number(hasPhoto(b)) - Number(hasPhoto(a));
+    if (photoDelta) return photoDelta;
     return (b.preferredPrice || 0) - (a.preferredPrice || 0);
   });
-  const shown = sorted.slice(0, 60);
-  label.textContent = `${items.length} products — ${def.label} (showing ${shown.length}, on sale first)`;
+  const shown = sorted.slice(0, appState.browseLimit);
+  label.textContent = `${items.length} products — ${def.label} (showing ${shown.length}, offers first)`;
+  renderBrowseMore(items.length);
   grid.innerHTML = items.length
     ? shown.map((it) => renderItemProductCard(it)).join('')
     : '<div class="small muted">No products in this category yet.</div>';
@@ -1512,7 +1515,7 @@ function quickFilterTest(deal, qf, itemMap, mainIds) {
 function renderQuickFilterBar() {
   const host = $('quick-filter-bar');
   if (!host || !appState.data) return;
-  const allDeals = appState.data.deals || [];
+  const allDeals = (appState.data.deals || []).filter((deal) => deal.currentPrice > 0 && deal.availabilityStatus !== 'out_of_stock');
   // Chip counts must match what the list below shows: when "My Main Stores
   // Only" is on (the default), count only main-store deals. The chips used
   // to count every store while the list showed main stores only — Family
@@ -1547,6 +1550,7 @@ function renderBestDealsView() {
     // main-gift products even when no live deal matches (Daniel, 2026-11-22:
     // "you have all of these lists... and theres no products for main gifts?").
     renderMainGiftsInto($('best-deals-grid'), $('deals-count-label'));
+    renderBrowseMore(0);
     return;
   }
   if (CATALOG_QFS.has(appState.quickFilter)) {
@@ -1603,8 +1607,15 @@ function renderBestDealsView() {
   $('deals-count-label').textContent = f.favOnly !== false && favStoreIds.size
     ? `${list.length} products (${offerCount} offers) from your main stores`
     : `${list.length} products (${offerCount} offers) from all stores`;
-  $('best-deals-grid').innerHTML = list.length ? list.slice(0, 60).map((x) => renderProductCardHtml(x)).join('') : '<div class="small muted">No deals match your filters.</div>';
+  $('best-deals-grid').innerHTML = list.length ? list.slice(0, appState.browseLimit).map((x) => renderProductCardHtml(x)).join('') : '<div class="small muted">No deals match your filters.</div>';
+  renderBrowseMore(list.length);
   attachLogoFallbacks($('best-deals-grid'));
+}
+
+function renderBrowseMore(total) {
+  const button = $('best-deals-more');
+  button.hidden = total <= appState.browseLimit;
+  button.textContent = `Show more (${Math.min(appState.browseLimit, total)} of ${total})`;
 }
 
 function renderSettingsView() {
@@ -1863,6 +1874,7 @@ function bindEvents() {
   $('home-deals-img-only')?.addEventListener('change', (e) => { appState.homeDealsImgOnly = e.target.checked; appState.homeDealsLimit = HOME_DEALS_PAGE_SIZE; renderHomePage(); });
   $('home-main-deals-more')?.addEventListener('click', () => { appState.homeDealsLimit += HOME_DEALS_PAGE_SIZE; renderHomePage(); });
   $('wishlists-more').addEventListener('click', () => { appState.wishlistLimit += WISHLIST_PAGE_SIZE; renderWishlistsView(); });
+  $('best-deals-more').addEventListener('click', () => { appState.browseLimit += WISHLIST_PAGE_SIZE; renderBestDealsView(); });
 
   // Home Section 2: Uploaded Wish Lists & Deals filters
   $('home-wl-search')?.addEventListener('input', (e) => { appState.homeWlSearch = e.target.value; appState.homeWlLimit = 24; renderHomePage(); });
@@ -1914,16 +1926,18 @@ function bindEvents() {
     const qfBtn = e.target.closest('[data-quick-filter]');
     if (qfBtn) {
       appState.quickFilter = qfBtn.dataset.quickFilter;
+      appState.browseLimit = WISHLIST_PAGE_SIZE;
       // The home page's shop-by buttons use this same handler: without
       // switching to the deals view the click looked dead (Daniel, 2026-11-22).
       switchView('best-deals');
-      renderBestDealsView();
       return;
     }
 
     const storeDealsBtn = e.target.closest('[data-store-deals]');
     if (storeDealsBtn) {
       const storeId = storeDealsBtn.dataset.storeDeals;
+      appState.quickFilter = 'all';
+      appState.browseLimit = WISHLIST_PAGE_SIZE;
       appState.filters = { ...appState.filters, retailer: storeId, favOnly: false };
       const retailerSel = $('filter-retailer');
       if (retailerSel) retailerSel.value = storeId;
@@ -1931,7 +1945,6 @@ function bindEvents() {
       if (favChk) favChk.checked = false;
       savePrefs();
       switchView('best-deals');
-      renderBestDealsView();
       return;
     }
 

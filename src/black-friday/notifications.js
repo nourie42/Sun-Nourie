@@ -88,6 +88,7 @@ export function getChannelStatus({ env = process.env, settings = {} } = {}) {
 export function evaluateSmartAlerts({
   wishlist = [],
   evaluatedDeals = [],
+  wishlistOffers = null,
   previousDealsById = {},
   existingAlerts = [],
   settings = {},
@@ -170,8 +171,8 @@ export function evaluateSmartAlerts({
   const activeWish = wishlist.filter((w) => !['purchased', 'no_longer_interested'].includes(w.status));
 
   for (const item of activeWish) {
-    const matches = evaluatedDeals
-      .filter((d) => !d.archived && d.currentPrice !== null && matchWishlistToDeal(item, d).matched)
+    const matches = (wishlistOffers ? (wishlistOffers.get(item.id) || []) : evaluatedDeals)
+      .filter((d) => !d.archived && d.currentPrice !== null && (wishlistOffers || matchWishlistToDeal(item, d).matched))
       .sort((a, b) => (a.finalAllInTotal ?? a.currentPrice) - (b.finalAllInTotal ?? b.currentPrice));
 
     if (!matches.length) continue;

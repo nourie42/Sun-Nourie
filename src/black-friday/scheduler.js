@@ -57,10 +57,11 @@ function isHolidayFeedWeek(date) {
   return date.getTime() >= start && date.getTime() < start + 8 * 24 * HOUR_MS;
 }
 
-function indexWishlistOffers(deals) {
+function indexWishlistOffers(deals, include = () => true) {
   const offers = new Map();
   for (const deal of deals) {
     for (const id of deal.matchedWishlistIds) {
+      if (!include(deal, id)) continue;
       const matches = offers.get(id) || [];
       matches.push(deal);
       offers.set(id, matches);
@@ -510,9 +511,12 @@ export function createBlackFridayEngine({
         }
 
         // 6. Smart Alerts evaluation & delivery
+        const wishById = new Map(state.wishlist.map((item) => [item.id, item]));
         const newAlerts = feedOnly ? [] : evaluateSmartAlerts({
           wishlist: state.wishlist,
           evaluatedDeals: activeEvaluated,
+          wishlistOffers: indexWishlistOffers(activeEvaluated, (deal, itemId) =>
+            state.aiMatchVerdicts?.[`${wishById.get(itemId)?.canonicalKey}|${deal.canonicalKey}`] !== 'mismatch'),
           previousDealsById,
           existingAlerts: state.alerts,
           settings: state.settings,

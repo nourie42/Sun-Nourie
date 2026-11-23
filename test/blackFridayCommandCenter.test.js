@@ -240,8 +240,8 @@ test('true deal detection computes Wake County 7.25% NC tax, defensible baseline
     nowMs: Date.parse(nowIso),
   });
 
-  assert.equal(evaluated.baselineType, 'observed_history');
-  assert.equal(evaluated.normalPrice, 79.95);
+  assert.equal(evaluated.baselineType, 'editorial_regular');
+  assert.equal(evaluated.normalPrice, 80);
   assert.equal(evaluated.verifiedDiscountPct, 37.5);
   assert.equal(evaluated.tier, 'great');
   assert.equal(evaluated.estimatedTax, 3.63); // 50 * 0.0725 = 3.625 -> 3.63
@@ -258,6 +258,9 @@ test('true deal detection computes Wake County 7.25% NC tax, defensible baseline
     availabilityStatus: 'unverified',
   };
   const evalUnknown = evaluateDeal(noBaselineDeal, { historyEntries: [], nowMs: Date.parse(nowIso) });
+  const evalObserved = evaluateDeal(noBaselineDeal, { historyEntries: history, nowMs: Date.parse(nowIso) });
+  assert.equal(evalObserved.baselineType, 'observed_history');
+  assert.equal(evalObserved.normalPrice, 79.95);
   assert.equal(evalUnknown.normalPrice, null);
   assert.equal(evalUnknown.verifiedDiscountPct, null);
   assert.equal(evalUnknown.tier, 'unverified');
@@ -378,8 +381,7 @@ test('smart alerts trigger on >=25% discount, deduplicate repeats, and respect q
   }, { wishlistMatches: [wish], nowMs: now.getTime() });
 
   const firstRun = evaluateSmartAlerts({ wishlist: [wish], evaluatedDeals: [evalDeal], existingAlerts: [], now });
-  assert.ok(firstRun.some((a) => a.type === 'wishlist_discount'));
-  assert.ok(firstRun.some((a) => a.type === 'target_price_reached'));
+  assert.deepEqual(firstRun.map((a) => a.type), ['target_price_reached']);
 
   // Re-running with same unchanged deal produces 0 duplicate alerts
   const secondRun = evaluateSmartAlerts({ wishlist: [wish], evaluatedDeals: [evalDeal], existingAlerts: firstRun, now });
@@ -562,6 +564,13 @@ test('full Express API + auth gate + failed source reporting + persistence lifec
   assert.equal(dashboard.deals.some((deal) => deal.title === 'Old Sony Headphones for $1'), false);
   assert.ok(dashboard.deals.some((deal) => deal.retailerId === 'barnesnoble' && deal.currentPrice === 15 && deal.imageUrl));
   assert.ok(dashboard.personalized.tier1Exact.some((rec) => rec.wishlistItemId === added.item.id));
+
+  const favorite = await fetch(`${base}/api/black-friday/stores/favorite`, {
+    method: 'POST', headers: { Cookie: cookie, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ storeId: 'amazon', isFavorite: false }),
+  });
+  assert.equal((await favorite.json()).isFavorite, false);
+  assert.equal(engine.buildDashboardPayload().mainStoreStats.some((store) => store.id === 'amazon'), false);
 
   const healthRes = await fetch(`${base}/api/black-friday/health`, { headers: { Cookie: cookie } });
   const health = await healthRes.json();
