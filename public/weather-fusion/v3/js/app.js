@@ -25,7 +25,7 @@ import {
 import { dogWalkerScene, referenceScene } from '../../exposure-scene.js?v=true-night-art-v6';
 import { danCard, danOverview, danTakeDisplay } from '../../dans-summary.js?v=afd-discussion-section-v1';
 import { activeRiskOutlooks, outlookDetailHTML } from '../../risk-outlooks.js?v=risk-outlooks-v5';
-import { forecastWindowDetailHTML } from '../../forecast-window-banners.js?v=rain-hours-only-v1';
+import { forecastWindowBannerHTML, forecastWindowDetailHTML } from '../../forecast-window-banners.js?v=rain-hours-only-v1';
 import {GlobePanel} from './globe-panel.js?v=wind-visibility-v1';
 import {outlookItems,renderOutlookPanel,openOutlookNote} from '../../outlook-panel.js?v=daily-hourly-v1';
 import { todayForecastHTML, todayRainDisplay } from '../../today-card.js?v=hour-details-v1';
@@ -656,17 +656,29 @@ async function openRiskOutlookModal(risk, f) {
 
 function renderTopCompactPills(f) {
   const host=document.getElementById('weather-outlook-summary');
+  const perfectHost=document.getElementById('perfect-weather-window');
   if(!host)return;
-  if(!f.canonical){host.hidden=true;return;}
-  const items=outlookItems(f.canonical);
+  if(!f.canonical){host.hidden=true;if(perfectHost){perfectHost.hidden=true;perfectHost.replaceChildren();}return;}
+  const now=Date.now(),items=outlookItems(f.canonical,now);
+  const perfect=items.find(item=>item.kind==='perfect');
   const summary=items.find(item=>item.kind==='risk')?.risk.title||document.getElementById('take-banner-copy')?.textContent||'';
-  renderOutlookPanel(host,{summary,items,onTake:()=>openWeatherTakeModal(f),onItem:item=>{
+  renderOutlookPanel(host,{summary,items:items.filter(item=>item.kind!=='perfect'),onTake:()=>openWeatherTakeModal(f),onItem:item=>{
     if(item.kind==='risk'){
       if(item.risk.kind==='wssi')openOutlookNote(item.risk.title,[item.risk.summary,item.risk.url]);
       else void openRiskOutlookModal(item.risk,f);
     }else if(item.kind==='change')openModal('Change Alert',item.messages.map(message=>`<p>${cleanTakeJargon(message)}</p>`).join(''));
     else openModal(item.kind==='rain'?'Rain Outlook':'Perfect Weather',forecastWindowDetailHTML(item.view,item.kind,f.location.name,Date.now()));
   }});
+  if(perfectHost){
+    const banner=perfect?forecastWindowBannerHTML(perfect.view,'perfect',now):'';
+    perfectHost.hidden=!banner;
+    perfectHost.innerHTML=banner;
+    const button=perfectHost.querySelector('button');
+    if(button){
+      button.removeAttribute('aria-controls');
+      button.addEventListener('click',()=>openModal('Perfect Weather',forecastWindowDetailHTML(perfect.view,'perfect',f.location.name,Date.now())));
+    }
+  }
 }
 
 function selectHeroBackdropPhoto(cur, canonical = null) {
