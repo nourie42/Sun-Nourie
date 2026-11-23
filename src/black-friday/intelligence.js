@@ -602,6 +602,7 @@ export function matchWishlistToDeal(item, deal) {
     ['sku', item.sku || itemIdentity.identifiers.sku, deal.identifiers?.sku],
   ];
   for (const [idType, a, b] of idPairs) {
+    if (idType === 'sku' && item.retailerId && deal.retailerId && item.retailerId !== deal.retailerId) continue;
     if (a && b && String(a).toUpperCase() === String(b).toUpperCase()) {
       return { matched: true, confidence: 0.98, matchType: `exact_${idType}`, rejectionReason: null };
     }
@@ -646,13 +647,16 @@ export function matchWishlistToDeal(item, deal) {
   // Exact Brand + Model Number match
   const itemModel = (item.modelNumber || itemIdentity.modelNumber || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
   const dealModel = (deal.modelNumber || dealIdentity.modelNumber || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
-  const dealTitleCompact = String(deal.title || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
 
   if (itemModel && itemModel.length >= 4) {
     if (dealModel && itemModel === dealModel) {
       return { matched: true, confidence: 0.94, matchType: 'exact_model_number', rejectionReason: null };
     }
-    if (dealTitleCompact.includes(itemModel)) {
+    // Normalizing the whole title made prices, sizes and partial words look
+    // like model numbers. Allow separator differences inside a complete model.
+    const modelGroups = itemModel.match(/[A-Z]+|\d+/g);
+    const modelPattern = new RegExp(`\\b${modelGroups.join('[-_ ]*')}\\b`, 'i');
+    if (modelPattern.test(deal.title || '')) {
       return { matched: true, confidence: 0.9, matchType: 'title_model_match', rejectionReason: null };
     }
     // If both have explicit distinct model numbers from same brand, don't falsely merge them as identical!

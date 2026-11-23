@@ -204,6 +204,12 @@ test('product matching identifies identical models and blocks generation/size/ac
   };
   assert.equal(matchWishlistToDeal(clip5Wish, go5Deal).matched, false);
   assert.equal(matchWishlistToDeal(clip5Wish, clip5Bundle).matched, false);
+
+  const pedalboard = createWishlistItemObject({ name: 'Donner DB-P100 aluminum pedalboard', modelNumber: 'P100' });
+  const doughCutter = createWishlistItemObject({ name: 'Dexter-Russell Sani-Safe dough cutter S196', modelNumber: 'S196' });
+  assert.equal(matchWishlistToDeal(pedalboard, { title: 'RoseArt Hobby Haven Quilt Shop 1000-Piece Jigsaw Puzzle $4.69' }).matched, false);
+  assert.equal(matchWishlistToDeal(doughCutter, { title: 'Disney Girls Bomber Jacket Minnie Mouse Lightweight Sweatshirts $19.64-28.37' }).matched, false);
+  assert.equal(matchWishlistToDeal(pedalboard, { title: 'Aluminum pedalboard P-100' }).matched, true);
 });
 
 test('true deal detection computes Wake County 7.25% NC tax, defensible baselines, inflated list warnings, and honest zero-evidence scoring', () => {

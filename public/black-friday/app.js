@@ -1430,7 +1430,7 @@ function renderItemProductCard(item) {
           <div class="deal-why" style="margin-bottom:8px;">
             <strong>${best.freshness === 'stale' ? 'Last reported price:' : 'Current offer:'}</strong> ${money(best.currentPrice)} at <strong>${esc(best.retailerName || '')}</strong>
             ${best.verifiedDiscountPct != null ? ` · <span class="badge badge-${esc(best.tier || 'great')}">${best.verifiedDiscountPct}% OFF</span>` : ''}
-            ${best.retailerUrl ? ` · <a href="${esc(best.retailerUrl)}" target="_blank" rel="noopener noreferrer" style="color:var(--accent-cyan);font-weight:800;">SHOP NOW ↗</a>` : ''}
+            ${best.retailerUrl ? ` · <a href="${esc(best.retailerUrl)}" target="_blank" rel="noopener noreferrer" style="color:var(--accent-cyan);font-weight:800;">${best.isDirectProductUrl ? 'SHOP NOW' : 'VIEW DEAL'} ↗</a>` : ''}
           </div>` : `
           <div class="small muted" style="margin-bottom:8px;">No current offer found for this item.
           ${link ? ` · <a href="${esc(link)}" target="_blank" rel="noopener noreferrer" style="color:var(--accent-cyan);">Open product page ↗</a>` : ''}</div>`}
