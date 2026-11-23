@@ -30209,6 +30209,69 @@
    "price": 31.54,
    "tier": "Level 2 (mid)",
    "sourceType": "cool-science-research"
+  },
+  {
+   "name": "Tempest Weather Station by WeatherFlow \u2014 solar home weather station: wind, rain, temp, humidity, pressure, UV + lightning detection, app-connected (Weather pick for Bear \u2014 added 2026-11-22)",
+   "recipient": "Bear",
+   "retailerName": "Best Buy",
+   "url": "https://www.bestbuy.com/product/weatherflow-tempest-tempest-solar-powered-wifi-home-weather-station-with-rain-gauge-wind-meter-and-lightning-detection-white/J3Q5C7984F/sku/11456753",
+   "price": 296.65,
+   "tier": "Level 1 (best)",
+   "sourceType": "weather-research"
+  },
+  {
+   "name": "Ambient Weather WS-2902 WiFi Smart Weather Station \u2014 outdoor sensor array with color console, uploads to Weather Underground (Weather pick for Bear \u2014 added 2026-11-22)",
+   "recipient": "Bear",
+   "retailerName": "Amazon",
+   "url": "https://www.amazon.com/dp/B01N5TEHLI",
+   "price": 199.99,
+   "tier": "Level 1 (best)",
+   "sourceType": "weather-research"
+  },
+  {
+   "name": "Kestrel 3000 Pocket Weather Meter \u2014 handheld wind, temp, humidity, dew point; waterproof, for fishing and the truck (Weather pick for Bear \u2014 added 2026-11-22)",
+   "recipient": "Bear",
+   "retailerName": "The Fire Store",
+   "url": "https://thefirestore.com/Kestrel-3000-Pocket-Weather-Meter-Red",
+   "price": 179.39,
+   "tier": "Level 1 (best)",
+   "sourceType": "weather-research"
+  },
+  {
+   "name": "AcuRite Iris 5-in-1 Weather Station (01540M) \u2014 wireless wind/rain/temp/humidity sensor with indoor display and WiFi (Weather pick for Bear \u2014 added 2026-11-22)",
+   "recipient": "Bear",
+   "retailerName": "AcuRite",
+   "url": "https://www.acurite.com/collections/wi-fi-connected-weather-stations/products/pro-5-in-1-weather-station-with-wifi",
+   "price": 109.99,
+   "tier": "Level 1 (best)",
+   "sourceType": "weather-research"
+  },
+  {
+   "name": "AcuRite Portable Lightning Detector (02020) \u2014 pocket detector alerts when lightning strikes within 25 miles, for fishing safety (Weather pick for Bear \u2014 added 2026-11-22)",
+   "recipient": "Bear",
+   "retailerName": "Walmart",
+   "url": "https://www.walmart.com/ip/AcuRite-02020-Portable-Lightning-Detector/143686432",
+   "price": 41.7,
+   "tier": "Level 2 (mid)",
+   "sourceType": "weather-research"
+  },
+  {
+   "name": "Stanwood Wind Sculpture \u2014 kinetic copper dual-helix spinner, 7.5 ft yard piece that spins in the slightest breeze (Weather pick for Bear \u2014 added 2026-11-22)",
+   "recipient": "Bear",
+   "retailerName": "Etsy",
+   "url": "https://www.etsy.com/listing/875229433/dual-helix-spinner",
+   "price": 381.95,
+   "tier": "Level 1 (best)",
+   "sourceType": "weather-research"
+  },
+  {
+   "name": "Enkrio Storm Glass Weather Predictor (wood base) \u2014 FitzRoy crystal bottle desk piece; decorative, PRICE NOT VERIFIED (last seen ~$29.98) (Weather pick for Bear \u2014 added 2026-11-22)",
+   "recipient": "Bear",
+   "retailerName": "Amazon",
+   "url": "https://www.amazon.com/dp/B08HMYBB6Q",
+   "price": null,
+   "tier": "Level 2 (mid)",
+   "sourceType": "weather-research"
   }
  ]
 }
