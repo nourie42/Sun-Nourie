@@ -43,7 +43,7 @@ registerNourieEnterprisesAccess(app);
 
 // Extra tools disabled by default (Daniel, 2026-11-22): this one small
 // service hosts the weather apps plus a shelf of research/deal tools, and it
-// kept tipping over. Weather and Black Friday stay up; the extras come back
+// kept tipping over. Weather, the lightweight What's Up tracker, and Black Friday stay up; the extras come back
 // by setting EXTRA_APPS_ENABLED=1 in the environment. This gate blocks the
 // extras' pages and assets everywhere they can be reached — their API
 // registrations below, the direct file routes, and the legacy server's
@@ -52,7 +52,7 @@ registerNourieEnterprisesAccess(app);
 const EXTRA_APPS_ENABLED = process.env.EXTRA_APPS_ENABLED === '1';
 if (!EXTRA_APPS_ENABLED) {
   const DISABLED_PREFIXES = [
-    '/whats-up', '/whatsup', '/deal-lens', '/deal-desk', '/deal-intelligence',
+    '/deal-lens', '/deal-desk', '/deal-intelligence',
     '/ai-council', '/fuel-atlas', '/distributors', '/household-pl',
     '/nourie-enterprises', '/aadt', '/developments', '/scraper',
     '/gas-finder', '/gas-station-prospector', '/thermal', '/ai_job',
@@ -127,8 +127,8 @@ if (EXTRA_APPS_ENABLED) {
 }
 registerWeatherComparisonRoutes(app);
 const weatherFusion = registerWeatherFusionRoutes(app);
+registerWhatsUpRoutes(app, { getForecast: (query) => weatherFusion.getForecast(query) });
 if (EXTRA_APPS_ENABLED) {
-  registerWhatsUpRoutes(app, { getForecast: (query) => weatherFusion.getForecast(query) });
   registerAiAgentRoutes(app);
   registerAiCouncilRoutes(app);
   registerDealDeskRoutes(app);
