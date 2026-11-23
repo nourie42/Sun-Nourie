@@ -1417,7 +1417,7 @@ function mainGiftItemIds() {
   return ids;
 }
 
-function renderMainGiftCard(item) {
+function renderItemProductCard(item) {
   const thumb = secureImageUrl(item.bestOffer?.imageUrl || item.imageUrl || item.screenshotThumbnail);
   const best = item.bestOffer;
   const link = item.sourceUrl || best?.retailerUrl || '';
@@ -1429,7 +1429,7 @@ function renderMainGiftCard(item) {
       <div>
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px;">
           <strong style="font-size:15.5px;">${esc(item.name)}</strong>
-          <span class="badge badge-danger">⭐ MAIN GIFT</span>
+          ${item.mainGift ? '<span class="badge badge-danger">⭐ MAIN GIFT</span>' : ''}
           ${item.recipient ? `<span class="badge badge-watch">For: ${esc(item.recipient)}</span>` : ''}
         </div>
         <div class="small muted" style="margin-bottom:6px;">${esc([item.retailerName, item.tier].filter(Boolean).join(' · '))}</div>
@@ -1462,9 +1462,44 @@ function renderMainGiftsInto(grid, label) {
       lastRec = item.recipient;
       parts.push(`<h3 style="grid-column:1/-1;margin:10px 0 0;">${esc(lastRec || '')}</h3>`);
     }
-    parts.push(renderMainGiftCard(item));
+    parts.push(renderItemProductCard(item));
   }
   grid.innerHTML = parts.join('');
+  attachLogoFallbacks(grid);
+}
+
+// Shop-by categories show the person's PRODUCTS (the gift catalog), not
+// just the handful of live deals that happen to match — the deal-only view
+// left most categories nearly empty (Daniel, 2026-11-22: "still barely
+// anything for most catagories"). Items on sale sort first with their deal
+// badge; All Deals remains the live deal feed.
+const CATALOG_QFS = new Set(['kish', 'angel', 'bear', 'family', 'ali', 'level1', 'level2', 'level3', 'stocking', 'under20', 'under10']);
+
+function catalogItemsFor(def) {
+  const items = appState.data?.wishlist || [];
+  if (!def) return [];
+  if (def.recipient) return items.filter((w) => w.recipient === def.recipient);
+  if (def.tierPrefix) return items.filter((w) => String(w.tier || '').startsWith(def.tierPrefix));
+  if (def.maxPrice) return items.filter((w) => w.preferredPrice > 0 && w.preferredPrice < def.maxPrice);
+  return [];
+}
+
+function renderCatalogInto(grid, label, def) {
+  const items = catalogItemsFor(def);
+  const sorted = [...items].sort((a, b) => {
+    const ad = a.bestOffer?.verifiedDiscountPct ?? -1;
+    const bd = b.bestOffer?.verifiedDiscountPct ?? -1;
+    if (bd !== ad) return bd - ad;
+    const ao = a.bestOffer?.currentPrice != null ? 0 : 1;
+    const bo = b.bestOffer?.currentPrice != null ? 0 : 1;
+    if (ao !== bo) return ao - bo;
+    return (b.preferredPrice || 0) - (a.preferredPrice || 0);
+  });
+  const shown = sorted.slice(0, 60);
+  label.textContent = `${items.length} products — ${def.label} (showing ${shown.length}, on sale first)`;
+  grid.innerHTML = items.length
+    ? shown.map((it) => renderItemProductCard(it)).join('')
+    : '<div class="small muted">No products in this category yet.</div>';
   attachLogoFallbacks(grid);
 }
 
@@ -1499,9 +1534,11 @@ function renderQuickFilterBar() {
   // 1 card (Bot 1 click-through, 2026-11-22).
   const productCount = (subset) => new Set(subset.map((dl) => dl.canonicalKey || dl.id)).size;
   host.innerHTML = QUICK_FILTERS.map((def) => {
-    // Main Gifts shows products, not deals — its count is the product count.
+    // Main Gifts and the shop-by categories show products — their counts
+    // are product counts from the wish list itself.
     const n = def.id === 'all' ? productCount(deals)
       : def.id === 'main' ? mainIds.size
+      : CATALOG_QFS.has(def.id) ? catalogItemsFor(def).length
       : productCount(deals.filter((dl) => quickFilterTest(dl, def.id, itemMap, mainIds)));
     return `<button type="button" class="qf-chip ${appState.quickFilter === def.id ? 'is-active' : ''}" data-quick-filter="${def.id}">${esc(def.label)} <span class="tabular">${n}</span></button>`;
   }).join('');
@@ -1516,6 +1553,11 @@ function renderBestDealsView() {
     // main-gift products even when no live deal matches (Daniel, 2026-11-22:
     // "you have all of these lists... and theres no products for main gifts?").
     renderMainGiftsInto($('best-deals-grid'), $('deals-count-label'));
+    return;
+  }
+  if (CATALOG_QFS.has(appState.quickFilter)) {
+    const def = QUICK_FILTERS.find((x) => x.id === appState.quickFilter);
+    renderCatalogInto($('best-deals-grid'), $('deals-count-label'), def);
     return;
   }
   const retSel = $('filter-retailer');
