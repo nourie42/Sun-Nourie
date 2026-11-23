@@ -58,7 +58,7 @@ button:focus-visible,a:focus-visible{outline:2px solid #d6efff;outline-offset:3p
 
 .hero-bg-photo.sky-night-rain{filter:brightness(.48) saturate(.76)}
 
-.beta-location-actions.main-app-return {justify-content:space-between;flex-wrap:wrap;gap:8px}
+.beta-location-actions.main-app-return {justify-content:space-between;gap:8px}
 .beta-location-actions [aria-busy="true"] {opacity:.7}
 .beta-location-status {min-height:20px;margin-top:3px;margin-bottom:6px;text-align:center;color:#e0edf7;font-size:13px}
 .beta-hour-rain-details {margin:8px 0 12px;padding:8px 10px;border:1px solid #adcde638;border-radius:12px}

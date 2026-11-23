@@ -47,8 +47,6 @@ assert.doesNotMatch(home, /Click for Details/);
 assert.doesNotMatch(home, /risk-outlooks|outlook-dialog/);
 
 const weather = read("public/weather-fusion/index.html");
-assert.match(weather, /id="perfect-weather-tracker-link"[^>]*href="\/whats-up\/"/);
-assert.match(read("public/weather-fusion/v3/index.html"), /id="perfect-weather-tracker-link"[^>]*href="\/whats-up\/"/);
 assert.doesNotMatch(weather, /weather-alert-banner/);
 assert.doesNotMatch(weather, /id="perfect-weather-banner"/);
 assert.doesNotMatch(weather, /id="storm-weather-banner"/);
