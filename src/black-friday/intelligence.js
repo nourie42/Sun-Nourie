@@ -788,10 +788,18 @@ export function evaluateDeal(deal, {
   // price as a labeled extra.
   let couponDependent = false;
   let afterCouponPrice = null;
+  // Second condition: re-evaluating an already-corrected deal (e.g. one
+  // restored from the deals seed) has currentPrice == preCouponPrice; it is
+  // still coupon-dependent when the post claims a lower with-codes price.
+  // Without this, the warning data vanished on every redeploy (2026-11-22).
   if (
     storeCheckedPrice === null &&
     textFacts.preCouponPrice && textFacts.couponCodes.length > 0 &&
-    currentPrice !== null && currentPrice < textFacts.preCouponPrice - 1
+    currentPrice !== null &&
+    (currentPrice < textFacts.preCouponPrice - 1 ||
+      (Math.abs(currentPrice - textFacts.preCouponPrice) <= 1 &&
+        textFacts.afterCouponPrice !== null &&
+        textFacts.afterCouponPrice < currentPrice - 1))
   ) {
     couponDependent = true;
     afterCouponPrice = textFacts.afterCouponPrice ?? currentPrice;

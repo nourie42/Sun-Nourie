@@ -30110,6 +30110,105 @@
    "price": 49.98,
    "tier": "Level 2 (mid)",
    "sourceType": "daniel-screenshot"
+  },
+  {
+   "name": "The Swinging Sticks \u2014 kinetic energy sculpture, desktop version (chaotic double pendulum, the Iron Man 2 desk prop) (Cool Science Finds \u2014 added 2026-11-22)",
+   "recipient": "Kish",
+   "retailerName": "Amazon",
+   "url": "https://www.amazon.com/Fortune-Products-Inc-Swinging-Sculpture/dp/B073G984Q7",
+   "price": 98.0,
+   "tier": "Level 1 (best)",
+   "sourceType": "cool-science-research"
+  },
+  {
+   "name": "Joytech Bluetooth Music Tesla Coil \u2014 desktop Tesla coil that plays music through its lightning arc (Cool Science Finds \u2014 added 2026-11-22)",
+   "recipient": "Kish",
+   "retailerName": "Amazon",
+   "url": "https://www.amazon.com/dp/B08KDG6CFK",
+   "price": 49.99,
+   "tier": "Level 2 (mid)",
+   "sourceType": "cool-science-research"
+  },
+  {
+   "name": "Toysmith Euler's Disk \u2014 chrome disk that spins for minutes on a mirror, humming at a rising pitch (Cool Science Finds \u2014 added 2026-11-22)",
+   "recipient": "Kish",
+   "retailerName": "Amazon",
+   "url": "https://www.amazon.com/dp/B000239E6Q",
+   "price": 35.99,
+   "tier": "Level 2 (mid)",
+   "sourceType": "cool-science-research"
+  },
+  {
+   "name": "STEM Source Ferrofluid Kit \u2014 sealed display bottle with 2 neodymium magnets (Cool Science Finds \u2014 added 2026-11-22)",
+   "recipient": "Kish",
+   "retailerName": "Amazon",
+   "url": "https://www.amazon.com/dp/B0B7F8KQZK",
+   "price": 24.99,
+   "tier": "Level 2 (mid)",
+   "sourceType": "cool-science-research"
+  },
+  {
+   "name": "CERROPI Large Newton's Cradle \u2014 7 balls on a European beech base, 50-60 seconds of clean swing (Cool Science Finds \u2014 added 2026-11-22)",
+   "recipient": "Bear",
+   "retailerName": "Amazon",
+   "url": "https://www.amazon.com/dp/B082CNJXXF",
+   "price": 39.99,
+   "tier": "Level 2 (mid)",
+   "sourceType": "cool-science-research"
+  },
+  {
+   "name": "MetMo Helico MK3 (Nylon) \u2014 magnetic herringbone gear fidget, precision-made in the UK \u2014 PRE-ORDER, Christmas arrival NOT guaranteed (Cool Science Finds \u2014 added 2026-11-22)",
+   "recipient": "Bear",
+   "retailerName": "MetMo",
+   "url": "https://www.metmo.co.uk/collections/helico",
+   "price": 131.0,
+   "tier": "Level 1 (best)",
+   "sourceType": "cool-science-research"
+  },
+  {
+   "name": "Theefun Plasma Ball \u2014 8 inch, lightning follows your fingertips, touch and sound responsive (Cool Science Finds \u2014 added 2026-11-22)",
+   "recipient": "Angel",
+   "retailerName": "Amazon",
+   "url": "https://www.amazon.com/dp/B0CRL28YRZ",
+   "price": 39.99,
+   "tier": "Level 2 (mid)",
+   "sourceType": "cool-science-research"
+  },
+  {
+   "name": "Speks \u2014 512 tiny magnetic balls, the original brand-name set (ages 14+) (Cool Science Finds \u2014 added 2026-11-22)",
+   "recipient": "Angel",
+   "retailerName": "The Met Store",
+   "url": "https://store.metmuseum.org/gift-guide/gift-finder/results/speks-magnet-balls-speks",
+   "price": 34.95,
+   "tier": "Level 2 (mid)",
+   "sourceType": "cool-science-research"
+  },
+  {
+   "name": "Toysmith 3-D Mirascope \u2014 6 inch, parabolic mirrors project a floating hologram you can't touch (Cool Science Finds \u2014 added 2026-11-22)",
+   "recipient": "Angel",
+   "retailerName": "Amazon",
+   "url": "https://www.amazon.com/dp/B000N5T8KA",
+   "price": 10.99,
+   "tier": "Level 3 (under $20)",
+   "sourceType": "cool-science-research"
+  },
+  {
+   "name": "Magnetic Levitating Plant Pot \u2014 black hexagon, pot floats and rotates 360\u00b0 above its base (plant not included) (Cool Science Finds \u2014 added 2026-11-22)",
+   "recipient": "Ali",
+   "retailerName": "Amazon",
+   "url": "https://www.shopabunda.com/products/magnetic-levitating-flower-pot-air-bonsai-black-hexagon-suspension-floating-plant-pot-360-degree-rotation-pot-home-and-office-desk-decor",
+   "price": 59.0,
+   "tier": "Level 2 (mid)",
+   "sourceType": "cool-science-research"
+  },
+  {
+   "name": "AcuRite Galileo Thermometer with Glass Globe Barometer set \u2014 floating glass balls read the temperature (Cool Science Finds \u2014 added 2026-11-22)",
+   "recipient": "Ali",
+   "retailerName": "Amazon",
+   "url": "https://www.amazon.com/dp/B000A3IN10",
+   "price": 31.54,
+   "tier": "Level 2 (mid)",
+   "sourceType": "cool-science-research"
   }
  ]
 }
