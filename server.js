@@ -41,6 +41,33 @@ registerPrivatePageAccess(app);
 registerWeatherSiteAccess(app);
 registerNourieEnterprisesAccess(app);
 
+// Extra tools disabled by default (Daniel, 2026-11-22): this one small
+// service hosts the weather apps plus a shelf of research/deal tools, and it
+// kept tipping over. Weather and Black Friday stay up; the extras come back
+// by setting EXTRA_APPS_ENABLED=1 in the environment. This gate blocks the
+// extras' pages and assets everywhere they can be reached — their API
+// registrations below, the direct file routes, and the legacy server's
+// static folder (Bot 4 verification, 2026-11-22: APIs were off but the
+// static shells were still being served).
+const EXTRA_APPS_ENABLED = process.env.EXTRA_APPS_ENABLED === '1';
+if (!EXTRA_APPS_ENABLED) {
+  const DISABLED_PREFIXES = [
+    '/whats-up', '/whatsup', '/deal-lens', '/deal-desk', '/deal-intelligence',
+    '/ai-council', '/fuel-atlas', '/distributors', '/household-pl',
+    '/nourie-enterprises', '/aadt', '/developments', '/scraper',
+    '/gas-finder', '/gas-station-prospector', '/thermal', '/ai_job',
+    '/signals', '/site-research', '/distributor-', '/site-aadt',
+    '/site-address', '/site-autocomplete',
+  ];
+  app.use((req, res, next) => {
+    const p = String(req.path || '').toLowerCase();
+    if (DISABLED_PREFIXES.some((x) => p === x || p.startsWith(`${x}/`) || p.startsWith(x))) {
+      return res.status(503).send('Temporarily disabled.');
+    }
+    return next();
+  });
+}
+
 let legacyReady = false;
 let shuttingDown = false;
 
@@ -79,11 +106,7 @@ async function waitForLegacy() {
 }
 waitForLegacy();
 
-// Extra tools disabled by default (Daniel, 2026-11-22): this one small
-// service hosts the weather apps plus a shelf of research/deal tools, and it
-// kept tipping over. Weather and Black Friday stay up; the extras come back
-// by setting EXTRA_APPS_ENABLED=1 in the environment.
-const EXTRA_APPS_ENABLED = process.env.EXTRA_APPS_ENABLED === '1';
+// Extra-app API registrations (gate + rationale at the top of this file).
 if (EXTRA_APPS_ENABLED) {
   registerDistributorPresentationFix(app);
   registerDistributorResearchRoutes(app, { openAiApiKey: process.env.OPENAI_API_KEY || "" });
