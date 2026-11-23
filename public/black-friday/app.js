@@ -1748,6 +1748,9 @@ function bindEvents() {
     const qfBtn = e.target.closest('[data-quick-filter]');
     if (qfBtn) {
       appState.quickFilter = qfBtn.dataset.quickFilter;
+      // The home page's shop-by buttons use this same handler: without
+      // switching to the deals view the click looked dead (Daniel, 2026-11-22).
+      switchView('best-deals');
       renderBestDealsView();
       return;
     }
