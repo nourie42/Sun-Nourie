@@ -79,31 +79,40 @@ async function waitForLegacy() {
 }
 waitForLegacy();
 
-registerDistributorPresentationFix(app);
-registerDistributorResearchRoutes(app, { openAiApiKey: process.env.OPENAI_API_KEY || "" });
-registerDistributorCompanySearchRoutes(app, {
-  openAiApiKey: process.env.OPENAI_API_KEY || "",
-  googleApiKey: process.env.GOOGLE_API_KEY || "",
-});
-registerSiteWordLayoutFix(app);
-registerSiteResearchReportEnhancements(app);
-registerSiteResearchRoutes(app, { openAiApiKey: process.env.OPENAI_API_KEY || "" });
-registerExpandedAadtRoutes(app, { legacyPort });
-registerSiteEnhancementRoutes(app, {
-  legacyPort,
-  googleApiKey: process.env.GOOGLE_API_KEY || "",
-});
-registerFuelAtlasLocationCompanyBridge(app);
-registerFuelAtlasRoutes(app, { googleApiKey: process.env.GOOGLE_API_KEY || "" });
+// Extra tools disabled by default (Daniel, 2026-11-22): this one small
+// service hosts the weather apps plus a shelf of research/deal tools, and it
+// kept tipping over. Weather and Black Friday stay up; the extras come back
+// by setting EXTRA_APPS_ENABLED=1 in the environment.
+const EXTRA_APPS_ENABLED = process.env.EXTRA_APPS_ENABLED === '1';
+if (EXTRA_APPS_ENABLED) {
+  registerDistributorPresentationFix(app);
+  registerDistributorResearchRoutes(app, { openAiApiKey: process.env.OPENAI_API_KEY || "" });
+  registerDistributorCompanySearchRoutes(app, {
+    openAiApiKey: process.env.OPENAI_API_KEY || "",
+    googleApiKey: process.env.GOOGLE_API_KEY || "",
+  });
+  registerSiteWordLayoutFix(app);
+  registerSiteResearchReportEnhancements(app);
+  registerSiteResearchRoutes(app, { openAiApiKey: process.env.OPENAI_API_KEY || "" });
+  registerExpandedAadtRoutes(app, { legacyPort });
+  registerSiteEnhancementRoutes(app, {
+    legacyPort,
+    googleApiKey: process.env.GOOGLE_API_KEY || "",
+  });
+  registerFuelAtlasLocationCompanyBridge(app);
+  registerFuelAtlasRoutes(app, { googleApiKey: process.env.GOOGLE_API_KEY || "" });
+}
 registerWeatherComparisonRoutes(app);
 const weatherFusion = registerWeatherFusionRoutes(app);
-registerWhatsUpRoutes(app, { getForecast: (query) => weatherFusion.getForecast(query) });
-registerAiAgentRoutes(app);
-registerAiCouncilRoutes(app);
-registerDealDeskRoutes(app);
-registerHouseholdPLRoutes(app);
-registerDealIntelligenceRoutes(app);
-registerDealLensRoutes(app);
+if (EXTRA_APPS_ENABLED) {
+  registerWhatsUpRoutes(app, { getForecast: (query) => weatherFusion.getForecast(query) });
+  registerAiAgentRoutes(app);
+  registerAiCouncilRoutes(app);
+  registerDealDeskRoutes(app);
+  registerHouseholdPLRoutes(app);
+  registerDealIntelligenceRoutes(app);
+  registerDealLensRoutes(app);
+}
 registerBlackFridayRoutes(app);
 
 app.get("/fuel-atlas", (_req, res) => res.redirect(302, "/fuel-atlas.html"));

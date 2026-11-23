@@ -1398,14 +1398,74 @@ function mainGiftItemIds() {
   const recipients = [...new Set(items.map((w) => w.recipient).filter(Boolean))];
   for (const r of recipients) {
     const mine = items.filter((w) => w.recipient === r);
+    // 1) Explicitly flagged main gifts win (set in the seed / by Daniel).
+    const flagged = mine.filter((w) => w.mainGift);
+    if (flagged.length) { flagged.forEach((w) => ids.add(w.id)); continue; }
+    // 2) Known picks by name pattern.
     const pat = MAIN_GIFT_PATTERNS[r];
     const known = pat ? mine.filter((w) => pat.test(w.name || '')) : [];
     if (known.length) { known.forEach((w) => ids.add(w.id)); continue; }
-    const lvl1 = mine.filter((w) => String(w.tier || '').startsWith('Level 1') && w.preferredPrice > 0)
+    // 3) Fallback: priciest Level 1 item in a sane gift range. The old
+    // fallback crowned a $15,400 collector ring and a $16,495 jukebox;
+    // cap at $2,000 and skip items Daniel removed (Daniel, 2026-11-22).
+    const lvl1 = mine.filter((w) => String(w.tier || '').startsWith('Level 1')
+      && w.preferredPrice > 0 && w.preferredPrice <= 2000
+      && !/^REMOVED/i.test(w.name || ''))
       .sort((a, b) => (b.preferredPrice || 0) - (a.preferredPrice || 0));
     if (lvl1[0]) ids.add(lvl1[0].id);
   }
   return ids;
+}
+
+function renderMainGiftCard(item) {
+  const thumb = secureImageUrl(item.bestOffer?.imageUrl || item.imageUrl || item.screenshotThumbnail);
+  const best = item.bestOffer;
+  const link = item.sourceUrl || best?.retailerUrl || '';
+  return `
+    <article class="wishlist-card" data-wl-id="${esc(item.id)}">
+      <div class="wishlist-thumb">
+        ${thumb ? `<img src="${esc(thumb)}" alt="${esc(item.name)}" loading="lazy" />` : `<span style="font-size:28px;">${CAT_ICONS[item.category] || '🎁'}</span>`}
+      </div>
+      <div>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px;">
+          <strong style="font-size:15.5px;">${esc(item.name)}</strong>
+          <span class="badge badge-danger">⭐ MAIN GIFT</span>
+          ${item.recipient ? `<span class="badge badge-watch">For: ${esc(item.recipient)}</span>` : ''}
+        </div>
+        <div class="small muted" style="margin-bottom:6px;">${esc([item.retailerName, item.tier].filter(Boolean).join(' · '))}</div>
+        <div style="display:flex;gap:14px;flex-wrap:wrap;font-size:12.5px;margin-bottom:8px;" class="tabular">
+          <span>List price: <strong>${money(item.preferredPrice)}</strong></span>
+        </div>
+        ${best && best.currentPrice ? `
+          <div class="deal-why" style="margin-bottom:8px;">
+            <strong>On sale now:</strong> ${money(best.currentPrice)} at <strong>${esc(best.retailerName || '')}</strong>
+            ${best.verifiedDiscountPct != null ? ` · <span class="badge badge-${esc(best.tier || 'great')}">${best.verifiedDiscountPct}% OFF</span>` : ''}
+            ${best.retailerUrl ? ` · <a href="${esc(best.retailerUrl)}" target="_blank" rel="noopener noreferrer" style="color:var(--accent-cyan);font-weight:800;">SHOP NOW ↗</a>` : ''}
+          </div>` : `
+          <div class="small muted" style="margin-bottom:8px;">No live deal right now — this is the product itself, at its list price.
+          ${link ? ` · <a href="${esc(link)}" target="_blank" rel="noopener noreferrer" style="color:var(--accent-cyan);">Open product page ↗</a>` : ''}</div>`}
+      </div>
+    </article>`;
+}
+
+function renderMainGiftsInto(grid, label) {
+  const d = appState.data;
+  const mainIds = mainGiftItemIds();
+  const items = (d.wishlist || []).filter((w) => mainIds.has(w.id));
+  const order = ['Kish', 'Angel', 'Bear', 'Family', 'Ali'];
+  items.sort((a, b) => (order.indexOf(a.recipient) - order.indexOf(b.recipient)) || ((b.preferredPrice || 0) - (a.preferredPrice || 0)));
+  label.textContent = `${items.length} main-gift products`;
+  let lastRec = null;
+  const parts = ['<div class="small muted" style="grid-column:1/-1;">⭐ <strong>Main gifts</strong> — the products themselves, one per person, whether or not a deal is live. A sale badge appears here the moment one of them goes on sale.</div>'];
+  for (const item of items) {
+    if (item.recipient !== lastRec) {
+      lastRec = item.recipient;
+      parts.push(`<h3 style="grid-column:1/-1;margin:10px 0 0;">${esc(lastRec || '')}</h3>`);
+    }
+    parts.push(renderMainGiftCard(item));
+  }
+  grid.innerHTML = parts.join('');
+  attachLogoFallbacks(grid);
 }
 
 function quickFilterTest(deal, qf, itemMap, mainIds) {
@@ -1427,7 +1487,10 @@ function renderQuickFilterBar() {
   const itemMap = new Map((appState.data.wishlist || []).map((w) => [w.id, w]));
   const mainIds = mainGiftItemIds();
   host.innerHTML = QUICK_FILTERS.map((def) => {
-    const n = def.id === 'all' ? deals.length : deals.filter((dl) => quickFilterTest(dl, def.id, itemMap, mainIds)).length;
+    // Main Gifts shows products, not deals — its count is the product count.
+    const n = def.id === 'all' ? deals.length
+      : def.id === 'main' ? mainIds.size
+      : deals.filter((dl) => quickFilterTest(dl, def.id, itemMap, mainIds)).length;
     return `<button type="button" class="qf-chip ${appState.quickFilter === def.id ? 'is-active' : ''}" data-quick-filter="${def.id}">${esc(def.label)} <span class="tabular">${n}</span></button>`;
   }).join('');
 }
@@ -1436,6 +1499,13 @@ function renderBestDealsView() {
   const d = appState.data;
   if (!d) return;
   renderQuickFilterBar();
+  if (appState.quickFilter === 'main') {
+    // Main Gifts is a product view, not a deal filter: show each person's
+    // main-gift products even when no live deal matches (Daniel, 2026-11-22:
+    // "you have all of these lists... and theres no products for main gifts?").
+    renderMainGiftsInto($('best-deals-grid'), $('deals-count-label'));
+    return;
+  }
   const retSel = $('filter-retailer');
   const activeRetMap = new Map();
   for (const deal of d.deals) activeRetMap.set(deal.retailerId, deal.retailerName);

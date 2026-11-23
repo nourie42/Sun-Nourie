@@ -72,10 +72,18 @@ export async function priceCheck({ query, myPrice = null }, { fetchImpl = fetch,
   // refurbished or resale unit is a wrong answer.
   const item = { name: q, allowRefurbished: false, allowOpenBox: false };
   const CONDITION_RE = /refurbished|renewed|refurb\b|resale|open[ -]?box|pre[ -]?owned|used\b/i;
+  // Accessory guard: parts and add-ons (CREAMi pints, lids, blades...) are
+  // not the product. Unless the shopper asked for the accessory itself, an
+  // accessory can never be the "cheapest" answer (Daniel, 2026-11-22: a
+  // $9.99 2-pack of CREAMi pints was crowned cheapest CREAMi).
+  const ACCESSORY_RE = /\b(pints?|containers?|lids?|blades?|replacement|accessor\w*|compatible with|refills?)\b/i;
+  const queryWantsAccessory = ACCESSORY_RE.test(q);
   const offers = [];
   const seen = new Set();
   const addOffer = (o) => {
     if (!o || !(o.price > 0) || !o.url) return;
+    if (!queryWantsAccessory && ACCESSORY_RE.test(o.title || '')) return;
+    if (CONDITION_RE.test(o.title || '')) return;
     const key = `${o.retailer}|${o.price}|${o.url}`;
     if (seen.has(key)) return;
     seen.add(key);

@@ -16313,7 +16313,8 @@
    "url": "https://www.homedepot.com/p/Husky-72-in-Crossover-Truck-Tool-Box-in-Aluminum-w-Low-Profile-for-Full-Size-Trucks-in-Matte-Black-102101-53-01/302959740",
    "price": 469,
    "tier": "Level 1 (best)",
-   "sourceType": "spreadsheet"
+   "sourceType": "spreadsheet",
+   "mainGift": true
   },
   {
    "name": "Husky 72 in. Crossover Truck Tool Box, Aluminum, Standard Profile, Matte Black",
@@ -16322,7 +16323,8 @@
    "url": "https://www.homedepot.com/p/Husky-72-in-Crossover-Truck-Tool-Box-in-Aluminum-w-Standard-Profile-for-Full-Size-Trucks-in-Matte-Black-102100-53-01/302959746",
    "price": 479,
    "tier": "Level 1 (best)",
-   "sourceType": "spreadsheet"
+   "sourceType": "spreadsheet",
+   "mainGift": true
   },
   {
    "name": "Milwaukee M18 18V Brushless Cordless 1/2 in. Compact Drill/Driver Kit (3601-21P) \u2014 battery, charger & bag",
@@ -16347,7 +16349,8 @@
    "url": "https://realtruck.com/p/uws-crossover-toolbox/",
    "price": 633.95,
    "tier": "Level 1 (best)",
-   "sourceType": "spreadsheet"
+   "sourceType": "spreadsheet",
+   "mainGift": true
   },
   {
    "name": "Whitewater Torque 7V Heated Vest, Black, size Large",
@@ -16486,7 +16489,8 @@
    "price": 658.95,
    "tier": "Level 1 (best)",
    "sourceType": "spreadsheet",
-   "imageUrl": "http://www.deezee.com/cdn/shop/files/TB-Red-Crossover-DZ10170LTB-03-hires_ae6a3dea-a695-4841-a230-aa1e229b5b40.jpg?v=1793144680"
+   "imageUrl": "http://www.deezee.com/cdn/shop/files/TB-Red-Crossover-DZ10170LTB-03-hires_ae6a3dea-a695-4841-a230-aa1e229b5b40.jpg?v=1793144680",
+   "mainGift": true
   },
   {
    "name": "Garmin Instinct 3 45mm AMOLED rugged GPS smartwatch, black",
@@ -17528,7 +17532,8 @@
    "price": 304.95,
    "tier": "Level 1 (best)",
    "sourceType": "spreadsheet",
-   "imageUrl": "http://www.deezee.com/cdn/shop/files/TB-Poly-Crossover-DZ6170P-02_b943e7e2-6327-4ccd-bf2d-9cd0421f50df.jpg?v=1792088294"
+   "imageUrl": "http://www.deezee.com/cdn/shop/files/TB-Poly-Crossover-DZ6170P-02_b943e7e2-6327-4ccd-bf2d-9cd0421f50df.jpg?v=1792088294",
+   "mainGift": true
   },
   {
    "name": "Samsung Galaxy Tab S11 128GB Wi-Fi Gray",
@@ -30272,6 +30277,16 @@
    "price": null,
    "tier": "Level 2 (mid)",
    "sourceType": "weather-research"
+  },
+  {
+   "name": "Ray-Ban Meta Wayfarer (Gen 3), Matte Black / Clear \u2014 Kish's main gift (picked 2026-11-21)",
+   "recipient": "Kish",
+   "retailerName": "Best Buy",
+   "url": "https://www.bestbuy.com/site/searchpage.jsp?st=ray-ban+meta+wayfarer+gen+3",
+   "price": 449,
+   "tier": "Level 1 (best)",
+   "sourceType": "daniel-confirmed",
+   "mainGift": true
   }
  ]
 }

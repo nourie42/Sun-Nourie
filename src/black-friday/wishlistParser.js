@@ -1177,6 +1177,7 @@ export function createWishlistItemObject(input = {}) {
     allowRefurbished: Boolean(input.allowRefurbished),
     allowOpenBox: Boolean(input.allowOpenBox),
     isGiftIdea,
+    mainGift: Boolean(input.mainGift),
     sourceUrl: validSourceUrl,
     sourceType: input.sourceType || 'manual',
     uploadFileId: input.uploadFileId || null,
