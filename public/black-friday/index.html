@@ -114,19 +114,7 @@
 
         <!-- ==================== 1. HOME PAGE (3 CLEAR SECTIONS REQUESTED BY USER) ==================== -->
         <section id="view-command-center" class="view-panel is-active" aria-label="Family Shopping HQ">
-          <!-- SECTION 0: YOUR 10 PRIORITY STORES — FIRST, NO LONG SCROLL -->
-          <div class="glass-panel" id="home-bf-sales-panel">
-            <div class="section-head">
-              <div>
-                <div class="section-kicker">Official Deal Pages · Best Sale Days &amp; Times</div>
-                <h2>Your 10 Priority Stores</h2>
-              </div>
-              <button class="btn btn-sm" data-goto="black-friday-live" type="button">Event Timeline &amp; Countdowns →</button>
-            </div>
-            <div id="home-bf-store-sales" class="stores-grid"></div>
-          </div>
-
-          <!-- SECTION 0: SHOP BY PERSON / BY LEVEL — TOP OF HOME (Daniel, 2026-11-22) -->
+          <!-- SECTION 0: SHOP BY PERSON / BY LEVEL — VERY TOP OF HOME, ABOVE THE STORE CARDS (Daniel, 2026-11-23: kids buttons first so they are not buried on the phone) -->
           <div class="glass-panel" id="home-shop-by-panel">
             <div class="section-kicker">Jump Straight To Deals</div>
             <h2 style="margin:2px 0 8px;">🛒 Shop by person</h2>
@@ -148,6 +136,18 @@
               <button type="button" class="qf-chip" data-quick-filter="under10">Under $10</button>
             </div>
           </div>
+          <!-- SECTION 1: YOUR 10 PRIORITY STORES — BELOW SHOP-BY (Daniel, 2026-11-23) -->
+          <div class="glass-panel" id="home-bf-sales-panel">
+            <div class="section-head">
+              <div>
+                <div class="section-kicker">Official Deal Pages · Best Sale Days &amp; Times</div>
+                <h2>Your 10 Priority Stores</h2>
+              </div>
+              <button class="btn btn-sm" data-goto="black-friday-live" type="button">Event Timeline &amp; Countdowns →</button>
+            </div>
+            <div id="home-bf-store-sales" class="stores-grid"></div>
+          </div>
+
           <!-- SECTION 0A: BEFORE YOU BUY — PRICE CHECK (Daniel, 2026-11-22) -->
           <div class="glass-panel" id="home-price-check-panel">
             <div class="section-kicker">Before You Buy</div>
