@@ -24,7 +24,7 @@
   <link rel="stylesheet" href="/weather-fusion/dewpoint-meter.css?v=feel-chart-v3" />
   <link rel="stylesheet" href="/weather-fusion/weather-glass.css?v=ice-v5" />
   <link rel="stylesheet" href="/weather-fusion/outlook-panel.css?v=compact-v3" />
-  <link rel="stylesheet" href="/weather-fusion/v3/css/styles.css?v=v3-all-15" />
+  <link rel="stylesheet" href="/weather-fusion/v3/css/styles.css?v=v3-all-16" />
   <link rel="stylesheet" href="/weather-fusion/v3/css/people-globe.css?v=today-dewpoint-v1" />
 </head>
 <body class="beta-weather-app" data-sky="cloudy">
@@ -153,6 +153,9 @@
 
     <!-- Urgent Official NWS Weather Alerts -->
     <div id="urgent-alerts-container"></div>
+
+    <!-- Only shown when important near-term forecast details have low confidence -->
+    <section id="forecast-confidence-bar" class="glass forecast-confidence-bar" aria-live="polite" aria-label="Low forecast confidence" hidden></section>
 
     <!-- Official Weather Hazards (Compact Single-Line Bar, Only When Active) -->
     <div id="weather-hazards-strip" class="hazards-strip-grid" hidden></div>
@@ -461,6 +464,6 @@
   </footer>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
-  <script type="module" src="/weather-fusion/v3/js/app.js?v=today-dewpoint-v1"></script>
+  <script type="module" src="/weather-fusion/v3/js/app.js?v=confidence-bar-v1"></script>
 </body>
 </html>
