@@ -1483,7 +1483,14 @@ function quickFilterTest(deal, qf, itemMap, mainIds) {
 function renderQuickFilterBar() {
   const host = $('quick-filter-bar');
   if (!host || !appState.data) return;
-  const deals = appState.data.deals || [];
+  const allDeals = appState.data.deals || [];
+  // Chip counts must match what the list below shows: when "My Main Stores
+  // Only" is on (the default), count only main-store deals. The chips used
+  // to count every store while the list showed main stores only — Family
+  // read 11 while the list showed 2 (Daniel, 2026-11-22).
+  const favIds = new Set((appState.data.favoriteStores || []).map((s) => s.id));
+  const favOnly = appState.filters?.favOnly !== false && favIds.size > 0;
+  const deals = favOnly ? allDeals.filter((dl) => favIds.has(dl.retailerId)) : allDeals;
   const itemMap = new Map((appState.data.wishlist || []).map((w) => [w.id, w]));
   const mainIds = mainGiftItemIds();
   host.innerHTML = QUICK_FILTERS.map((def) => {
@@ -1534,7 +1541,27 @@ function renderBestDealsView() {
   else if (f.sort === 'price_desc') list.sort((a, b) => (b.finalAllInTotal ?? -1) - (a.finalAllInTotal ?? -1));
   else if (f.sort === 'newest') list.sort((a, b) => Date.parse(b.publishedAt || 0) - Date.parse(a.publishedAt || 0));
 
-  $('deals-count-label').textContent = f.favOnly !== false && favStoreIds.size ? `${list.length} deals from your main stores` : `${list.length} deals from all stores`;
+  // Collapse exact duplicate offers of the same product (same canonicalKey —
+  // e.g. the CREAMi listed at both Amazon and Kohl's): the grid shows the
+  // cheapest offer per product; the rest still exist and surface through
+  // Find Cheaper / Compare (Daniel, 2026-11-22: "there are 2 things and
+  // they are duplicates").
+  const offerCount = list.length;
+  {
+    const byKey = new Map();
+    for (const dl of list) {
+      const key = dl.canonicalKey || dl.id;
+      const prev = byKey.get(key);
+      const price = dl.finalAllInTotal ?? dl.currentPrice ?? Number.POSITIVE_INFINITY;
+      const prevPrice = prev ? (prev.finalAllInTotal ?? prev.currentPrice ?? Number.POSITIVE_INFINITY) : Number.POSITIVE_INFINITY;
+      if (!prev || price < prevPrice) byKey.set(key, dl);
+    }
+    list = [...byKey.values()];
+  }
+
+  $('deals-count-label').textContent = f.favOnly !== false && favStoreIds.size
+    ? `${list.length} products (${offerCount} offers) from your main stores`
+    : `${list.length} products (${offerCount} offers) from all stores`;
   $('best-deals-grid').innerHTML = list.length ? list.slice(0, 60).map((x) => renderProductCardHtml(x)).join('') : '<div class="small muted">No deals match your filters.</div>';
   attachLogoFallbacks($('best-deals-grid'));
 }
