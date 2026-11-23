@@ -20,6 +20,7 @@ import {
 import { RETAILER_DIRECTORY, PRIMARY_LOCATION } from './constants.js';
 
 const DEFAULT_UA = 'BlackFridayCommandCenter/1.0 (Personal Family Shopping Monitor; +https://github.com/nourie42/Sun-Nourie)';
+export const MAX_DEAL_POST_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
 const AGGREGATOR_DOMAINS = ['slickdeals.net', 'slickdealscdn.com', 'dealnews.com', 'hip2save.com', '9to5toys.com', 'dealcatcher.com', 'dansdeals.com', 'bradsdeals.com', 'camelcamelcamel.com', 'keepa.com', 'cashbackmonitor.com', 'rakuten.com', 'retailmenot.com', 'cheapshark.com'];
 const RETAILER_DOMAINS = RETAILER_DIRECTORY
@@ -44,6 +45,10 @@ export const SOURCE_CATALOG = Object.freeze([
   { id: 'slickdeals_samsclub', name: "Sam's Club Live Deals", kind: 'rss', category: 'Sams Club Store Feed', url: 'https://slickdeals.net/newsearch.php?q=sams+club&searcharea=deals&searchin=first&rss=1', maxItems: 25 },
   { id: 'slickdeals_macys', name: "Macy's Live Deals", kind: 'rss', category: 'Macys Store Feed', url: 'https://slickdeals.net/newsearch.php?q=macys&searcharea=deals&searchin=first&rss=1', maxItems: 25 },
   { id: 'slickdeals_kohls', name: "Kohl's Live Deals", kind: 'rss', category: 'Kohls Store Feed', url: 'https://slickdeals.net/newsearch.php?q=kohls&searcharea=deals&searchin=first&rss=1', maxItems: 25 },
+  { id: 'slickdeals_academy', name: 'Academy Sports Live Deals', kind: 'rss', category: 'Academy Store Feed', url: 'https://slickdeals.net/newsearch.php?q=academy+sports&searcharea=deals&searchin=first&rss=1', maxItems: 25 },
+  { id: 'slickdeals_cabelas', name: "Cabela's Live Deals", kind: 'rss', category: 'Cabelas Store Feed', url: 'https://slickdeals.net/newsearch.php?q=cabela%27s&searcharea=deals&searchin=first&rss=1', maxItems: 25 },
+  { id: 'slickdeals_barnesnoble', name: 'Barnes & Noble Live Deals', kind: 'rss', category: 'Barnes & Noble Store Feed', url: 'https://slickdeals.net/newsearch.php?q=barnes+%26+noble&searcharea=deals&searchin=first&rss=1', maxItems: 25 },
+  { id: 'barnesnoble_holiday', name: 'Barnes & Noble Black Friday', kind: 'retailer_sale', category: 'Official Retailer Deals', url: 'https://www.barnesandnoble.com/pages/black-friday-cyber-monday-deals', maxItems: 36 },
   { id: 'slickdeals_nike', name: 'Nike Live Deals', kind: 'rss', category: 'Nike Store Feed', url: 'https://slickdeals.net/newsearch.php?q=nike&searcharea=deals&searchin=first&rss=1', maxItems: 25 },
   { id: 'slickdeals_lego', name: 'LEGO Live Deals', kind: 'rss', category: 'LEGO Store Feed', url: 'https://slickdeals.net/newsearch.php?q=lego&searcharea=deals&searchin=first&rss=1', maxItems: 25 },
   { id: 'slickdeals_apple', name: 'Apple Live Deals', kind: 'rss', category: 'Apple Store Feed', url: 'https://slickdeals.net/newsearch.php?q=apple&searcharea=deals&searchin=first&rss=1', maxItems: 25 },
@@ -252,6 +257,7 @@ export function normalizeRssItemToDeal(rawItem, source, nowIso) {
   const parsedPubDate = rawItem.pubDate && Number.isFinite(Date.parse(rawItem.pubDate))
     ? new Date(rawItem.pubDate).toISOString()
     : nowIso;
+  if (Date.parse(nowIso) - Date.parse(parsedPubDate) > MAX_DEAL_POST_AGE_MS) return null;
 
   const id = makeDealFingerprint(retailer.id, identity.canonicalKey, source.id, displayTitle);
 
@@ -844,9 +850,10 @@ export async function runAllAdapters({
   fetchImpl = globalThis.fetch,
   now = () => new Date(),
   includeOptionalChecks = true,
+  feedOnly = false,
 } = {}) {
   const nowIso = now().toISOString();
-  const activeSources = SOURCE_CATALOG.filter((s) => enabledSources[s.id] !== false);
+  const activeSources = SOURCE_CATALOG.filter((s) => enabledSources[s.id] !== false && (!feedOnly || ['rss', 'retailer_sale'].includes(s.kind)));
 
   const results = [];
   // Run in polite batches of 8 so per-store + main feeds complete briskly
@@ -856,6 +863,7 @@ export async function runAllAdapters({
     const batchOut = await Promise.all(
       batch.map(async (source) => {
         if (source.kind === 'rss') return runRssSource(source, { fetchImpl, nowIso });
+        if (source.id === 'barnesnoble_holiday') return runBarnesNobleSale(source, { fetchImpl, nowIso });
         // cheapshark source removed — see DEAL_SOURCES note.
         if (source.id === 'cashbackmonitor') return runCashbackMonitorSource(source, { fetchImpl, nowIso });
         if (source.id === 'bestbuy_api') return runBestBuyApiSource(source, { env, fetchImpl, nowIso });
@@ -882,6 +890,55 @@ export async function runAllAdapters({
     healthById,
     cashbackRates,
     fetchedAt: nowIso,
+  };
+}
+
+async function runBarnesNobleSale(source, { fetchImpl, nowIso }) {
+  const response = await fetchWithRetry(source.url, { fetchImpl, timeoutMs: 10_000, retries: 0 });
+  const deals = new Map();
+  let itemCount = 0;
+  if (response.ok) {
+    const cards = response.text.split('<div class="carousel-slide quick-add-hover-product-item">');
+    itemCount = cards.length - 1;
+    for (const rawCard of cards.slice(1)) {
+      const card = rawCard.slice(0, 8_000);
+      const media = card.match(/<a\b[^>]*href="(\/w\/[^"\s]+)"[^>]*>\s*<img\b([^>]+)>/i);
+      const title = stripHtml(media?.[2].match(/\balt="([^"]+)"/)?.[1] || '');
+      const imageUrl = stripHtml(media?.[2].match(/\bsrc="(https:\/\/[^"\s]+)"/)?.[1] || '');
+      const price = Number(card.match(/class="product-item-card__current-price">\$([\d.]+)/)?.[1]);
+      const regular = Number(card.match(/class="product-item-card__compare-price">\$([\d.]+)/)?.[1]);
+      if (!media || !title || !imageUrl || !(price > 0 && price < regular)) continue;
+      const url = new URL(stripHtml(media[1]), source.url);
+      const ean = url.searchParams.get('ean');
+      if (!/^\d{13}$/.test(ean || '') || deals.has(ean)) continue;
+      const deal = normalizeRssItemToDeal({ title, link: url.href, dealPriceTag: `$${price}`, imageUrl, vendorName: 'Barnes & Noble' }, source, nowIso);
+      if (!deal) continue;
+      deals.set(ean, {
+        ...deal,
+        id: `barnesnoble_${ean}`,
+        canonicalKey: `gtin:${ean}`,
+        identifiers: { ...deal.identifiers, gtin: ean },
+        retailerId: 'barnesnoble',
+        retailerName: 'Barnes & Noble',
+        retailerUrl: url.href,
+        dealPageUrl: source.url,
+        isDirectProductUrl: true,
+        reportedRegularPrice: regular,
+        baselineSource: 'editorial_regular',
+        isBlackFriday: true,
+      });
+      if (deals.size >= source.maxItems) break;
+    }
+  }
+  const status = response.ok && itemCount ? 'ok' : [403, 435].includes(response.status) ? 'blocked' : response.status === 429 ? 'rate_limited' : 'error';
+  return {
+    deals: [...deals.values()],
+    health: {
+      sourceId: source.id, name: source.name, kind: source.kind, category: source.category, status,
+      httpStatus: response.status || null, lastAttemptAt: nowIso, lastSuccessAt: status === 'ok' ? nowIso : null,
+      lastError: status === 'ok' ? null : response.error || (response.ok ? 'No product cards found on the sale page' : `HTTP ${response.status}`),
+      itemsFetched: itemCount, dealsParsed: deals.size, latencyMs: response.latencyMs,
+    },
   };
 }
 

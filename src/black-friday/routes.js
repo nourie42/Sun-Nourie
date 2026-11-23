@@ -4,7 +4,8 @@
  */
 
 import express from 'express';
-import zlib from 'node:zlib';
+import { gzip } from 'node:zlib';
+import { promisify } from 'node:util';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
@@ -27,6 +28,7 @@ import { deliverAlertExternally, getChannelStatus } from './notifications.js';
 import { priceCheck } from './pricecheck.js';
 
 const PUBLIC_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'public', 'black-friday');
+const gzipAsync = promisify(gzip);
 
 const PAGE_CSP = [
   "default-src 'self'",
@@ -96,44 +98,32 @@ export function registerBlackFridayRoutes(app, {
   app.use('/black-friday', uiRouter);
 
   const api = express.Router();
+  const asyncRoute = (method, route, handler) => {
+    api[method](route, (req, res, next) => { void handler(req, res).catch(next); });
+  };
   api.use(express.json({ limit: '25mb' }));
   api.use((_req, res, next) => {
     setPrivateHeaders(res, false);
     next();
   });
-  // Wire slimming + gzip (2026-11-22): dashboard responses were ~11 MB of raw
-  // JSON; a few at once tipped the small Render instance into 502s. Every
-  // res.json on this router swaps any embedded dashboard for the slim wire
-  // copy and gzips large bodies when the client accepts it. Any failure falls
-  // back to the original response untouched.
   api.use((req, res, next) => {
     const origJson = res.json.bind(res);
     res.json = (body) => {
-      try {
-        let out = body;
-        if (out && typeof out === 'object') {
-          if (out.dashboard && typeof out.dashboard === 'object') {
-            out = { ...out, dashboard: engine.slimDashboardForWire(out.dashboard) };
-          } else if (out.wishlist && out.deals) {
-            out = engine.slimDashboardForWire(out);
-          }
-        }
-        const accept = String(req.headers['accept-encoding'] || '');
-        if (out && typeof out === 'object' && /\bgzip\b/.test(accept)) {
-          const buffers = (out.wishlist && out.deals) ? engine.dashboardWireBuffers(out) : null;
-          const text = buffers ? buffers.json : JSON.stringify(out);
-          if (text && text.length > 100000) {
-            const buf = buffers ? buffers.gzip : zlib.gzipSync(Buffer.from(text));
-            res.set('Content-Encoding', 'gzip');
-            res.set('Content-Type', 'application/json; charset=utf-8');
-            res.set('Vary', 'Accept-Encoding');
-            return res.send(buf);
-          }
-        }
-        return origJson(out);
-      } catch {
-        return origJson(body);
-      }
+      const dashboard = body?.dashboard || (body?.kpis && Array.isArray(body.deals) ? body : null);
+      if (!dashboard) return origJson(body);
+      const slim = engine.slimDashboardForWire(dashboard);
+      const out = body === dashboard ? slim : { ...body, dashboard: slim };
+      res.vary('Accept-Encoding');
+      if (!req.headers['accept-encoding'] || !req.acceptsEncodings('gzip')) return origJson(out);
+      const compressed = body === dashboard ? engine.gzipDashboard(slim) : gzipAsync(JSON.stringify(out));
+      void compressed.then((buffer) => {
+        if (res.destroyed) return;
+        res.set('Content-Encoding', 'gzip');
+        res.type('application/json').send(buffer);
+      }, () => {
+        if (!res.destroyed) origJson(out);
+      }).catch(next);
+      return res;
     };
     next();
   });
@@ -145,7 +135,7 @@ export function registerBlackFridayRoutes(app, {
 
   // 1b. "Before you buy" price check (Daniel, 2026-11-22): search the site's
   // live deals + a fresh Slickdeals search for the lowest price on anything.
-  api.post('/price-check', async (req, res) => {
+  asyncRoute('post', '/price-check', async (req, res) => {
     const query = String(req.body?.query || '').trim().slice(0, 120);
     const myPriceRaw = Number(req.body?.myPrice);
     const myPrice = Number.isFinite(myPriceRaw) && myPriceRaw > 0 ? myPriceRaw : null;
@@ -178,7 +168,7 @@ export function registerBlackFridayRoutes(app, {
   });
 
   // 3. Health & Telemetry
-  api.get('/health', async (_req, res) => {
+  asyncRoute('get', '/health', async (_req, res) => {
     const dash = engine.buildDashboardPayload();
     const backups = await store.listBackups();
     res.json({
@@ -200,21 +190,38 @@ export function registerBlackFridayRoutes(app, {
   });
 
   // 4. Manual Refresh
-  api.post('/refresh', async (req, res) => {
+  asyncRoute('post', '/refresh', async (req, res) => {
+    const state = store.getState();
+    if (req.body?.background && state.scheduler.running) {
+      return res.status(202).json({ ok: true, at: state.scheduler.lastRunAt });
+    }
     if (!engine.canManualRefresh() && !req.body?.force) {
       return res.status(429).json({ ok: false, error: 'A refresh just ran. Wait a few seconds before trying again.' });
     }
     engine.markManualRefresh();
-    const result = await engine.runMonitoringSweep({
+    const refresh = engine.runMonitoringSweep({
       reason: 'manual',
       workerSource: 'manual',
       createBackup: Boolean(req.body?.backup),
+      feedOnly: req.body?.feedOnly === true,
     });
+    if (req.body?.background) {
+      void refresh.catch(console.error);
+      return res.status(202).json({ ok: true, at: state.scheduler.lastRunAt });
+    }
+    const result = await refresh;
     res.json({ ...result, dashboard: engine.buildDashboardPayload() });
   });
 
+  api.get('/refresh-status', (req, res) => {
+    const scheduler = store.getState().scheduler;
+    const at = String(req.query.at || '');
+    const result = (scheduler.history || []).find((run) => run.at === at) || null;
+    res.json({ running: scheduler.running && scheduler.lastRunAt === at, result });
+  });
+
   // 5. Store Directory Favorites & Link Verification (Priority 1)
-  api.post('/stores/favorite', async (req, res) => {
+  asyncRoute('post', '/stores/favorite', async (req, res) => {
     const storeId = String(req.body?.storeId || '').trim();
     if (!RETAILER_BY_ID[storeId]) return res.status(400).json({ error: 'Unknown retailer ID.' });
     const state = store.getState();
@@ -236,13 +243,13 @@ export function registerBlackFridayRoutes(app, {
     res.json({ ok: true, isFavorite: list.has(storeId), favoriteStoreIds: [...list] });
   });
 
-  api.post('/stores/verify-links', async (_req, res) => {
+  asyncRoute('post', '/stores/verify-links', async (_req, res) => {
     const statuses = await engine.verifyStores();
     res.json({ ok: true, checkedCount: Object.keys(statuses).length, statuses, dashboard: engine.buildDashboardPayload() });
   });
 
   // 6. REAL UPLOAD CENTER: Preview, Preserve Original File & Commit (Priority 2)
-  api.post('/uploads/preview', async (req, res) => {
+  asyncRoute('post', '/uploads/preview', async (req, res) => {
     try {
       const b = req.body || {};
       const state = store.getState();
@@ -293,7 +300,7 @@ export function registerBlackFridayRoutes(app, {
     }
   });
 
-  api.post('/uploads/commit', async (req, res) => {
+  asyncRoute('post', '/uploads/commit', async (req, res) => {
     try {
       const b = req.body || {};
       const uploadType = b.uploadType === 'deal' ? 'deal' : 'wishlist';
@@ -453,7 +460,7 @@ export function registerBlackFridayRoutes(app, {
     }
   });
 
-  api.get('/uploads/:fileId', async (req, res) => {
+  asyncRoute('get', '/uploads/:fileId', async (req, res) => {
     const file = await store.readUploadedFile(req.params.fileId);
     if (!file) return res.status(404).json({ error: 'Uploaded file not found.' });
     res.setHeader('Content-Disposition', `inline; filename="${file.meta.filename.replace(/"/g, '')}"`);
@@ -461,7 +468,7 @@ export function registerBlackFridayRoutes(app, {
   });
 
   // 7. User-Uploaded Saved Deals CRUD
-  api.patch('/saved-deals/:id', async (req, res) => {
+  asyncRoute('patch', '/saved-deals/:id', async (req, res) => {
     const state = store.getState();
     const sd = (state.savedDeals || []).find((x) => x.id === req.params.id);
     if (!sd) return res.status(404).json({ error: 'Saved deal not found.' });
@@ -483,7 +490,7 @@ export function registerBlackFridayRoutes(app, {
     res.json({ ok: true, savedDeal: sd, dashboard: engine.buildDashboardPayload() });
   });
 
-  api.delete('/saved-deals/:id', async (req, res) => {
+  asyncRoute('delete', '/saved-deals/:id', async (req, res) => {
     const state = store.getState();
     state.savedDeals = (state.savedDeals || []).filter((x) => x.id !== req.params.id);
     await store.persist();
@@ -515,7 +522,7 @@ export function registerBlackFridayRoutes(app, {
   });
 
   // 9. Actionable Recommendation Feedback: LOVE IT / NOT INTERESTED / ALREADY BOUGHT (Priority 3)
-  api.post('/feedback', async (req, res) => {
+  asyncRoute('post', '/feedback', async (req, res) => {
     const { dealId, action, profileId, canonicalKey, title } = req.body || {};
     if (!['love', 'unlove', 'reject', 'bought', 'reset_rejected'].includes(action)) {
       return res.status(400).json({ error: 'Valid action (love|unlove|reject|bought|reset_rejected) required.' });
@@ -581,7 +588,7 @@ export function registerBlackFridayRoutes(app, {
   });
 
   // Back-compat alias for Deal Hunter feedback
-  api.post('/hunter/feedback', async (req, res) => {
+  asyncRoute('post', '/hunter/feedback', async (req, res) => {
     const { dealId, action } = req.body || {};
     const mapped = action === 'save' ? 'love' : action === 'unsave' ? 'unlove' : action === 'reset' ? 'reset_rejected' : 'reject';
     req.body = { dealId, action: mapped };
@@ -609,7 +616,7 @@ export function registerBlackFridayRoutes(app, {
     res.json({ wishlist: dash.wishlist, profiles: dash.profiles });
   });
 
-  api.post('/wishlist/inspect-url', async (req, res) => {
+  asyncRoute('post', '/wishlist/inspect-url', async (req, res) => {
     const rawUrl = String(req.body?.url || '').trim();
     if (!rawUrl) return res.status(400).json({ error: 'Product URL is required.' });
     const result = await inspectRetailerUrl(rawUrl, { fetchImpl, now });
@@ -623,7 +630,7 @@ export function registerBlackFridayRoutes(app, {
     res.json(matchGiftIdeaDeals(prompt, dash.deals));
   });
 
-  api.post('/wishlist', async (req, res) => {
+  asyncRoute('post', '/wishlist', async (req, res) => {
     try {
       const body = req.body || {};
       const state = store.getState();
@@ -668,7 +675,7 @@ export function registerBlackFridayRoutes(app, {
     }
   });
 
-  api.post('/wishlist/:id/move', async (req, res) => {
+  asyncRoute('post', '/wishlist/:id/move', async (req, res) => {
     const state = store.getState();
     const item = state.wishlist.find((w) => w.id === req.params.id);
     if (!item) return res.status(404).json({ error: 'Wish-list item not found.' });
@@ -681,7 +688,7 @@ export function registerBlackFridayRoutes(app, {
     res.json({ ok: true, item, dashboard: engine.buildDashboardPayload() });
   });
 
-  api.patch('/wishlist/:id', async (req, res) => {
+  asyncRoute('patch', '/wishlist/:id', async (req, res) => {
     const state = store.getState();
     const item = state.wishlist.find((w) => w.id === req.params.id);
     if (!item) return res.status(404).json({ error: 'Wish-list item not found.' });
@@ -701,7 +708,7 @@ export function registerBlackFridayRoutes(app, {
     res.json({ item, dashboard: engine.buildDashboardPayload() });
   });
 
-  api.delete('/wishlist/:id', async (req, res) => {
+  asyncRoute('delete', '/wishlist/:id', async (req, res) => {
     const state = store.getState();
     const before = state.wishlist.length;
     state.wishlist = state.wishlist.filter((w) => w.id !== req.params.id);
@@ -710,14 +717,14 @@ export function registerBlackFridayRoutes(app, {
     res.json({ ok: true, dashboard: engine.buildDashboardPayload() });
   });
 
-  api.post('/wishlist/:id/search', async (req, res) => {
+  asyncRoute('post', '/wishlist/:id/search', async (req, res) => {
     const out = await engine.searchForWishlistItem(req.params.id);
     if (!out) return res.status(404).json({ error: 'Wish-list item not found.' });
     res.json({ ...out, dashboard: engine.buildDashboardPayload() });
   });
 
   // 11. Editable Family Shopping Profiles (Priority 4)
-  api.post('/profiles', async (req, res) => {
+  asyncRoute('post', '/profiles', async (req, res) => {
     const name = String(req.body?.name || '').trim();
     if (!name) return res.status(400).json({ error: 'Profile name is required.' });
     const state = store.getState();
@@ -741,7 +748,7 @@ export function registerBlackFridayRoutes(app, {
     res.status(201).json({ profile, dashboard: engine.buildDashboardPayload() });
   });
 
-  api.patch('/profiles/:id', async (req, res) => {
+  asyncRoute('patch', '/profiles/:id', async (req, res) => {
     const state = store.getState();
     const prof = state.profiles.find((p) => p.id === req.params.id);
     if (!prof) return res.status(404).json({ error: 'Profile not found.' });
@@ -763,7 +770,7 @@ export function registerBlackFridayRoutes(app, {
     res.json({ ok: true, profile: prof, dashboard: engine.buildDashboardPayload() });
   });
 
-  api.delete('/profiles/:id', async (req, res) => {
+  asyncRoute('delete', '/profiles/:id', async (req, res) => {
     const state = store.getState();
     if (req.params.id === 'family-main') return res.status(400).json({ error: 'Default Family Shared List cannot be deleted.' });
     state.profiles = state.profiles.filter((p) => p.id !== req.params.id);
@@ -802,7 +809,7 @@ export function registerBlackFridayRoutes(app, {
     });
   });
 
-  api.post('/alerts/read', async (req, res) => {
+  asyncRoute('post', '/alerts/read', async (req, res) => {
     const state = store.getState();
     const ids = Array.isArray(req.body?.ids) ? new Set(req.body.ids) : null;
     for (const a of state.alerts) if (!ids || ids.has(a.id)) a.read = true;
@@ -810,7 +817,7 @@ export function registerBlackFridayRoutes(app, {
     res.json({ ok: true, unreadCount: state.alerts.filter((a) => !a.read).length });
   });
 
-  api.post('/alerts/test', async (_req, res) => {
+  asyncRoute('post', '/alerts/test', async (_req, res) => {
     const state = store.getState();
     const testAlert = {
       id: `al_test_${crypto.randomBytes(4).toString('hex')}`,
@@ -835,7 +842,7 @@ export function registerBlackFridayRoutes(app, {
     res.json({ ok: true, alert: testAlert, externalDelivery: external, channels: getChannelStatus({ env, settings: state.settings }) });
   });
 
-  api.patch('/settings', async (req, res) => {
+  asyncRoute('patch', '/settings', async (req, res) => {
     const state = store.getState();
     const b = req.body || {};
     if (b.theme && ['dark', 'light'].includes(b.theme)) state.settings.theme = b.theme;
@@ -844,7 +851,10 @@ export function registerBlackFridayRoutes(app, {
     if (b.thresholds && typeof b.thresholds === 'object') state.settings.thresholds = { ...state.settings.thresholds, ...b.thresholds };
     if (b.decisionWeights && typeof b.decisionWeights === 'object') state.settings.decisionWeights = { ...state.settings.decisionWeights, ...b.decisionWeights };
     if (b.alerts && typeof b.alerts === 'object') state.settings.alerts = { ...state.settings.alerts, ...b.alerts };
-    if (b.monitoring && typeof b.monitoring === 'object') state.settings.monitoring = { ...state.settings.monitoring, ...b.monitoring };
+    if (b.monitoring && typeof b.monitoring === 'object') {
+      state.settings.monitoring = { ...state.settings.monitoring, ...b.monitoring };
+      if (autoStart && !state.scheduler.running) engine.scheduleNext();
+    }
     if (b.budgets && typeof b.budgets === 'object') state.settings.budgets = { ...state.settings.budgets, ...b.budgets };
     if (b.enabledSources && typeof b.enabledSources === 'object') state.settings.enabledSources = { ...state.settings.enabledSources, ...b.enabledSources };
     await store.persist();

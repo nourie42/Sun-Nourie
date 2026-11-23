@@ -248,6 +248,9 @@ export function createBlackFridayStore({
       if (!list.length) return;
       state.deals = {};
       for (const d of list) if (d && d.id) state.deals[d.id] = d;
+      if (!state.scheduler.lastSuccessfulRunAt && Number.isFinite(Date.parse(seed.snapshotAt))) {
+        state.scheduler.lastSuccessfulRunAt = seed.snapshotAt;
+      }
     } catch { /* seed is best-effort */ }
   }
 

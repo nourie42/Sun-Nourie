@@ -1708,6 +1708,7 @@ export function buildPersonalizedRecommendations({
   savedDeals = [],
   profiles = [],
   feedback = {},
+  wishlistOffers = null,
 } = {}) {
   const rejectedIds = new Set(feedback.rejectedDealIds || []);
   const rejectedKeys = new Set(feedback.rejectedCanonicalKeys || []);
@@ -1754,6 +1755,7 @@ export function buildPersonalizedRecommendations({
   }
 
   const eligibleDeals = (evaluatedDeals || []).filter((d) => !d.archived && d.currentPrice !== null && !isRejected(d) && !boughtIds.has(d.id));
+  const eligibleIds = new Set(eligibleDeals.map((deal) => deal.id));
   const usedIds = new Set();
 
   // ---- TIER 1: Exact Wish-List Matches (round-robin across wish-list items so one item doesn't crowd out others) ----
@@ -1763,8 +1765,9 @@ export function buildPersonalizedRecommendations({
   const sortedWish = [...activeWish].sort((a, b) => (prioWeight[b.priority] || 2) - (prioWeight[a.priority] || 2));
 
   for (const item of sortedWish) {
-    const matches = eligibleDeals
-      .filter((d) => matchWishlistToDeal(item, d).matched)
+    const matches = (wishlistOffers
+      ? (wishlistOffers.get(item.id) || []).filter((d) => eligibleIds.has(d.id))
+      : eligibleDeals.filter((d) => matchWishlistToDeal(item, d).matched))
       .sort((a, b) => (a.finalAllInTotal ?? a.currentPrice) - (b.finalAllInTotal ?? b.currentPrice));
 
     for (const m of matches) tier1AllExactIds.add(m.id);

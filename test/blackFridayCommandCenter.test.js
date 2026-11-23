@@ -434,6 +434,7 @@ test('XML RSS parser and JSON-LD HTML metadata extractor parse real structured f
 
 test('full Express API + auth gate + failed source reporting + persistence lifecycle works end-to-end', async (t) => {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'bf-cmd-test-'));
+  const now = () => new Date('2026-11-23T15:00:00Z');
   t.after(() => fs.rmSync(tmpDir, { recursive: true, force: true }));
 
   const mockFetch = async (url) => {
@@ -451,6 +452,12 @@ test('full Express API + auth gate + failed source reporting + persistence lifec
         metacriticScore: '93', thumb: 'https://example.com/hades.jpg', dealRating: '9.5', lastChange: 1795350000,
       }]), { status: 200, headers: { 'content-type': 'application/json' } });
     }
+    if (s.includes('barnesandnoble.com/pages/black-friday-cyber-monday-deals')) {
+      return new Response(`<div class="carousel-slide quick-add-hover-product-item">
+        <a href="/w/test-book/1140000000?ean=9781234567897"><img alt="Test Book" src="https://cdn.example.com/book.jpg"></a>
+        <div class="product-item-card__current-price">$15.00</div><div class="product-item-card__compare-price">$30.00</div>
+      </div>`, { headers: { 'content-type': 'text/html' } });
+    }
     if (s.includes('cashbackmonitor.com')) {
       return new Response('<table><tr><td><a href="/cashback-store/best-buy/">Best Buy</a></td><td>4.5%</td></tr></table>', { status: 200, headers: { 'content-type': 'text/html' } });
     }
@@ -460,7 +467,8 @@ test('full Express API + auth gate + failed source reporting + persistence lifec
       <description><![CDATA[<img src="https://example.com/xm5.jpg">Down from $399.99 at Amazon. Black Friday deal.]]></description>
       <vendorname>Amazon</vendorname>
       <pubDate>Sun, 22 Nov 2026 14:20:00 +0000</pubDate>
-    </item></channel></rss>`, { status: 200, headers: { 'content-type': 'text/xml' } });
+    </item><item><title>Old Sony Headphones for $1</title><link>https://www.amazon.com/dp/B09XS7JWHH</link>
+      <pubDate>Sat, 01 Aug 2026 14:20:00 +0000</pubDate></item></channel></rss>`, { status: 200, headers: { 'content-type': 'text/xml' } });
   };
 
   const app = express();
@@ -470,6 +478,7 @@ test('full Express API + auth gate + failed source reporting + persistence lifec
     dataDir: tmpDir,
     fetchImpl: mockFetch,
     autoStart: false,
+    now,
   });
   t.after(() => engine.stop());
 
@@ -528,7 +537,31 @@ test('full Express API + auth gate + failed source reporting + persistence lifec
   assert.equal(refRes.status, 200);
   const refreshed = await refRes.json();
   assert.equal(refreshed.ok, true);
-  assert.ok(refreshed.observationsAdded >= 1);
+  assert.ok(refreshed.dealsFetched >= 1);
+  assert.ok(refreshed.dashboard.priceHistoryIndex.some((product) => product.observationsCount >= 1));
+
+  const queued = await fetch(`${base}/api/black-friday/refresh`, {
+    method: 'POST', headers: { Cookie: cookie, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ background: true, feedOnly: true, force: true }),
+  });
+  assert.equal(queued.status, 202);
+  const { at } = await queued.json();
+  const deadline = Date.now() + 5000;
+  let status;
+  do {
+    const response = await fetch(`${base}/api/black-friday/refresh-status?at=${encodeURIComponent(at)}`, { headers: { Cookie: cookie } });
+    status = await response.json();
+    if (status.running) await new Promise((resolve) => setTimeout(resolve, 10));
+  } while (status.running && Date.now() < deadline);
+  assert.equal(status.running, false);
+  assert.equal(status.result?.ok, true);
+
+  const dashboardRes = await fetch(`${base}/api/black-friday/bootstrap`, { headers: { Cookie: cookie, 'Accept-Encoding': 'gzip' } });
+  assert.equal(dashboardRes.headers.get('content-encoding'), 'gzip');
+  const dashboard = await dashboardRes.json();
+  assert.equal(dashboard.deals.some((deal) => deal.title === 'Old Sony Headphones for $1'), false);
+  assert.ok(dashboard.deals.some((deal) => deal.retailerId === 'barnesnoble' && deal.currentPrice === 15 && deal.imageUrl));
+  assert.ok(dashboard.personalized.tier1Exact.some((rec) => rec.wishlistItemId === added.item.id));
 
   const healthRes = await fetch(`${base}/api/black-friday/health`, { headers: { Cookie: cookie } });
   const health = await healthRes.json();

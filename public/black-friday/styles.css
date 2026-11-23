@@ -635,9 +635,12 @@ html[data-theme="light"] .deal-media {
   border-radius: 10px;
   filter: drop-shadow(0 6px 16px rgba(0, 0, 0, 0.28));
 }
-.deal-media-fallback {
-  font-size: 42px;
+.product-photo-placeholder {
+  font-size: 28px;
   opacity: 0.72;
+}
+.deal-media .product-photo-placeholder {
+  font-size: 42px;
 }
 
 .deal-media-top {
