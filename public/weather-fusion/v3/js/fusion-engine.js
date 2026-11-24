@@ -870,7 +870,9 @@ export function buildUnifiedFusionPayload(loc, baseData, multiModelData, aqiData
         ? csFeels.daylight
         : bIdx !== undefined && baseData?.hourly?.is_day?.[bIdx] !== undefined
         ? Boolean(baseData.hourly.is_day[bIdx])
-        : hourOfDay >= 6 && hourOfDay <= 18;
+        : Number.isFinite(lat) && Number.isFinite(lon)
+        ? solarElevation(hourEpoch, lat, lon) > -0.0145
+        : hourOfDay >= 6 && hourOfDay < 18;
 
     const diurnalUnit = Math.sin(((hourOfDay - 9) / 24) * 2 * Math.PI); // -1 at 3 AM, +1 at 3 PM
     const diurnalWave = diurnalUnit * 7.5;
@@ -1310,6 +1312,10 @@ export function buildUnifiedFusionPayload(loc, baseData, multiModelData, aqiData
     if (typeof cc.visibility === 'number' && Number.isFinite(cc.visibility)) hours[0].visibilityMi = Number(cc.visibility.toFixed(1));
 
     // The hourly rain ledger remains a forecast; current radar is displayed separately.
+
+    if (Number.isFinite(lat) && Number.isFinite(lon)) {
+      hours[0].isDay = solarElevation(Date.now(), lat, lon) > -0.0145;
+    }
 
     const curFeelsSeries = canonSeries.feels?.get(startEpoch);
     const curCanonHour = canonHours.get(startEpoch) || canonicalData.hours?.[0];

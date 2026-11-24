@@ -1,11 +1,33 @@
 const WSSI_ROOT='https://mapservices.weather.noaa.gov/vector/rest/services/outlooks/wpc_wssi/MapServer/4/query';
 const WSSI_PAGE='https://www.wpc.ncep.noaa.gov/wwd/wssi/wssi.php';
 const SPC_ROOT='https://mapservices.weather.noaa.gov/vector/rest/services/outlooks/SPC_wx_outlks/MapServer/1/query';
+const SPC_ROOTS={
+ 1:'https://mapservices.weather.noaa.gov/vector/rest/services/outlooks/SPC_wx_outlks/MapServer/1/query',
+ 2:'https://mapservices.weather.noaa.gov/vector/rest/services/outlooks/SPC_wx_outlks/MapServer/9/query',
+ 3:'https://mapservices.weather.noaa.gov/vector/rest/services/outlooks/SPC_wx_outlks/MapServer/17/query',
+};
 const WPC_URL='https://www.wpc.ncep.noaa.gov/exper/eromap/geojson/Day1_Latest.geojson';
+const WPC_URLS={
+ 1:'https://www.wpc.ncep.noaa.gov/exper/eromap/geojson/Day1_Latest.geojson',
+ 2:'https://www.wpc.ncep.noaa.gov/exper/eromap/geojson/Day2_Latest.geojson',
+ 3:'https://www.wpc.ncep.noaa.gov/exper/eromap/geojson/Day3_Latest.geojson',
+};
 const WPC_DISCUSSION_URL='https://www.wpc.ncep.noaa.gov/discussions/hpcdiscussions.php?disc=qpferd&fmt=reg';
 const SPC_DISCUSSION_URL='https://www.spc.noaa.gov/products/outlook/day1otlk.txt';
+const SPC_DISCUSSION_URLS={
+ 1:'https://www.spc.noaa.gov/products/outlook/day1otlk.txt',
+ 2:'https://www.spc.noaa.gov/products/outlook/day2otlk.txt',
+ 3:'https://www.spc.noaa.gov/products/outlook/day3otlk.txt',
+};
 const WPC_PAGE='https://www.wpc.ncep.noaa.gov/qpf/excessive_rainfall_outlook_ero.php';
 const SPC_PAGE='https://www.spc.noaa.gov/products/outlook/day1otlk.html';
+const SPC_PAGES={
+ 1:'https://www.spc.noaa.gov/products/outlook/day1otlk.html',
+ 2:'https://www.spc.noaa.gov/products/outlook/day2otlk.html',
+ 3:'https://www.spc.noaa.gov/products/outlook/day3otlk.html',
+};
+const DAY_NUMS=[1,2,3];
+const dayLabel=day=>day===1?'today':day===2?'tomorrow':`day ${day}`;
 const finite=value=>typeof value==='number'&&Number.isFinite(value);
 const stamp=value=>{
  const text=String(value||'');
@@ -33,26 +55,26 @@ export function inGeoJson(longitude,latitude,geometry){
 const spcLabel={3:'Marginal',4:'Slight',5:'Enhanced',6:'Moderate',8:'High'};
 const wpcRank={marginal:1,slight:2,moderate:3,high:4};
 const DAY=86400000;
-function availableDayOneRisk(issue,start,end,now){
- return [issue,start,end,now].every(finite)&&issue<=now&&start<=now+DAY&&end>now;
+function availableDayRisk(issue,start,end,now,day=1){
+ return [issue,start,end,now].every(finite)&&issue<=now&&start<=now+day*DAY&&end>now;
 }
-function currentDayOneWindow(features=[],fields,now=Date.now()){
+function currentDayWindow(features=[],fields,now=Date.now(),day=1){
  for(const feature of features||[]){
   const values=fields(feature);
   const issue=stamp(values.issue),start=stamp(values.start),end=stamp(values.end);
-  if(availableDayOneRisk(issue,start,end,now))return {issuedAt:new Date(issue).toISOString(),validFrom:new Date(start).toISOString(),expires:new Date(end).toISOString()};
+  if(availableDayRisk(issue,start,end,now,day))return {issuedAt:new Date(issue).toISOString(),validFrom:new Date(start).toISOString(),expires:new Date(end).toISOString()};
  }
  return null;
 }
-export function normalizeSpcRisk(attributes,now=Date.now()){
+export function normalizeSpcRisk(attributes,now=Date.now(),day=1){
  const level=spcLabel[Number(attributes?.dn)],issue=stamp(attributes?.issue),start=stamp(attributes?.valid),end=stamp(attributes?.expire);
- if(!level||!availableDayOneRisk(issue,start,end,now))return null;
- return {id:`spc-day1-${level.toLowerCase()}`,kind:'spc',level,rank:Number(attributes.dn),title:`${level} risk of severe storms today`,summary:level==='Marginal'?'A few storms could become strong.':'Severe storms are possible. Stay weather-aware.',issuedAt:new Date(issue).toISOString(),validFrom:new Date(start).toISOString(),expires:new Date(end).toISOString(),url:'https://www.spc.noaa.gov/products/outlook/day1otlk.html'};
+ if(!level||!availableDayRisk(issue,start,end,now,day))return null;
+ return {id:`spc-day${day}-${level.toLowerCase()}`,kind:'spc',day,level,rank:Number(attributes.dn),title:`${level} risk of severe storms ${dayLabel(day)}`,summary:level==='Marginal'?'A few storms could become strong.':'Severe storms are possible. Stay weather-aware.',issuedAt:new Date(issue).toISOString(),validFrom:new Date(start).toISOString(),expires:new Date(end).toISOString(),url:SPC_PAGES[day]||SPC_PAGE};
 }
-export function normalizeWpcRisk(feature,longitude,latitude,now=Date.now()){
+export function normalizeWpcRisk(feature,longitude,latitude,now=Date.now(),day=1){
  const p=feature?.properties||{},level=String(p.OUTLOOK||'').match(/Marginal|Slight|Moderate|High/i)?.[0],issue=stamp(p.ISSUE_TIME),start=stamp(p.START_TIME),end=stamp(p.END_TIME);
- if(!level||!inGeoJson(longitude,latitude,feature.geometry)||!availableDayOneRisk(issue,start,end,now))return null;
- return {id:`wpc-day1-${level.toLowerCase()}`,kind:'wpc',level,rank:wpcRank[level.toLowerCase()]||0,title:`${level} risk of flooding rain today`,summary:level==='Marginal'?'Heavy rain could cause flooding in a few spots.':'Heavy rain could cause flooding. Keep away from flooded roads.',issuedAt:new Date(issue).toISOString(),validFrom:new Date(start).toISOString(),expires:new Date(end).toISOString(),url:'https://www.wpc.ncep.noaa.gov/qpf/excessive_rainfall_outlook_ero.php'};
+ if(!level||!inGeoJson(longitude,latitude,feature.geometry)||!availableDayRisk(issue,start,end,now,day))return null;
+ return {id:`wpc-day${day}-${level.toLowerCase()}`,kind:'wpc',day,level,rank:wpcRank[level.toLowerCase()]||0,title:`${level} risk of flooding rain ${dayLabel(day)}`,summary:level==='Marginal'?'Heavy rain could cause flooding in a few spots.':'Heavy rain could cause flooding. Keep away from flooded roads.',issuedAt:new Date(issue).toISOString(),validFrom:new Date(start).toISOString(),expires:new Date(end).toISOString(),url:WPC_PAGE};
 }
 const wssiRank={limited:1,minor:2,moderate:3,major:4,extreme:5};
 // WSSI times look like "08Z 10/13/26".
@@ -80,29 +102,44 @@ export function createRiskOutlookService({cached,now=Date.now}){
  return async location=>{
   const spcMeta={id:'spc-outlook',label:'SPC severe-weather outlook',status:'unavailable',fetchedAt:null,issuedAt:null,url:'https://www.spc.noaa.gov/products/outlook/day1otlk.html'};
   const wpcMeta={id:'wpc-outlook',label:'WPC excessive-rainfall outlook',status:'unavailable',fetchedAt:null,issuedAt:null,url:'https://www.wpc.ncep.noaa.gov/qpf/excessive_rainfall_outlook_ero.php'};
-  const spc=(async()=>{try{
-   const q=new URLSearchParams({f:'json',where:'1=1',geometry:`${location.longitude},${location.latitude}`,geometryType:'esriGeometryPoint',inSR:'4326',outSR:'4326',spatialRel:'esriSpatialRelIntersects',outFields:'dn,valid,expire,issue,label,label2',returnGeometry:'false'});
-   const response=await cached(`${SPC_ROOT}?${q}`,120000,{timeout:12000}),features=response.data?.features;
-   if(!Array.isArray(features)||response.data?.error)throw new Error('SPC outlook unavailable.');
-   const value=features.map(f=>normalizeSpcRisk(f.attributes,now())).filter(Boolean).sort((a,b)=>b.rank-a.rank)[0]||null;
-   let window=value;
-   if(!window){
-    const productQuery=new URLSearchParams({f:'json',where:'1=1',outFields:'issue,valid,expire',returnGeometry:'false',returnDistinctValues:'true'});
-    const product=await cached(`${SPC_ROOT}?${productQuery}`,120000,{timeout:12000}),productFeatures=product.data?.features;
-    if(!Array.isArray(productFeatures)||product.data?.error)throw new Error('SPC outlook freshness unavailable.');
-    window=currentDayOneWindow(productFeatures,f=>({issue:f?.attributes?.issue,start:f?.attributes?.valid,end:f?.attributes?.expire}),now());
-   }
-   if(!window)throw new Error('SPC outlook data is not current.');
-   return {value,meta:{...spcMeta,status:'ready',fetchedAt:response.fetchedAt,issuedAt:window.issuedAt||null,validFrom:window.validFrom||null,validUntil:window.expires||null}};
-  }catch{return {value:null,meta:{...spcMeta,message:'SPC outlook could not be checked.'}};}})();
-  const wpc=(async()=>{try{
-   const response=await cached(WPC_URL,120000,{timeout:12000}),features=response.data?.features;
-   if(!Array.isArray(features))throw new Error('WPC outlook unavailable.');
-   const value=features.map(f=>normalizeWpcRisk(f,location.longitude,location.latitude,now())).filter(Boolean).sort((a,b)=>b.rank-a.rank)[0]||null;
-   const window=value||currentDayOneWindow(features,f=>({issue:f?.properties?.ISSUE_TIME,start:f?.properties?.START_TIME,end:f?.properties?.END_TIME}),now());
-   if(!window)throw new Error('WPC outlook data is not current.');
-   return {value,meta:{...wpcMeta,status:'ready',fetchedAt:response.fetchedAt,issuedAt:window.issuedAt||null,validFrom:window.validFrom||null,validUntil:window.expires||null}};
-  }catch{return {value:null,meta:{...wpcMeta,message:'WPC outlook could not be checked.'}};}})();
+  const spc=(async()=>{
+   const dayResults=await Promise.all(DAY_NUMS.map(async day=>{try{
+    const root=SPC_ROOTS[day];
+    const q=new URLSearchParams({f:'json',where:'1=1',geometry:`${location.longitude},${location.latitude}`,geometryType:'esriGeometryPoint',inSR:'4326',outSR:'4326',spatialRel:'esriSpatialRelIntersects',outFields:'dn,valid,expire,issue,label,label2',returnGeometry:'false'});
+    const response=await cached(`${root}?${q}`,120000,{timeout:12000}),features=response.data?.features;
+    if(!Array.isArray(features)||response.data?.error)throw new Error('SPC outlook unavailable.');
+    const value=features.map(f=>normalizeSpcRisk(f.attributes,now(),day)).filter(Boolean).sort((a,b)=>b.rank-a.rank)[0]||null;
+    let window=value;
+    if(!window&&day===1){
+     const productQuery=new URLSearchParams({f:'json',where:'1=1',outFields:'issue,valid,expire',returnGeometry:'false',returnDistinctValues:'true'});
+     const product=await cached(`${root}?${productQuery}`,120000,{timeout:12000}),productFeatures=product.data?.features;
+     if(!Array.isArray(productFeatures)||product.data?.error)throw new Error('SPC outlook freshness unavailable.');
+     window=currentDayWindow(productFeatures,f=>({issue:f?.attributes?.issue,start:f?.attributes?.valid,end:f?.attributes?.expire}),now(),day);
+    }
+    if(day===1&&!window)throw new Error('SPC outlook data is not current.');
+    return {ok:true,day,value,fetchedAt:response.fetchedAt,window};
+   }catch{return {ok:false,day,value:null,fetchedAt:null,window:null};}}));
+   const d1=dayResults[0];
+   const values=dayResults.map(r=>r.value).filter(Boolean);
+   if(!d1.ok&&!values.length)return {values:[],meta:{...spcMeta,message:'SPC outlook could not be checked.'}};
+   const ref=d1.ok?d1:dayResults.find(r=>r.ok);
+   return {values,meta:{...spcMeta,status:'ready',fetchedAt:ref.fetchedAt,issuedAt:ref.window?.issuedAt||null,validFrom:ref.window?.validFrom||null,validUntil:ref.window?.expires||null}};
+  })();
+  const wpc=(async()=>{
+   const dayResults=await Promise.all(DAY_NUMS.map(async day=>{try{
+    const response=await cached(WPC_URLS[day],120000,{timeout:12000}),features=response.data?.features;
+    if(!Array.isArray(features))throw new Error('WPC outlook unavailable.');
+    const value=features.map(f=>normalizeWpcRisk(f,location.longitude,location.latitude,now(),day)).filter(Boolean).sort((a,b)=>b.rank-a.rank)[0]||null;
+    const window=value||currentDayWindow(features,f=>({issue:f?.properties?.ISSUE_TIME,start:f?.properties?.START_TIME,end:f?.properties?.END_TIME}),now(),day);
+    if(day===1&&!window)throw new Error('WPC outlook data is not current.');
+    return {ok:true,day,value,fetchedAt:response.fetchedAt,window};
+   }catch{return {ok:false,day,value:null,fetchedAt:null,window:null};}}));
+   const d1=dayResults[0];
+   const values=dayResults.map(r=>r.value).filter(Boolean);
+   if(!d1.ok&&!values.length)return {values:[],meta:{...wpcMeta,message:'WPC outlook could not be checked.'}};
+   const ref=d1.ok?d1:dayResults.find(r=>r.ok);
+   return {values,meta:{...wpcMeta,status:'ready',fetchedAt:ref.fetchedAt,issuedAt:ref.window?.issuedAt||null,validFrom:ref.window?.validFrom||null,validUntil:ref.window?.expires||null}};
+  })();
   const wssiMeta={id:'wssi-outlook',label:'WPC Winter Storm Severity Index',status:'unavailable',fetchedAt:null,issuedAt:null,url:WSSI_PAGE};
   const wssi=(async()=>{try{
    const q=new URLSearchParams({f:'json',where:'1=1',geometry:`${location.longitude},${location.latitude}`,geometryType:'esriGeometryPoint',inSR:'4326',spatialRel:'esriSpatialRelIntersects',outFields:'impact,start_time,end_time,issue_time',returnGeometry:'false'});
@@ -117,10 +154,10 @@ export function createRiskOutlookService({cached,now=Date.now}){
     window=currentWssiWindow(productFeatures,now());
    }
    if(!window)throw new Error('WSSI data is not current.');
-   return {value,meta:{...wssiMeta,status:'ready',fetchedAt:response.fetchedAt,issuedAt:window.issuedAt||null,validFrom:window.validFrom||null,validUntil:window.expires||null}};
-  }catch{return {value:null,meta:{...wssiMeta,message:'Winter outlook could not be checked.'}};}})();
+   return {values:value?[value]:[],meta:{...wssiMeta,status:'ready',fetchedAt:response.fetchedAt,issuedAt:window.issuedAt||null,validFrom:window.validFrom||null,validUntil:window.expires||null}};
+  }catch{return {values:[],meta:{...wssiMeta,message:'Winter outlook could not be checked.'}};}})();
   const results=await Promise.all([spc,wpc,wssi]);
-  return {value:results.map(r=>r.value).filter(Boolean),meta:results.map(r=>r.meta)};
+  return {value:results.flatMap(r=>r.values),meta:results.map(r=>r.meta)};
  };
 }
 
@@ -132,22 +169,25 @@ export const OUTLOOK_LEGEND={
 export function outlookLevelFromText(value){
  return String(value||'').match(/Marginal|Slight|Enhanced|Moderate|High/i)?.[0]||null;
 }
-export function parseWpcDiscussion(html){
+export function parseWpcDiscussion(html,day=1){
  const raw=String(html||'');
  const pre=raw.match(/<pre\b[^>]*>([\s\S]*?)<\/pre>/i)?.[1]||raw;
  const text=decodeEntities(pre).replace(/<[^>]+>/g,'').replace(/\r/g,'').replace(/[ \t]+\n/g,'\n').trim();
  if(!/Excessive Rainfall Discussion/i.test(text))return null;
  const office=text.match(/NWS Weather Prediction Center[^\n]+/i)?.[0]?.trim()||'NWS Weather Prediction Center College Park MD';
  const issued=text.match(/(?:\d{1,2}:\d{2}|\d{3,4})\s*[AP]M\s+[A-Z]{3,4}\s+\w{3}\s+\w+\s+\d{1,2}\s+\d{4}/i)?.[0]||null;
- const valid=text.match(/Day 1\s*(?:\n\s*)?Valid\s+([^\n]+)/i)?.[1]?.trim()||null;
- const discussion=text.match(/Day 1\b[\s\S]*?(?=\nDay 2\b|\nDay 4\b|\n\$\$|$)/i)?.[0]?.trim()||null;
+ const d=DAY_NUMS.includes(Number(day))?Number(day):1;
+ const valid=text.match(new RegExp(`Day ${d}\\s*(?:\\n\\s*)?Valid\\s+([^\\n]+)`,'i'))?.[1]?.trim()||null;
+ const nextDay=d+1;
+ const discussion=text.match(new RegExp(`Day ${d}\\b[\\s\\S]*?(?=\\nDay ${nextDay}\\b|\\nDay 4\\b|\\n\\$\\$|$)`,'i'))?.[0]?.trim()||null;
  if(!discussion)return null;
- return {product:'Excessive Rainfall Discussion',office,issued,validLabel:valid?`Day 1 Valid ${valid}`:'Day 1',discussion};
+ return {product:'Excessive Rainfall Discussion',office,issued,validLabel:valid?`Day ${d} Valid ${valid}`:`Day ${d}`,discussion};
 }
-export function parseSpcDiscussion(text){
+export function parseSpcDiscussion(text,day=1){
  const clean=String(text||'').replace(/\r/g,'').trim();
- if(!/Day 1 Convective Outlook|Storm Prediction Center/i.test(clean))return null;
- return {product:'Day 1 Convective Outlook',office:'NWS Storm Prediction Center Norman OK',issued:null,validLabel:'Day 1 convective outlook',discussion:clean.slice(0,20000)};
+ const d=DAY_NUMS.includes(Number(day))?Number(day):1;
+ if(!/Day [123] Convective Outlook|Storm Prediction Center/i.test(clean))return null;
+ return {product:`Day ${d} Convective Outlook`,office:'NWS Storm Prediction Center Norman OK',issued:null,validLabel:`Day ${d} convective outlook`,discussion:clean.slice(0,20000)};
 }
 const CWA_KEYS={
  RAH:['raleigh','knightdale','north carolina','carolina','carolinas','nc','mid-atlantic','central north carolina','virginia','va','south carolina','sc'],
@@ -354,16 +394,17 @@ export function outlookSpcMapFeatures(features){
   return [{level,geometry}];
  });
 }
-function detailBase(kind,location){
+function detailBase(kind,location,day=1){
+ const d=DAY_NUMS.includes(Number(day))?Number(day):1;
  return {
-  kind,title:'Outlooks',
-  product:kind==='wpc'?'Excessive Rainfall Discussion':'Day 1 Convective Outlook',
+  kind,day:d,title:'Outlooks',
+  product:kind==='wpc'?'Excessive Rainfall Discussion':`Day ${d} Convective Outlook`,
   office:kind==='wpc'?'NWS Weather Prediction Center College Park MD':'NWS Storm Prediction Center Norman OK',
   issued:null,validLabel:null,discussion:null,excerpt:null,headline:null,summary:null,
   mode:null,error:null,level:null,region:null,place:location?.name||null,
   features:[],legend:OUTLOOK_LEGEND[kind],
   location:location&&finite(location.latitude)&&finite(location.longitude)?{latitude:location.latitude,longitude:location.longitude,name:location.name||'',office:location.office||null}:null,
-  sourceUrl:kind==='wpc'?WPC_PAGE:SPC_PAGE,
+  sourceUrl:kind==='wpc'?WPC_PAGE:(SPC_PAGES[d]||SPC_PAGE),
  };
 }
 export function sanitizeOutlookDetail(detail={}){
@@ -401,26 +442,27 @@ async function attachLocalOutlook(detail,location,{request,env}={}){
  return sanitizeOutlookDetail(detail);
 }
 export function createOutlookDetailService({cached,now=Date.now,request=null,env={}}){
- return async ({kind,location}={})=>{
+ return async ({kind,day=1,location}={})=>{
   if(kind!=='wpc'&&kind!=='spc'){const error=new Error('Choose a WPC or SPC outlook.');error.status=400;throw error;}
-  const detail=detailBase(kind,location);
+  const d=DAY_NUMS.includes(Number(day))?Number(day):1;
+  const detail=detailBase(kind,location,d);
   if(kind==='wpc'){
    const [geo,disc]=await Promise.allSettled([
-    cached(WPC_URL,120000,{timeout:12000}),
+    cached(WPC_URLS[d]||WPC_URL,120000,{timeout:12000}),
     cached(WPC_DISCUSSION_URL,120000,{text:true,timeout:12000}),
    ]);
    if(geo.status==='fulfilled'&&Array.isArray(geo.value.data?.features))detail.features=outlookMapFeatures(geo.value.data.features);
-   if(disc.status==='fulfilled')Object.assign(detail,parseWpcDiscussion(disc.value.data)||{});
+   if(disc.status==='fulfilled')Object.assign(detail,parseWpcDiscussion(disc.value.data,d)||{});
    if(!detail.features.length&&!detail.discussion){const error=new Error('The excessive rainfall outlook could not be loaded.');error.status=503;throw error;}
    return attachLocalOutlook(detail,location,{request,env});
   }
   const q=new URLSearchParams({f:'json',where:'1=1',outSR:'4326',outFields:'dn,valid,expire,issue,label,label2',returnGeometry:'true'});
   const [geo,disc]=await Promise.allSettled([
-   cached(`${SPC_ROOT}?${q}`,120000,{timeout:12000}),
-   cached(SPC_DISCUSSION_URL,120000,{text:true,timeout:12000}),
+   cached(`${SPC_ROOTS[d]||SPC_ROOT}?${q}`,120000,{timeout:12000}),
+   cached(SPC_DISCUSSION_URLS[d]||SPC_DISCUSSION_URL,120000,{text:true,timeout:12000}),
   ]);
   if(geo.status==='fulfilled'&&Array.isArray(geo.value.data?.features))detail.features=outlookSpcMapFeatures(geo.value.data.features);
-  if(disc.status==='fulfilled')Object.assign(detail,parseSpcDiscussion(disc.value.data)||{});
+  if(disc.status==='fulfilled')Object.assign(detail,parseSpcDiscussion(disc.value.data,d)||{});
   if(!detail.features.length&&!detail.discussion){const error=new Error('The severe-weather outlook could not be loaded.');error.status=503;throw error;}
   return attachLocalOutlook(detail,location,{request,env});
  };

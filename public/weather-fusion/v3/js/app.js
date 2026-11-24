@@ -354,10 +354,11 @@ function isSkyCloudyOrWet(f) {
   if (!cur) return false;
   const cond = String(cur.condition || f?.canonical?.current?.condition || '').toLowerCase();
   const clouds = Math.max(Number(cur.cloudCover) || 0, Number(f?.canonical?.current?.skyCover) || 0);
-  if (/storm|thunder|rain|shower|drizzle|snow|sleet|flurr|ice|freez|wintry|overcast|mostly cloudy|\bcloudy\b|fog|mist|haze|smoke/.test(cond)) {
+  const isPartly = /partly\s+(?:cloudy|sunny)|few clouds|scattered/.test(cond);
+  if (/storm|thunder|rain|shower|drizzle|snow|sleet|flurr|ice|freez|wintry|overcast|mostly cloudy|fog|mist|haze|smoke/.test(cond) || (!isPartly && /\bcloudy\b/.test(cond))) {
     return true;
   }
-  if (!/sunny|clear/.test(cond) && clouds >= 70) return true;
+  if (!isPartly && !/sunny|clear/.test(cond) && clouds >= 70) return true;
   return (cur.precipIn || 0) >= 0.02 || (cur.rainChance || 0) >= 60;
 }
 
@@ -628,6 +629,7 @@ async function openRiskOutlookModal(risk, f) {
       longitude: String(f.location.longitude),
       place: f.location.name
     });
+    if (risk.day) q.set('day', String(risk.day));
     if (f.location.wfo || f.location.office) q.set('office', f.location.wfo || f.location.office);
     const res = await fetch(`/api/weather-fusion/outlook?${q}`, { cache: 'no-store', headers: { Accept: 'application/json' } });
     const detail = await res.json();
@@ -703,9 +705,10 @@ function selectHeroBackdropPhoto(cur, canonical = null) {
   const isNight = !cur.isDay;
   const isStorm = /storm|thunder|t-storm|lightning/.test(cond);
   const isRain = /rain|shower|drizzle|snow|sleet|flurr|ice|freez|wintry/.test(cond) || (cur.precipIn || 0) >= 0.02 || (cur.rainChance || 0) >= 60;
-  const isExplicitSunny = /partly|mostly sunny|sunny|clear/.test(cond) && !/mostly cloudy|\bcloudy\b|overcast/.test(cond);
-  const isOvercastCloudy = /overcast|mostly cloudy|\bcloudy\b|fog|mist|haze|smoke/.test(cond) || (!isExplicitSunny && clouds >= 70);
-  const isPartly = /partly|mostly sunny|few clouds|scattered/.test(cond) || clouds >= 30;
+  const isPartlyCond = /partly\s+(?:cloudy|sunny)|mostly sunny|few clouds|scattered/.test(cond);
+  const isExplicitSunny = (isPartlyCond || /sunny|clear/.test(cond)) && !/mostly cloudy|overcast/.test(cond) && (isPartlyCond || !/\bcloudy\b/.test(cond));
+  const isOvercastCloudy = /overcast|mostly cloudy|fog|mist|haze|smoke/.test(cond) || (!isPartlyCond && /\bcloudy\b/.test(cond)) || (!isExplicitSunny && clouds >= 70);
+  const isPartly = isPartlyCond || clouds >= 30;
 
   if (isStorm) {
     return { src: '/weather-fusion/today-sky-rain.webp', cls: 'sky-storm' };

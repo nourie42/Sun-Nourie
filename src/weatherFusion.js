@@ -759,7 +759,7 @@ export function createWeatherService({ fetchImpl = globalThis.fetch, env = proce
     if(typeof query.place==='string'&&query.place.trim())location.name=clean(query.place,80);
     if(typeof query.office==='string'&&/^[A-Za-z]{3}$/.test(query.office.trim()))location.office=query.office.trim().toUpperCase();
     const kind=String(query.kind||'').toLowerCase();
-    return sanitizeOutlookDetail(await loadOutlookDetail({kind,location}));
+    return sanitizeOutlookDetail(await loadOutlookDetail({kind,day:query.day,location}));
   }
   return { getForecast, getAlerts, getBriefing, getBulletins, getOutlook, search, radar, modelMaps: direct.maps, getWinterMap:query=>query?.kind==='model-grid'?loadModelSnowMap(query):loadWpcWinter.map(query) };
 }

@@ -74,6 +74,7 @@ export async function openRiskOutlook(risk,forecast){
  if(!dialog.open)dialog.showModal();
  document.body.classList.add('dialog-open');
  const query=new URLSearchParams({kind:risk.kind});
+ if(risk.day)query.set('day',String(risk.day));
  const lat=forecast?.location?.latitude,lon=forecast?.location?.longitude;
  if(finite(lat)&&finite(lon)){query.set('latitude',String(lat));query.set('longitude',String(lon));}
  if(forecast?.location?.name)query.set('place',forecast.location.name);
