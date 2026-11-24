@@ -28,6 +28,20 @@ test('a standalone excerpt drops only its initial connective and keeps a complet
   assert.equal(card.items[0]?.summary,'Uncertainty remains about the rain arriving Monday.',transition);
  }
 });
+test('a discussion summary never starts with an orphaned If so fragment',()=>{
+ const f=forecast('Some of the models may develop the rain sooner Wednesday morning. If so, rain would then more quickly move into central NC through the afternoon.');
+ f.discussion.text='.DISCUSSION...\nSome of the models may develop the rain sooner Wednesday morning. If so, rain would then more quickly move into central NC through the afternoon.\n&&';
+ const display=danTakeDisplay(null,f,now);
+ assert.match(display,/^Some forecasts may develop the rain sooner Wednesday morning\./);
+ assert.match(display,/Rain may move sooner into central NC through the afternoon\./);
+ assert.doesNotMatch(display,/If so|would then|models/i);
+});
+test('a contextless cached summary is rejected instead of displayed',()=>{
+ const f=forecast('Rain may arrive Monday.');
+ const display=danTakeDisplay({signature:f.signature,mode:'ai',danSummary:'If so, showers may arrive sooner.'},f,now);
+ assert.doesNotMatch(display,/^If so/i);
+ assert.match(display,/^A cold front will bring rain Saturday\./);
+});
 test('untranslated decoupling is withheld rather than converted to an unsupported frost forecast',()=>{
  const card=danCard(null,forecast('It remains uncertain whether winds will decouple Monday.'),now);
  assert.equal(card.text,'');

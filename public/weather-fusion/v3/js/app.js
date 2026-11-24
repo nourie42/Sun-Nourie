@@ -23,10 +23,10 @@ import {
   WeatherMapController
 } from './map.js?v=smooth-radar-v1';
 import { dogWalkerScene, referenceScene } from '../../exposure-scene.js?v=true-night-art-v6';
-import { danCard, danOverview, danTakeDisplay } from '../../dans-summary.js?v=afd-discussion-section-v1';
+import { danCard, danOverview, danTakeDisplay } from '../../dans-summary.js?v=complete-discussion-context-v2';
 import { activeRiskOutlooks, outlookDetailHTML } from '../../risk-outlooks.js?v=risk-outlooks-v5';
 import { forecastWindowBannerHTML, forecastWindowDetailHTML } from '../../forecast-window-banners.js?v=rain-hours-only-v1';
-import {confidenceWarningDetailHTML,confidenceWarningHTML,lowConfidenceWarning} from '../../confidence-bar.js?v=event-change-risk-v3';
+import {confidenceWarningDetailHTML,confidenceWarningHTML,lowConfidenceWarning} from '../../confidence-bar.js?v=multi-event-confidence-v4';
 import {GlobePanel} from './globe-panel.js?v=wind-visibility-v1';
 import {outlookItems,renderOutlookPanel,openOutlookNote} from '../../outlook-panel.js?v=daily-hourly-v1';
 import { todayForecastHTML, todayRainDisplay } from '../../today-card.js?v=hour-details-v1';
@@ -436,7 +436,7 @@ function renderForecastConfidenceBar(f){
   if(slot)slot.hidden=!warning;
   host.innerHTML=confidenceWarningHTML(warning);
   const button=host.querySelector('.forecast-confidence-button');
-  if(button&&warning)button.onclick=()=>openModal(`Forecast confidence · ${warning.dayLabel}`,confidenceWarningDetailHTML(warning));
+  if(button&&warning)button.onclick=()=>openModal(warning.modalTitle,confidenceWarningDetailHTML(warning));
 }
 
 function renderAll() {

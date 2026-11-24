@@ -19,8 +19,16 @@ const brief=text=>{const sentences=norm(text).match(/[^.!?]+[.!?]+|[^.!?]+$/g)||
 const hasNumericQuantity=text=>/\d/.test(String(text||'').replace(/\b\d{1,2}(?::\d{2})?\s*(?:am|pm)\b/gi,''));
 // An extracted sentence has lost the preceding argument. Remove its opening
 // connective, while preserving transitions inside a complete source paragraph.
-const standalone=text=>norm(text).replace(/^(?:(?:however|consequently|therefore|nevertheless|thus|as a result|in addition|meanwhile)[,:]?\s+)+/i,'').replace(/^[a-z]/,letter=>letter.toUpperCase());
-const plain=text=>standalone(norm(text).replace(/\btemperatures expected\b/gi,'temperatures are expected').replace(/\b(patchy frost) possible\b/gi,'$1 is possible').replace(/\s+and following sharply cooler and wet conditions that will develop\b/gi,'. Much cooler, wet weather will follow').replace(/\binto Sat\b/g,'into Saturday').replace(/\bfrost Sun morning\b/g,'frost Sunday morning').replace(/\bMon morning\b/g,'Monday morning').replace(/\bconvection\b/gi,'showers and storms').replace(/\bprecipitation\b/gi,'wet weather').replace(/\btemps\b/gi,'temperatures').replace(/\bPoPs\b/g,'rain chances').replace(/\bQPF\b/g,'rainfall amounts').replace(/\bwrt(?:\s+to)?\b/gi,'about'));
+const standalone=text=>{
+ let value=norm(text);
+ // AFD prose sometimes separates a conditional answer from the sentence that
+ // defined the condition. Rewrite the common rain-timing form; withhold other
+ // contextless "If so" fragments instead of displaying an orphaned clause.
+ if(/^if so,?\s+rain would then more quickly move\b/i.test(value))value=value.replace(/^if so,?\s+rain would then more quickly move\b/i,'Rain may move sooner');
+ else if(/^if so\b/i.test(value))return '';
+ return value.replace(/^(?:(?:however|consequently|therefore|nevertheless|thus|as a result|in addition|meanwhile)[,:]?\s+)+/i,'').replace(/^[a-z]/,letter=>letter.toUpperCase());
+};
+const plain=text=>standalone(norm(text).replace(/\ba return to below normal temperatures and gusty winds today behind a cold front\b/gi,'It will be cooler and windy today').replace(/\ba potent storm system will affect much of the eastern United States including our region beginning Wednesday and lasting into Thanksgiving Day\b/gi,'A strong storm will bring rain and wind Wednesday into Thanksgiving Day').replace(/\binto the I-40 corridor of central NC\b/gi,'across central North Carolina').replace(/\bsome of the models\b/gi,'some forecasts').replace(/\btemperatures expected\b/gi,'temperatures are expected').replace(/\b(patchy frost) possible\b/gi,'$1 is possible').replace(/\s+and following sharply cooler and wet conditions that will develop\b/gi,'. Much cooler, wet weather will follow').replace(/\binto Sat\b/g,'into Saturday').replace(/\bfrost Sun morning\b/g,'frost Sunday morning').replace(/\bMon morning\b/g,'Monday morning').replace(/\bconvection\b/gi,'showers and storms').replace(/\bprecipitation\b/gi,'wet weather').replace(/\btemps\b/gi,'temperatures').replace(/\bPoPs\b/g,'rain chances').replace(/\bQPF\b/g,'rainfall amounts').replace(/\bwrt(?:\s+to)?\b/gi,'about'));
 // Remove reporting clauses from the take, including previously cached AI prose.
 // Keep the weather claim and all uncertainty words intact.
 export function directTakeWording(text){
@@ -34,6 +42,7 @@ export function weatherOnlyProse(text){
 }
 function plainKeyMessage(text){
  let message=plain(text).replace(/\bseasonable temperatures\b/gi,'temperatures near normal').replace(/\babundant high clouds\b/gi,'plenty of high clouds');
+ if(!message)return '';
  message=message.replace(/^Chance of (showers|storms|rain|snow)(\b.*)$/i,(_,weather,rest)=>`${weather[0].toUpperCase()+weather.slice(1)} ${/s$/.test(weather)?'are':'is'} possible${rest}`)
   .replace(/^Continued very warm\b/i,'It will stay very warm')
   .replace(/^Temperatures near normal,/i,'Expect temperatures near normal,');
@@ -65,6 +74,7 @@ export function danOverview(briefing,forecast,now=Date.now()){
      const current=anchoredText(sentence,anchor,zone,now),period=discussionPeriod(sentence,anchor,zone);
      if((period&&period.end<=now)||hasDanJargon(sentence)||hasNumericQuantity(sentence)||forecastProseConflict(current,forecast,now)||!/(?:rain|shower|storm|snow|wind|cloud|temperature|warm|cold|cool|heat|fog|dry|sun)/i.test(sentence))continue;
      const message=plainKeyMessage(current);
+     if(!message)continue;
      if(message.length>180||messages.join(' ').length+message.length>360)continue;
      messages.push(message);
      if(messages.length===3)break;
@@ -78,7 +88,10 @@ export function danOverview(briefing,forecast,now=Date.now()){
     if(section!=='SYNOPSIS'&&!/\b(?:will|may|could|is|are|remains?|continues?|expected|possible|likely|can|should|becomes?|develops?)\b/i.test(s))return false;
     const period=discussionPeriod(s,anchor,zone);return (!period||period.end>now)&&!forecastProseConflict(anchoredText(s,anchor,zone,now),forecast,now);
    }).join(' ');
-   if(brief(currentSentences))return {text:plain(anchoredText(brief(currentSentences),anchor,zone,now)),source:'Local NWS discussion summary'};
+   if(brief(currentSentences)){
+    const summary=plain(anchoredText(brief(currentSentences),anchor,zone,now));
+    if(summary)return {text:summary,source:'Local NWS discussion summary'};
+   }
   }
   if(oneKeyMessage)return {text:oneKeyMessage,source:'Local NWS discussion key message'};
  }
@@ -88,7 +101,8 @@ export function danTakeDisplay(briefing,forecast,now=Date.now()){
  if(forecast?.comparison?.source==='google')return 'Nourie Weather Take summarizes the NWS discussion on the regular weather page. This page shows the experimental model forecast.';
  const card=danCard(briefing,forecast,now);
  const summary=briefing?.signature===forecast?.signature&&typeof briefing?.danSummary==='string'?weatherOnlyProse(briefing.danSummary):'';
- if(summary&&!hasDanJargon(summary)&&!hasNumericQuantity(summary)&&!forecastProseConflict(summary,forecast,now))return directTakeWording(summary)+(card.text?'\n\n'+card.text:'');
+ const directSummary=standalone(directTakeWording(summary));
+ if(directSummary&&!hasDanJargon(directSummary)&&!hasNumericQuantity(directSummary)&&!forecastProseConflict(directSummary,forecast,now))return directSummary+(card.text?'\n\n'+card.text:'');
  const overview=danOverview(null,forecast,now);
  return directTakeWording(overview.text)+(card.text?'\n\n'+card.text:'');
 }
