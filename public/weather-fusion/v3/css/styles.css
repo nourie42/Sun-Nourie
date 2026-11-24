@@ -3623,3 +3623,35 @@ body.awaiting-location .v3-main-stack > :not(#location-needed-card) {
 /* Match the main app's frosted ice-frame glass cards while retaining Beta information and layout. */
 :root{--glass-bg:var(--weather-tile-fill);--glass-border:var(--weather-tile-border);--glass-shadow:0 8px 24px rgba(0,0,0,.18);--glass-highlight:inset 0 1px 0 rgba(255,255,255,.42), inset 0 0 0 1px rgba(210,235,255,.14)}
 .v3-main-stack :is(.glass,.hazard-slim-btn),.weather-take-bar{background:var(--weather-tile-fill)!important;border:1px solid var(--weather-tile-border)!important;border-radius:var(--weather-tile-radius);backdrop-filter:var(--weather-tile-blur);-webkit-backdrop-filter:var(--weather-tile-blur);box-shadow:var(--weather-tile-shadow);text-shadow:var(--weather-tile-text-shadow)}
+
+.remainder-card{display:grid;gap:14px;padding:18px;border-radius:20px;background:var(--glass-bg);border:1px solid var(--glass-border);color:var(--text)}
+.remainder-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.remainder-head .day-name{display:block;font-size:24px;font-weight:700;letter-spacing:-.01em}
+.remainder-head .today-condition{display:block;font-size:15px;color:#9fe3ff;margin-top:2px}
+.remainder-icon svg{width:56px;height:56px}
+.remainder-temps{display:flex;gap:28px;font-size:28px}
+.remainder-temps span{display:grid;justify-items:start}
+.remainder-temps small,.remainder-summary small,.remainder-footer small{font-size:12px;color:var(--faint)}
+.remainder-feels{font-size:15px;color:var(--muted)}
+.remainder-feels b{font-size:20px;color:var(--text)}
+.remainder-summary,.remainder-footer{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;padding-top:12px;border-top:1px solid rgba(255,255,255,.14)}
+.remainder-summary span,.remainder-footer span{display:grid;gap:2px}
+.remainder-summary strong,.remainder-footer strong{font-size:16px;font-variant-numeric:tabular-nums}
+.remainder-footer{grid-template-columns:repeat(5,minmax(0,1fr))}
+.remainder-hours{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}
+.remainder-hour{display:grid;justify-items:center;gap:4px;padding:10px 4px;border-radius:14px;background:rgba(255,255,255,.06);font-size:12px;color:var(--muted)}
+.remainder-hour svg{width:28px;height:28px}
+.remainder-hour strong{font-size:17px;color:var(--text)}
+.remainder-hour em{font-style:normal;color:var(--blue)}
+.remainder-more{justify-self:center;background:none;border:0;color:var(--blue);font:inherit;font-size:14px;cursor:pointer;padding:4px 8px}
+.d7-columns{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
+.d7-col{display:grid;justify-items:center;gap:3px;min-width:0;padding:10px 2px;border-radius:12px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.05);color:var(--text);font:inherit;cursor:pointer}
+.d7-col.is-selected{border-color:var(--blue);background:rgba(103,196,255,.14)}
+.d7-col-day{font-size:12px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.d7-col-date{font-size:11px;color:var(--faint)}
+.d7-col-icon svg{width:34px;height:34px}
+.d7-col-rain{font-size:12px;color:var(--blue)}
+.d7-col-amt,.d7-col-wind{font-size:11px;color:var(--muted)}
+.d7-col-temps{display:grid;justify-items:center;font-size:13px;font-variant-numeric:tabular-nums}
+.d7-col-temps b{color:var(--gold)}
+.d7-col-temps small{font-size:11px;color:var(--muted)}

@@ -9,15 +9,14 @@ import {
   outdoorExposureReadings,
   searchLocations
 } from './fusion-engine.js?v=today-dewpoint-v1';
-import {bindTodayHourPicker,todayHourlyPreview,todaySummary} from './today-preview.js?v=today-dewpoint-v1';
+import {todaySummary} from './today-preview.js?v=today-dewpoint-v1';
 import {hourlyRainInputsHTML, rainPercent} from './hourly-rain.js?v=local-hourly-v1';
 import { getLunarPhaseFraction, renderWeatherIconSvg } from './icons.js?v=v3-sky-8';
 import {
   HOURLY_METRICS,
   extractHourMetricValue,
   renderDewPointFeelChart,
-  renderHourlyExplorerChart,
-  renderSevenDayDualSplineChart
+  renderHourlyExplorerChart
 } from './charts.js?v=smooth-trend-v4';
 import {
   WeatherMapController
@@ -29,7 +28,7 @@ import { forecastWindowBannerHTML, forecastWindowDetailHTML } from '../../foreca
 import {confidenceWarningDetailHTML,confidenceWarningHTML,lowConfidenceWarning} from '../../confidence-bar.js?v=multi-event-confidence-v4';
 import {GlobePanel} from './globe-panel.js?v=wind-visibility-v1';
 import {outlookItems,renderOutlookPanel,openOutlookNote} from '../../outlook-panel.js?v=daily-hourly-v1';
-import { todayForecastHTML, todayRainDisplay } from '../../today-card.js?v=hour-details-v1';
+import { todayRainDisplay } from '../../today-card.js?v=hour-details-v1';
 import {applyLocalRadar, displayedRainChance, observedRainLabel} from '../../rain-display.js?v=local-radar-v2';
 import {currentWeatherDisplay} from '../../current-weather.js?v=local-radar-v2';
 import { dayGraphHTML, installDayGraph } from '../../day-graph.js?v=hourly-rain-v5';
@@ -366,66 +365,77 @@ function todayHours(f) {
   return f.hours48.filter(hour=>hour.dayKey===f.days[0]?.dayKey);
 }
 
+function remainderHours(f) {
+  const cutoff = Date.now() - 30 * 60 * 1000;
+  return (f.hours48 || []).filter(h => Date.parse(h.time) >= cutoff).slice(0, 5);
+}
+
 function renderBetaTodayCard(f) {
   const host = document.getElementById('today-forecast');
   if (!host) return;
-  if (f?.canonical?.days?.length) {
-    host.hidden = false;
-    host.innerHTML = todayForecastHTML(f.canonical, Date.now(), {interactive:false});
-    // V3 presents the conditional confidence warning once at the top of the page.
-    host.querySelector('.today-confidence-banner')?.remove();
-  } else if (f?.days?.length) {
-    const d = f.days[0];
-    const cur = f.current;
-    host.hidden = false;
-    host.innerHTML = `
-      <div class="today-weather-card today-remainder">
-        <span class="today-copy">
+  const d = f?.days?.[0];
+  if (!d) {
+    host.hidden = true;
+    return;
+  }
+  const cur = f.current;
+  const hours = remainderHours(f);
+  const hourTemp = h => (Object.hasOwn(h, 'forecastTempF') ? h.forecastTempF : h.tempF);
+  const hourWinds = hours.map(h => h.forecastWindMph).filter(Number.isFinite);
+  const totalRain = hours.reduce((sum, h) => sum + (Number(h.precipIn) || 0), 0);
+  const windRange = hourWinds.length
+    ? `${Math.round(Math.min(...hourWinds))}–${Math.round(Math.max(...hourWinds))} mph`
+    : '—';
+  const avgWind = hourWinds.length ? hourWinds.reduce((a, b) => a + b, 0) / hourWinds.length : null;
+  const num = (value, format = v => Math.round(v)) => (Number.isFinite(value) ? format(value) : '—');
+  const hourLabel = h => new Intl.DateTimeFormat('en-US', { timeZone: f.timeZone, hour: 'numeric' }).format(new Date(Date.parse(h.time)));
+
+  host.hidden = false;
+  host.innerHTML = `
+    <div class="remainder-card">
+      <div class="remainder-head">
+        <div>
           <span class="day-name">Remainder of Today</span>
           <span class="today-condition">${escapeAttr(d.condition || cur.condition)}</span>
-          <span class="today-temperatures">
-            <span class="today-low"><strong>${fmtTemp(d.lowF)}</strong><small>Low</small></span>
-            <i>—</i>
-            <span class="today-high"><strong>${fmtTemp(d.highF)}</strong><small>High</small></span>
-          </span>
-          <span class="today-feels">Peak forecast feels like <b>${fmtTemp(d.peakFeelsF)}</b><small>outdoors</small></span>
-        </span>
-        <span class="today-symbol" title="${escapeAttr(cur.rainLedger?.tooltip || '')}">
-          ${renderWeatherIconSvg(d.icon || cur.icon, 56)}
-          ${d.rainChance >= 5 ? `<strong>${Math.round(d.rainChance)}%</strong><small>Rain chance</small>` : ''}
-        </span>
-        <span class="today-metrics">
-          <span class="today-metric"><span><strong>${Math.round(d.maxWindMph || cur.windMph || 0)} mph</strong><small>Avg wind</small></span></span>
-          <span class="today-metric"><span><strong>${Math.round(f.airQuality?.currentAqi ?? 42)}</strong><small>AQI now</small></span></span>
-          <span class="today-metric"><span><strong>${Math.round(d.maxUvIndex ?? cur.uvIndex ?? 0)}</strong><small>Peak UV</small></span></span>
-        </span>
+        </div>
+        <span class="remainder-icon">${renderWeatherIconSvg(d.icon || cur.icon, 56)}</span>
       </div>
-    `;
-  } else {
-    host.hidden = true;
-  }
-
-  const tile = host.querySelector('.today-weather-card');
-  if (tile) {
-    const hours = todayHours(f);
-    tile.classList.add('beta-today-graph');
-    tile.querySelector('.today-metrics').insertAdjacentHTML(
-      'beforebegin', todayHourlyPreview(hours, f.timeZone, state.useCelsius)
-    );
-    bindTodayHourPicker(tile,hours,{
-      timeZone:f.timeZone,useCelsius:state.useCelsius,selectedTime:state.todayHourTime,
-      onSelect:time=>{state.todayHourTime=time;}
-    });
-    tile.insertAdjacentHTML('beforeend','<button class="today-more" type="button" aria-haspopup="dialog">View 48-hour graph ›</button>');
-    tile.querySelector('.today-more').onclick = () => {
-      state.selectedHourIdx = 0;
-      state.selectedMetricId = 'temp';
-      open48hExplorerModal(f);
-    };
-  }
-  for (const control of host.querySelectorAll('[data-today-forecast]')) {
-    control.onclick = () => openDayHourlyModal(f.days[0],f);
-  }
+      <div class="remainder-temps">
+        <span><strong>${fmtTemp(d.lowF)}</strong><small>Low</small></span>
+        <span><strong>${fmtTemp(d.highF)}</strong><small>High</small></span>
+      </div>
+      <div class="remainder-feels">Peak feels like <b>${fmtTemp(d.peakFeelsF)}</b> <small>outdoors</small></div>
+      <div class="remainder-summary">
+        <span><small>Rain chance</small><strong>${num(d.rainChance, v => `${v}%`)}</strong></span>
+        <span><small>Total rain</small><strong>${totalRain.toFixed(2)}"</strong></span>
+        <span><small>Wind</small><strong>${windRange}</strong></span>
+      </div>
+      <div class="remainder-hours">
+        ${hours.map(h => `
+          <span class="remainder-hour">
+            <small>${hourLabel(h)}</small>
+            ${renderWeatherIconSvg(h.icon || d.icon, 28)}
+            <strong>${fmtTemp(hourTemp(h))}</strong>
+            <em>${num(h.rainChance, v => `${v}%`)}</em>
+            <span>${Number.isFinite(h.precipIn) ? h.precipIn.toFixed(2) + '"' : '—'}</span>
+            <span>${num(h.forecastWindMph, v => `${v} mph`)}</span>
+          </span>`).join('')}
+      </div>
+      <div class="remainder-footer">
+        <span><small>Avg wind</small><strong>${num(avgWind, v => `${v} mph`)}</strong></span>
+        <span><small>Dew point</small><strong>${fmtTemp(d.dewPointF ?? cur.dewPointF)}</strong></span>
+        <span><small>Cloud cover</small><strong>${num(cur.cloudCover, v => `${v}%`)}</strong></span>
+        <span><small>AQI</small><strong>${num(f.airQuality?.currentAqi)}</strong></span>
+        <span><small>UV</small><strong>${num(d.maxUvIndex ?? cur.uvIndex)}</strong></span>
+      </div>
+      <button class="remainder-more" type="button" aria-haspopup="dialog">View 48-hour graph ›</button>
+    </div>
+  `;
+  host.querySelector('.remainder-more').onclick = () => {
+    state.selectedHourIdx = 0;
+    state.selectedMetricId = 'temp';
+    open48hExplorerModal(f);
+  };
 }
 
 function renderForecastConfidenceBar(f){
@@ -1185,14 +1195,19 @@ function renderSevenDayForecast(f) {
   }
 
   if (dualStage) {
-    renderSevenDayDualSplineChart({
-      containerEl: dualStage,
-      days7,
-      selectedDayIdx: isExpanded ? selIdx : null,
-      activeCurveId: state.sevenDayActiveCurve,
-      useCelsius: state.useCelsius,
-      renderIconFn: renderWeatherIconSvg,
-      onSelectDay: (idx) => {
+    dualStage.innerHTML = `<div class="d7-columns">${days7.map((day, idx) => `
+      <button type="button" class="d7-col${isExpanded && idx === selIdx ? ' is-selected' : ''}" data-d7-idx="${idx}" aria-label="${escapeAttr(day.dayName)}, ${escapeAttr(day.dateLabel)}">
+        <strong class="d7-col-day">${escapeAttr(day.dayName)}</strong>
+        <small class="d7-col-date">${escapeAttr(day.dateLabel)}</small>
+        <span class="d7-col-icon">${renderWeatherIconSvg(day.icon, 40)}</span>
+        <span class="d7-col-rain">💧 ${rainPercent(day.rainChance)}</span>
+        <span class="d7-col-amt">${Number(day.totalQpfIn ?? 0).toFixed(2)}"</span>
+        <span class="d7-col-temps"><b>${fmtTemp(day.highF)}</b><small>${fmtTemp(day.lowF)}</small></span>
+        <span class="d7-col-wind">${Math.round(day.maxWindMph ?? 0)} mph</span>
+      </button>`).join('')}</div>`;
+    dualStage.querySelectorAll('[data-d7-idx]').forEach(el => {
+      el.onclick = () => {
+        const idx = Number(el.dataset.d7Idx);
         if (state.sevenDayDetailExpanded && state.selectedDayIdx === idx) {
           state.sevenDayDetailExpanded = false;
         } else {
@@ -1202,15 +1217,7 @@ function renderSevenDayForecast(f) {
         renderSevenDayForecast(f);
         renderModelExplanationSection(f);
         renderCompareModelsSection(f);
-      },
-      onSelectCurve: (curveId, dayIdx) => {
-        state.sevenDayActiveCurve = curveId;
-        if (typeof dayIdx === 'number') {
-          state.selectedDayIdx = dayIdx;
-          state.sevenDayDetailExpanded = true;
-        }
-        renderSevenDayForecast(f);
-      }
+      };
     });
   }
 
