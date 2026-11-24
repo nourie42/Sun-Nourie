@@ -81,7 +81,8 @@ test('confidence control remains a compact top row and opens the multi-day expla
   const index=readFileSync(new URL('../public/weather-fusion/v3/index.html',import.meta.url),'utf8');
   const css=readFileSync(new URL('../public/weather-fusion/v3/css/styles.css',import.meta.url),'utf8');
   const app=readFileSync(new URL('../public/weather-fusion/v3/js/app.js',import.meta.url),'utf8');
-  assert.ok(index.indexOf('hero-confidence-slot')<index.indexOf('class="shell hero-stage"'));
+  assert.ok(index.indexOf('id="forecast-confidence-bar"')>index.indexOf('class="shell hero-stage"'));
+  assert.ok(index.indexOf('id="forecast-confidence-bar"')<index.indexOf('id="today-forecast"'));
   assert.match(css,/\.forecast-confidence-button\s*\{[^}]*min-height:\s*52px/s);
   assert.match(css,/\.forecast-confidence-list/);
   assert.match(app,/openModal\(warning\.modalTitle/);
