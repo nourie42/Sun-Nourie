@@ -3691,7 +3691,6 @@ body.awaiting-location .v3-main-stack > :not(#location-needed-card) {
 .nws-alert-body p{margin:0 0 8px;line-height:1.4}
 .nws-alert-view{font:inherit;font-size:12px;font-weight:700;padding:5px 12px;border-radius:999px;border:1px solid rgba(255,190,190,.5);background:rgba(255,255,255,.08);color:#fff;cursor:pointer}
 .rem-tile{background-size:cover;background-position:center;position:relative}
-.rem-tile.is-night::before{content:"";position:absolute;inset:0;border-radius:inherit;background:rgba(3,10,28,.55)}
 .rem-tile span{position:relative}
 .rem-hours{display:flex;gap:6px;overflow-x:auto;scroll-snap-type:x proximity;padding-bottom:4px;-webkit-overflow-scrolling:touch;scrollbar-width:thin}
 .rem-hour{flex:0 0 68px;scroll-snap-align:start}

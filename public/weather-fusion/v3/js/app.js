@@ -398,27 +398,37 @@ function remIcon(name, size = 16) {
   return `<svg class="rem-ico" width="${size}" height="${size}" viewBox="0 0 24 24" fill="${filled ? 'currentColor' : 'none'}" stroke="${filled ? 'none' : 'currentColor'}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${REMAINDER_ICON_PATHS[name]}</svg>`;
 }
 
-function remainderSkyTile(condition) {
-  const c = String(condition || '').toLowerCase();
-  if (/tornado|hurricane|severe|damaging/.test(c)) return 'severe-storms';
-  if (/thunder|t-storm|storm/.test(c)) return 'thunderstorms';
-  if (/freezing rain|freezing drizzle|ice storm/.test(c)) return 'freezing-rain';
-  if (/blowing snow|drifting|blizzard/.test(c)) return 'blowing-snow';
-  if (/wintry|mix|sleet/.test(c)) return 'wintry-mix';
-  if (/snow/.test(c)) return /light|flurr|scattered|chance|slight/.test(c) ? 'light-snow' : 'snow';
-  if (/\bice\b|icing/.test(c)) return 'ice';
-  if (/rain.*wind|wind.*rain|gusty/.test(c)) return 'rain-windy';
-  if (/shower.*sun|sun.*shower|showers and sun/.test(c)) return 'showers-sun';
-  if (/light rain|drizzle|sprinkle|slight chance/.test(c)) return 'light-rain';
-  if (/rain|shower/.test(c)) return 'rain';
-  if (/fog|mist/.test(c)) return 'fog';
-  if (/haze|smoke/.test(c)) return 'haze';
-  if (/dust|sand/.test(c)) return 'dust';
-  if (/overcast|mostly cloudy|broken/.test(c)) return 'mostly-cloudy';
-  if (/cloudy/.test(c) && !/partly/.test(c)) return 'cloudy';
-  if (/partly|scattered|few clouds/.test(c)) return 'partly-cloudy';
-  if (/mostly sunny|mostly clear/.test(c)) return 'mostly-sunny';
-  return 'sunny';
+function remainderSky(hours, cur) {
+  const text = hours.map(h => String(h.condition || h.forecastCondition || '').toLowerCase()).join(' ');
+  const sum = key => hours.reduce((total, h) => total + (Number(h[key]) || 0), 0);
+  const peak = key => hours.reduce((top, h) => Math.max(top, Number(h[key]) || 0), 0);
+  const qpf = sum('precipIn'), snowIn = sum('snowfallIn'), chance = peak('rainChance');
+  const wind = peak('forecastWindMph'), gust = peak('windGustMph');
+  const clouds = hours.length ? hours.reduce((t, h) => t + (Number(h.forecastCloudCover) || 0), 0) / hours.length : (cur.cloudCover ?? 50);
+  const storm = /thunder|t-storm|storm/.test(text);
+  const freezing = /freezing|ice storm/.test(text);
+  const snowy = /snow|sleet|wintry|flurr|blizzard/.test(text) || snowIn >= 0.1;
+  const rainy = qpf >= 0.05 || chance >= 50 || /rain|shower|drizzle/.test(text);
+  if (storm) return gust >= 40 ? { tile: 'severe-storms', label: 'Severe Storms' } : { tile: 'thunderstorms', label: 'Thunderstorms' };
+  if (freezing) return { tile: 'freezing-rain', label: 'Freezing Rain' };
+  if (snowy && rainy) return { tile: 'wintry-mix', label: 'Wintry Mix' };
+  if (snowy) {
+    if (wind >= 25) return { tile: 'blowing-snow', label: 'Blowing Snow' };
+    return snowIn >= 0.5 ? { tile: 'snow', label: 'Snow' } : { tile: 'light-snow', label: 'Light Snow' };
+  }
+  if (rainy) {
+    if (wind >= 25 || gust >= 40) return { tile: 'rain-windy', label: 'Rain & Windy' };
+    if (qpf >= 0.75 || (qpf >= 0.5 && chance >= 80)) return { tile: 'rain', label: 'Heavy Rain' };
+    if (qpf >= 0.1 || chance >= 60) return { tile: 'rain', label: 'Rain' };
+    return { tile: 'light-rain', label: 'Light Rain' };
+  }
+  if (/fog|mist/.test(text)) return { tile: 'fog', label: 'Fog' };
+  if (/haze|smoke/.test(text)) return { tile: 'haze', label: 'Haze' };
+  if (/dust|sand/.test(text)) return { tile: 'dust', label: 'Dust' };
+  if (clouds >= 85) return { tile: 'cloudy', label: 'Cloudy' };
+  if (clouds >= 60) return { tile: 'mostly-cloudy', label: 'Mostly Cloudy' };
+  if (clouds >= 30) return { tile: 'partly-cloudy', label: 'Partly Cloudy' };
+  return cur.isDay ? { tile: 'sunny', label: 'Sunny' } : { tile: 'sunny', label: 'Clear' };
 }
 
 
@@ -461,6 +471,7 @@ function renderBetaTodayCard(f) {
   const aqiLabel = f.airQuality?.label || (aqi > 100 ? 'Unhealthy' : aqi > 50 ? 'Moderate' : 'Good');
   const pill = (label, tone) => `<em class="rem-pill rem-${tone}">${escapeAttr(label)}</em>`;
   const condition = d.condition || cur.condition;
+  const sky = remainderSky(hours, cur);
 
   host.hidden = false;
   host.innerHTML = `
@@ -471,8 +482,8 @@ function renderBetaTodayCard(f) {
         <time>Updated ${fmtHour(new Date().toISOString(), { hour: 'numeric', minute: '2-digit' })}</time>
       </header>
       <div class="rem-top">
-        <div class="rem-tile${cur.isDay ? '' : ' is-night'}" style="background-image:url(/weather-fusion/tile-${remainderSkyTile(condition)}.jpg)">
-          <span>${escapeAttr(condition)}</span>
+        <div class="rem-tile" style="background-image:url(/weather-fusion/tile-${sky.tile}.jpg)">
+          <span>${escapeAttr(sky.label)}</span>
         </div>
         <div class="rem-temps">
           <span><strong>${fmtTemp(d.lowF)}</strong><small>Low</small></span>
