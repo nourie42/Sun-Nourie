@@ -9,7 +9,7 @@ import {
   outdoorExposureReadings,
   searchLocations
 } from './fusion-engine.js?v=today-dewpoint-v1';
-import {todaySummary} from './today-preview.js?v=today-dewpoint-v1';
+import {todaySummary, twoDayHeadline} from './today-preview.js?v=two-day-headline-v1';
 import {hourlyRainInputsHTML, rainPercent} from './hourly-rain.js?v=local-hourly-v1';
 import { getLunarPhaseFraction, renderWeatherIconSvg } from './icons.js?v=v3-sky-8';
 import {
@@ -26,7 +26,7 @@ import { danCard, danOverview, danTakeDisplay } from '../../dans-summary.js?v=co
 import { activeRiskOutlooks, outlookDetailHTML } from '../../risk-outlooks.js?v=risk-outlooks-v5';
 import { forecastWindowBannerHTML, forecastWindowDetailHTML } from '../../forecast-window-banners.js?v=rain-hours-only-v1';
 import {confidenceWarningDetailHTML,confidenceWarningHTML,lowConfidenceWarning} from '../../confidence-bar.js?v=multi-event-confidence-v4';
-import {GlobePanel} from './globe-panel.js?v=wind-visibility-v1';
+import {GlobePanel} from './globe-panel.js?v=wind-flow-v2';
 import {outlookItems,renderOutlookPanel,openOutlookNote} from '../../outlook-panel.js?v=daily-hourly-v1';
 import { todayRainDisplay } from '../../today-card.js?v=hour-details-v1';
 import {applyLocalRadar, displayedRainChance, observedRainLabel} from '../../rain-display.js?v=local-radar-v2';
@@ -348,6 +348,21 @@ function escapeAttr(val) {
   return String(val ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
+function twoDayHeadlineFor(f) {
+  const [d0, d1] = f?.days || [];
+  if (!d0 || !d1) return '';
+  const since = Date.now() - 60 * 60 * 1000;
+  const rest = todayHours(f).filter(h => Date.parse(h.time) >= since);
+  const sum = key => rest.reduce((total, h) => total + (Number(h[key]) || 0), 0);
+  const peak = key => rest.reduce((top, h) => Math.max(top, Number(h[key]) || 0), 0);
+  const storm = day => /thunder|t-storm/.test(String(day.condition || '').toLowerCase());
+  const today = rest.length
+    ? { qpf: sum('precipIn'), chance: peak('rainChance'), wind: peak('forecastWindMph'), gust: peak('windGustMph'), snow: sum('snowfallIn'), storm: storm(d0) }
+    : { qpf: d0.totalQpfIn, chance: d0.rainChance, wind: d0.maxWindMph, gust: d0.maxGustMph, snow: d0.totalSnowIn, storm: storm(d0) };
+  const tomorrow = { qpf: d1.totalQpfIn, chance: d1.rainChance, wind: d1.maxWindMph, gust: d1.maxGustMph, snow: d1.totalSnowIn, storm: storm(d1) };
+  return twoDayHeadline(today, tomorrow);
+}
+
 function isPartlyCloudyCondition(f) {
   const cond = String(f?.current?.condition || f?.canonical?.current?.condition || '').toLowerCase();
   return /partly\s+(?:cloudy|sunny)|mostly sunny|few clouds|scattered/.test(cond);
@@ -383,27 +398,16 @@ function remIcon(name, size = 16) {
   return `<svg class="rem-ico" width="${size}" height="${size}" viewBox="0 0 24 24" fill="${filled ? 'currentColor' : 'none'}" stroke="${filled ? 'none' : 'currentColor'}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${REMAINDER_ICON_PATHS[name]}</svg>`;
 }
 
-function overcastSkyBackground(top, bottom, { rain = false } = {}) {
-  const streaks = rain
-    ? Array.from({ length: 36 }, (_, i) => {
-        const x = (i * 97) % 320;
-        const y = (i * 53) % 220;
-        return `<line x1='${x}' y1='${y}' x2='${x - 7}' y2='${y + 18}'/>`;
-      }).join('')
-    : '';
-  const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='320' height='220' viewBox='0 0 320 220'><defs><linearGradient id='g' x1='0' y1='0' x2='0' y2='1'><stop offset='0' stop-color='${top}'/><stop offset='1' stop-color='${bottom}'/></linearGradient><filter id='n' x='0' y='0' width='100%' height='100%'><feTurbulence type='fractalNoise' baseFrequency='0.006 0.012' numOctaves='5' seed='9' result='t'/><feColorMatrix in='t' type='matrix' values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  2.6 0 0 0 -1.25'/></filter></defs><rect width='320' height='220' fill='url(#g)'/><rect width='320' height='220' filter='url(#n)' opacity='0.85'/><g stroke='#d6e8fb' stroke-opacity='0.5' stroke-width='1.1' stroke-linecap='round'>${streaks}</g></svg>`;
-  const encoded = encodeURIComponent(svg).replace(/[()']/g, c => `%${c.charCodeAt(0).toString(16).toUpperCase()}`);
-  return `url(data:image/svg+xml,${encoded}) center/cover`;
-}
-
 function remainderSkyBackground(condition, isDay) {
   const c = String(condition || '').toLowerCase();
-  if (/thunder|storm/.test(c)) return overcastSkyBackground('#3c4256', '#171a2a', { rain: true });
-  if (/rain|shower|drizzle|snow|sleet|freez/.test(c)) return overcastSkyBackground('#4a5a6c', '#222e3d', { rain: true });
-  if (/cloud|overcast|fog|mist/.test(c)) return overcastSkyBackground('#566073', '#2c3443');
-  if (!isDay) return 'radial-gradient(circle at 30% 35%, rgba(255,255,255,.18), transparent 42%), linear-gradient(170deg, #1a2c58, #080f22)';
-  if (/sunny|clear|fair/.test(c)) return 'linear-gradient(170deg, #3a8ae0, #1b4f9c)';
-  return overcastSkyBackground('#566073', '#2c3443');
+  const photo = (file, position, size, shade) =>
+    `linear-gradient(rgba(5,12,30,${shade}),rgba(5,12,30,${shade})), url(/weather-fusion/${file}) ${position} / ${size} no-repeat`;
+  if (/thunder|storm/.test(c)) return photo('today-sky-rain.webp', '85% 35%', 'auto 190%', isDay ? 0.3 : 0.6);
+  if (/rain|shower|drizzle|snow|sleet|freez/.test(c)) return photo('today-sky-rain.webp', '88% 45%', 'auto 170%', isDay ? 0 : 0.5);
+  if (/partly|few clouds|scattered|mostly sunny/.test(c)) return isDay ? photo('today-sky-clouds.webp', '76% 46%', 'cover', 0) : photo('today-sky-night-v2.webp', '88% 50%', 'cover', 0);
+  if (/cloud|overcast|fog|mist|haze|smoke/.test(c)) return photo('today-sky-rain.webp', '38% 6%', 'auto 240%', isDay ? 0.2 : 0.7);
+  if (!isDay) return photo('today-sky-night-v2.webp', 'center', 'cover', 0);
+  return photo('today-sky-clear.webp', '66% 42%', 'cover', 0);
 }
 
 function remainderHours(f) {
@@ -1018,7 +1022,9 @@ function renderHeroAndBriefing(f) {
   const observedRain = hasObservedRain(f);
   const summary = document.getElementById('hero-day-summary');
   if (summary) {
-    summary.textContent = todaySummary(todayHours(f),f.canonical?.days?.[0]?.high,{observedRain});
+    const headline = twoDayHeadlineFor(f);
+    summary.textContent = headline || todaySummary(todayHours(f),f.canonical?.days?.[0]?.high,{observedRain});
+    summary.classList.toggle('is-headline', Boolean(headline));
     summary.hidden = !summary.textContent;
   }
   if (sceneEl) sceneEl.innerHTML = renderWeatherIconSvg(observedRain ? 'rain' : cur.icon, 68);

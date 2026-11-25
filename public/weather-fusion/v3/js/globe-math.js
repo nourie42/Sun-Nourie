@@ -23,4 +23,4 @@ export function subsolarPoint(now=Date.now()){
 }
 
 export function sampleWindField(grid,latitude,longitude){return (grid?.regional?sampleGlobeWind(grid.regional,latitude,longitude):null)||sampleGlobeWind(grid,latitude,longitude);}
-export function screenWindDensity(area,speed){return Math.min(1400,Math.max(0,Math.round(area/260*Math.min(2,Math.max(0,speed)/7))));}
+export function screenWindDensity(area,speed){return Math.min(1400,Math.max(0,Math.round(area/140*Math.min(2,Math.max(0,speed)/7))));}

@@ -1,4 +1,6 @@
-import {advanceWind,sampleWindField,screenWindDensity} from './globe-math.js?v=tiled-v3';
+import {advanceWind,sampleWindField,screenWindDensity} from './globe-math.js?v=tiled-v4';
+const WIND_COLORS=['rgba(204,240,255,.92)','rgba(130,222,255,.94)','rgba(140,240,170,.95)','rgba(255,232,120,.96)','rgba(255,160,80,.97)','rgba(255,100,130,.98)'];
+const STREET_WIND_COLORS=['rgba(10,106,149,.7)','rgba(6,95,142,.8)','rgba(10,120,90,.85)','rgba(150,110,0,.9)','rgba(190,80,10,.92)','rgba(190,20,60,.95)'];
 let library;
 function loadLibrary(){
  if(globalThis.maplibregl)return Promise.resolve(globalThis.maplibregl);
@@ -141,10 +143,38 @@ export class WeatherGlobeRenderer{
  seed(){
   this.particles=[];if(!this.grid||!this.width||!this.height)return;
   let mean=0,n=0;for(let y=20;y<this.height;y+=70)for(let x=20;x<this.width;x+=70){const v=this.velocity(x,y);if(v){mean+=v.speed;n++;}}
-  const count=screenWindDensity(this.width*this.height,n?mean/n:0);let tries=0;while(this.particles.length<count&&tries++<count*6){const x=Math.random()*this.width,y=Math.random()*this.height,v=this.velocity(x,y);if(!v||Math.random()>Math.min(1,.25+v.speed/18))continue;this.particles.push({x,y,age:Math.random()*7});}this.canvas.dataset.windParticles=this.particles.length;
+  const count=screenWindDensity(this.width*this.height,n?mean/n:0);let tries=0;while(this.particles.length<count&&tries++<count*10){const x=Math.random()*this.width,y=Math.random()*this.height,v=this.velocity(x,y);if(!v||Math.random()>Math.min(1,.25+v.speed/18))continue;this.particles.push({x,y,age:Math.random()*7});}this.canvas.dataset.windParticles=this.particles.length;
  }
  clearTrails(){this.ctx.clearRect(0,0,this.width||0,this.height||0);}
- color(speed){if(this.street)return speed>12?'rgba(6,95,142,.85)':'rgba(10,106,149,.7)';return speed>12?'rgba(255,230,159,.9)':'rgba(181,232,245,.85)';}
+ windClass(speed){const ms=(speed-9)/2.2;return ms<3?0:ms<6?1:ms<10?2:ms<15?3:ms<22?4:5;}
+ classColor(i){return this.street?STREET_WIND_COLORS[i]:WIND_COLORS[i];}
+ color(speed){return this.classColor(this.windClass(speed));}
  drawArrows(){if(this.motion||this.moving||!this.layers.wind||!this.grid)return;this.clearTrails();for(let y=18;y<this.height;y+=36)for(let x=18;x<this.width;x+=36){const v=this.velocity(x,y);if(!v)continue;const n=Math.hypot(v.x,v.y);if(n<1e-8)continue;const dx=v.x/n*7,dy=v.y/n*7;this.ctx.strokeStyle=this.color(v.speed);this.ctx.lineWidth=1;this.ctx.beginPath();this.ctx.moveTo(x-dx,y-dy);this.ctx.lineTo(x+dx,y+dy);this.ctx.moveTo(x+dx-dx*.6-dy*.45,y+dy-dy*.6+dx*.45);this.ctx.lineTo(x+dx,y+dy);this.ctx.lineTo(x+dx-dx*.6+dy*.45,y+dy-dy*.6-dx*.45);this.ctx.stroke();}}
- loop(now){this.frame=null;if(!this.active||!this.motion)return;if(now-(this.last||0)>35){const dt=Math.min(.08,(now-(this.last||now))/1000);this.last=now;if(this.layers.wind&&this.grid&&!this.moving){this.ctx.globalCompositeOperation='destination-in';this.ctx.fillStyle='rgba(0,0,0,.92)';this.ctx.fillRect(0,0,this.width,this.height);this.ctx.globalCompositeOperation='source-over';for(const p of this.particles){const v=this.velocity(p.x,p.y);if(!v||p.age>8||p.x<0||p.y<0||p.x>this.width||p.y>this.height){p.x=Math.random()*this.width;p.y=Math.random()*this.height;p.age=0;continue;}const x=p.x+v.x*dt,y=p.y+v.y*dt;this.ctx.strokeStyle=this.color(v.speed);this.ctx.lineWidth=v.speed>12?1.2:.85;this.ctx.beginPath();this.ctx.moveTo(p.x,p.y);this.ctx.lineTo(x,y);this.ctx.stroke();p.x=x;p.y=y;p.age+=dt;}}}this.frame=requestAnimationFrame(t=>this.loop(t));}
+ loop(now){
+  this.frame=null;if(!this.active||!this.motion)return;
+  if(now-(this.last||0)>35){
+   const dt=Math.min(.08,(now-(this.last||now))/1000);this.last=now;
+   if(this.layers.wind&&this.grid&&!this.moving){
+    const ctx=this.ctx;
+    ctx.globalCompositeOperation='destination-in';ctx.fillStyle='rgba(0,0,0,.95)';ctx.fillRect(0,0,this.width,this.height);ctx.globalCompositeOperation='source-over';
+    const buckets=[[],[],[],[],[],[]];
+    for(const p of this.particles){
+     const v=this.velocity(p.x,p.y);
+     if(!v||p.age>8||p.x<0||p.y<0||p.x>this.width||p.y>this.height){p.x=Math.random()*this.width;p.y=Math.random()*this.height;p.age=0;continue;}
+     const x=p.x+v.x*dt,y=p.y+v.y*dt;
+     buckets[this.windClass(v.speed)].push(p.x,p.y,x,y);
+     p.x=x;p.y=y;p.age+=dt;
+    }
+    ctx.lineCap='round';ctx.shadowColor='rgba(3,16,34,.6)';ctx.shadowBlur=2;
+    buckets.forEach((seg,i)=>{
+     if(!seg.length)return;
+     ctx.strokeStyle=this.classColor(i);ctx.lineWidth=1.35+i*.22;ctx.beginPath();
+     for(let k=0;k<seg.length;k+=4){ctx.moveTo(seg[k],seg[k+1]);ctx.lineTo(seg[k+2],seg[k+3]);}
+     ctx.stroke();
+    });
+    ctx.shadowBlur=0;ctx.shadowColor='transparent';
+   }
+  }
+  this.frame=requestAnimationFrame(t=>this.loop(t));
+ }
 }

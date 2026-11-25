@@ -211,3 +211,37 @@ export function todaySummary(hours, high, {observedRain = false} = {}) {
   if (skyHours.some(row=>row.kind==='cloudy'||row.kind==='partly-cloudy')) return `Cloudy${andTemp} ${period}${wind>=18?', with strong winds':''}`;
   return temperature ? `${lead}${period}${wind>=18?' and windy':''}` : '';
 }
+
+const HAZARD_ORDER = ['thunderstorms','strong winds','gusty winds','heavy rain','rain','scattered showers','snow'];
+
+function dayHazards({qpf = 0, chance = 0, wind = 0, gust = 0, snow = 0, storm = false} = {}) {
+  const hazards = [];
+  if (storm) hazards.push('thunderstorms');
+  if (gust >= 40 || wind >= 25) hazards.push('strong winds');
+  else if (gust >= 30 || wind >= 18) hazards.push('gusty winds');
+  if (qpf >= .75 || (qpf >= .5 && chance >= 80)) hazards.push('heavy rain');
+  else if (qpf >= .1 && chance >= 50) hazards.push('rain');
+  else if (chance >= 40) hazards.push('scattered showers');
+  if (snow >= .5) hazards.push('snow');
+  return hazards.sort((a,b)=>HAZARD_ORDER.indexOf(a)-HAZARD_ORDER.indexOf(b));
+}
+
+const joinHazards = list => list.length < 3 ? list.join(' and ') : `${list.slice(0,-1).join(', ')} and ${list.at(-1)}`;
+const capitalize = text => text[0].toUpperCase() + text.slice(1);
+
+/** One-line headline covering today and tomorrow. Returns '' when there is nothing notable tomorrow. */
+export function twoDayHeadline(today, tomorrow) {
+  const first = dayHazards(today), second = dayHazards(tomorrow);
+  if (!second.length) return '';
+  if (!first.length) return `${capitalize(joinHazards(second))} tomorrow`;
+  const shared = first.filter(hazard => second.includes(hazard));
+  if (!shared.length) return `${capitalize(joinHazards(first))} today, ${joinHazards(second)} tomorrow`;
+  const stormSystem = shared.includes('strong winds') && (shared.includes('heavy rain') || shared.includes('thunderstorms'));
+  const base = stormSystem
+    ? `Storm system will bring ${joinHazards(shared)} today and tomorrow`
+    : `${capitalize(joinHazards(shared))} today and tomorrow`;
+  const extras = [[first.filter(hazard => !second.includes(hazard)), 'today'], [second.filter(hazard => !first.includes(hazard)), 'tomorrow']]
+    .filter(([list]) => list.length)
+    .map(([list, day]) => `${joinHazards(list)} ${day}`);
+  return extras.length ? `${base}, with ${extras.join(' and ')}` : base;
+}
