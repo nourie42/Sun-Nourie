@@ -561,6 +561,11 @@ body[data-sky="night"] .atmosphere {
   filter: brightness(0.96) saturate(0.84);
 }
 
+.hero-bg-photo.sky-partly-night {
+  object-position: 74% 46%;
+  filter: brightness(0.26) saturate(0.7) hue-rotate(195deg) contrast(1.1);
+}
+
 .hero-bg-photo.sky-overcast-night {
   object-position: 0% 10% !important;
   transform: scale(2.25);

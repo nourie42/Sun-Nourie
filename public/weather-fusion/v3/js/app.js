@@ -348,6 +348,11 @@ function escapeAttr(val) {
   return String(val ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
+function isPartlyCloudyCondition(f) {
+  const cond = String(f?.current?.condition || f?.canonical?.current?.condition || '').toLowerCase();
+  return /partly\s+(?:cloudy|sunny)|mostly sunny|few clouds|scattered/.test(cond);
+}
+
 function isSkyCloudyOrWet(f) {
   const cur = f?.current;
   if (!cur) return false;
@@ -780,6 +785,9 @@ function selectHeroBackdropPhoto(cur, canonical = null) {
   }
   if (isOvercastCloudy) {
     return { src: '/weather-fusion/today-sky-rain.webp', cls: isNight ? 'sky-overcast-night' : 'sky-overcast' };
+  }
+  if (isNight && isPartlyCond) {
+    return { src: '/weather-fusion/today-sky-clouds.webp', cls: 'sky-partly-night' };
   }
   if (isNight) {
     return { src: '/weather-fusion/today-sky-night-v2.webp', cls: '' };
@@ -3481,7 +3489,7 @@ function initSkyCanvas() {
         }
         if (p.x < -40) p.x = W + 20;
       });
-    } else if (mood === 'night' && (state.skyOverride === 'night' || !isSkyCloudyOrWet(state.forecast))) {
+    } else if (mood === 'night' && (state.skyOverride === 'night' || (!isSkyCloudyOrWet(state.forecast) && !isPartlyCloudyCondition(state.forecast)))) {
       // Twinkling stars & current moon phase only on clear/partly-cloudy nights (never when overcast cloudy)
       particles.slice(0, 55).forEach((p) => {
         const twinkle = 0.25 + 0.55 * (0.5 + 0.5 * Math.sin(ts * 0.002 + p.phase));
