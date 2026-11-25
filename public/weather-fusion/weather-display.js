@@ -165,9 +165,10 @@ export function currentSample(forecast, now = Date.now()) {
   const canonicalGuidance=current.type==='guidance'&&current.localEstimate?.basis==='canonical-hourly-blend'
     &&finite(thermalTime)&&thermalTime===Date.parse(current.time);
   const thermalInputs=canonicalGuidance?{...current,condition:current.thermalCondition||current.condition}:current;
-  // Current sunlight must use the actual viewing time, not a stale observation or assembled forecast timestamp.
+  // A modeled hour uses that hour's sun. The live view uses the actual time, not a stale observation or assembled forecast timestamp.
   const comfort = thermalComfort(thermalInputs, forecast.location, canonicalGuidance?thermalTime:finite(assembled)?assembled:now);
-  const solarDaylight=solarElevation(now,forecast.location?.latitude,forecast.location?.longitude);
+  const solarClock=canonicalGuidance&&finite(thermalTime)?thermalTime:now;
+  const solarDaylight=solarElevation(solarClock,forecast.location?.latitude,forecast.location?.longitude);
   const isDay=finite(solarDaylight)?solarDaylight>0:comfort.daylight;
   comfort.daylight=isDay;
   if(canonicalGuidance){

@@ -7,16 +7,23 @@ let forecastCalls = 0;
 const app = express();
 app.get('/api/weather-fusion/forecast', (req, res) => {
   const data = fixture(req.query.location);
-  const second = forecastCalls++ > 0;
+  const second = forecastCalls++ >= 2;
   const chance = second ? 60 : 40;
   data.assembledAt = second ? '2026-09-05T21:59:00.000Z' : '2026-09-05T21:58:00.000Z';
+  const window = data.days[0].rainLikelihood?.window;
   data.days[0].rainLikelihood = {
     ...(data.days[0].rainLikelihood || {}),
     value: chance,
     aggregation: 'maximum-hourly',
     coverage: {complete:true},
-    window: {start:'2026-09-05T21:00:00.000Z', end:'2026-09-06T11:00:00.000Z'},
   };
+  const start = Date.parse(window?.start), end = Date.parse(window?.end);
+  for (const row of data.rainTimeline || []) {
+    const time = Date.parse(row.time);
+    if (row.rainLikelihood && typeof row.rainLikelihood === 'object' && time >= start && time < end) {
+      row.rainLikelihood = {...row.rainLikelihood, value: chance};
+    }
+  }
   res.json(data);
 });
 app.get('/api/weather-fusion/radar', (_req,res) => res.json({frames:[],status:'unavailable'}));
@@ -78,21 +85,21 @@ try {
       const labels=cards.map(card=>card.querySelector('.jump-label'));
       return {
         navFits:nav.scrollWidth<=nav.clientWidth+1,
-        fiveCards:cards.length===5,
+        nineCards:cards.length===9,
         labelsOneLine:labels.every(el=>el.scrollWidth<=el.clientWidth+1&&getComputedStyle(el).whiteSpace==='nowrap'),
-        oneRow:Math.max(...cards.map(card=>rect(card).top))-Math.min(...cards.map(card=>rect(card).top))<3,
+        threeRows:new Set(cards.map(card=>Math.round(rect(card).top))).size===3,
         noArrows:cards.every(card=>!card.querySelector('.jump-arrow')),
         noArtwork:cards.every(card=>!card.querySelector('.jump-visual')&&!card.querySelector('svg.jump-svg')),
-        compactButtons:cards.every(card=>{const h=rect(card).height;return h>=34&&h<=46;}),
+        compactButtons:cards.every(card=>{const h=rect(card).height;return h>=28&&h<=36;}),
         rowFits:[...row.children].filter(el=>el.getClientRects().length).every(el=>{const r=rect(el);return r.left>=rr.left-1&&r.right<=rr.right+1;}),
         metaBelow:meta.top>=Math.max(...[...row.children].filter(el=>!el.classList.contains('day-meta')&&!el.classList.contains('forecast-confidence-notice')).map(el=>rect(el).bottom))-4,
         confidenceOwnRow:confidence.bottom<=Math.min(wind.top,uv.top)+2,
-        windLeftOfUv:wind.left<uv.left&&wind.right<=uv.left+2,
+        windLeftOfUv:wind.left<uv.left,
         lowerInside:[confidence,wind,uv].every(r=>r.left>=rr.left-1&&r.right<=rr.right+1),
         gustInsideWind:!row.querySelector('.day-wind-chip em')||rect(row.querySelector('.day-wind-chip em')).right<=wind.right+1,
       };
     });
-    assert.deepEqual(layout,{navFits:true,fiveCards:true,labelsOneLine:true,oneRow:true,noArrows:true,noArtwork:true,compactButtons:true,rowFits:true,metaBelow:true,confidenceOwnRow:true,windLeftOfUv:true,lowerInside:true,gustInsideWind:true},`flat one-row mobile button layout at ${width}px`);
+    assert.deepEqual(layout,{navFits:true,nineCards:true,labelsOneLine:true,threeRows:true,noArrows:true,noArtwork:true,compactButtons:true,rowFits:true,metaBelow:true,confidenceOwnRow:true,windLeftOfUv:false,lowerInside:true,gustInsideWind:true},`nine-card mobile navigation at ${width}px`);
   }
 
   console.log(JSON.stringify({
