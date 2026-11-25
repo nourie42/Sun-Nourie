@@ -26,6 +26,7 @@ import {forecastPeriodSummary} from '../public/weather-fusion/forecast-story.js'
 import {isTonightPeriod} from '../public/weather-fusion/weather-math.js';
 import {bannerStateFromNwsPeriods} from '../public/weather-fusion/alert-banners.js';
 import {createAccuracyService} from './weatherFusionAccuracy.js';
+import {createStormSnowBetaService} from './weatherFusionBeta.js';
 /** Weather Fusion: isolated, dependency-free Express route registration.
  * Numeric forecasts stay deterministic. AI explains supplied facts; it cannot edit them.
  * Source contracts and deployment requirements: docs/weather-fusion.md.
@@ -285,9 +286,13 @@ export function summarizeRadarPresence(samples, observedAt) {
   const inArea = nearby || coherentPrecipitation(samples,RADAR_AREA_MILES);
   const accepted = active.filter(sample => sample.distanceMiles === 0 || (close&&sample.distanceMiles<=RADAR_CLOSE_MILES) || (nearby && sample.distanceMiles <= RADAR_NEARBY_MILES) || (inArea && sample.distanceMiles <= RADAR_AREA_MILES));
   const nearest = accepted.reduce((best,sample)=>!best||sample.distanceMiles<best.distanceMiles?sample:best,null);
+  const typed = accepted.find(sample => typeof sample.hydrometeor === 'string') || null;
   return {status:available.length ? 'ready' : 'unavailable',observedAt,
     atLocation,close,nearby,inArea,
     nearestRainMiles:nearest?.distanceMiles??null,nearestRainDirection:radarDirection(nearest?.bearing),
+    observedTypeAtLocation:typeof center?.hydrometeor === 'string' ? center.hydrometeor : null,
+    nearestObservedType:typed?.hydrometeor || null,
+    typeEvidence:typed ? 'NOAA dual-polarization hydrometeor classification' : 'Unavailable',
     closeRadiusMiles:RADAR_CLOSE_MILES,nearbyRadiusMiles:RADAR_NEARBY_MILES,scanRadiusMiles:RADAR_AREA_MILES,source:'NOAA MRMS reflectivity checked against local NEXRAD dual-polarization classification'};
 }
 
@@ -768,9 +773,11 @@ export function registerWeatherFusionRoutes(app, options = {}) {
   registerGlobeRoutes(app,{fetchImpl:options.fetchImpl,now:options.now,parseRadarTimes});
   const service = createWeatherService({env:{...process.env,WEATHER_NOURIE_BLEND_V2:process.env.WEATHER_NOURIE_BLEND_V2||'true'},...options});
   const accuracy = createAccuracyService({fetchImpl: options.fetchImpl || fetch, now: options.now || Date.now});
+  const stormSnowBeta = createStormSnowBetaService({now: options.now || Date.now});
   const getForecastRecorded = async (query) => {
     const forecast = await service.getForecast(query);
     try { accuracy.recordRuntimeForecast(forecast); } catch {}
+    try { stormSnowBeta.recordForecast(forecast); } catch {}
     return forecast;
   };
   const counters = new Map();
@@ -810,6 +817,7 @@ export function registerWeatherFusionRoutes(app, options = {}) {
     'v3/js/app.js',
     'v3/js/charts.js',
     'v3/js/fusion-engine.js',
+    'v3/js/storm-and-snow-beta.js',
     'v3/js/hourly-rain.js',
     'v3/js/today-preview.js',
     'v3/js/icons.js',
@@ -906,6 +914,7 @@ export function registerWeatherFusionRoutes(app, options = {}) {
     }
     return accuracy.getAccuracy({ latitude: lat, longitude: lon, days: q.days, horizon: q.horizon });
   }));
+  app.get('/api/weather-fusion/storm-snow/history', route((q) => stormSnowBeta.getHistory(q)));
   return service;
 }
 

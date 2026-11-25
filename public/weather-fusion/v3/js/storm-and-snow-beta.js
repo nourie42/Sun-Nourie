@@ -1,103 +1,153 @@
-// Storm and Snow Beta: point-forecast UI, using the existing canonical forecast.
-// Regional rain grids, calibrated distributions and verified history are not fabricated.
-import {winterDayAmount,winterAmountText,winterSnowMapForDay,winterAreaDataUrl,safeWinterMapUrl} from '../../snow-outlook.js?v=snow-readable-v1';
-const finite=v=>typeof v==='number'&&Number.isFinite(v);
-const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const pct=v=>finite(v)&&v>=0&&v<=100?Math.round(v)+'%':'Unavailable';
-const inches=v=>finite(v)&&v>=0?v.toFixed(2)+'″':'Unavailable';
-const rainSource='https://www.wpc.ncep.noaa.gov/qpf/qpf2.shtml';
-const snowSource='https://www.wpc.ncep.noaa.gov/pwpf/wwd_accum_probs.php';
-const detailNames={map:'Accumulation map',probabilities:'Chance & amounts',changes:'Forecast changes',timing:'Storm timing',live:'Live tracking',confidence:'Forecast confidence',impacts:'Weather impacts'};
-const icons={map:'◈',probabilities:'%',changes:'↗',timing:'◷',live:'◎',confidence:'◇',impacts:'⚠'};
-const css=`
-.storm-beta{color:#183b52;background:#edf7fc;border-radius:16px;padding:14px;line-height:1.4;--accent:#197e83;--pale:#e0f3ed;max-width:100%;overflow-wrap:anywhere}
-.storm-beta[data-mode=snow]{--accent:#246ead;--pale:#e4f0ff}
-.storm-beta *{box-sizing:border-box}
-.storm-beta h3,.storm-beta h4,.storm-beta p{color:inherit;margin:0}
-.storm-beta h3{font-size:22px}.storm-beta h4{font-size:16px}
-.storm-beta small,.storm-beta .sb-note{color:#48677a;font-size:12px}
-.storm-beta .sb-top{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px}
-.storm-beta .sb-card,.storm-beta .sb-tile{background:rgba(255,255,255,.89);border:1px solid #ccdfe9;border-radius:14px;box-shadow:0 3px 12px #1c4b7210;padding:13px;margin:0;color:#183b52}
-.storm-beta .sb-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:10px}
-.storm-beta button{cursor:pointer;min-height:44px;font:inherit;color:#183b52}
-.storm-beta button.sb-tile{text-align:left;display:flex;flex-direction:column;gap:6px;min-width:0}
-.storm-beta .sb-tile strong{font-size:14px;color:#183b52}.storm-beta .sb-tile span{color:var(--accent);font-weight:700}
-.storm-beta .sb-hero{background:linear-gradient(110deg,#ffffffec,var(--pale));margin:10px 0;display:grid;gap:7px}
-.storm-beta .sb-hero strong{font-size:30px;color:var(--accent)}
-.storm-beta .sb-entry{min-height:128px;background:linear-gradient(145deg,#fff,var(--pale))}
-.storm-beta .sb-entry[data-select=snow]{--pale:#e4f0ff;--accent:#246ead}
-.storm-beta .sb-back,.storm-beta select{border:1px solid #b9d2df;background:white;border-radius:10px;padding:8px 12px;color:#183b52;min-height:44px}
-.storm-beta .sb-row{display:flex;justify-content:space-between;gap:8px;border-bottom:1px solid #e0ebf0;padding:9px 0;align-items:center}
-.storm-beta .sb-row:last-child{border:0}.storm-beta a{color:#126496;text-decoration:underline}
-.storm-beta .sb-map{height:320px;min-height:240px;border-radius:10px;overflow:hidden;background:#e6eef2;margin:8px 0}
-.storm-beta .sb-legend{display:flex;flex-wrap:wrap;gap:8px;font-size:12px}.storm-beta .sb-legend i{width:12px;height:12px;display:inline-block;margin-right:4px;border:1px solid #adbdca}
-.storm-beta .sb-map-tile{width:100%;min-height:76px;margin-top:8px}
-.storm-beta .sb-alert{border-left:3px solid #b34a35;padding-left:10px;margin:10px 0}
-@media(max-width:370px){.storm-beta{padding:9px}.storm-beta .sb-grid{gap:6px}.storm-beta .sb-tile{padding:9px}}
+// Storm and Snow Beta: experimental Rain Central and Snow Central surfaces.
+// This module consumes the canonical forecast and authoritative live endpoints.
+// It never converts deterministic amounts into probabilities or missing values
+// into zeros. Production weather rendering remains in app.js.
+import { winterAreaDataUrl, safeWinterMapUrl, winterSnowMapForDay, winterDayAmount, winterAmountText } from '../../snow-outlook.js?v=snow-readable-v1';
+
+const finite = value => typeof value === 'number' && Number.isFinite(value);
+const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
+const pct = value => finite(value) && value >= 0 && value <= 100 ? `${Math.round(value)}%` : 'Unavailable';
+const amount = (value, unit = 'in') => finite(value) && value >= 0 ? `${value.toFixed(2)}″ ${unit}` : 'Unavailable';
+const dateMs = value => { const parsed = Date.parse(value || ''); return Number.isFinite(parsed) ? parsed : null; };
+const rainSource = 'https://www.wpc.ncep.noaa.gov/qpf/day1-3.shtml';
+const snowSource = 'https://www.wpc.ncep.noaa.gov/pwpf/wwd_accum_probs.php';
+const officialRadar = 'https://radar.weather.gov/';
+const detailNames = { map: 'Accumulation map', probabilities: 'Chance & amounts', changes: 'Forecast changes', timing: 'Storm timing', live: 'Live tracking', confidence: 'Forecast confidence', impacts: 'Weather impacts' };
+const icons = { map: '◈', probabilities: '%', changes: '↗', timing: '◷', live: '◎', confidence: '◇', impacts: '⚠' };
+
+const css = `
+.storm-beta{--sb-ink:#133850;--sb-muted:#4b6879;--sb-accent:#0e8580;--sb-pale:#e2f4ef;--sb-border:#c8dfe8;color:var(--sb-ink);background:#eef8fc;border-radius:18px;padding:14px;line-height:1.42;max-width:100%;overflow-wrap:anywhere}
+.storm-beta[data-mode=snow]{--sb-accent:#246cad;--sb-pale:#e5f1ff}
+.storm-beta *{box-sizing:border-box}.storm-beta h3,.storm-beta h4,.storm-beta p{color:inherit;margin:0}.storm-beta h3{font-size:22px}.storm-beta h4{font-size:16px}
+.storm-beta small,.storm-beta .sb-note{color:var(--sb-muted);font-size:12px}.storm-beta .sb-top{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px}.storm-beta .sb-top>div{min-width:0}.storm-beta .sb-card,.storm-beta .sb-tile{background:rgba(255,255,255,.9);border:1px solid var(--sb-border);border-radius:15px;box-shadow:0 3px 14px #1c4b7210;padding:13px;color:var(--sb-ink)}
+.storm-beta .sb-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:10px}.storm-beta button{cursor:pointer;min-height:44px;font:inherit;color:var(--sb-ink)}.storm-beta button.sb-tile{text-align:left;display:flex;flex-direction:column;gap:6px;min-width:0}.storm-beta .sb-tile strong{font-size:15px}.storm-beta .sb-tile span{color:var(--sb-accent);font-weight:750}.storm-beta .sb-entry{min-height:170px;background-size:cover;background-position:center;position:relative;isolation:isolate;overflow:hidden}.storm-beta .sb-entry:before{content:"";position:absolute;inset:0;background:linear-gradient(130deg,#ffffffef 10%,#ffffffb3 62%,#dff5eea8);z-index:-1}.storm-beta .sb-entry[data-select=snow]{--sb-accent:#246cad;--sb-pale:#e5f1ff;background-image:url('/weather-fusion/header-snow.webp')}.storm-beta .sb-entry[data-select=rain]{background-image:url('/weather-fusion/header-rain.webp')}
+.storm-beta .sb-back,.storm-beta select{border:1px solid #b9d2df;background:#fff;border-radius:10px;padding:8px 12px;color:var(--sb-ink);min-height:44px}.storm-beta .sb-back{font-weight:700}.storm-beta .sb-horizons{display:flex;gap:6px;overflow-x:auto;padding:2px 0 6px}.storm-beta .sb-horizon{border:1px solid #b9d2df;border-radius:999px;background:#fff;padding:8px 12px;white-space:nowrap}.storm-beta .sb-horizon[aria-pressed=true]{background:var(--sb-accent);border-color:var(--sb-accent);color:#fff}.storm-beta .sb-days{display:flex;gap:6px;overflow-x:auto;margin:2px 0 8px}.storm-beta .sb-day{background:#fff;border:1px solid #b9d2df;border-radius:10px;padding:8px 10px;min-width:82px}.storm-beta .sb-day[aria-pressed=true]{border-color:var(--sb-accent);box-shadow:inset 0 -3px var(--sb-accent);font-weight:700}.storm-beta .sb-hero{background:linear-gradient(110deg,#ffffffee,var(--sb-pale));margin:10px 0;display:grid;gap:7px}.storm-beta .sb-hero strong{font-size:30px;color:var(--sb-accent);line-height:1.1}.storm-beta .sb-hero .sb-hero-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.storm-beta .sb-hero .sb-stat{padding:8px;border-radius:10px;background:#ffffffa8}.storm-beta .sb-hero .sb-stat b{display:block;font-size:16px}.storm-beta .sb-tile.sb-map-tile{min-height:96px;grid-column:1/-1}.storm-beta a{color:#126496;text-decoration:underline}.storm-beta .sb-map{height:390px;min-height:260px;border-radius:12px;overflow:hidden;background:#e6eef2;margin:8px 0}.storm-beta .sb-map-panel{display:grid;grid-template-columns:205px minmax(0,1fr) 205px;gap:10px;align-items:start}.storm-beta .sb-layer-panel,.storm-beta .sb-summary{min-width:0}.storm-beta .sb-layer-panel label{display:flex;gap:8px;align-items:flex-start;padding:8px 0;border-bottom:1px solid #e0ebf0;font-size:13px}.storm-beta .sb-layer-panel input{margin-top:4px}.storm-beta .sb-legend{display:flex;flex-wrap:wrap;gap:8px;font-size:12px}.storm-beta .sb-legend i{width:12px;height:12px;display:inline-block;margin-right:4px;border:1px solid #adbdca}.storm-beta .sb-row{display:flex;justify-content:space-between;gap:8px;border-bottom:1px solid #e0ebf0;padding:9px 0;align-items:flex-start}.storm-beta .sb-row:last-child{border:0}.storm-beta .sb-row strong{text-align:right}.storm-beta .sb-table{width:100%;border-collapse:collapse;font-size:13px;margin-top:6px}.storm-beta .sb-table th,.storm-beta .sb-table td{border-bottom:1px solid #e0ebf0;padding:8px 4px;text-align:left;vertical-align:top}.storm-beta .sb-table th:last-child,.storm-beta .sb-table td:last-child{text-align:right}.storm-beta .sb-alert{border-left:3px solid #b34a35;padding-left:10px;margin:10px 0}.storm-beta .sb-alert p{margin-top:3px}.storm-beta .sb-callout{background:#f5fbfe;border:1px solid #d1e4ed;border-radius:10px;padding:10px;margin-top:10px}.storm-beta .sb-error{color:#7b342c}.storm-beta .sb-graph{width:100%;height:110px;background:#f8fcfe;border:1px solid #d8e7ee;border-radius:10px;margin-top:8px}.storm-beta .sb-graph polyline{fill:none;stroke:var(--sb-accent);stroke-width:3}.storm-beta .sb-graph line{stroke:#c8dce6;stroke-width:1}.storm-beta .sb-icon-button{border:1px solid #b9d2df;border-radius:10px;background:#fff;padding:8px 12px}.storm-beta [hidden]{display:none!important}
+@media(max-width:760px){.storm-beta .sb-map-panel{display:block}.storm-beta .sb-layer-panel,.storm-beta .sb-summary{margin-bottom:8px}.storm-beta .sb-map{height:330px}.storm-beta .sb-hero .sb-hero-grid{grid-template-columns:1fr 1fr}.storm-beta .sb-hero .sb-stat:last-child{grid-column:1/-1}}
+@media(max-width:370px){.storm-beta{padding:9px}.storm-beta .sb-grid{gap:6px}.storm-beta .sb-tile{padding:9px}.storm-beta .sb-hero .sb-hero-grid{display:block}.storm-beta .sb-stat{margin-top:6px}}
 `;
-function stamp(v,z){try{return new Intl.DateTimeFormat('en-US',{timeZone:z,weekday:'short',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}).format(new Date(v));}catch{return 'Time unavailable';}}
-function row(a,b){return '<div class="sb-row"><span>'+esc(a)+'</span><strong>'+esc(b)+'</strong></div>';}
-function link(url,title){return '<a href="'+esc(url)+'" target="_blank" rel="noopener noreferrer">'+esc(title)+'</a>';}
-function amountFor(f,d,mode){if(mode==='snow'){const r=f?.canonical?.snow?.days?.find(x=>x.date===d?.dayKey);const a=winterDayAmount(r);return {text:winterAmountText(a.value,a.range),label:a.source||'Snowfall guidance unavailable',winter:r,a};}
- const c=f?.canonical?.days?.find(x=>x.date===d?.dayKey);return {text:inches(c?.qpf),label:'Liquid-equivalent precipitation (may include frozen precipitation)'};}
-export function openStormAndSnowBeta(f,openModal){
- if(!document.getElementById('storm-beta-css')){const s=document.createElement('style');s.id='storm-beta-css';s.textContent=css;document.head.append(s);}
- const dialog=document.getElementById('nourie-dialog'),body=document.getElementById('modal-body');
- if(!dialog||!body)return;
- openModal('Storm and Snow Beta','<div class="storm-beta"></div>');
- const root=body.querySelector('.storm-beta');if(!root)return;
- let mode=null,view='landing',dayIndex=0,map=null,controller=null;
- const days=(f?.days||[]).slice(0,5),z=f?.timeZone||'America/New_York';
- function dispose(){controller?.abort();controller=null;map?.remove();map=null;}
- dialog.addEventListener('close',dispose,{once:true});
- function render(){
-  dispose();root.dataset.mode=mode||'rain';
-  const d=days[dayIndex],a=amountFor(f,d,mode),w=a.winter;
-  const chance=mode==='snow'?pct(w?.snowChance):pct(d?.rainChance);
-  const chanceLabel=mode==='snow'?'Peak hourly snow-type chance':'Existing daily blended rain chance';
-  const head='<div class="sb-top">'+(mode?'<button class="sb-back" data-back>‹ Back</button>':'')+'<div><h3>'+esc(mode?(mode==='snow'?'Snow Central':'Rain Central'):'Storm and Snow Beta')+'</h3><small>'+esc(f?.location?.name||'Select a forecast location')+'</small></div></div>';
-  if(!mode){root.innerHTML=head+'<p class="sb-note">Explore rain and winter weather using your existing forecast.</p><div class="sb-grid">'+['rain','snow'].map(m=>'<button class="sb-tile sb-entry" data-select="'+m+'"><span>'+ (m==='rain'?'☂ Rain Central':'❄ Snow Central')+'</span><strong>'+esc(amountFor(f,days[0],m).text)+'</strong><small>'+esc(amountFor(f,days[0],m).label)+'</small><span>Explore ›</span></button>').join('')+'</div>';return;}
-  const select='<label class="sb-note">Forecast date <select data-day>'+days.map((x,i)=>'<option value="'+i+'"'+(i===dayIndex?' selected':'')+'>'+esc(x.shortWeekday+' · '+x.dateLabel)+'</option>').join('')+'</select></label>';
-  const tile=(id,summary)=>'<button class="sb-tile'+(id==='map'?' sb-map-tile':'')+'" data-view="'+id+'"><span>'+icons[id]+' '+detailNames[id]+' ›</span><small>'+esc(summary)+'</small></button>';
-  if(view==='landing'){root.innerHTML=head+select+'<section class="sb-card sb-hero"><small>'+esc(a.label)+'</small><strong>'+esc(a.text)+'</strong><b>'+esc(chance+' · '+chanceLabel)+'</b><small>Forecast assembled '+esc(stamp(f?.fetchedAt,z))+'</small></section>'+tile('map',mode==='snow'?'Explore available snowfall grids and official guidance':'Official rainfall guidance; regional beta layer pending')+'<div class="sb-grid">'+tile('probabilities',chance+' · '+chanceLabel)+tile('changes','Forecast history pending')+tile('timing',d?.condition||'Timing unavailable')+tile('live','Current weather and observations')+tile('confidence','Source coverage and uncertainty')+tile('impacts','Official weather alerts')+'</div>';return;}
-  let html='';
-  if(view==='probabilities'){
-   html='<section class="sb-card">'+row(chanceLabel,chance)+(mode==='snow'?row('Peak hourly freezing rain chance',pct(w?.freezingRainChance))+row('Peak hourly sleet chance',pct(w?.sleetChance)):'')+'<h4>Published accumulation probabilities</h4>';
-   const products=(w?.wpc||[]).filter(p=>p.kind==='snow'&&p.start&&p.end);
-   html+=products.length?products.map(p=>row('At least '+p.inches+'″ · '+stamp(p.start,z)+' – '+stamp(p.end,z),Array.isArray(p.probabilityRange)?p.probabilityRange.join('–')+'%':'Unavailable')).join(''):'<p class="sb-note">Calibrated amount probabilities are not available for this period.</p>';
-   html+='<p class="sb-note">Hourly or daily occurrence chances are not accumulation probabilities. Mutually exclusive outcomes require a validated distribution.</p></section>';
-  }else if(view==='map'){
-   const descriptor=mode==='snow'?winterSnowMapForDay(f?.canonical?.snow,w):null;
-   html='<section class="sb-card"><h4>'+esc(descriptor?.label||'Regional accumulation guidance')+'</h4><p class="sb-note">'+esc(descriptor?.start&&descriptor?.end?stamp(descriptor.start,z)+' – '+stamp(descriptor.end,z):'No compatible regional grid available in this beta.')+'</p><div data-map class="sb-map" hidden></div><p data-status role="status" class="sb-note"></p><div data-legend class="sb-legend"></div>'+link(safeWinterMapUrl(descriptor?.sourceUrl)||(mode==='snow'?snowSource:rainSource),'Open official NOAA accumulation map')+'</section>';
-   root.innerHTML=head+select+html;
-   if(descriptor?.kind==='geojson')void mountMap(descriptor);else root.querySelector('[data-status]').textContent='Interactive layer unavailable; use the official forecast link.';
-   return;
-  }else if(view==='changes'){html='<section class="sb-card"><h4>Forecast history</h4><p>Comparable archived forecast snapshots are not wired into this beta. A change cannot be calculated from a single forecast.</p></section>';
-  }else if(view==='timing'){html='<section class="sb-card"><h4>Available timing guidance</h4>'+row('Forecast condition',d?.condition||'Unavailable')+(w?.snowEventWindows||[]).map(v=>row(v.source||'Snow window',stamp(v.start,z)+' – '+stamp(v.end,z))).join('')+'<p class="sb-note">Storm arrival, peak and ending require validated event windows.</p></section>';
-  }else if(view==='live'){html='<section class="sb-card">'+row('Current weather reading',f?.current?.condition||'Unavailable')+'<p class="sb-note">Current reading may be a forecast or observation; observed totals and remaining accumulation are not connected here.</p>'+link('https://radar.weather.gov/','Open official live radar')+'</section>';
-  }else if(view==='confidence'){html='<section class="sb-card">'+row('Existing daily forecast confidence',d?.confidence?.level||'Unavailable')+(mode==='snow'?row('Winter data coverage',w?.coverageStatus||'Unavailable'):'')+'<p class="sb-note">Event-specific calibrated confidence and historical performance are pending verification.</p></section>';
-  }else if(view==='impacts'){const alerts=Array.isArray(f?.alerts)?f.alerts:[];html='<section class="sb-card"><h4>Available official alerts</h4>'+(alerts.length?alerts.map(x=>'<div class="sb-alert"><strong>'+esc(x.event||x.properties?.event||x.headline||'Official alert')+'</strong><p>'+esc(x.headline||x.properties?.headline||'')+'</p></div>').join(''):'<p>No alert entries in the current snapshot; check official guidance for updates.</p>')+link('https://www.weather.gov/','National Weather Service')+'</section>';}
-  root.innerHTML=head+select+html;
- }
- async function mountMap(d){
-  const el=root.querySelector('[data-map]'),status=root.querySelector('[data-status]'),legend=root.querySelector('[data-legend]'),url=winterAreaDataUrl(d.url);
-  if(!url||!window.L||!finite(f?.location?.latitude)||!finite(f?.location?.longitude)){status.textContent='Compatible map or location unavailable.';return;}
-  const c=new AbortController();controller=c;el.hidden=false;
-  const L=window.L;map=L.map(el).setView([f.location.latitude,f.location.longitude],6);const activeMap=map;
-  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap contributors',maxZoom:12}).addTo(map);
-  L.circleMarker([f.location.latitude,f.location.longitude],{radius:6,color:'#173b65',fillColor:'#fff',fillOpacity:1}).addTo(map);
-  status.textContent='Loading snowfall accumulation…';requestAnimationFrame(()=>activeMap.invalidateSize());
-  const timeout=setTimeout(()=>c.abort(),25000);
-  try{const res=await fetch(url,{signal:c.signal,headers:{Accept:'application/geo+json,application/json'}});if(!res.ok)throw Error('map');const geo=await res.json();
-   if(geo.type!=='FeatureCollection'||!Array.isArray(geo.features)||geo.features.length>20000||geo.metadata?.quantity!=='snowfall'||geo.metadata?.unit!=='in'||Date.parse(geo.metadata.start)!==Date.parse(d.start)||Date.parse(geo.metadata.end)!==Date.parse(d.end)||geo.features.some(x=>x.geometry?.type!=='Polygon'||!finite(x.properties?.value)||x.properties.value<0))throw Error('invalid');
-   if(controller!==c||!map||c.signal.aborted)return;
-   const color=x=>/^#[0-9a-f]{6}$/i.test(x||'')?x:'#83b6de';
-   L.geoJSON(geo,{style:x=>({weight:0,fillColor:color(x.properties.color),fillOpacity:.65}),onEachFeature:(x,layer)=>layer.bindPopup(esc(inches(x.properties.value))+' snowfall · '+(d.source==='model-grid'?'model estimate':'contour lower bound'))}).addTo(map);
-   legend.innerHTML=(geo.metadata.legend||[]).map(x=>'<span><i style="background:'+color(x.color)+'"></i>'+esc(x.label)+'</span>').join('');
-   status.textContent=geo.features.length?'Snowfall in inches · '+(d.source==='model-grid'?'regional model guidance':'official WPC contours'):'No measurable contour published for this product.';
-  }catch{if(controller===c)status.textContent='Map unavailable; this is not a zero snowfall forecast.';}finally{clearTimeout(timeout);}
- }
- root.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;if(b.hasAttribute('data-back')){if(view==='landing')mode=null;else view='landing';render();}else if(b.dataset.select){mode=b.dataset.select;view='landing';render();}else if(b.dataset.view){view=b.dataset.view;render();}});
- root.addEventListener('change',e=>{if(e.target.matches('[data-day]')){dayIndex=Number(e.target.value);render();}});
- render();
+
+function stamp(value, zone) {
+  const parsed = dateMs(value); if (!parsed) return 'Time unavailable';
+  try { return new Intl.DateTimeFormat('en-US', { timeZone: zone || 'America/New_York', weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }).format(new Date(parsed)); } catch { return new Date(parsed).toISOString(); }
+}
+function shortDate(value, zone) {
+  const parsed = dateMs(`${value}T12:00:00Z`); if (!parsed) return 'Date unavailable';
+  try { return new Intl.DateTimeFormat('en-US', { timeZone: zone, weekday: 'short', month: 'short', day: 'numeric' }).format(new Date(parsed)); } catch { return value; }
+}
+function row(label, value) { return `<div class="sb-row"><span>${esc(label)}</span><strong>${esc(value)}</strong></div>`; }
+function link(url, title) { const safe = safeWinterMapUrl(url) || '#'; return `<a href="${esc(safe)}" target="_blank" rel="noopener noreferrer">${esc(title)}</a>`; }
+function localDate(value, zone) { try { return new Intl.DateTimeFormat('en-CA', { timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(value)); } catch { return new Date(value).toISOString().slice(0, 10); } }
+function hoursFor(forecast, day) {
+  const source = Array.isArray(day?.hours) && day.hours.length ? day.hours : (forecast?.hours || []);
+  return source.filter(hour => !day?.dayKey || localDate(hour.time, forecast?.timeZone || forecast?.location?.timeZone) === day.dayKey);
+}
+function rainTotal(forecast, day) {
+  if (finite(day?.totalQpfIn)) return day.totalQpfIn;
+  const values = hoursFor(forecast, day).map(hour => Number(hour.precipIn)).filter(value => finite(value) && value >= 0);
+  return values.length ? values.reduce((sum, value) => sum + value, 0) : null;
+}
+function snowRow(forecast, day) { return (forecast?.canonical?.snow?.days || forecast?.snow?.days || []).find(rowValue => rowValue.date === (day?.dayKey || day?.date)) || null; }
+function dayRows(forecast) {
+  const source = (forecast?.days || forecast?.canonical?.days || []).slice(0, 5);
+  return source.map((day, index) => ({ ...day, index, dayKey: day.dayKey || day.date, dateLabel: day.dateLabel || shortDate(day.dayKey || day.date, forecast?.timeZone || forecast?.location?.timeZone) }));
+}
+function horizonRows(rows, horizon) { if (horizon === '1-3') return rows.slice(1, 4); if (horizon === '3-5') return rows.slice(3, 5); return rows.slice(0, 1); }
+function timingFor(forecast, day, mode) {
+  const hours = hoursFor(forecast, day).filter(hour => {
+    const condition = String(hour.condition || hour.summary || '').toLowerCase();
+    return mode === 'snow' ? /snow|sleet|flurr|blizzard|freez|ice|wintry/.test(condition) || Number(hour.snowfallIn) >= .1 : (finite(hour.rainChance) && hour.rainChance >= 35) || Number(hour.precipIn) >= .005 || /rain|shower|drizzle|storm|thunder/.test(condition);
+  });
+  if (!hours.length) return { status: 'unavailable', onset: null, peak: null, end: null, windows: [] };
+  const peak = hours.reduce((best, hour) => (Number(hour.rainChance) || Number(hour.snowfallIn) || Number(hour.precipIn) || 0) > (Number(best?.rainChance) || Number(best?.snowfallIn) || Number(best?.precipIn) || 0) ? hour : best, hours[0]);
+  return { status: 'available', onset: hours[0].time, peak: peak.time, end: new Date(dateMs(hours.at(-1).time) + 3600000).toISOString(), windows: [{ start: hours[0].time, end: new Date(dateMs(hours.at(-1).time) + 3600000).toISOString() }] };
+}
+function metric(forecast, day, mode) {
+  const snow = snowRow(forecast, day), zone = forecast?.timeZone || forecast?.location?.timeZone || 'America/New_York';
+  if (mode === 'snow') {
+    const guidance = winterDayAmount(snow);
+    return { amount: guidance.value, amountText: winterAmountText(guidance.value, guidance.range), amountLabel: guidance.source || 'Snowfall depth guidance', chance: snow?.snowChance, chanceLabel: 'Peak hourly snow-type occurrence', timing: timingFor(forecast, day, mode), source: snow?.probabilitySource || guidance.source || 'Canonical winter guidance', row: snow, zone };
+  }
+  return { amount: rainTotal(forecast, day), amountText: amount(rainTotal(forecast, day)), amountLabel: 'Liquid-equivalent precipitation; may include melted frozen precipitation', chance: day?.rainChance, chanceLabel: 'Daily occurrence likelihood from the canonical blend', timing: timingFor(forecast, day, mode), source: day?.rainProbabilitySource || 'Canonical hourly rain-likelihood blend', row: day, zone };
+}
+function mapDescriptors(forecast, day, mode) {
+  const snow = snowRow(forecast, day), maps = forecast?.canonical?.snow?.maps || forecast?.snow?.maps || [];
+  if (mode === 'snow') {
+    const aligned = winterSnowMapForDay(forecast?.canonical?.snow || forecast?.snow, snow);
+    const compatible = maps.filter(item => item.quantity === 'snowfall' || item.kind === 'arcgis');
+    return [...(aligned ? [aligned] : []), ...compatible.filter(item => item.id !== aligned?.id)];
+  }
+  return maps.filter(item => item.id?.startsWith('wpc-qpf-') || item.kind === 'radar').concat({ id: 'radar', kind: 'radar', label: 'Observed NOAA MRMS radar', start: null, end: null, description: 'Observed radar is not a future accumulation forecast.' });
+}
+function descriptorText(descriptor, zone) {
+  if (!descriptor) return 'No compatible layer is published for this forecast period.';
+  const times = descriptor.start && descriptor.end ? `${stamp(descriptor.start, zone)} – ${stamp(descriptor.end, zone)}` : 'Live observed frame times are verified by NOAA';
+  return `${times}. ${descriptor.description || ''}`;
+}
+function colorFor(value) { if (!finite(value)) return '#83b6de'; if (value >= 6) return '#7543b8'; if (value >= 4) return '#3869c0'; if (value >= 2) return '#2b9ed5'; if (value >= 1) return '#76c5e8'; return '#c8e9f7'; }
+function arcgisLayer(L, descriptor) {
+  const base = safeWinterMapUrl(descriptor?.url); if (!base || !descriptor?.layers?.length) return null;
+  const layer = descriptor.layers[0];
+  return L.TileLayer.extend({ getTileUrl(coords) { const tile = 256, nw = this._map.unproject([coords.x * tile, coords.y * tile], coords.z), se = this._map.unproject([(coords.x + 1) * tile, (coords.y + 1) * tile], coords.z); const query = new URLSearchParams({ f: 'image', format: 'png32', transparent: 'true', layers: `show:${layer}`, bbox: `${nw.lng},${se.lat},${se.lng},${nw.lat}`, bboxSR: '4326', imageSR: '4326', size: '256,256' }); return `${base.replace(/\/$/, '')}/export?${query}`; } });
+}
+
+export function openStormAndSnowBeta(forecast, openModal) {
+  if (!document.getElementById('storm-beta-css')) { const style = document.createElement('style'); style.id = 'storm-beta-css'; style.textContent = css; document.head.append(style); }
+  const dialog = document.getElementById('nourie-dialog'), body = document.getElementById('modal-body'); if (!dialog || !body) return;
+  openModal('Storm and Snow Beta', '<div class="storm-beta"></div>');
+  const root = body.querySelector('.storm-beta'); if (!root) return;
+  const rows = dayRows(forecast), zone = forecast?.timeZone || forecast?.location?.timeZone || 'America/New_York';
+  const state = { mode: null, view: 'landing', horizon: 'today', dayIndex: 0, map: null, request: null, mapDescriptor: null, renderId: 0 };
+  const dispose = () => { state.request?.abort(); state.request = null; state.map?.remove(); state.map = null; };
+  dialog.addEventListener('close', dispose, { once: true });
+  const activeRows = () => horizonRows(rows, state.horizon);
+  const selectedDay = () => rows[state.dayIndex] || rows[0];
+  const header = () => `<div class="sb-top">${state.mode ? '<button class="sb-back" data-back aria-label="Back">‹ Back</button>' : ''}<div><h3>${esc(state.mode === 'snow' ? 'Snow Central' : state.mode === 'rain' ? 'Rain Central' : 'Storm and Snow Beta')}</h3><small>${esc(forecast?.location?.name || 'Selected forecast location')} · ${esc(zone)}</small></div></div>`;
+  function landing() {
+    const first = rows[0]; return `${header()}<p class="sb-note">Experimental forecast tools. The main production weather page is unchanged.</p><div class="sb-grid"><button class="sb-tile sb-entry" data-select="rain"><span>☂ Rain Central</span><strong>${esc(metric(forecast, first, 'rain').amountText)}</strong><small>Verified canonical rain amount and occurrence data</small><span>Explore Rain Central ›</span></button><button class="sb-tile sb-entry" data-select="snow"><span>❄ Snow Central</span><strong>${esc(metric(forecast, first, 'snow').amountText)}</strong><small>Snow depth guidance and published type probabilities</small><span>Explore Snow Central ›</span></button></div>`;
+  }
+  function controls() {
+    const h = [['today', 'Today remainder'], ['1-3', '1–3 days'], ['3-5', '3–5 days']];
+    return `<div class="sb-horizons" role="group" aria-label="Forecast horizon">${h.map(([id, label]) => `<button class="sb-horizon" data-horizon="${id}" aria-pressed="${state.horizon === id}">${label}</button>`).join('')}</div><div class="sb-days" role="group" aria-label="Forecast day">${activeRows().map(day => `<button class="sb-day" data-day="${day.index}" aria-pressed="${day.index === state.dayIndex}">${esc(day.index === 0 ? 'Today' : day.dateLabel)}</button>`).join('')}</div>`;
+  }
+  function hero() {
+    const day = selectedDay(), m = metric(forecast, day, state.mode); return `<section class="sb-card sb-hero"><small>${esc(m.amountLabel)}</small><strong>${esc(m.amountText)}</strong><div class="sb-hero-grid"><div class="sb-stat"><small>Chance</small><b>${esc(pct(m.chance))}</b><small>${esc(m.chanceLabel)}</small></div><div class="sb-stat"><small>Timing</small><b>${esc(m.timing.status === 'available' ? stamp(m.timing.onset, zone) : 'Unavailable')}</b><small>${esc(m.timing.status === 'available' ? 'Supported onset' : 'No validated event window')}</small></div><div class="sb-stat"><small>Confidence</small><b>${esc(day?.confidence?.level || 'Unavailable')}</b><small>Relative source agreement, not a calibrated accuracy percentage</small></div></div><small>Updated ${esc(stamp(forecast?.fetchedAt || forecast?.assembledAt, zone))} · ${esc(m.source)}</small></section>`;
+  }
+  function tile(id, summary) { return `<button class="sb-tile${id === 'map' ? ' sb-map-tile' : ''}" data-view="${id}"><span>${icons[id]} ${detailNames[id]} ›</span><small>${esc(summary)}</small></button>`; }
+  function home() { const day = selectedDay(), m = metric(forecast, day, state.mode); return `${header()}${controls()}${hero()}${tile('map', state.mode === 'snow' ? 'Regional snowfall depth, WPC threshold and model layers aligned to the selected period' : 'WPC liquid-equivalent guidance and observed NOAA MRMS radar') }<div class="sb-grid">${tile('probabilities', 'Occurrence chance, published threshold ranges and honest unavailable states')}${tile('changes', 'Immutable snapshots, revision deltas and material-change thresholds')}${tile('timing', m.timing.status === 'available' ? 'Validated onset, peak and end windows' : 'No supported event timing for this period')}${tile('live', 'Observed radar, current frame, precipitation type and remaining forecast')}${tile('confidence', 'Source coverage plus live verification metrics')}${tile('impacts', 'NWS alerts and WPC outlooks, kept separate from model guidance')}</div>`; }
+  function probabilities() {
+    const day = selectedDay(), m = metric(forecast, day, state.mode), snow = m.row, thresholds = state.mode === 'rain' ? ['0.01″ measurable rain', '0.10″', '0.25″', '0.50″', '1.00″', '2.00″', '3.00″', '5.00″'] : ['0.1″ measurable snow', '1″', '2″', '4″', '6″', '8″', '12″'];
+    const published = state.mode === 'snow' ? (snow?.wpc || []).filter(item => item.start && item.end) : [];
+    return `${header()}${controls()}<section class="sb-card"><h4>Occurrence versus accumulation</h4>${row(m.chanceLabel, pct(m.chance))}${state.mode === 'snow' ? row('Freezing rain · peak hourly type chance', pct(snow?.freezingRainChance)) + row('Sleet · peak hourly type chance', pct(snow?.sleetChance)) : row('Expected amount', m.amountText)}<p class="sb-note">Occurrence and accumulation are separate quantities. P50/P25–P75/P10–P90 are shown only when a calibrated distribution is present.</p><h4>Threshold probabilities</h4><table class="sb-table"><thead><tr><th>Threshold</th><th>Published probability</th></tr></thead><tbody>${thresholds.map(label => { const found = published.find(item => `${item.inches}″` === label || `${item.inches}` === label.replace('″', '')); return `<tr><td>${label}</td><td>${found?.probabilityRange ? `${found.probabilityRange[0]}–${found.probabilityRange[1]}%` : '<span class="sb-note">Unavailable — calibrated distribution not present in canonical snapshot</span>'}</td></tr>`; }).join('')}</tbody></table>${published.length ? `<p class="sb-note">Snow threshold ranges are WPC published categories for their exact valid periods; they are not the chance of any snow.</p>` : '<p class="sb-note">No compatible calibrated threshold product was returned for this selected period. The beta does not estimate one from deterministic model amounts.</p>'}</section>`;
+  }
+  function timing() { const day = selectedDay(), m = metric(forecast, day, state.mode), events = state.mode === 'snow' ? (m.row?.snowEventWindows || []) : []; return `${header()}${controls()}<section class="sb-card"><h4>Storm timing</h4>${m.timing.status === 'available' ? row('Onset', stamp(m.timing.onset, zone)) + row('Peak supported signal', stamp(m.timing.peak, zone)) + row('End of supported signal', stamp(m.timing.end, zone)) : '<p class="sb-note">Hourly timing is unavailable for this period. The beta does not invent an arrival or dry time from a broad daily label.</p>'}${events.map(event => row(event.source || 'Published event window', `${stamp(event.start, zone)} – ${stamp(event.end, zone)}`)).join('')}<p class="sb-note">Long-range horizons stay broad unless an authoritative hourly or event window is present.</p></section>`; }
+  function impacts() { const alerts = Array.isArray(forecast?.alerts) ? forecast.alerts : [], outlooks = Array.isArray(forecast?.riskOutlooks) ? forecast.riskOutlooks : []; return `${header()}${controls()}<section class="sb-card"><h4>Official impacts</h4>${alerts.length ? alerts.map(alert => `<div class="sb-alert"><strong>${esc(alert.event || alert.properties?.event || alert.headline || 'NWS alert')}</strong><p>${esc(alert.headline || alert.properties?.headline || alert.description || '')}</p></div>`).join('') : '<p>No NWS watch, warning or advisory was returned in this snapshot.</p>'}${outlooks.length ? `<h4>WPC/NWS outlooks</h4>${outlooks.map(item => row(item.title || item.name || 'Official outlook', item.category || item.risk || 'Published outlook')).join('')}` : '<p class="sb-note">No separate WPC outlook entry was returned for this location.</p>'}<p class="sb-note">Modeled accumulation and live radar are displayed as guidance/evidence, never as official warnings.</p>${link('https://www.weather.gov/', 'Open National Weather Service')}</section>`; }
+  function confidence() { return `${header()}${controls()}<section class="sb-card"><h4>Forecast confidence</h4>${row('Selected-day source agreement', selectedDay()?.confidence?.level || 'Unavailable')}${row('Confidence score', finite(selectedDay()?.confidence?.score) ? `${selectedDay().confidence.score}` : 'Unavailable')}<p class="sb-note">This is the existing relative forecast confidence index. It is not a calibrated probability of being correct.</p><div data-accuracy class="sb-callout" role="status">Loading live verification metrics…</div></section>`; }
+  function live() { return `${header()}${controls()}<section class="sb-card"><h4>Live tracking</h4><div data-live class="sb-callout" role="status">Loading NOAA MRMS observed frame…</div><p class="sb-note">Radar verifies current precipitation presence and motion evidence; it does not measure snowfall depth or observed liquid totals at this point.</p>${link(officialRadar, 'Open official live radar')}</section>`; }
+  function changes() { return `${header()}${controls()}<section class="sb-card"><h4>Forecast changes</h4><div data-history class="sb-callout" role="status">Loading equivalent forecast snapshots…</div></section>`; }
+  function mapView() { const day = selectedDay(), descriptors = mapDescriptors(forecast, day, state.mode), selected = descriptors.find(item => item.id === state.mapDescriptor) || descriptors[0]; state.mapDescriptor = selected?.id || null; return `${header()}${controls()}<section class="sb-card"><h4>Regional forecast map</h4><p class="sb-note">${esc(descriptorText(selected, zone))}</p><div class="sb-map-panel"><aside class="sb-card sb-layer-panel" aria-label="Map layers"><strong>Layers</strong>${descriptors.length ? descriptors.map(item => `<label><input type="radio" name="storm-map-layer" data-layer="${esc(item.id)}" ${item.id === selected?.id ? 'checked' : ''}/> <span>${esc(item.label || item.id)}</span></label>`).join('') : '<p class="sb-note">No compatible layer returned.</p>'}<button class="sb-icon-button" type="button" data-recenter>Recenter</button></aside><div><div data-map class="sb-map" role="region" aria-label="Interactive forecast map" tabindex="0"></div><p data-map-status class="sb-note" role="status">Preparing map…</p><div data-map-legend class="sb-legend"></div></div><aside class="sb-card sb-summary"><h4>Selected period</h4>${row('Date', day?.dateLabel || day?.dayKey || 'Unavailable')}${row('Valid time', selected?.start && selected?.end ? `${stamp(selected.start, zone)} – ${stamp(selected.end, zone)}` : 'Live frame')}<p class="sb-note">Click the map to inspect the selected location. Map data remain aligned to the period shown above.</p></aside></div>${selected?.sourceUrl ? `<p class="sb-note">${link(selected.sourceUrl, 'Open source product')}</p>` : ''}</section>`; }
+  function render() {
+    dispose(); state.renderId += 1; root.dataset.mode = state.mode || 'rain'; root.innerHTML = state.mode === null ? landing() : state.view === 'landing' ? home() : state.view === 'probabilities' ? probabilities() : state.view === 'timing' ? timing() : state.view === 'changes' ? changes() : state.view === 'live' ? live() : state.view === 'confidence' ? confidence() : state.view === 'impacts' ? impacts() : mapView();
+    if (state.view === 'map') void mountMap(state.renderId);
+    if (state.view === 'changes') void loadChanges(state.renderId);
+    if (state.view === 'live') void loadLive(state.renderId);
+    if (state.view === 'confidence') void loadAccuracy(state.renderId);
+  }
+  async function mountMap(renderId) {
+    const host = root.querySelector('[data-map]'), status = root.querySelector('[data-map-status]'), legend = root.querySelector('[data-map-legend]'), descriptor = mapDescriptors(forecast, selectedDay(), state.mode).find(item => item.id === state.mapDescriptor); if (!host || !status || !window.L || !finite(Number(forecast?.location?.latitude)) || !finite(Number(forecast?.location?.longitude))) { if (status) status.textContent = 'Interactive map or selected location is unavailable.'; return; }
+    const L = window.L, location = [Number(forecast.location.latitude), Number(forecast.location.longitude)]; state.map = L.map(host, { scrollWheelZoom: false }).setView(location, 6); const map = state.map; L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 12, attribution: '© OpenStreetMap contributors' }).addTo(map); L.circleMarker(location, { radius: 7, color: '#173b65', fillColor: '#fff', fillOpacity: 1 }).addTo(map); map.on('click', event => L.popup().setLatLng(event.latlng).setContent(`<strong>Selected map point</strong><p>${event.latlng.lat.toFixed(3)}, ${event.latlng.lng.toFixed(3)}</p><small>Use this point to compare the regional layer. Point accumulation is not inferred from the map.</small>`).openOn(map)); root.querySelector('[data-recenter]')?.addEventListener('click', () => map.setView(location, 6)); root.querySelectorAll('[data-layer]').forEach(input => input.addEventListener('change', () => { state.mapDescriptor = input.dataset.layer; render(); })); requestAnimationFrame(() => map.invalidateSize());
+    if (!descriptor) { status.textContent = 'No compatible regional product is available for this exact period.'; return; }
+    if (descriptor.kind === 'radar') {
+      status.textContent = 'Loading verified NOAA MRMS observed frame…'; const query = new URLSearchParams({ latitude: forecast.location.latitude, longitude: forecast.location.longitude }); const response = await fetch(`/api/weather-fusion/radar?${query}`, { cache: 'no-store' }); const data = await response.json(); if (renderId !== state.renderId || !state.map) return; if (data.status !== 'ready' || !data.frames?.length) { status.textContent = data.message || 'NOAA radar timestamps are unavailable.'; return; } L.tileLayer.wms(data.url, { layers: data.layer, styles: 'radar_reflectivity', format: 'image/png', transparent: true, opacity: .7, time: data.frames.at(-1) }).addTo(map); status.textContent = `${data.message || 'Observed NOAA MRMS radar'} Valid frame ${stamp(data.frames.at(-1), zone)}.`; return;
+    }
+    if (descriptor.kind === 'geojson') {
+      const url = winterAreaDataUrl(descriptor.url); if (!url) { status.textContent = 'The regional model-grid URL failed validation.'; return; } status.textContent = 'Loading validated regional cells…'; const response = await fetch(url, { cache: 'no-store', headers: { Accept: 'application/geo+json,application/json' } }); const geo = await response.json(); if (renderId !== state.renderId || !state.map) return; const valid = geo?.type === 'FeatureCollection' && Array.isArray(geo.features) && geo.features.length <= 20000 && geo.metadata?.unit === 'in' && geo.features.every(feature => feature.geometry?.type === 'Polygon' && finite(Number(feature.properties?.value)) && Number(feature.properties.value) >= 0); if (!valid) { status.textContent = 'The regional response failed validation; no zero forecast was substituted.'; return; } const layer = L.geoJSON(geo, { style: feature => ({ weight: 1, color: '#ffffff80', fillColor: colorFor(Number(feature.properties.value)), fillOpacity: .68 }), onEachFeature: (feature, item) => item.bindPopup(`<strong>${esc(amount(Number(feature.properties.value)))}</strong><p>${esc(geo.metadata?.start ? `${stamp(geo.metadata.start, zone)} – ${stamp(geo.metadata.end, zone)}` : 'Published valid period')}</p>`)}).addTo(map); try { map.fitBounds(layer.getBounds().pad(.12)); } catch {} legend.innerHTML = (geo.metadata?.legend || []).map(item => `<span><i style="background:${esc(item.color)}"></i>${esc(item.label)}</span>`).join(''); status.textContent = `${geo.features.length} regional cells · ${esc(geo.metadata?.quantity || 'snowfall')} in · exact valid period shown above.`; return;
+    }
+    const Layer = arcgisLayer(L, descriptor); if (!Layer) { status.textContent = 'The official ArcGIS layer URL failed validation.'; return; } const overlay = new Layer('', { opacity: .72, tileSize: 256, crossOrigin: true }).addTo(map); status.textContent = `${descriptor.label || 'Official ArcGIS layer'} · ${descriptorText(descriptor, zone)}`; legend.innerHTML = (descriptor.legend || []).map(item => `<span>${esc(item.label || '')}</span>`).join('');
+  }
+  async function loadLive(renderId) { const target = root.querySelector('[data-live]'); if (!target) return; try { const query = new URLSearchParams({ latitude: forecast.location.latitude, longitude: forecast.location.longitude }); const response = await fetch(`/api/weather-fusion/radar?${query}`, { cache: 'no-store' }); const data = await response.json(); if (renderId !== state.renderId) return; const p = data.precipitation || {}; target.innerHTML = `${row('NOAA MRMS status', data.status || 'Unavailable')}${row('Observed frame', data.frames?.at(-1) ? stamp(data.frames.at(-1), zone) : 'Unavailable')}${row('At selected point', p.atLocation === true ? 'Observed precipitation' : p.atLocation === false ? 'No observed precipitation' : 'Unavailable')}${row('Verified precip type', p.observedTypeAtLocation || p.nearestObservedType || 'Unavailable')}${row('Motion evidence', p.approaching === true ? 'Approaching' : p.approaching === false ? 'Not approaching' : 'Unavailable')}<p class="sb-note">${esc(data.message || 'Radar is observed evidence, not a future accumulation forecast.')} ${esc(p.typeEvidence || '')}</p>`; } catch { if (renderId === state.renderId) target.innerHTML = '<p class="sb-error">NOAA live radar is temporarily unavailable. This is not a dry forecast.</p>'; } }
+  async function loadChanges(renderId) { const target = root.querySelector('[data-history]'), day = selectedDay(); if (!target || !day) return; try { const query = new URLSearchParams({ latitude: forecast.location.latitude, longitude: forecast.location.longitude, center: state.mode, date: day.dayKey }); const response = await fetch(`/api/weather-fusion/storm-snow/history?${query}`, { cache: 'no-store' }); const data = await response.json(); if (renderId !== state.renderId) return; const snapshots = Array.isArray(data.snapshots) ? data.snapshots : []; if (snapshots.length < 2) { target.innerHTML = '<p>No equivalent prior snapshot has been recorded for this location, center and local-day window. A change or trend is intentionally not claimed.</p>'; return; } const previous = snapshots.at(-2), current = snapshots.at(-1), a = previous.day?.[state.mode], b = current.day?.[state.mode], amountDelta = finite(Number(a?.amount)) && finite(Number(b?.amount)) ? Number(b.amount) - Number(a.amount) : null, probDelta = finite(Number(a?.chance)) && finite(Number(b?.chance)) ? Number(b.chance) - Number(a.chance) : null, onsetDelta = dateMs(a?.timing?.onset) && dateMs(b?.timing?.onset) ? (dateMs(b.timing.onset) - dateMs(a.timing.onset)) / 3600000 : null, material = Math.abs(amountDelta || 0) >= (state.mode === 'snow' ? .5 : .25) || Math.abs(probDelta || 0) >= 10 || Math.abs(onsetDelta || 0) >= 2; const points = snapshots.slice(-8).map((item, index) => { const value = Number(item.day?.[state.mode]?.amount); return [index, finite(value) ? value : 0]; }), max = Math.max(1, ...points.map(point => point[1])), polyline = points.map(([x, value]) => `${8 + x * (84 / Math.max(1, points.length - 1))},${94 - value / max * 72}`).join(' '); target.innerHTML = `<p>${material ? '<strong>Material revision detected.</strong>' : '<strong>No material revision by the beta thresholds.</strong>'}</p>${row('Previous issued', stamp(previous.issuedAt, zone))}${row('Current issued', stamp(current.issuedAt, zone))}${row('Amount change', amountDelta === null ? 'Unavailable' : `${amountDelta >= 0 ? '+' : ''}${amountDelta.toFixed(2)}″`)}${row('Occurrence change', probDelta === null ? 'Unavailable' : `${probDelta >= 0 ? '+' : ''}${Math.round(probDelta)} points`)}${row('Timing change', onsetDelta === null ? 'Unavailable' : `${onsetDelta >= 0 ? '+' : ''}${onsetDelta.toFixed(1)} hours`)}<svg class="sb-graph" viewBox="0 0 100 110" role="img" aria-label="Recorded amount history"><line x1="8" y1="94" x2="92" y2="94"/><polyline points="${polyline}"/></svg><p class="sb-note">Snapshots are immutable records of equivalent windows. Thresholds: ${state.mode === 'snow' ? '0.50″ snow' : '0.25″ rain'}, 10 probability points, 2 timing hours.</p>`; } catch { if (renderId === state.renderId) target.innerHTML = '<p class="sb-error">Forecast history is unavailable. No change is asserted without comparable snapshots.</p>'; } }
+  async function loadAccuracy(renderId) { const target = root.querySelector('[data-accuracy]'); if (!target) return; try { const query = new URLSearchParams({ latitude: forecast.location.latitude, longitude: forecast.location.longitude, days: 30, horizon: 24 }); const response = await fetch(`/api/weather-fusion/accuracy?${query}`, { cache: 'no-store' }); const data = await response.json(); if (renderId !== state.renderId) return; const nourie = (data.rankings || []).find(item => item.isNourie || /nourie/i.test(item.name || item.id || '')); const truth = data.truthSummary || {}; target.innerHTML = `<strong>Live verification</strong>${row('Weather Nourie score', finite(Number(nourie?.overallScore ?? nourie?.accuracyScore)) ? `${Number(nourie.overallScore ?? nourie.accuracyScore).toFixed(1)}/100` : 'Unavailable')}${row('Verified hours', truth.totalHours ?? 'Unavailable')}${row('NWS station hours', truth.nwsStationHours ?? 'Unavailable')}<p class="sb-note">${esc(data.methodology || 'Verification methodology was not returned.')}</p>`; } catch { if (renderId === state.renderId) target.innerHTML = '<p class="sb-note">Live verification metrics are unavailable for this location right now.</p>'; } }
+  root.addEventListener('click', event => { const button = event.target.closest('button'); if (!button) return; if (button.hasAttribute('data-back')) { if (state.view === 'landing') state.mode = null; else state.view = 'landing'; render(); return; } if (button.dataset.select) { state.mode = button.dataset.select; state.view = 'landing'; state.horizon = 'today'; state.dayIndex = 0; render(); return; } if (button.dataset.view) { state.view = button.dataset.view; render(); return; } if (button.dataset.horizon) { state.horizon = button.dataset.horizon; const available = activeRows(); if (!available.some(day => day.index === state.dayIndex)) state.dayIndex = available[0]?.index || 0; render(); return; } if (button.dataset.day) { state.dayIndex = Number(button.dataset.day); render(); } });
+  root.addEventListener('change', event => { if (event.target.matches('[data-layer]')) { state.mapDescriptor = event.target.dataset.layer; render(); } });
+  render();
 }
