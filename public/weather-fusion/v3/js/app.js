@@ -1110,7 +1110,9 @@ function renderHeroAndBriefing(f) {
   if (tempEl) tempEl.textContent = fmtTemp(cur.tempF);
   if (condEl) {
     let displayCondition = cur.condition || '';
-    if (!observedRain && displayCondition) {
+    // If condition contains probability language, it's likely forecast, not observation
+    const isForecastLang = /(?:slight\s+)?chance|scattered|possible|likely/i.test(displayCondition);
+    if (!observedRain && displayCondition && isForecastLang) {
       displayCondition = displayCondition.toLowerCase()
         .replace(/^slight\s+chance\s+(?:of\s+)?/i, '')
         .replace(/^chance\s+(?:of\s+)?/i, '')
