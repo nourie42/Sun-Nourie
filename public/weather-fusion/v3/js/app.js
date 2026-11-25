@@ -476,7 +476,7 @@ function renderBetaTodayCard(f) {
       <div class="rem-foot">
         <span>${remIcon('wind', 20)}<b>${num(avgWind, x => `${x} mph`)}</b>Avg Wind</span>
         <span>${remIcon('drop', 20)}<b>${fmtTemp(d.dewPointF ?? cur.dewPointF)}</b>Dew Point</span>
-        <span>${remIcon('cloud', 20)}<b>${num(cur.cloudCover, x => `${x}%`)}</b>Cloud Cover</span>
+        <span>${remIcon('cloud', 20)}<b>${num(cur.cloudCover, x => `${x}%`)}</b>Clouds</span>
         <span>${remIcon('leaf', 20)}<b>AQI ${num(aqi)}</b>${Number.isFinite(aqi) ? pill(aqiLabel, aqiTone) : ''}</span>
         <span>${remIcon('sun', 20)}<b>UV ${num(uv)}</b>${pill(uvLabel, uvTone)}</span>
       </div>
