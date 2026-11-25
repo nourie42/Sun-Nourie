@@ -24,7 +24,7 @@ const PUBLIC_PAGES = new Set([
 ]);
 const PUBLIC_ASSET = /^\/weather-fusion\/[a-z0-9][a-z0-9._-]*\.(?:js|css|webp|png|jpe?g|svg|json|webmanifest|ico)$/;
 const PUBLIC_BETA_ASSET = /^\/weather-fusion\/v3\/(?:js\/[a-z0-9][a-z0-9._-]*\.js|css\/[a-z0-9][a-z0-9._-]*\.css|vendor\/(?:three\.module\.min\.js|maplibre-gl\.(?:js|css)|maplibre-license\.txt)|textures\/earth-(?:day|night)\.jpg)$/;
-const PUBLIC_APIS = new Set(['forecast', 'alerts', 'briefing', 'bulletins', 'outlook', 'search', 'radar', 'models', 'winter-map', 'accuracy', 'globe', 'globe-image', 'globe-tile'].map(name => `/api/weather-fusion/${name}`));
+const PUBLIC_APIS = new Set(['forecast', 'alerts', 'briefing', 'bulletins', 'outlook', 'search', 'radar', 'models', 'winter-map', 'accuracy', 'globe', 'globe-image', 'globe-tile', 'storm-snow/history'].map(name => `/api/weather-fusion/${name}`));
 export function isPublicWeatherPath(url, method = 'GET') {
   const upperMethod = String(method).toUpperCase();
   let pathname;

@@ -10,7 +10,8 @@
 
 const HOUR = 3600000;
 const DAY = 24 * HOUR;
-export const STORM_SNOW_BETA_VERSION = 'storm-snow-beta-v2';
+const HISTORY_BUCKET_MS = 30 * 60000;
+export const STORM_SNOW_BETA_VERSION = 'storm-snow-beta-v3';
 export const MATERIAL_CHANGE_THRESHOLDS = Object.freeze({
   rainAmountIn: 0.25,
   snowAmountIn: 0.5,
@@ -48,22 +49,25 @@ function localMidnight(date, zone) {
   return guess;
 }
 
-function numericSeries(hours, field) {
-  return hours.map(row => Number(row?.[field])).filter(finite);
-}
+// The canonical forecast uses precipitation/pop/qpf; the V3 view model uses
+// precipIn/rainChance/totalQpfIn. Both are accepted so history is never empty.
+const hourAmount = row => finite(row?.precipIn) ? row.precipIn : finite(row?.precipitation) ? row.precipitation : null;
+const hourChance = row => finite(row?.rainChance) ? row.rainChance : finite(row?.rainLikelihood?.value) ? row.rainLikelihood.value : finite(row?.pop) ? row.pop : null;
+const dayAmount = day => finite(day?.totalQpfIn) ? day.totalQpfIn : finite(day?.qpf) ? day.qpf : null;
+const dayChance = day => finite(day?.rainChance) ? day.rainChance : finite(day?.rainLikelihood?.value) ? day.rainLikelihood.value : finite(day?.pop) ? day.pop : null;
 
 function forecastTiming(hours, zone, { snow = false } = {}) {
   const candidates = hours.filter(row => {
     const condition = String(row?.condition || '').toLowerCase();
     if (snow) return /snow|sleet|flurr|blizzard|freez|ice|wintry/.test(condition) || (finite(row?.snowfallIn) && row.snowfallIn >= 0.1);
-    return (finite(row?.rainChance) && row.rainChance >= 35) || (finite(row?.precipIn) && row.precipIn >= 0.005) || /rain|shower|drizzle|storm|thunder/.test(condition);
+    return (finite(hourChance(row)) && hourChance(row) >= 35) || (finite(hourAmount(row)) && hourAmount(row) >= 0.005) || /rain|shower|drizzle|storm|thunder/.test(condition);
   });
   if (!candidates.length) return { status: 'unavailable', onset: null, peak: null, end: null, windows: [] };
   const onset = Date.parse(candidates[0].time);
   const end = Date.parse(candidates.at(-1).time) + HOUR;
   const peakRow = candidates.reduce((best, row) => {
-    const score = snow ? (Number(row.snowfallIn) || 0) : Math.max(Number(row.rainChance) || 0, (Number(row.precipIn) || 0) * 100);
-    const bestScore = snow ? (Number(best?.snowfallIn) || 0) : Math.max(Number(best?.rainChance) || 0, (Number(best?.precipIn) || 0) * 100);
+    const score = snow ? (Number(row.snowfallIn ?? row.snowfall) || 0) : Math.max(hourChance(row) || 0, (hourAmount(row) || 0) * 100);
+    const bestScore = snow ? (Number(best?.snowfallIn ?? best?.snowfall) || 0) : Math.max(hourChance(best) || 0, (hourAmount(best) || 0) * 100);
     return score > bestScore ? row : best;
   }, candidates[0]);
   const peak = Date.parse(peakRow.time);
@@ -81,10 +85,10 @@ function rainDaySnapshot(day, hours, start, end, index, zone) {
     const time = Date.parse(row?.time);
     return finite(time) && time >= start && time < end;
   });
-  const amounts = numericSeries(inWindow, 'precipIn');
-  const chances = numericSeries(inWindow, 'rainChance');
-  const amount = amounts.length ? round(amounts.reduce((sum, value) => sum + value, 0), 3) : (index > 0 && finite(day?.totalQpfIn) ? round(day.totalQpfIn, 3) : null);
-  const chance = chances.length ? Math.round(Math.max(...chances)) : (finite(day?.rainChance) ? Math.round(day.rainChance) : null);
+  const amounts = inWindow.map(hourAmount).filter(finite);
+  const chances = inWindow.map(hourChance).filter(finite);
+  const amount = amounts.length ? round(amounts.reduce((sum, value) => sum + value, 0), 3) : (index > 0 && finite(dayAmount(day)) ? round(dayAmount(day), 3) : null);
+  const chance = chances.length ? Math.round(Math.max(...chances)) : (finite(dayChance(day)) ? Math.round(dayChance(day)) : null);
   return {
     amount,
     amountUnit: 'in liquid-equivalent precipitation',
@@ -99,6 +103,9 @@ function rainDaySnapshot(day, hours, start, end, index, zone) {
     } : null,
     supportHours: amounts.length,
     expectedHours: inWindow.length,
+    // Hourly amounts let the client compare snapshots over the same remaining
+    // window instead of mistaking rain that already fell for a downward trend.
+    hours: inWindow.map(row => ({ time: iso(Date.parse(row.time)), amount: finite(hourAmount(row)) ? round(hourAmount(row), 3) : null })),
     range: null,
     quantiles: null,
     sourceWindow: { start: iso(start), end: iso(end) },
@@ -127,6 +134,7 @@ function snowDaySnapshot(snowDay, start, end) {
       windows: eventWindows,
     } : { status: 'unavailable', onset: null, peak: null, end: null, windows: [] },
     confidence: { level: snowDay?.confidence || null, score: null, spreadF: null },
+    intervals: (snowDay?.nwsRawIntervals || []).filter(row => finite(row?.value) && finite(Date.parse(row?.start)) && finite(Date.parse(row?.end))).map(row => ({ start: row.start, end: row.end, value: round(row.value, 2) })),
     supportHours: finite(snowDay?.nwsCoveredHours) ? snowDay.nwsCoveredHours : null,
     expectedHours: finite(snowDay?.expectedHours) ? snowDay.expectedHours : null,
     range: Array.isArray(display.range) ? display.range.map(value => finite(value) ? round(value, 3) : null) : (Array.isArray(snowDay?.range) ? snowDay.range : null),
@@ -210,11 +218,15 @@ export function createStormSnowBetaService({ now = Date.now } = {}) {
         const entry = { ...snapshot, center, day: row, days: undefined };
         const list = histories.get(key) || [];
         if (list.some(previous => previous.issuedAt === entry.issuedAt && previous.signature === entry.signature)) continue;
+        // Forecasts reassemble every few minutes. Keeping only the newest record
+        // per 30-minute bucket lets 48 records span a day of real revisions.
+        const last = list.at(-1);
+        if (last && Date.parse(entry.issuedAt) >= Date.parse(last.issuedAt) && Date.parse(entry.issuedAt) - Date.parse(last.issuedAt) < HISTORY_BUCKET_MS && list.length > 1) list.pop();
         // JSON cloning gives callers a detached immutable response while the
         // retained record remains untouched by route serialization.
         list.push(JSON.parse(JSON.stringify(entry)));
         list.sort((a, b) => Date.parse(a.issuedAt) - Date.parse(b.issuedAt));
-        while (list.length > 24) list.shift();
+        while (list.length > 48) list.shift();
         histories.set(key, list);
       }
     }
