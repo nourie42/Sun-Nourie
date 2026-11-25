@@ -14,6 +14,12 @@ const SNOW_SOURCE = 'https://www.wpc.ncep.noaa.gov/pwpf/wwd_accum_probs.php';
 const RADAR_PAGE = 'https://radar.weather.gov/';
 const SOURCE_NAMES = { nws: 'NWS', hrrr: 'HRRR', ecmwf: 'ECMWF', nbm: 'NBM', wn: 'WeatherNext', weathernext3: 'WeatherNext 3', gefs: 'GEFS', gfs: 'GFS', nam: 'NAM', wpc: 'WPC' };
 const MATERIAL = { rain: 0.25, snow: 0.5, chance: 10 };
+// NOAA MRMS reflectivity legend (conus_bref_qcd): one color per legend pixel, dBZ = (index - 136) / 5.
+const REFLECTIVITY_PALETTE = '8d817f8e827e8e837c8f847a8f84788f85768f857490867390867191876f91886d91896c92896a928a68928a66938b64938c62948c61948d5f948e5d948e5b958f5a9590589690569691549792549893569995589a965a9b975c9c985e9e9a609e9b61a09d64a19e65a29f68a3a069a4a26ba5a36da7a56fa7a571a9a773aaa875abaa77acab78adac7baead7cb0af7fb0b080b2b282b3b384b4b486b5b588b7b78ab8b88cb9ba8ebabb90bcbc92bdbe94bfbf96bfc098c1c29ac2c39cc4c59ec5c69fc6c7a2c7c9a3c9caa6cacba7cbcdaaccceabced0aecfd1afd0d2b1d1d3b3d2d4b4d0d2b4cfd1b4cdd0b4cccfb4cbcdb4c9ccb4c8cbb4c7cab4c5c9b4c4c8b4c2c6b4c1c5b4c0c4b4bfc3b4bdc1b4bcc1b4babfb4b9beb4b8bdb4b6bcb4b5bab4b4b9b4b2b8b4b1b7b4afb6b4afb5b4adb3b4acb3b5abb1b4aab0b5a9afb4a8aeb5a7adb4a6acb5a4abb5a3aab5a2a9b5a1a8b5a0a6b59fa6b59ea4b59da3b59ba2b59ba1b599a0b5989fb5979eb5969db5959cb5939bb59199b48f98b48d96b38b95b38993b28892b28590b1848fb1818db0808cb07d8aaf7c89af7a87ae7886ae7684ad7483ad7281ac7080ac6e7eab6c7dab6a7baa687aaa6678a96477a96276a86175a86074a75f73a75d72a65c71a65b70a65a6fa6586ea5576da5566ca4556ba4536aa45269a35068a34f67a34e66a24d66a24b64a14a64a14962a14862a14660a04560a0445f9f4460a04563a24666a44769a6486da8496faa4a73ac4b76ae4d79b04d7cb14f7fb35082b55186b75289b9538cbb548fbd5593bf5695c15799c3589cc5599fc75aa2c85ca5cb5ca8cc5eacce5eaece5eb0cd5db1cb5db3c95cb4c75cb6c55bb8c35bbac25abbc05abdbe59bebc59c0bb58c2b958c3b757c5b557c7b356c8b156cab055cbae55cdac54cfaa54d1a953d2a753d4a552d5a351d69f4ed69a4cd69449d68e46d68943d68341d67d3ed6773bd67238d66c36d66733d66130d65b2dd6552bd65028d64a25d64522d63f20d6391dd6331bd62e18d62815d62312d61d10d6170ed5140ed2140ece140ecb140ec8130ec5130dc2130dbf130dbc120db9120db5120db2120daf120dac120ca9110ca6110ca3110ca0110c9c100c99100c96100c93100b90100b8d100b8a0f0b880f0b860f0b840f0b820e0b810e0b7f0e0b7d0e0a7b0d0b7a0d0a780d0a770d0a750c0a730c0a710c0a700c0a6e0b0a6d0b0a6b0b0a690b0a670a0a660a09640a09620a096109095f090e6109186609226b082c71083576073f7b074980075386075d8b066790067096057b9b0584a0058ea60498ab04a2b004abb503b5bb03bfc002c9c502d3ca02ddd002e7d501f1da01fadf00ffe101fedf03fdde05fcdb06fcda09fad80afad60cf9d40ef8d210f7d012f7cf14f5cc15f5cb17f4c919f3c71bf2c51df1c31ff0c120f0c022efbd24eebc26edba28ecb82aebb62bebb42debb32decb32cecb329edb328eeb326efb324f0b322f1b321f1b21ef2b31df3b21bf4b219f5b217f6b216f6b213f7b212f8b210f9b20efab20cfbb20afbb108fcb207fdb105feb103ffb101fd0101f90101f60202f20202ef0303eb0404e70405e30505e00606dc0606d80707d40708d10809cd0909c90a0ac50a0bc20b0cbe0b0cba0c0db70d0db30d0eaf0e0fac0f10a80f10a41011a21011a30f10a40e0fa40e0fa50d0ea60d0ea60c0da70c0ca70b0ba80a0ba8090aa9090aaa0809aa0808ab0707ac0607ac0506ad0505ad0405ae0404ae0303af0303b00202b00101b10000fffdfffdf7fffdf1fffbecfffae6fff9e1fef8dbfff7d5fef6d0fef4cafef4c5fef2bffef1bafef0b4fdefaffeeea9fdeda4fdeb9efdeb98fde993fde88dfde788fde682fde57cfce477fce474fce574fde674fce774fde874fdea75fdea74fdec75fded74fdee75fdef74fdf075fef175fef275fef375fef575fef675fef775fef875fef975fffa75fffb75fffc75fffe75ffff75ffab00fca700faa400f8a000f69d00f59a00f39700f19300ef9000ee8d00ec8900eb8600e98300e77f00e57c00e47900e27600e17200df6f00dd6b00db6800da6500d86200d65e00d55b00d3';
+// NOAA MRMS surface precipitation type legend (conus_pcpn_typ).
+const PRECIP_FLAGS = [[4, 80, 164, 'rain'], [200, 200, 200, 'snow'], [255, 50, 50, 'rain'], [150, 0, 150, 'hail'], [110, 255, 255, 'rain'], [0, 249, 0, 'rain'], [0, 151, 0, 'rain']];
+const RAIN_SCALE = [[5, '9be7a0'], [15, '4cc25a'], [20, '1f9e3a'], [30, '0f7a2c'], [35, 'f0e442'], [40, 'f5a623'], [45, 'ef5a28'], [50, 'd7191c'], [55, 'a50f15'], [60, 'd63fd6']];
+const SNOW_SCALE = [[5, 'd6e9ff'], [10, 'acd3ff'], [15, '80b9ff'], [20, '5299f7'], [25, '2f78e3'], [30, '1f58c6'], [35, '1b3c9e']];
 export const HORIZONS = [
   { id: 'today', label: 'Today' },
   { id: '1-3', label: '1–3 Days' },
@@ -160,7 +166,7 @@ export function buildStormModel(forecast, now = Date.now()) {
       pop: num(raw.rainLikelihood?.value ?? raw.pop ?? raw.rainChance ?? view.rainChance),
       sources: sourceList(raw.qpfBlend?.sources),
       confidence: confidenceOf(raw.confidence ?? view.confidence),
-      condition: raw.condition || view.condition || '',
+      condition: raw.condition || view.condition || '', nightCondition: raw.nightCondition || '',
       high: num(raw.high ?? view.highF), low: num(raw.low ?? view.lowF),
       gust: num(view.maxGustMph),
       freezingRain: raw.freezingRainPossible === true, sleet: raw.sleetPossible === true,
@@ -201,6 +207,18 @@ export function buildStormModel(forecast, now = Date.now()) {
     }
   }
   intervals.sort((x, y) => x.a - y.a); periods.sort((x, y) => x.a - y.a); events.sort((x, y) => x.a - y.a);
+  // NWS snowfall is published in 6-hour blocks. Each block is timed across its hours by the
+  // hourly melted precipitation in hours whose NWS wording has snow falling, which keeps the
+  // NWS total exact while showing when it falls hardest.
+  for (const block of intervals) {
+    const rows = hours.filter(row => row.t >= block.a && row.t < block.b);
+    if (!rows.length) continue;
+    // A block that began before the hourly data keeps only the share of its hours still ahead.
+    const value = block.value * Math.min(1, rows.length / Math.round((block.b - block.a) / HOUR));
+    const snowy = rows.filter(row => (row.type === 'snow' || row.type === 'mix') && finite(row.precip) && row.precip > 0);
+    const weight = sum(snowy.map(row => row.precip));
+    for (const row of rows) row.snow = value === 0 ? 0 : weight > 0 ? (snowy.includes(row) ? value * row.precip / weight : 0) : value / rows.length;
+  }
   const merged = [];
   for (const row of events) { const last = merged.at(-1); if (last && row.a <= last.b) last.b = Math.max(last.b, row.b); else merged.push({ ...row }); }
   const current = forecast?.current || {};
@@ -253,7 +271,7 @@ function hourlySources(rows) {
 }
 function rainPortion(model, day, a, b) {
   const inside = hoursIn(model, a, b), slots = slotCount(a, b), known = inside.filter(row => finite(row.precip));
-  if (slots && known.length >= slots) return { day, amount: sum(known.map(row => row.precip)), sources: hourlySources(known), mode: 'hourly' };
+  if (slots && known.length >= slots) return { day, amount: sum(known.map(row => row.precip)), sources: hourlySources(known), mode: 'hourly', hours: known };
   if (!finite(day.qpf)) return { day, amount: null, sources: null, mode: 'missing' };
   const outsideSlots = slotCount(day.start, day.end) - slots;
   if (outsideSlots <= 0) return { day, amount: day.qpf, sources: day.sources.length ? new Map(day.sources.map(row => [row.id, row.value])) : null, mode: 'daily' };
@@ -274,70 +292,108 @@ function confidenceFor(model, win) {
   return { score, label, factors: days[0].confidence.factors, days: days.map(day => ({ name: day.name, date: day.date, score: day.confidence.score, label: day.confidence.label })) };
 }
 const wetHour = row => (finite(row.precip) && row.precip >= 0.01) || (finite(row.pop) && row.pop >= 60);
+// Precipitation type always comes from the NWS forecast wording, which forecasters set
+// from the full temperature profile aloft, never from the surface temperature alone.
+// Liquid with no snow in its wording is rain.
+const liquidKind = row => (row.type === 'snow' ? 'snow' : row.type === 'mix' ? 'mix' : 'rain');
+const dayKind = day => {
+  const kind = precipType(`${day.condition} ${day.nightCondition || ''}`);
+  return kind === 'snow' ? 'snow' : kind === 'mix' ? 'mix' : 'rain';
+};
+const wetRain = row => liquidKind(row) !== 'snow' && wetHour(row);
+export const TYPE_NAMES = { rain: 'Rain', storm: 'Rain & thunderstorms', snow: 'Snow', mix: 'Rain & snow', none: 'Precipitation' };
 
 export function rainSummary(model, win) {
   if (!win) return null;
   const portions = daysIn(model, win).map(day => rainPortion(model, day, Math.max(win.start, day.start), Math.min(win.end, day.end)));
   const known = portions.filter(row => finite(row.amount));
-  const amount = known.length ? sum(known.map(row => row.amount)) : null;
+  const parts = { rain: 0, mix: 0, snow: 0 };
+  for (const portion of known) {
+    if (portion.mode === 'hourly') for (const row of portion.hours) parts[liquidKind(row)] += row.precip;
+    else parts[dayKind(portion.day)] += portion.amount;
+  }
+  const total = parts.rain + parts.mix + parts.snow;
+  const amount = known.length ? parts.rain + parts.mix : null;
+  const share = total > 0 ? (parts.rain + parts.mix) / total : 1;
   let sources = null;
   if (portions.length && portions.every(row => row.sources)) {
     let ids = [...portions[0].sources.keys()];
     for (const row of portions) ids = ids.filter(id => row.sources.has(id));
-    if (ids.length) sources = ids.map(id => ({ id, value: sum(portions.map(row => row.sources.get(id))) })).sort((a, b) => b.value - a.value);
+    // Each source's total liquid is reduced by the same share the NWS wording assigns to snow.
+    if (ids.length) sources = ids.map(id => ({ id, value: sum(portions.map(row => row.sources.get(id))) * share })).sort((a, b) => b.value - a.value);
   }
-  const range = sources && sources.length >= 2 ? [Math.min(...sources.map(row => row.value)), Math.max(...sources.map(row => row.value))] : null;
+  const range = sources && sources.length >= 2 && amount >= 0.01 ? [Math.min(...sources.map(row => row.value)), Math.max(...sources.map(row => row.value))] : null;
   const windowHours = hoursIn(model, win.start, win.end);
-  const chances = windowHours.map(row => row.pop).filter(finite).concat(portions.filter(row => row.mode !== 'hourly').map(row => row.day.pop).filter(finite));
-  const chance = chances.length ? Math.max(...chances) : null;
-  const wet = windowHours.filter(row => finite(row.precip) && row.precip > 0);
-  const liquid = sum(wet.map(row => row.precip));
-  const frozen = sum(wet.filter(row => row.type === 'snow' || row.type === 'mix').map(row => row.precip));
-  const frozenShare = liquid >= 0.05 ? frozen / liquid : 0;
-  return { kind: 'rain', win, amount, partial: known.length < portions.length, prorated: portions.some(row => row.mode === 'prorated'), sources, range, chance, frozen, frozenShare, thunder: windowHours.some(row => row.type === 'storm'), timing: rainTiming(model, win, portions), confidence: confidenceFor(model, win), maxGust: maxGust(model, win), portions };
+  const chances = windowHours.filter(row => liquidKind(row) !== 'snow').map(row => row.pop).filter(finite)
+    .concat(portions.filter(row => row.mode !== 'hourly' && dayKind(row.day) !== 'snow').map(row => row.day.pop).filter(finite));
+  const chance = chances.length ? Math.max(...chances) : (windowHours.length ? 0 : null);
+  const frozenShare = total >= 0.05 ? parts.snow / total : 0;
+  return { kind: 'rain', win, amount, total, parts, frozen: parts.snow, frozenShare, mix: parts.mix, partial: known.length < portions.length, prorated: portions.some(row => row.mode === 'prorated'), sources, range, chance, thunder: windowHours.some(row => row.type === 'storm'), timing: rainTiming(model, win, portions), confidence: confidenceFor(model, win), maxGust: maxGust(model, win), portions };
 }
 function maxGust(model, win) {
   const values = hoursIn(model, win.start, win.end).map(row => row.gust).filter(finite).concat(daysIn(model, win).map(day => day.gust).filter(finite));
   return values.length ? Math.max(...values) : null;
 }
+function wetRuns(model, win, test) {
+  const all = model.hours, runs = [];
+  for (let i = 0; i < all.length; i += 1) {
+    if (!test(all[i])) continue;
+    let j = i;
+    while (j + 1 < all.length && test(all[j + 1])) j += 1;
+    const a = all[i].t, b = all[j].t + HOUR;
+    if (b > win.start && a < win.end) runs.push({ a, b, open: j === all.length - 1, types: [...new Set(all.slice(i, j + 1).map(row => row.type))] });
+    i = j;
+  }
+  return runs;
+}
 function rainTiming(model, win, portions) {
-  const all = model.hours;
   const inside = hoursIn(model, win.start, win.end);
-  const wetInside = inside.filter(wetHour);
   const coveredEnd = inside.length ? inside.at(-1).t + HOUR : win.start;
-  const later = portions.filter(row => row.mode !== 'hourly' && ((finite(row.amount) && row.amount >= 0.05) || (!finite(row.amount) && finite(row.day.pop) && row.day.pop >= 50))).map(row => row.day);
-  const timing = { status: 'none', later, series: inside.map(row => ({ t: row.t, value: finite(row.precip) ? row.precip : 0, type: row.type })) };
-  if (wetInside.length) {
-    let first = all.indexOf(wetInside[0]), last = all.indexOf(wetInside.at(-1));
-    while (first > 0 && wetHour(all[first - 1]) && all[first - 1].t + HOUR > win.start) first -= 1;
-    while (last < all.length - 1 && wetHour(all[last + 1])) last += 1;
+  const later = portions.filter(row => row.mode !== 'hourly' && dayKind(row.day) !== 'snow' && ((finite(row.amount) && row.amount >= 0.05) || (!finite(row.amount) && finite(row.day.pop) && row.day.pop >= 50))).map(row => row.day);
+  const runs = wetRuns(model, win, wetRain);
+  const seriesEnd = Math.max(win.end, runs.at(-1)?.b ?? win.end);
+  const timing = { status: 'none', later, runs, coveredEnd, series: hoursIn(model, win.start, seriesEnd).map(row => ({ t: row.t, value: finite(row.precip) ? row.precip : 0, type: row.type === 'none' ? 'rain' : row.type })) };
+  if (runs.length) {
     timing.status = 'hourly';
-    timing.onset = all[first].t;
-    timing.underway = all[first].t <= model.now;
-    timing.continuing = !timing.underway && first > 0 && wetHour(all[first - 1]);
-    timing.end = all[last].t + HOUR;
-    timing.openEnd = last === all.length - 1;
-    let best = null;
-    for (let i = 0; i < inside.length; i += 1) {
-      const block = inside.slice(i, i + 3), total = sum(block.map(row => row.precip || 0));
-      if (!best || total > best.amount) best = { a: block[0].t, b: block.at(-1).t + HOUR, amount: total };
-    }
-    if (best && best.amount >= 0.03) timing.heaviest = best;
+    timing.onset = runs[0].a;
+    timing.underway = runs[0].a <= model.now;
+    timing.continuing = !timing.underway && runs[0].a < win.start;
+    timing.end = runs.at(-1).b;
+    timing.openEnd = runs.at(-1).open;
+    const candidates = hoursIn(model, Math.max(win.start, runs[0].a), timing.end).filter(row => liquidKind(row) !== 'snow' && finite(row.precip));
+    const peak = candidates.reduce((best, row) => (!best || row.precip > best.precip ? row : best), null);
+    if (peak && peak.precip >= 0.01) timing.heaviest = { a: peak.t, b: peak.t + HOUR, amount: peak.precip, hourly: true };
   } else if (later.length) {
     timing.status = 'daily';
     timing.wettest = later.reduce((best, day) => ((portions.find(row => row.day === day)?.amount || 0) > (portions.find(row => row.day === best)?.amount || 0) ? day : best), later[0]);
   }
-  timing.coveredEnd = coveredEnd;
-  if (timing.status === 'hourly' && timing.end > win.end) timing.series = hoursIn(model, win.start, timing.end).map(row => ({ t: row.t, value: finite(row.precip) ? row.precip : 0, type: row.type }));
   return timing;
+}
+function runText(model, run, index, win) {
+  const start = index === 0 && run.a <= model.now ? 'Now' : index === 0 && run.a < win.start ? 'Continues' : when(run.a, model.zone, model.now);
+  const end = run.open ? `past ${when(run.b, model.zone, model.now)}` : when(run.b, model.zone, model.now);
+  return start === 'Continues' ? `Continues until ${end}` : `${start} – ${end}`;
 }
 export function rainTimingText(model, summary) {
   const t = summary.timing;
-  const tail = t.later.length && t.status === 'hourly' ? `, then ${t.later.map(day => day.short).join(', ')}` : '';
-  const end = t.status === 'hourly' ? (t.openEnd ? `past ${when(t.end, model.zone, model.now)}` : when(t.end, model.zone, model.now)) : '';
-  if (t.status === 'hourly') return t.continuing ? `Continues until ${end}${tail}` : `${t.underway ? 'Now' : when(t.onset, model.zone, model.now)} – ${end}${tail}`;
+  if (t.status === 'hourly') {
+    const shown = t.runs.slice(0, 2).map((run, index) => runText(model, run, index, summary.win)).join(', ');
+    const more = t.runs.length > 2 ? ', and later' : t.later.length ? `, then ${t.later.map(day => day.short).join(', ')}` : '';
+    return shown + more;
+  }
   if (t.status === 'daily') return t.later.length === 1 ? t.later[0].name : `${t.later[0].short} – ${t.later.at(-1).short}`;
   return 'No rain expected';
+}
+/** Consecutive hours of the same NWS precipitation type, for a type timeline. */
+export function typeTimeline(model, a, b) {
+  const rows = hoursIn(model, a, b).filter(row => wetHour(row));
+  const out = [];
+  for (const row of rows) {
+    const type = row.type === 'none' ? 'rain' : row.type, last = out.at(-1);
+    if (last && last.type === type && last.b === row.t) last.b = row.t + HOUR;
+    else out.push({ a: row.t, b: row.t + HOUR, type });
+  }
+  return out;
 }
 
 export function snowSummary(model, win) {
@@ -345,7 +401,11 @@ export function snowSummary(model, win) {
   const days = daysIn(model, win);
   const covered = model.intervals.filter(row => overlap(row.a, row.b, win.start, win.end) > 0);
   const coveredMs = sum(covered.map(row => overlap(row.a, row.b, win.start, win.end)));
-  let amount = covered.length ? sum(covered.map(row => row.value * overlap(row.a, row.b, win.start, win.end) / (row.b - row.a))) : null;
+  let amount = null;
+  for (const block of covered) {
+    const rows = hoursIn(model, block.a, block.b).filter(row => row.t >= block.a && finite(row.snow));
+    amount = (amount || 0) + (rows.length ? sum(rows.filter(row => row.t + HOUR > win.start && row.t < win.end).map(row => row.snow)) : block.value * overlap(block.a, block.b, win.start, win.end) / (block.b - block.a));
+  }
   if (coveredMs < (win.end - win.start) * 0.9) {
     // Beyond the NWS 6-hour grid, use each fully uncovered day's displayed snowfall.
     for (const day of days) {
@@ -362,10 +422,9 @@ export function snowSummary(model, win) {
   const dayChances = days.map(day => num(day.snow?.snowChance)).filter(finite);
   const chance = periodChances.length ? Math.max(...periodChances) : dayChances.length ? Math.max(...dayChances) : null;
   const chanceSource = periodChances.length ? 'nws' : dayChances.length ? 'blend' : null;
-  const freezingRain = days.some(day => day.freezingRain || num(day.snow?.freezingRainChance) > 0) || model.periods.some(row => row.ice && /freezing/i.test(row.detail + row.wording) && overlap(row.a, row.b, win.start, win.end) > 0);
-  const sleet = days.some(day => day.sleet || num(day.snow?.sleetChance) > 0) || model.periods.some(row => /sleet/i.test(row.detail + row.wording) && overlap(row.a, row.b, win.start, win.end) > 0);
-  const snowHours = hoursIn(model, win.start, win.end).filter(row => row.type === 'snow' || row.type === 'mix');
-  const marginal = snowHours.length > 0 && snowHours.some(row => finite(row.temp) && row.temp >= 31 && row.temp <= 35);
+  // Same rule as the server: NWS wording or at least a 10% NBM type probability.
+  const freezingRain = days.some(day => day.freezingRain || num(day.snow?.freezingRainChance) >= 10) || model.periods.some(row => row.ice && /freezing/i.test(row.detail + row.wording) && overlap(row.a, row.b, win.start, win.end) > 0);
+  const sleet = days.some(day => day.sleet || num(day.snow?.sleetChance) >= 10) || model.periods.some(row => /sleet/i.test(row.detail + row.wording) && overlap(row.a, row.b, win.start, win.end) > 0);
   const wpc = new Map();
   for (const day of days) for (const row of day.snow?.wpc || []) {
     if (overlap(ms(row.start) ?? 0, ms(row.end) ?? 0, win.start, win.end) <= 0) continue;
@@ -374,13 +433,16 @@ export function snowSummary(model, win) {
     if (!value) continue;
     if (!current || value[1] > current.range[1]) wpc.set(key, { kind: row.kind, inches: row.inches, range: value, day: row.day, start: ms(row.start), end: ms(row.end) });
   }
-  const models = [], modelDays = days.filter(day => day.snow?.models || day.snow?.nearTermModels);
+  const models = [], modelDays = days.filter(day => Object.values({ ...(day.snow?.models || {}), ...(day.snow?.nearTermModels || {}) }).some(value => num(value?.value ?? value) !== null));
   for (const day of days) for (const [id, value] of Object.entries({ ...(day.snow?.models || {}), ...(day.snow?.nearTermModels || {}) })) {
     const amountValue = num(value?.value ?? value);
     if (amountValue !== null) { const row = models.find(item => item.id === id); if (row) row.value += amountValue; else models.push({ id, value: amountValue }); }
   }
   const events = model.snowEvents.filter(row => overlap(row.a, row.b, win.start, win.end) > 0);
-  const timing = { status: 'none', series: covered.map(row => ({ t: row.a, b: row.b, value: row.value })) };
+  const hourly = hoursIn(model, win.start, Math.max(win.end, events.at(-1)?.b ?? win.end)).filter(row => finite(row.snow));
+  const hourlyEnd = hourly.length ? hourly.at(-1).t + HOUR : win.start;
+  const later = covered.filter(row => row.b > hourlyEnd && row.value > 0);
+  const timing = { status: 'none', hourly: hourly.length > 0, series: hourly.length ? hourly.map(row => ({ t: row.t, value: Math.round(row.snow * 100) / 100, type: 'snow' })) : covered.map(row => ({ t: row.a, b: row.b, value: row.value })), laterSnow: sum(later.map(row => row.value * overlap(row.a, row.b, Math.max(hourlyEnd, win.start), win.end) / (row.b - row.a))), hourlyEnd };
   if (events.length) {
     timing.status = 'event';
     timing.onset = Math.max(events[0].a, win.start); timing.underway = events[0].a <= model.now; timing.continuing = !timing.underway && events[0].a < win.start; timing.end = events.at(-1).b;
@@ -388,16 +450,26 @@ export function snowSummary(model, win) {
     const snowy = covered.filter(row => row.value > 0);
     if (snowy.length) { timing.status = 'event'; timing.onset = snowy[0].a; timing.underway = snowy[0].a <= model.now; timing.end = snowy.at(-1).b; }
   }
-  const heavy = covered.filter(row => row.value > 0).sort((x, y) => y.value - x.value)[0];
-  if (heavy) timing.heaviest = { a: heavy.a, b: heavy.b, amount: heavy.value };
-  const mixedWording = chanceSource === 'nws' && model.periods.some(row => row.snow && overlap(row.a, row.b, win.start, win.end) > 0 && /rain|shower|drizzle/i.test(row.wording));
+  const peakHour = hourly.filter(row => row.t + HOUR > model.now).reduce((best, row) => (!best || row.snow > best.snow ? row : best), null);
+  if (peakHour && peakHour.snow >= 0.05) timing.heaviest = { a: peakHour.t, b: peakHour.t + HOUR, amount: peakHour.snow, hourly: true };
+  else { const heavy = covered.filter(row => row.value > 0).sort((x, y) => y.value - x.value)[0]; if (heavy) timing.heaviest = { a: heavy.a, b: heavy.b, amount: heavy.value }; }
+  const liquid = rainSummary(model, win);
+  const frozenLiquid = liquid ? liquid.parts.snow + liquid.parts.mix : 0;
+  // Snow depth divided by the melted precipitation that falls in snow hours: low ratios
+  // mean dense, wet snow; high ratios mean light, fluffy snow.
+  const ratio = finite(amount) && amount >= 1 && frozenLiquid >= 0.1 ? amount / frozenLiquid : null;
   const modelSpan = modelDays.length ? (modelDays.length === 1 ? modelDays[0].name : `${modelDays[0].short} – ${modelDays.at(-1).short}`) : '';
-  return { kind: 'snow', win, amount, range, chance, chanceSource, mixedWording, freezingRain, sleet, marginal, wpc: [...wpc.values()].sort((a, b) => (a.kind === b.kind ? a.inches - b.inches : a.kind === 'snow' ? -1 : 1)), models, modelSpan, periods: snowPeriods, timing, confidence: confidenceFor(model, win), liquid: rainSummary(model, win)?.amount ?? null };
+  return { kind: 'snow', win, amount, range, chance, chanceSource, freezingRain, sleet, ratio, frozenLiquid, wpc: [...wpc.values()].sort((a, b) => (a.kind === b.kind ? a.inches - b.inches : a.kind === 'snow' ? -1 : 1)), models, modelSpan, periods: snowPeriods, timing, confidence: confidenceFor(model, win), liquid: liquid?.total ?? null };
 }
 export function snowTimingText(model, summary) {
   const t = summary.timing;
   if (t.status === 'event') return t.continuing ? `Continues until ${when(t.end, model.zone, model.now)}` : `${t.underway ? 'Now' : when(t.onset, model.zone, model.now)} – ${when(t.end, model.zone, model.now)}`;
   return 'No snow expected';
+}
+export function ratioText(ratio) {
+  if (!finite(ratio)) return '';
+  const value = Math.round(ratio);
+  return `About ${value}:1 · ${value <= 8 ? 'wet, heavy snow' : value <= 12 ? 'typical density' : 'light, fluffy snow'}`;
 }
 function headline(summary) {
   if (summary.kind === 'snow') {
@@ -536,6 +608,72 @@ export function contourValueAt(geo, lat, lon) {
   return best;
 }
 
+// ---------------------------------------------------------------- typed radar
+let paletteRgb = null;
+const reflectivityCache = new Map(), flagCache = new Map();
+const hexRgb = hex => [parseInt(hex.slice(0, 2), 16), parseInt(hex.slice(2, 4), 16), parseInt(hex.slice(4, 6), 16)];
+export function reflectivityDbz(r, g, b) {
+  const key = (r << 16) | (g << 8) | b;
+  if (reflectivityCache.has(key)) return reflectivityCache.get(key);
+  if (!paletteRgb) { paletteRgb = []; for (let i = 0; i < REFLECTIVITY_PALETTE.length; i += 6) paletteRgb.push(hexRgb(REFLECTIVITY_PALETTE.slice(i, i + 6))); }
+  let best = -1, distance = Infinity;
+  paletteRgb.forEach(([pr, pg, pb], index) => { const d = (pr - r) ** 2 + (pg - g) ** 2 + (pb - b) ** 2; if (d < distance) { distance = d; best = index; } });
+  const dbz = distance <= 900 ? (best - 136) / 5 : null;
+  reflectivityCache.set(key, dbz);
+  return dbz;
+}
+export function precipFlag(r, g, b) {
+  const key = (r << 16) | (g << 8) | b;
+  if (flagCache.has(key)) return flagCache.get(key);
+  let best = null, distance = Infinity;
+  for (const [fr, fg, fb, kind] of PRECIP_FLAGS) { const d = (fr - r) ** 2 + (fg - g) ** 2 + (fb - b) ** 2; if (d < distance) { distance = d; best = kind; } }
+  const kind = distance <= 1200 ? best : null;
+  flagCache.set(key, kind);
+  return kind;
+}
+export function radarColor(kind, dbz) {
+  if (kind === 'hail') return [255, 95, 210];
+  const scale = kind === 'snow' ? SNOW_SCALE : RAIN_SCALE;
+  let color = null;
+  for (const [level, hex] of scale) if (dbz >= level) color = hex;
+  return color ? hexRgb(color) : null;
+}
+const loadImage = url => new Promise((resolve, reject) => { const image = new Image(); image.crossOrigin = 'anonymous'; image.onload = () => resolve(image); image.onerror = reject; image.src = url; });
+function typedRadarLayer(L, reflectivityUrl, typeUrl, time) {
+  const Layer = L.GridLayer.extend({
+    createTile(coords, done) {
+      const tile = document.createElement('canvas'), size = this.getTileSize(), map = this._map, crs = map.options.crs;
+      tile.width = size.x; tile.height = size.y;
+      const nw = crs.project(map.unproject(L.point(coords.x * size.x, coords.y * size.y), coords.z)), se = crs.project(map.unproject(L.point((coords.x + 1) * size.x, (coords.y + 1) * size.y), coords.z));
+      const query = layer => new URLSearchParams({ service: 'WMS', version: '1.3.0', request: 'GetMap', layers: layer, styles: '', format: 'image/png', transparent: 'true', crs: 'EPSG:3857', bbox: `${nw.x},${se.y},${se.x},${nw.y}`, width: String(size.x), height: String(size.y), time });
+      Promise.all([loadImage(`${reflectivityUrl}?${query('conus_bref_qcd')}`), loadImage(`${typeUrl}?${query('conus_pcpn_typ')}`).catch(() => null)]).then(([reflectivity, flags]) => {
+        const context = tile.getContext('2d', { willReadFrequently: true }), w = size.x, h = size.y;
+        context.drawImage(reflectivity, 0, 0, w, h);
+        const ref = context.getImageData(0, 0, w, h).data;
+        let type = null;
+        if (flags) { context.clearRect(0, 0, w, h); context.drawImage(flags, 0, 0, w, h); type = context.getImageData(0, 0, w, h).data; }
+        const out = context.createImageData(w, h);
+        for (let i = 0; i < ref.length; i += 4) {
+          if (ref[i + 3] < 16) continue;
+          const dbz = reflectivityDbz(ref[i], ref[i + 1], ref[i + 2]);
+          if (dbz === null || dbz < 5) continue;
+          // Reflectivity without an MRMS precipitation flag is not precipitation (birds, clutter).
+          const kind = type ? (type[i + 3] < 16 ? null : precipFlag(type[i], type[i + 1], type[i + 2])) : 'rain';
+          if (!kind) continue;
+          const color = radarColor(kind, dbz);
+          if (!color) continue;
+          out.data[i] = color[0]; out.data[i + 1] = color[1]; out.data[i + 2] = color[2]; out.data[i + 3] = 215;
+        }
+        context.clearRect(0, 0, w, h);
+        context.putImageData(out, 0, 0);
+        done(null, tile);
+      }).catch(error => done(error, tile));
+      return tile;
+    },
+  });
+  return new Layer({ tileSize: 256, zIndex: 300, updateWhenZooming: false });
+}
+
 // ---------------------------------------------------------------- icons & charts
 const ICONS = {
   back: '<path d="M15 5l-7 7 7 7"/>', close: '<path d="M6 6l12 12M18 6L6 18"/>', chev: '<path d="M9 5l7 7-7 7"/>',
@@ -559,7 +697,7 @@ function barChart(rows, { kind, zone, now, unitLabel }) {
   const y = value => top + (height - top - bottom) * (1 - value / max);
   const ticks = [0, max / 2, max];
   const every = Math.max(1, Math.ceil(rows.length / 6));
-  return `<svg class="sb-chart" viewBox="0 0 ${width} ${height}" role="img" aria-label="${esc(unitLabel)}">${ticks.map(value => `<line x1="${left}" x2="${width}" y1="${y(value)}" y2="${y(value)}" class="sb-grid"/><text x="${left - 4}" y="${y(value) + 3}" text-anchor="end" class="sb-axis">${kind === 'snow' ? short(Math.round(value * 10) / 10) : value.toFixed(2)}</text>`).join('')}${rows.map((row, index) => { const x = left + index * step + (step - bar) / 2, h = Math.max(row.value > 0 ? 1.5 : 0, y(0) - y(row.value)); return `<rect x="${x.toFixed(1)}" y="${(y(0) - h).toFixed(1)}" width="${bar.toFixed(1)}" height="${h.toFixed(1)}" rx="${Math.min(3, bar / 3).toFixed(1)}" class="sb-bar sb-bar-${row.type || kind}"><title>${esc(when(row.t, zone, now))}: ${esc(inches(row.value, kind))}</title></rect>`; }).join('')}${rows.map((row, index) => (index % every === 0 ? `<text x="${(left + index * step + step / 2).toFixed(1)}" y="${height - 6}" text-anchor="middle" class="sb-axis">${esc(kind === 'snow' ? `${dayShort(row.t, zone)} ${hourText(row.t, zone)}` : hourText(row.t, zone))}</text>` : '')).join('')}</svg>`;
+  return `<svg class="sb-chart" viewBox="0 0 ${width} ${height}" role="img" aria-label="${esc(unitLabel)}">${ticks.map(value => `<line x1="${left}" x2="${width}" y1="${y(value)}" y2="${y(value)}" class="sb-grid"/><text x="${left - 4}" y="${y(value) + 3}" text-anchor="end" class="sb-axis">${kind === 'snow' ? short(Math.round(value * 10) / 10) : value.toFixed(2)}</text>`).join('')}${rows.map((row, index) => { const x = left + index * step + (step - bar) / 2, h = Math.max(row.value > 0 ? 1.5 : 0, y(0) - y(row.value)); return `<rect x="${x.toFixed(1)}" y="${(y(0) - h).toFixed(1)}" width="${bar.toFixed(1)}" height="${h.toFixed(1)}" rx="${Math.min(3, bar / 3).toFixed(1)}" class="sb-bar sb-bar-${row.type || kind}"><title>${esc(when(row.t, zone, now))}: ${esc(inches(row.value, kind))}</title></rect>`; }).join('')}${rows.map((row, index) => (index % every === 0 ? `<text x="${Math.min(width - 2, left + index * step + step / 2).toFixed(1)}" y="${height - 6}" text-anchor="${left + index * step + step / 2 > width - 30 ? 'end' : 'middle'}" class="sb-axis">${esc(kind === 'snow' ? `${dayShort(row.t, zone)} ${hourText(row.t, zone)}` : hourText(row.t, zone))}</text>` : '')).join('')}</svg>`;
 }
 function lineChart(points, { kind, zone, now }) {
   const width = 340, height = 150, left = 34, bottom = 22, top = 12;
@@ -645,8 +783,10 @@ const CSS = `
 .sb-big{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}.sb-big strong{font-size:40px;font-weight:850;letter-spacing:-.03em;color:var(--accent);line-height:1}.sb-big span{font-size:14px;font-weight:700;color:var(--muted)}
 .sb-rows{display:grid}.sb-kv{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:9px 0;border-bottom:1px solid var(--line);font-size:14px}.sb-kv:last-child{border-bottom:0}.sb-kv span{color:var(--muted);font-weight:600}.sb-kv strong{text-align:right;font-weight:800;color:#fff}
 .sb-bars{display:grid;gap:9px}.sb-barrow{display:grid;grid-template-columns:72px 1fr 74px;align-items:center;gap:8px;font-size:13px;font-weight:700}.sb-barrow>span:last-child{text-align:right;color:#fff}.sb-track{height:11px;border-radius:999px;background:rgba(255,255,255,.1);overflow:hidden}.sb-track i{display:block;height:100%;border-radius:999px;background:linear-gradient(90deg,var(--accent),var(--accent2))}
-.sb-chart{width:100%;height:auto;display:block;margin-top:6px}.sb-grid{stroke:rgba(186,222,255,.14);stroke-width:1}.sb-axis{font-size:9.5px;fill:#9cb8d4;font-weight:600}.sb-bar{fill:var(--accent)}.sb-bar-snow,.sb-bar-mix{fill:#60a5fa}.sb-bar-storm{fill:#a78bfa}.sb-line{fill:none;stroke:var(--accent);stroke-width:2.6;stroke-linejoin:round}.sb-dot{fill:#0c1c30;stroke:var(--accent);stroke-width:2}
-.sb-key{display:flex;flex-wrap:wrap;gap:12px;font-size:12px;font-weight:700;color:var(--muted);margin-top:6px}.sb-key span{display:flex;align-items:center;gap:5px}.sb-key i{width:11px;height:11px;border-radius:3px;background:var(--accent)}.sb-key-storm{background:#a78bfa!important}.sb-key-snow,.sb-key-mix{background:#60a5fa!important}
+.sb-chart{width:100%;height:auto;display:block;margin-top:6px}.sb-grid{stroke:rgba(186,222,255,.14);stroke-width:1}.sb-axis{font-size:9.5px;fill:#9cb8d4;font-weight:600}.sb-bar{fill:var(--accent)}.sb-bar-snow{fill:#60a5fa}.sb-bar-mix{fill:#f0abfc}.sb-bar-storm{fill:#a78bfa}.sb-line{fill:none;stroke:var(--accent);stroke-width:2.6;stroke-linejoin:round}.sb-dot{fill:#0c1c30;stroke:var(--accent);stroke-width:2}
+.sb-key{display:flex;flex-wrap:wrap;gap:12px;font-size:12px;font-weight:700;color:var(--muted);margin-top:6px}.sb-key span{display:flex;align-items:center;gap:5px}.sb-key i{width:11px;height:11px;border-radius:3px;background:var(--accent)}.sb-key-storm{background:#a78bfa!important}.sb-key-snow{background:#60a5fa!important}.sb-key-mix{background:#f0abfc!important}
+.sb-types{display:grid;gap:6px}.sb-type{display:grid;grid-template-columns:12px 1fr auto;align-items:center;gap:8px;font-size:13.5px;padding:7px 10px;border-radius:12px;background:rgba(255,255,255,.05);border:1px solid var(--line)}.sb-type i{width:12px;height:12px;border-radius:4px;background:#2dd4bf}.sb-type strong{font-weight:750;white-space:nowrap}.sb-type-snow i{background:#60a5fa}.sb-type-mix i{background:#f0abfc}.sb-type-storm i{background:#a78bfa}
+.sb-radar-key{display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding:0 12px 12px;font-size:12px;font-weight:750;color:var(--muted)}.sb-radar-key span{display:flex;align-items:center;gap:6px}.sb-radar-key i{width:34px;height:9px;border-radius:5px}.sb-radar-key small{font-weight:600;opacity:.8}
 .sb-gauge{width:200px;max-width:100%;display:block;margin:0 auto}.sb-gauge-track{fill:none;stroke:rgba(255,255,255,.12);stroke-width:14;stroke-linecap:round}.sb-gauge-fill{fill:none;stroke:var(--accent);stroke-width:14;stroke-linecap:round}.sb-gauge-value{font-size:30px;font-weight:850;fill:#f2f8ff}.sb-gauge-label{font-size:12px;font-weight:700;fill:#9cb8d4}
 .sb-alert{border-radius:16px;border:1px solid rgba(248,113,113,.34);border-left:4px solid #f87171;background:rgba(127,29,29,.28);padding:13px;display:grid;gap:4px}.sb-alert[data-sev=Moderate],.sb-alert[data-sev=Minor]{border-color:rgba(251,191,36,.34);border-left-color:#fbbf24;background:rgba(120,53,15,.26)}.sb-alert strong{font-size:15px;color:#fff}.sb-alert small{font-size:12px;color:#cbdceb;font-weight:650}.sb-alert p{font-size:13px;line-height:1.45;color:#e8f2fc}
 .sb-alert details summary{cursor:pointer;font-size:12.5px;font-weight:800;color:var(--accent2);min-height:32px;display:flex;align-items:center}.sb-alert pre{white-space:pre-wrap;font:inherit;font-size:12.5px;line-height:1.45;margin:6px 0 0;max-height:260px;overflow:auto;color:#d6e7f7}
@@ -697,6 +837,7 @@ export function openStormAndSnowBeta(forecast, openModal) {
     return cache.get(key);
   };
   const timingText = s => (s.kind === 'snow' ? snowTimingText(model, s) : rainTimingText(model, s));
+  const entryTiming = s => (s.kind === 'rain' && s.timing.status === 'hourly' && s.timing.runs.length > 1 ? `${runText(model, s.timing.runs[0], 0, s.win)} +more` : timingText(s));
   const disposeMaps = () => { for (const map of state.maps) { try { map.remove(); } catch {} } state.maps = []; clearInterval(state.radarTimer); state.radarTimer = null; };
   dialog.addEventListener('close', () => { disposeMaps(); dialog.classList.remove('sb-dialog'); }, { once: true });
 
@@ -720,6 +861,11 @@ export function openStormAndSnowBeta(forecast, openModal) {
     return compact ? `<span class="sb-entry-trend ${cls}">${icon(name)}<span>${esc(text)}</span></span>` : `<div class="sb-row-i ${cls}" data-trend>${icon(name)}<span>${esc(text)}</span></div>`;
   }
 
+  const rainWord = s => (s.mix > s.parts?.rain ? 'rain mixed with snow' : 'rain');
+  const sourcesUsed = win => {
+    const ids = [...new Set(daysIn(model, win).flatMap(day => day.sources.map(item => item.id)))];
+    return ids.map(sourceName);
+  };
   // ---------------- landing
   function alertStrip() {
     const alerts = model.alerts.map(alert => ({ event: alert.event || alert.properties?.event || '', ends: ms(alert.ends || alert.expires || alert.properties?.ends || alert.properties?.expires) })).filter(alert => alert.event);
@@ -732,8 +878,9 @@ export function openStormAndSnowBeta(forecast, openModal) {
     const entry = mode => {
       const horizon = featuredHorizon(model, mode), s = summary(mode, horizon);
       if (!s) return '';
-      const chanceText = mode === 'snow' ? (finite(s.chance) ? `${pct(s.chance)} chance of ${s.mixedWording ? 'rain or snow' : 'snow'}` : 'Snow chance unavailable') : `${pct(s.chance)} chance of ${s.frozenShare >= 0.5 ? 'precipitation' : 'rain'}`;
-      return `<button type="button" class="sb-entry" data-select="${mode}" data-horizon-pick="${horizon}" aria-label="Open ${mode === 'snow' ? 'Snow' : 'Rain'} Central"><span class="sb-entry-photo" style="background-image:url('${centerPhoto(mode)}')"></span><span class="sb-entry-chip">${icon(mode === 'snow' ? 'flake' : 'rain')}${mode === 'snow' ? 'Snow Central' : 'Rain Central'}</span><span class="sb-entry-body"><strong class="sb-entry-amount">${esc(headline(s))}</strong><span class="sb-entry-chance">${esc(chanceText)}</span><span class="sb-entry-when">${icon('cal')}<span>${esc(timingText(s))}</span></span>${trendLine(mode, horizon, true)}</span><span class="sb-entry-go">${icon('chev')}</span></button>`;
+      const chanceText = mode === 'snow' ? (finite(s.chance) ? `${pct(s.chance)} chance of snow` : 'Snow chance unavailable') : `${pct(s.chance)} chance of ${rainWord(s)}`;
+      const note = mode === 'rain' && s.frozenShare >= 0.5 ? `<span class="sb-entry-when">${icon('flake')}<span>Mostly snow</span></span>` : '';
+      return `<button type="button" class="sb-entry" data-select="${mode}" data-horizon-pick="${horizon}" aria-label="Open ${mode === 'snow' ? 'Snow' : 'Rain'} Central"><span class="sb-entry-photo" style="background-image:url('${centerPhoto(mode)}')"></span><span class="sb-entry-chip">${icon(mode === 'snow' ? 'flake' : 'rain')}${mode === 'snow' ? 'Snow Central' : 'Rain Central'}</span><span class="sb-entry-body"><strong class="sb-entry-amount">${esc(headline(s))}</strong><span class="sb-entry-chance">${esc(chanceText)}</span><span class="sb-entry-when">${icon('cal')}<span>${esc(entryTiming(s))}</span></span>${note}${trendLine(mode, horizon, true)}</span><span class="sb-entry-go">${icon('chev')}</span></button>`;
     };
     return `${bar()}<main class="sb-main"><section class="sb-now" style="background-image:url('/weather-fusion/${skyPhoto(c)}')"><div class="sb-now-in"><div class="sb-now-main"><span class="sb-now-icon">${c.icon ? renderWeatherIconSvg(c.icon, 64) : ''}</span><div><div class="sb-now-temp">${finite(c.temp) ? `${Math.round(c.temp)}°` : '—'}</div><div class="sb-now-cond">${esc(c.condition || 'Conditions unavailable')}</div><div class="sb-now-feels">${finite(c.feels) ? `Feels like ${Math.round(c.feels)}°` : ''}</div></div></div><dl class="sb-facts">${facts.map(([k, v]) => `<div><dt>${k}</dt><dd>${esc(v)}</dd></div>`).join('')}</dl></div></section>${alertStrip()}<div class="sb-entries">${entry('rain')}${entry('snow')}</div><p class="sb-foot">Beta · Amounts from the NWS, NOAA's Weather Prediction Center and the Weather Nourie forecast blend.</p></main>`;
   }
@@ -744,17 +891,15 @@ export function openStormAndSnowBeta(forecast, openModal) {
   }
   function heroCard(s) {
     const mode = state.mode;
-    const frozen = mode === 'rain' && s.frozenShare >= 0.5;
-    const amountLabel = mode === 'snow' ? 'Expected snowfall' : frozen ? 'Total precipitation (melted)' : 'Expected rainfall';
+    const amountLabel = mode === 'snow' ? 'Expected snowfall' : 'Expected rainfall';
     const most = mode === 'snow'
       ? (s.range && finite(s.amount) && s.range[1] !== s.range[0] ? `Most likely ${inches(s.amount, 'snow')} · range from NWS` : s.range && s.range[1] === 0 ? 'NWS: little or no accumulation' : s.range ? 'NWS forecast' : '')
-      : (s.range && s.range[1] - s.range[0] >= 0.05 ? `Most likely ${inches(s.amount)}` : '');
-    const chanceLabel = mode === 'snow' ? (s.mixedWording ? 'Chance of rain or snow' : 'Chance of snow') : frozen ? 'Chance of precipitation' : 'Chance of rain';
+      : [s.range && s.range[1] - s.range[0] >= 0.05 ? `Most likely ${inches(s.amount)}` : '', s.mix >= 0.01 ? (s.parts.rain < 0.01 ? 'falls mixed with snow' : `includes ${inches(s.mix)} mixed with snow`) : ''].filter(Boolean).join(' · ');
+    const chanceLabel = mode === 'snow' ? 'Chance of snow' : `Chance of ${rainWord(s)}`;
     const conf = s.confidence;
     const notes = [];
-    if (mode === 'rain' && s.frozenShare >= 0.2) notes.push(`<div class="sb-callout">${icon('flake')}<span>${s.frozenShare >= 0.5 ? 'Most' : 'Some'} of this falls as snow or a rain–snow mix (${inches(s.frozen)} of melted liquid).</span><button type="button" data-switch="snow">Snow Central</button></div>`);
-    if (mode === 'snow' && s.marginal && (s.amount > 0 || s.range?.[1] > 0)) notes.push(`<div class="sb-callout">${icon('warn')}<span>Temperatures near 32°F: a degree or two decides rain versus snow, so totals can shift.</span></div>`);
-    if (mode === 'snow' && (s.freezingRain || s.sleet)) notes.push(`<div class="sb-callout">${icon('warn')}<span>${[s.freezingRain && 'Freezing rain', s.sleet && 'sleet'].filter(Boolean).join(' and ')} also possible in this period.</span></div>`);
+    if (mode === 'rain' && s.frozenShare >= 0.2) notes.push(`<div class="sb-callout">${icon('flake')}<span>${s.frozenShare >= 0.5 ? 'Most' : 'Some'} precipitation in this period falls as snow (${inches(s.frozen)} melted). It is counted in Snow Central, not here.</span><button type="button" data-switch="snow">Snow Central</button></div>`);
+    if (mode === 'snow' && (s.freezingRain || s.sleet)) notes.push(`<div class="sb-callout">${icon('warn')}<span>${esc((s.freezingRain && s.sleet ? 'Freezing rain and sleet' : s.freezingRain ? 'Freezing rain' : 'Sleet'))} also possible in this period (NWS forecast).</span></div>`);
     return `<section class="sb-card sb-hero" style="--hero-photo:url('${centerPhoto(mode)}')"><div class="sb-hero-stats"><div class="sb-stat"><strong>${esc(headline(s))}</strong><span>${amountLabel}</span>${most ? `<small>${esc(most)}</small>` : ''}</div><div class="sb-stat"><strong>${esc(pct(s.chance))}</strong><span>${chanceLabel}</span></div></div><div class="sb-hero-rows"><div class="sb-row-i">${icon('cal')}<span>${esc(timingText(s))}</span></div>${trendLine(mode, state.horizon)}</div><div class="sb-hero-foot"><span class="sb-pill">${icon('gauge')}Confidence: ${esc(conf.label || 'Unavailable')}</span>${s.partial || s.prorated ? '<span class="sb-note">Some days have incomplete guidance</span>' : ''}</div></section>${notes.join('')}`;
   }
   function layersFor() { return mapLayers(model, state.mode, state.horizon); }
@@ -800,14 +945,14 @@ export function openStormAndSnowBeta(forecast, openModal) {
     if (mode === 'snow') {
       const quotes = s.periods.filter(row => /accumulation/i.test(row.detail)).map(row => `<p class="sb-quote"><strong>${esc(row.name)}:</strong> ${esc((row.detail.match(/[^.]*accumulation[^.]*\./i) || [''])[0].trim())}</p>`).join('');
       const wpcRows = s.wpc.map(row => { const [a, b] = row.range, label = row.kind === 'ice' ? `Ice ${row.inches}″+` : `${row.inches}″+`; return `<div class="sb-barrow"><span>${esc(label)}</span><span class="sb-track"><i style="width:${Math.max(2, b)}%"></i></span><span>${a === 0 ? '<10%' : `${a}–${b}%`}</span></div>`; }).join('');
-      return detailShell('Chance &amp; Amounts', 'pct', `<div class="sb-big"><strong>${esc(pct(s.chance))}</strong><span>${s.chanceSource === 'nws' ? `NWS chance of precipitation in periods that mention snow${s.mixedWording ? ' (rain and snow)' : ''}` : 'Chance of snow'}</span></div><div class="sb-rows" style="margin-top:8px">${row('Expected snowfall', headline(s))}${finite(s.amount) ? row('NWS hourly-grid total', inches(s.amount, 'snow')) : ''}${finite(s.liquid) ? row('Melted liquid (all types)', inches(s.liquid)) : ''}</div>${s.models.length ? `<p class="sb-sub">Computer models · full days ${esc(s.modelSpan)}</p><div class="sb-rows">${s.models.map(item => row(sourceName(item.id), inches(item.value, 'snow'))).join('')}</div>` : ''}${quotes ? `<h3 style="margin-top:14px">${icon('flake')}What the NWS forecast says</h3><div style="display:grid;gap:8px">${quotes}</div>` : ''}${wpcRows ? `<h3 style="margin-top:14px">${icon('pct')}WPC chance of at least</h3><div class="sb-bars">${wpcRows}</div><p class="sb-note" style="margin-top:6px">Official WPC probability categories for their 24-hour periods.</p>` : ''}<p class="sb-note" style="margin-top:12px">Snowfall ranges come straight from NWS forecast wording. Percentile ranges are shown only when a calibrated distribution is published; none is estimated from model amounts.</p>`);
+      return detailShell('Chance &amp; Amounts', 'pct', `<div class="sb-big"><strong>${esc(pct(s.chance))}</strong><span>${s.chanceSource === 'nws' ? 'NWS chance of precipitation in the periods it forecasts snow' : 'Chance of snow'}</span></div><div class="sb-rows" style="margin-top:8px">${row('Expected snowfall', headline(s))}${finite(s.amount) ? row('NWS snowfall grid total', inches(s.amount, 'snow')) : ''}${finite(s.frozenLiquid) && s.frozenLiquid >= 0.01 ? row('Melted precipitation while snowing', inches(s.frozenLiquid)) : ''}${s.ratio ? row('Snow-to-liquid ratio', ratioText(s.ratio)) : ''}</div>${s.models.length ? `<p class="sb-sub">Computer models · full days ${esc(s.modelSpan)}</p><div class="sb-rows">${s.models.map(item => row(sourceName(item.id), inches(item.value, 'snow'))).join('')}</div>` : ''}${quotes ? `<h3 style="margin-top:14px">${icon('flake')}What the NWS forecast says</h3><div style="display:grid;gap:8px">${quotes}</div>` : ''}${wpcRows ? `<h3 style="margin-top:14px">${icon('pct')}WPC chance of at least</h3><div class="sb-bars">${wpcRows}</div><p class="sb-note" style="margin-top:6px">Official WPC probability categories for their 24-hour periods.</p>` : ''}<p class="sb-note" style="margin-top:12px">Snowfall ranges come straight from NWS forecast wording. Percentile ranges are shown only when a calibrated distribution is published; none is estimated from model amounts.</p>`);
     }
     const sources = s.sources || [];
     const thresholds = [0.01, 0.1, 0.25, 0.5, 1, 2, 3];
     const max = Math.max(0.01, ...sources.map(item => item.value));
     const sourceRows = sources.map(item => `<div class="sb-barrow"><span>${esc(sourceName(item.id))}</span><span class="sb-track"><i style="width:${(item.value / max) * 100}%"></i></span><span>${esc(inches(item.value))}</span></div>`).join('');
     const thresholdRows = sources.length >= 2 ? thresholds.map(level => { const count = sources.filter(item => item.value >= level).length; return `<div class="sb-barrow"><span>${level.toFixed(2)}″+</span><span class="sb-track"><i style="width:${(count / sources.length) * 100}%"></i></span><span>${count} of ${sources.length}</span></div>`; }).join('') : '';
-    return detailShell('Chance &amp; Amounts', 'pct', `<div class="sb-big"><strong>${esc(pct(s.chance))}</strong><span>Highest hourly chance of measurable ${s.frozenShare >= 0.5 ? 'precipitation' : 'rain'}</span></div><div class="sb-rows" style="margin-top:8px">${row('Most likely amount', inches(s.amount))}${s.range ? row('Range across forecast sources', rangeText(s.range[0], s.range[1])) : ''}${s.frozenShare >= 0.2 ? row('Falls as snow or mix (melted)', inches(s.frozen)) : ''}</div>${sourceRows ? `<h3 style="margin-top:14px">${icon('drop')}What each forecast source expects</h3><div class="sb-bars">${sourceRows}</div>` : ''}${thresholdRows ? `<h3 style="margin-top:14px">${icon('pct')}Sources reaching each amount</h3><div class="sb-bars">${thresholdRows}</div>` : ''}<p class="sb-note" style="margin-top:12px">Source counts show agreement between forecasts, not a calibrated probability. Percentile ranges are shown only when a calibrated distribution is published.</p>`);
+    return detailShell('Chance &amp; Amounts', 'pct', `<div class="sb-big"><strong>${esc(pct(s.chance))}</strong><span>Highest hourly chance of ${rainWord(s)} (NWS-forecast rain hours)</span></div><div class="sb-rows" style="margin-top:8px">${row('Most likely rainfall', inches(s.amount))}${s.range ? row('Range across forecast sources', rangeText(s.range[0], s.range[1])) : ''}${s.mix >= 0.01 ? row('Part mixed with snow', inches(s.mix)) : ''}${s.frozen >= 0.01 ? row('Falls as snow (melted, not counted)', inches(s.frozen)) : ''}</div>${sourceRows ? `<h3 style="margin-top:14px">${icon('drop')}What each forecast source expects</h3><div class="sb-bars">${sourceRows}</div>` : ''}${thresholdRows ? `<h3 style="margin-top:14px">${icon('pct')}Sources reaching each amount</h3><div class="sb-bars">${thresholdRows}</div>` : ''}<p class="sb-note" style="margin-top:12px">Rain versus snow follows the NWS hourly forecast. Source counts show agreement between forecasts, not a calibrated probability. Percentile ranges are shown only when a calibrated distribution is published.</p>`);
   }
   function row(label, value) { return `<div class="sb-kv"><span>${esc(label)}</span><strong>${esc(value)}</strong></div>`; }
   function timingView(s) {
@@ -815,19 +960,24 @@ export function openStormAndSnowBeta(forecast, openModal) {
     const rows = [];
     if (t.status === 'hourly' || t.status === 'event') {
       rows.push(row('Begins', t.underway ? 'Underway now' : t.continuing ? 'Already underway' : when(t.onset, zone, model.now)));
-      if (t.heaviest) rows.push(row('Heaviest', `${when(t.heaviest.a, zone, model.now)} – ${when(t.heaviest.b, zone, model.now)} (${inches(t.heaviest.amount, kind)})`));
+      if (t.heaviest) rows.push(row(t.heaviest.hourly ? 'Heaviest hour' : 'Heaviest', t.heaviest.hourly ? `${when(t.heaviest.a, zone, model.now)} (${inches(t.heaviest.amount, kind)} per hour)` : `${when(t.heaviest.a, zone, model.now)} – ${when(t.heaviest.b, zone, model.now)} (${inches(t.heaviest.amount, kind)})`));
       rows.push(row(t.openEnd ? 'Continues past' : 'Ends', when(t.end, zone, model.now)));
+      if (kind === 'rain' && t.runs?.length > 1) rows.push(row('Rain periods', t.runs.map((run, index) => runText(model, run, index, s.win)).join(', ')));
       if (t.later?.length) rows.push(row('More rain later', t.later.map(day => day.name).join(', ')));
     } else if (t.status === 'daily') {
       rows.push(row('Wettest day', `${t.wettest.name} (${inches(s.portions.find(item => item.day === t.wettest)?.amount)})`));
       rows.push(row('Days with rain', t.later.map(day => day.name).join(', ')));
     } else rows.push(row('Status', kind === 'snow' ? 'No snow expected' : 'No rain expected'));
-    const series = kind === 'snow' ? t.series.filter(item => item.t + HOUR > model.now) : t.series;
-    const typeNames = { rain: 'Rain', storm: 'Thunderstorms', snow: 'Snow', mix: 'Rain–snow mix' };
+    const series = t.series.filter(item => (item.b ?? item.t + HOUR) > model.now);
+    const typeNames = { rain: 'Rain', storm: 'Thunderstorms', snow: 'Snow (melted)', mix: 'Rain & snow' };
     const present = kind === 'rain' ? [...new Set(series.filter(item => item.value > 0).map(item => (item.type === 'none' ? 'rain' : item.type)))] : [];
+    const timeline = typeTimeline(model, Math.max(model.now - HOUR, s.win.start), Math.max(s.win.end, t.end || s.win.end));
+    const typeRows = timeline.length ? `<h3 style="margin-top:14px">${icon('rain')}Precipitation type (NWS hourly forecast)</h3><div class="sb-types">${timeline.map(item => `<div class="sb-type sb-type-${item.type}"><i></i><span>${esc(TYPE_NAMES[item.type] || item.type)}</span><strong>${esc(when(item.a, zone, model.now))} – ${esc(when(item.b, zone, model.now))}</strong></div>`).join('')}</div>` : '';
+    const chartTitle = kind === 'snow' ? (t.hourly ? 'Hourly snowfall' : 'NWS snowfall every 6 hours') : 'Hourly precipitation';
+    const laterSnow = kind === 'snow' && t.laterSnow >= 0.1 ? `<p class="sb-note">Plus ${esc(inches(t.laterSnow, 'snow'))} after ${esc(when(t.hourlyEnd, zone, model.now))} in the NWS 6-hour snowfall grid.</p>` : '';
     const key = present.length > 1 ? `<div class="sb-key">${present.map(type => `<span><i class="sb-key-${type}"></i>${typeNames[type] || type}</span>`).join('')}</div>` : '';
     const daily = kind === 'rain' && t.later?.length ? `<h3 style="margin-top:14px">${icon('cal')}Later days</h3><div class="sb-rows">${s.portions.filter(item => item.mode !== 'hourly').map(item => row(`${item.day.name} ${item.day.date}`, `${inches(item.amount)} · ${pct(item.day.pop)}`)).join('')}</div>` : '';
-    return detailShell('Storm Timing', 'clock', `<div class="sb-rows">${rows.join('')}</div>${series.some(item => item.value > 0) ? `<h3 style="margin-top:14px">${icon(kind === 'snow' ? 'flake' : 'drop')}${kind === 'snow' ? 'NWS snowfall every 6 hours' : 'Hourly precipitation'}</h3>${barChart(series, { kind, zone, now: model.now, unitLabel: kind === 'snow' ? 'Snowfall per 6 hours in inches' : 'Hourly precipitation in inches' })}${key}` : ''}${daily}<p class="sb-note" style="margin-top:10px">${kind === 'snow' ? 'Snow timing follows NWS snow hours and 6-hour snowfall grids.' : 'Hourly timing covers the next 48 hours; later days use daily totals.'}</p>`);
+    return detailShell('Storm Timing', 'clock', `<div class="sb-rows">${rows.join('')}</div>${series.some(item => item.value > 0) ? `<h3 style="margin-top:14px">${icon(kind === 'snow' ? 'flake' : 'drop')}${chartTitle}</h3>${barChart(series, { kind, zone, now: model.now, unitLabel: kind === 'snow' ? 'Snowfall per hour in inches' : 'Hourly precipitation in inches' })}${key}${laterSnow}` : ''}${typeRows}${daily}<p class="sb-note" style="margin-top:10px">${kind === 'snow' ? 'Hourly snowfall keeps each NWS 6-hour total exact and times it by the hourly precipitation in the hours NWS forecasts snow.' : 'Hourly timing covers the next 48 hours; later days use daily totals.'} Rain versus snow follows the NWS hourly forecast, which accounts for temperatures through the whole atmosphere, not just at the ground.</p>`);
   }
   function changesView() {
     const kind = state.mode === 'snow' ? 'snow' : 'rain', history = state.history.get(`${state.mode}|${state.horizon}`);
@@ -842,7 +992,7 @@ export function openStormAndSnowBeta(forecast, openModal) {
   }
   function confidenceView(s) {
     const c = s.confidence;
-    return detailShell('Forecast Confidence', 'gauge', `${gauge(c.score, c.label)}<div class="sb-rows">${c.days.map(day => row(`${day.name} ${day.date}`, `${day.label || '—'}${finite(day.score) ? ` (${day.score})` : ''}`)).join('')}${s.kind === 'rain' && s.range ? row('Source spread', rangeText(s.range[0], s.range[1])) : ''}</div>${c.factors.length ? `<h3 style="margin-top:14px">${icon('chart')}What drives it</h3><ul class="sb-list">${c.factors.slice(0, 6).map(item => `<li>${esc(item)}</li>`).join('')}</ul>` : ''}${s.kind === 'snow' && s.marginal ? '<p class="sb-callout" style="margin-top:10px">Snow amounts are less certain than this score suggests because temperatures sit near freezing.</p>' : ''}<div data-accuracy class="sb-note" style="margin-top:12px">Loading recent verification…</div><p class="sb-note" style="margin-top:8px">The score measures agreement between forecast sources and lead time. It is not a calibrated chance of being right.</p>`);
+    return detailShell('Forecast Confidence', 'gauge', `${gauge(c.score, c.label)}<div class="sb-rows">${c.days.map(day => row(`${day.name} ${day.date}`, `${day.label || '—'}${finite(day.score) ? ` (${day.score})` : ''}`)).join('')}${s.kind === 'rain' && s.range ? row('Source spread', rangeText(s.range[0], s.range[1])) : ''}</div>${c.factors.length ? `<h3 style="margin-top:14px">${icon('chart')}What drives it</h3><ul class="sb-list">${c.factors.slice(0, 6).map(item => `<li>${esc(item)}</li>`).join('')}</ul>` : ''}${(() => { const used = sourcesUsed(s.win); return used.length ? `<p class="sb-note" style="margin-top:10px">Sources in this forecast: <strong>${esc(used.join(', '))}</strong>.</p>${used.length < 2 ? '<p class="sb-callout" style="margin-top:8px">Only NWS guidance loaded in this update; model data (HRRR, ECMWF, NBM) was temporarily unavailable. Refresh in a minute.</p>' : ''}` : ''; })()}<div data-accuracy class="sb-note" style="margin-top:12px">Loading recent verification…</div><p class="sb-note" style="margin-top:8px">The score measures agreement between forecast sources and lead time. It is not a calibrated chance of being right.</p>`);
   }
   function relevantAlerts(mode) {
     const pattern = mode === 'snow' ? /winter|snow|ice|freez|blizzard|sleet|wind chill|cold|frost/i : /flood|rain|wind|thunder|tornado|hurricane|tropical|surge|coastal|storm/i;
@@ -856,7 +1006,7 @@ export function openStormAndSnowBeta(forecast, openModal) {
       else if (top >= 1) out.push('Slick, snow-covered roads possible, especially bridges and overpasses.');
       else if (top > 0) out.push('Light snow could make untreated surfaces slippery.');
       if (s.freezingRain) out.push('Freezing rain: a glaze of ice on roads, trees and power lines is possible.');
-      if (s.marginal && top > 0) out.push('Wet, heavy snow near 32°F can weigh down branches.');
+      if (s.ratio && s.ratio <= 8 && top >= 2) out.push(`Wet, heavy snow (${ratioText(s.ratio).toLowerCase().replace(' · wet, heavy snow', '')} snow-to-liquid) can weigh down tree limbs and power lines.`);
     } else {
       if (s.frozenShare >= 0.5) out.push('Most of this precipitation falls as snow or a rain–snow mix. See Snow Central for snow impacts.');
       if (s.amount >= 2) out.push('Heavy rain: flooding of poor-drainage areas, creeks and low roads is possible.');
@@ -889,7 +1039,7 @@ export function openStormAndSnowBeta(forecast, openModal) {
     const s = summary(state.mode), next = s && (s.timing.status === 'hourly' || s.timing.status === 'event') && !s.timing.underway ? `Forecast to begin ${when(s.timing.onset, zone, model.now)}` : s?.timing.underway ? 'Forecast: underway now' : 'No precipitation forecast in this period';
     const ok = radarReady(r), type = ok ? precipKind(p.atLocation ? p.observedTypeAtLocation : p.nearestObservedType) : null;
     const rows = !r ? '<p class="sb-note">Loading NOAA radar…</p>' : [row('Radar frame', r.frames?.length ? clock(ms(r.frames.at(-1)), zone) : 'Unavailable'), row('At your location', !ok ? 'Unavailable' : p.atLocation ? 'Falling now' : 'Not falling'), row('Nearest', !ok ? 'Unavailable' : finite(p.nearestRainMiles) ? `${Math.round(p.nearestRainMiles)} mi ${p.nearestRainDirection || ''}`.trim() : 'None within 36 mi'), row('Motion', !ok ? 'Unavailable' : p.approaching === true ? 'Approaching' : 'Not approaching'), row('Radar-detected type', type ? type.charAt(0).toUpperCase() + type.slice(1) : 'Not classified'), row('Forecast', next)].join('');
-    return `${bar()}<main class="sb-main">${seg()}<section class="sb-card sb-mapcard"><div class="sb-mapcard-head"><strong>Live radar<em>NOAA MRMS observed reflectivity</em></strong></div><div class="sb-mapwrap"><div class="sb-map sb-map-tall" data-live-map role="img" aria-label="Live radar map"></div></div><div class="sb-live-ctl"><button type="button" class="sb-btn" data-play aria-label="Play radar loop">${icon('play')}</button><input type="range" min="0" max="0" value="0" data-frame aria-label="Radar frame"/><output data-frame-time>—</output></div></section><section class="sb-card"><h3>${icon('radar')}Right now</h3><div class="sb-rows">${rows}</div><p class="sb-note" style="margin-top:8px">Radar shows where precipitation is falling; it does not measure snow depth or rainfall totals. <a href="${RADAR_PAGE}" target="_blank" rel="noopener">Official NWS radar</a></p></section></main>`;
+    return `${bar()}<main class="sb-main">${seg()}<section class="sb-card sb-mapcard"><div class="sb-mapcard-head"><strong>Live radar<em>NOAA MRMS · colored by NOAA precipitation type</em></strong></div><div class="sb-mapwrap"><div class="sb-map sb-map-tall" data-live-map role="img" aria-label="Live radar map"></div></div><div class="sb-live-ctl"><button type="button" class="sb-btn" data-play aria-label="Play radar loop">${icon('play')}</button><input type="range" min="0" max="0" value="0" data-frame aria-label="Radar frame"/><output data-frame-time>—</output></div><div class="sb-radar-key"><span><i style="background:linear-gradient(90deg,#9be7a0,#1f9e3a,#f0e442,#ef5a28,#a50f15)"></i>Rain</span><span><i style="background:linear-gradient(90deg,#d6e9ff,#80b9ff,#2f78e3,#1b3c9e)"></i>Snow</span><span><i style="background:#ff5fd2"></i>Hail</span><small>light → heavy</small></div></section><section class="sb-card"><h3>${icon('radar')}Right now</h3><div class="sb-rows">${rows}</div><p class="sb-note" style="margin-top:8px">Rain and snow colors come from NOAA's radar-based precipitation type (MRMS), which uses radar, model temperatures through the whole atmosphere and surface reports. Radar shows where precipitation is falling; it does not measure snow depth or rainfall totals. <a href="${RADAR_PAGE}" target="_blank" rel="noopener">Official NWS radar</a></p></section></main>`;
   }
   function mapView() {
     const layers = layersFor(), layer = selectedLayer();
@@ -980,15 +1130,18 @@ export function openStormAndSnowBeta(forecast, openModal) {
     if (!host || !window.L || !finite(model.location.lat)) return;
     const r = state.radar;
     const map = newMap(host, true);
-    if (!r || r.status !== 'ready' || !r.frames?.length || !safeWinterMapUrl(r.url)) return;
-    const L = window.L, frames = r.frames.slice(-8);
-    const layers = frames.map(time => L.tileLayer.wms(r.url, { layers: r.layer || 'conus_bref_qcd', format: 'image/png', transparent: true, version: '1.3.0', time, opacity: 0, zIndex: 300 }).addTo(map));
+    const reflectivityUrl = safeWinterMapUrl(r?.url);
+    if (!r || r.status !== 'ready' || !r.frames?.length || !reflectivityUrl || !/^https:\/\/opengeo\.ncep\.noaa\.gov\/geoserver\/conus\/conus_bref_qcd\/ows$/.test(reflectivityUrl)) return;
+    const typeUrl = reflectivityUrl.replace(/conus_bref_qcd\/ows$/, 'conus_pcpn_typ/ows');
+    const L = window.L, frames = r.frames.slice(-8), layers = [];
+    const layerAt = index => { if (!layers[index]) { layers[index] = typedRadarLayer(L, reflectivityUrl, typeUrl, frames[index]); layers[index].setOpacity(0); layers[index].addTo(map); } return layers[index]; };
     const slider = root.querySelector('[data-frame]'), out = root.querySelector('[data-frame-time]'), play = root.querySelector('[data-play]');
-    const show = index => { layers.forEach((layer, i) => layer.setOpacity(i === index ? 0.75 : 0)); if (slider) slider.value = String(index); if (out) out.textContent = clock(ms(frames[index]), zone); };
+    const show = index => { layerAt(index).setOpacity(1); layers.forEach((layer, i) => { if (layer && i !== index) layer.setOpacity(0); }); if (slider) slider.value = String(index); if (out) out.textContent = clock(ms(frames[index]), zone); };
     if (slider) { slider.max = String(frames.length - 1); slider.addEventListener('input', () => { clearInterval(state.radarTimer); state.radarTimer = null; if (play) play.innerHTML = icon('play'); show(Number(slider.value)); }); }
     show(frames.length - 1);
     play?.addEventListener('click', () => {
       if (state.radarTimer) { clearInterval(state.radarTimer); state.radarTimer = null; play.innerHTML = icon('play'); play.setAttribute('aria-label', 'Play radar loop'); return; }
+      frames.forEach((_, index) => layerAt(index));
       let index = 0; show(index); play.innerHTML = icon('pause'); play.setAttribute('aria-label', 'Pause radar loop');
       state.radarTimer = setInterval(() => { if (renderId !== state.renderId) return; index = (index + 1) % frames.length; show(index); }, 700);
     });
@@ -1003,9 +1156,10 @@ export function openStormAndSnowBeta(forecast, openModal) {
     if (!win) return;
     const dates = daysIn(model, win).map(day => day.key);
     try {
-      const results = await Promise.all(dates.map(date => fetch(`/api/weather-fusion/storm-snow/history?${new URLSearchParams({ latitude: model.location.lat, longitude: model.location.lon, center: mode, date })}`, { cache: 'no-store' }).then(response => (response.ok ? response.json() : null))));
-      const byDate = {};
-      results.forEach((data, index) => { byDate[dates[index]] = Array.isArray(data?.snapshots) ? data.snapshots : []; });
+      const response = await fetch(`/api/weather-fusion/storm-snow/history?${new URLSearchParams({ latitude: model.location.lat, longitude: model.location.lon, center: mode, dates: dates.join(',') })}`, { cache: 'no-store' });
+      if (!response.ok) throw new Error('history unavailable');
+      const data = await response.json(), byDate = {};
+      for (const date of dates) byDate[date] = Array.isArray(data?.byDate?.[date]) ? data.byDate[date] : [];
       state.history.set(key, historyTrend(byDate, model, mode, win));
     } catch { state.history.set(key, { status: 'error', points: [] }); }
     state.pending.delete(key);

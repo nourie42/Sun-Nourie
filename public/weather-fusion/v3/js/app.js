@@ -2730,7 +2730,7 @@ function initModalSystem() {
       return;
     }
     try {
-      const { openStormAndSnowBeta } = await import('./storm-and-snow-beta.js?v=storm-snow-beta-v4');
+      const { openStormAndSnowBeta } = await import('./storm-and-snow-beta.js?v=storm-snow-beta-v5');
       if (!document.getElementById('nourie-dialog')?.open) openStormAndSnowBeta(state.forecast, openModal);
     } catch (error) {
       console.error('Storm and Snow Beta:', error);

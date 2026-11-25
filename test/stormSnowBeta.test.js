@@ -84,8 +84,8 @@ test('beta UI contains functional data paths and no interim placeholder contract
   const page = fs.readFileSync(new URL('../public/weather-fusion/v3/index.html', import.meta.url), 'utf8');
   for (const required of ['Rain Central', 'Snow Central', '/api/weather-fusion/storm-snow/history', '/api/weather-fusion/radar', '/api/weather-fusion/accuracy', 'calibrated distribution']) assert.ok(source.includes(required));
   assert.doesNotMatch(source, /not wired into this beta|Forecast history pending|regional beta layer pending/);
-  assert.match(app, /storm-and-snow-beta\.js\?v=storm-snow-beta-v4/);
-  assert.match(page, /app\.js\?v=storm-snow-beta-v4/);
+  assert.match(app, /storm-and-snow-beta\.js\?v=storm-snow-beta-v5/);
+  assert.match(page, /app\.js\?v=storm-snow-beta-v5/);
 });
 
 test('accumulation map selection excludes radar and snow probability layers', () => {
@@ -144,6 +144,10 @@ test('today & tonight snow follows NWS periods past midnight instead of stopping
   assert.equal(new Date(win.end).toISOString(), '2026-11-26T12:00:00.000Z');
   const snow = snowSummary(model, win);
   assert.equal(snow.amount, 5.8);
+  // Hourly snowfall keeps the NWS total and peaks where hourly precipitation does.
+  assert.equal(snow.timing.heaviest.hourly, true);
+  assert.equal(Math.round(snow.timing.series.reduce((total, row) => total + row.value, 0) * 10) / 10, 5.8);
+  assert.equal(snow.ratio > 5 && snow.ratio < 9, true);
   assert.deepEqual(snow.range, [3, 8]);
   assert.equal(snow.chance, 100);
 });
@@ -151,9 +155,12 @@ test('today & tonight snow follows NWS periods past midnight instead of stopping
 test('rain totals split a day exactly using hourly guidance and keep per-source ranges', () => {
   const model = buildStormModel(stormForecast(), at('2026-11-25T17:00:00Z'));
   const today = rainSummary(model, horizonWindow(model, 'today'));
-  assert.equal(Math.round(today.amount * 100) / 100, 0.95); // 19 hours x 0.05
-  assert.deepEqual(today.range.map(value => Math.round(value * 100) / 100), [0.76, 1.14]);
-  assert.ok(today.frozenShare > 0.7);
+  // 19 hours x 0.05 of liquid, but NWS wording has snow for the first 16: only 3 hours are rain.
+  assert.equal(Math.round(today.amount * 100) / 100, 0.15);
+  assert.equal(Math.round(today.parts.snow * 100) / 100, 0.8);
+  assert.ok(today.frozenShare > 0.8);
+  // Source totals (0.76 and 1.14 of all liquid) keep only the rain share.
+  assert.deepEqual(today.range.map(value => Math.round(value * 100) / 100), [0.12, 0.18]);
   const next = rainSummary(model, horizonWindow(model, '1-3'));
   // Thu after 6 AM from 18 hourly values (0.9) + whole Fri daily total (1.2) + whole Sat daily total (0.3).
   assert.equal(Math.round(next.amount * 100) / 100, 2.4);
@@ -188,4 +195,28 @@ test('WPC contour values describe their published band', () => {
   const square = (value, size) => ({ type: 'Feature', properties: { value }, geometry: { type: 'Polygon', coordinates: [[[-size, -size], [size, -size], [size, size], [-size, size], [-size, -size]]] } });
   assert.equal(contourValueAt({ features: [square(1, 2), square(4, 1)] }, 0, 0), 4);
   assert.equal(contourValueAt({ features: [square(1, 2)] }, 5, 5), null);
+});
+
+test('radar pixels are recolored by NOAA precipitation type', async () => {
+  const { precipFlag, radarColor, reflectivityDbz } = await import('../public/weather-fusion/v3/js/storm-and-snow-beta.js');
+  assert.equal(precipFlag(200, 200, 200), 'snow');
+  assert.equal(precipFlag(110, 255, 255), 'rain');
+  assert.equal(precipFlag(150, 0, 150), 'hail');
+  assert.equal(precipFlag(20, 20, 20), null);
+  // NOAA legend colors: about 20 dBZ is bright green, 40 dBZ yellow, 50 dBZ red.
+  assert.ok(Math.abs(reflectivityDbz(51, 214, 97) - 20) <= 1);
+  assert.ok(Math.abs(reflectivityDbz(245, 204, 21) - 40) <= 1);
+  assert.ok(Math.abs(reflectivityDbz(212, 7, 8) - 50) <= 1);
+  assert.notDeepEqual(radarColor('snow', 25), radarColor('rain', 25));
+  assert.equal(radarColor('rain', 2), null);
+});
+
+test('history answers every date of a period in one request', () => {
+  const service = createStormSnowBetaService({ now: () => now });
+  service.recordForecast(forecast());
+  const history = service.getHistory({ latitude: 35.787, longitude: -78.481, center: 'rain', dates: '2026-11-25,2026-11-26' });
+  assert.deepEqual(Object.keys(history.byDate), ['2026-11-25', '2026-11-26']);
+  assert.equal(history.byDate['2026-11-25'].length, 1);
+  assert.equal(history.snapshots.length, 1);
+  assert.throws(() => service.getHistory({ latitude: 35.787, longitude: -78.481, center: 'rain', dates: 'bad' }), error => error.status === 400);
 });

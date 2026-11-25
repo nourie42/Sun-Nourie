@@ -198,13 +198,13 @@ function historyKey({ latitude, longitude, center, date }) {
 function validQuery(query = {}) {
   const latitude = Number(query.latitude ?? query.lat), longitude = Number(query.longitude ?? query.lon);
   const center = String(query.center || '').toLowerCase();
-  const date = String(query.date || '');
-  if (!finite(latitude) || !finite(longitude) || latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180 || !['rain', 'snow'].includes(center) || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+  const dates = String(query.dates || query.date || '').split(',').filter(Boolean);
+  if (!finite(latitude) || !finite(longitude) || latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180 || !['rain', 'snow'].includes(center) || !dates.length || dates.length > 7 || dates.some(date => !/^\d{4}-\d{2}-\d{2}$/.test(date))) {
     const error = new Error('A valid latitude, longitude, center and local forecast date are required.');
     error.status = 400;
     throw error;
   }
-  return { latitude, longitude, center, date };
+  return { latitude, longitude, center, date: dates[0], dates };
 }
 
 export function createStormSnowBetaService({ now = Date.now } = {}) {
@@ -235,8 +235,7 @@ export function createStormSnowBetaService({ now = Date.now } = {}) {
   }
   function getHistory(query) {
     const input = validQuery(query);
-    const key = historyKey(input);
-    const snapshots = (histories.get(key) || []).map(row => ({
+    const list = date => (histories.get(historyKey({ ...input, date })) || []).map(row => ({
       version: row.version,
       center: row.center,
       issuedAt: row.issuedAt,
@@ -246,7 +245,9 @@ export function createStormSnowBetaService({ now = Date.now } = {}) {
       source: row.source,
       day: row.day,
     }));
-    return { version: STORM_SNOW_BETA_VERSION, key, location: { latitude: input.latitude, longitude: input.longitude }, center: input.center, date: input.date, thresholds: MATERIAL_CHANGE_THRESHOLDS, snapshots };
+    // One request can cover every local date of a forecast period.
+    const byDate = Object.fromEntries(input.dates.map(date => [date, list(date)]));
+    return { version: STORM_SNOW_BETA_VERSION, key: historyKey(input), location: { latitude: input.latitude, longitude: input.longitude }, center: input.center, date: input.date, dates: input.dates, thresholds: MATERIAL_CHANGE_THRESHOLDS, snapshots: byDate[input.date], byDate };
   }
   return { recordForecast, getHistory, size: () => histories.size };
 }

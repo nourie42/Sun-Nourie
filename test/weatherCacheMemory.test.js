@@ -72,3 +72,17 @@ test('replacements and external invalidation do not leave phantom byte usage', a
   assert.equal(cache.values.size, 1);
   assert.ok(cache.sizeBytes <= 100);
 });
+
+test('source caches queue briefly for a free slot instead of dropping a feed', async () => {
+  const cache = new Cache(100, Date.now, { maxPending: 1, queueMs: 2000 });
+  let release;
+  const gate = new Promise(resolve => { release = resolve; });
+  const first = cache.get('hrrr', 60000, () => gate);
+  const queued = cache.get('ecmwf', 60000, async () => 'ecmwf-data');
+  release('hrrr-data');
+  assert.deepEqual(await Promise.all([first, queued]), ['hrrr-data', 'ecmwf-data']);
+  const timedOut = new Cache(100, Date.now, { maxPending: 1, queueMs: 20 });
+  const stuck = timedOut.get('slow', 60000, () => new Promise(() => {}));
+  await assert.rejects(timedOut.get('other', 60000, async () => 1), error => error.status === 429);
+  void stuck;
+});

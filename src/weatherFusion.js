@@ -307,8 +307,11 @@ export function summarizeRadarMotion(current,previous){
 
 /** Bounded cache; callers explicitly validate any retained value on failure. */
 export class Cache {
-  constructor(limit = 350, now = Date.now, { maxBytes = 16 * 1024 * 1024, retainExpired = true, maxPending = 50 } = {}) {
+  constructor(limit = 350, now = Date.now, { maxBytes = 16 * 1024 * 1024, retainExpired = true, maxPending = 50, queueMs = 0 } = {}) {
     this.values = new Map(); this.pending = new Map(); this.limit = limit; this.now = now;
+    // Source caches wait briefly for a free slot; rejecting instantly dropped
+    // whole model feeds (HRRR, ECMWF, NBM) whenever two forecasts assembled at once.
+    this.queueMs = queueMs; this.waiters = [];
     // Serialized bytes are a conservative payload budget, not a heap measurement.
     // Official feeds retain expired entries for their separately validated recovery.
     this.maxBytes = maxBytes; this.retainExpired = retainExpired; this.maxPending = maxPending;
@@ -320,7 +323,10 @@ export class Cache {
     if (hit && hit.expires > this.now()) return hit.value;
     if (this.pending.has(key)) return this.pending.get(key);
     const recover=error=>{if(hit&&onError)return onError(error,hit.value);throw error;};
-    if (this.pending.size >= this.maxPending) return recover(errorWithStatus('Weather sources are busy. Please retry shortly.', 429));
+    if (this.pending.size >= this.maxPending) {
+      if (this.queueMs > 0 && await this.waitForSlot(this.queueMs)) return this.get(key, ttl, load, {onError});
+      return recover(errorWithStatus('Weather sources are busy. Please retry shortly.', 429));
+    }
     const work = Promise.resolve().then(load).then((value) => {
       this.values.delete(key);
       let bytes;
@@ -335,9 +341,16 @@ export class Cache {
       }
       this.values.set(key, { value, bytes, expires: this.now() + ttl });
       return value;
-    }).catch(recover).finally(() => this.pending.delete(key));
+    }).catch(recover).finally(() => { this.pending.delete(key); this.waiters.shift()?.(true); });
     this.pending.set(key, work);
     return work;
+  }
+  waitForSlot(ms) {
+    return new Promise(resolve => {
+      const waiter = ok => { clearTimeout(timer); resolve(ok); };
+      const timer = setTimeout(() => { this.waiters = this.waiters.filter(item => item !== waiter); resolve(false); }, ms);
+      this.waiters.push(waiter);
+    });
   }
 }
 
@@ -451,7 +464,7 @@ export function buildForecast({ location, point, forecast, hourly, grid, discuss
 
 export function createWeatherService({ fetchImpl = globalThis.fetch, env = process.env, now = Date.now } = {}) {
   fetchImpl=createWeatherTransport(fetchImpl,now);
-  const cache = new Cache(350, now), officialCache = new Cache(150, now), aiCache = new Cache(100, now);
+  const cache = new Cache(350, now, { queueMs: 20000 }), officialCache = new Cache(150, now, { queueMs: 20000 }), aiCache = new Cache(100, now);
   const forecastCache = new Cache(100, now, { retainExpired: false, maxPending: 4 });
   const failureCooldown = new Map();
   const approvedTakes = new Map();
