@@ -80,8 +80,12 @@ test('material-change comparison uses amount, probability and timing thresholds'
 
 test('beta UI contains functional data paths and no interim placeholder contract', () => {
   const source = fs.readFileSync(new URL('../public/weather-fusion/v3/js/storm-and-snow-beta.js', import.meta.url), 'utf8');
+  const app = fs.readFileSync(new URL('../public/weather-fusion/v3/js/app.js', import.meta.url), 'utf8');
+  const page = fs.readFileSync(new URL('../public/weather-fusion/v3/index.html', import.meta.url), 'utf8');
   for (const required of ['Rain Central', 'Snow Central', '/api/weather-fusion/storm-snow/history', '/api/weather-fusion/radar', '/api/weather-fusion/accuracy', 'calibrated distribution']) assert.ok(source.includes(required));
   assert.doesNotMatch(source, /not wired into this beta|Forecast history pending|regional beta layer pending/);
+  assert.match(app, /storm-and-snow-beta\.js\?v=storm-snow-beta-v3/);
+  assert.match(page, /app\.js\?v=storm-snow-beta-v3/);
 });
 
 test('accumulation map selection excludes radar and snow probability layers', () => {
