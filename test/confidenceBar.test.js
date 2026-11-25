@@ -27,8 +27,9 @@ test('confident rain with similar amounts is not described as uncertain',()=>{
 test('wet-versus-dry disagreement is found even when the displayed rain chance is low',()=>{
   const sunday=day('2026-11-29',{rain:50,temperature:95,sky:53},{condition:'Sunny',pop:18,qpf:.03,
     ...rainPeak({nws:16,nbm:12,ecmwf:0,wn:100,weathernext3:100,gefs:0},['wn','weathernext3'],['ecmwf','gefs'])});
-  const warning=lowConfidenceWarning([today(),today(),today(),today(),today(),sunday]);
+  const warning=lowConfidenceWarning([today(),today(),today(),today(),sunday]);
   assert.equal(warning.items[0].dayLabel,'Sunday');
+  assert.equal(lowConfidenceWarning([today(),today(),today(),today(),today(),sunday]),null);
   assert.equal(warning.items[0].kind,'rain chance');
   assert.match(warning.items[0].text,/whether it rains enough to matter/i);
   assert.doesNotMatch(warning.items[0].text,/wind|cloud/i);

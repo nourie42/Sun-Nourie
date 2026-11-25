@@ -117,7 +117,7 @@ function warningItem(candidate,day,index){
 
 /** Find the most important unsettled future-day events. Unrelated fields and
  * isolated wind outliers cannot create a notice. */
-export function lowConfidenceWarning(days,{limit=7,minChangeRisk=35,maxItems=3}={}){
+export function lowConfidenceWarning(days,{limit=5,minChangeRisk=35,maxItems=3}={}){
   const candidates=[];
   for(const [index,day] of (days||[]).slice(0,limit).entries()){
     if(index===0)continue;

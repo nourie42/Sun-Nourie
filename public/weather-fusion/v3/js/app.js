@@ -398,21 +398,33 @@ function remIcon(name, size = 16) {
   return `<svg class="rem-ico" width="${size}" height="${size}" viewBox="0 0 24 24" fill="${filled ? 'currentColor' : 'none'}" stroke="${filled ? 'none' : 'currentColor'}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${REMAINDER_ICON_PATHS[name]}</svg>`;
 }
 
-function remainderSkyBackground(condition, isDay) {
+function remainderSkyTile(condition) {
   const c = String(condition || '').toLowerCase();
-  const photo = (file, position, size, shade) =>
-    `linear-gradient(rgba(5,12,30,${shade}),rgba(5,12,30,${shade})), url(/weather-fusion/${file}) ${position} / ${size} no-repeat`;
-  if (/thunder|storm/.test(c)) return photo('today-sky-rain.webp', '85% 35%', 'auto 190%', isDay ? 0.3 : 0.6);
-  if (/rain|shower|drizzle|snow|sleet|freez/.test(c)) return photo('today-sky-rain.webp', '88% 45%', 'auto 170%', isDay ? 0 : 0.5);
-  if (/partly|few clouds|scattered|mostly sunny/.test(c)) return isDay ? photo('today-sky-clouds.webp', '76% 46%', 'cover', 0) : photo('today-sky-night-v2.webp', '88% 50%', 'cover', 0);
-  if (/cloud|overcast|fog|mist|haze|smoke/.test(c)) return photo('today-sky-rain.webp', '38% 6%', 'auto 240%', isDay ? 0.2 : 0.7);
-  if (!isDay) return photo('today-sky-night-v2.webp', 'center', 'cover', 0);
-  return photo('today-sky-clear.webp', '66% 42%', 'cover', 0);
+  if (/tornado|hurricane|severe|damaging/.test(c)) return 'severe-storms';
+  if (/thunder|t-storm|storm/.test(c)) return 'thunderstorms';
+  if (/freezing rain|freezing drizzle|ice storm/.test(c)) return 'freezing-rain';
+  if (/blowing snow|drifting|blizzard/.test(c)) return 'blowing-snow';
+  if (/wintry|mix|sleet/.test(c)) return 'wintry-mix';
+  if (/snow/.test(c)) return /light|flurr|scattered|chance|slight/.test(c) ? 'light-snow' : 'snow';
+  if (/\bice\b|icing/.test(c)) return 'ice';
+  if (/rain.*wind|wind.*rain|gusty/.test(c)) return 'rain-windy';
+  if (/shower.*sun|sun.*shower|showers and sun/.test(c)) return 'showers-sun';
+  if (/light rain|drizzle|sprinkle|slight chance/.test(c)) return 'light-rain';
+  if (/rain|shower/.test(c)) return 'rain';
+  if (/fog|mist/.test(c)) return 'fog';
+  if (/haze|smoke/.test(c)) return 'haze';
+  if (/dust|sand/.test(c)) return 'dust';
+  if (/overcast|mostly cloudy|broken/.test(c)) return 'mostly-cloudy';
+  if (/cloudy/.test(c) && !/partly/.test(c)) return 'cloudy';
+  if (/partly|scattered|few clouds/.test(c)) return 'partly-cloudy';
+  if (/mostly sunny|mostly clear/.test(c)) return 'mostly-sunny';
+  return 'sunny';
 }
+
 
 function remainderHours(f) {
   const cutoff = Date.now() - 30 * 60 * 1000;
-  return (f.hours48 || []).filter(h => Date.parse(h.time) >= cutoff).slice(0, 5);
+  return todayHours(f).filter(h => Date.parse(h.time) >= cutoff);
 }
 
 function renderBetaTodayCard(f) {
@@ -459,7 +471,7 @@ function renderBetaTodayCard(f) {
         <time>Updated ${fmtHour(new Date().toISOString(), { hour: 'numeric', minute: '2-digit' })}</time>
       </header>
       <div class="rem-top">
-        <div class="rem-tile" style="background:${remainderSkyBackground(condition, cur.isDay)}">
+        <div class="rem-tile${cur.isDay ? '' : ' is-night'}" style="background-image:url(/weather-fusion/tile-${remainderSkyTile(condition)}.jpg)">
           <span>${escapeAttr(condition)}</span>
         </div>
         <div class="rem-temps">
@@ -626,16 +638,17 @@ function renderStatusAndAlerts(f) {
     .slice(0, 2)
     .map(
       (a, idx) => `
-      <div class="urgent-alert-banner" role="alert">
-        <div>
-          <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:0.12em;color:#ffd0d0;">
-            ⚠ Official NWS ${a.severity} Alert · ${a.senderName}
-          </div>
-          <div style="font-size:15.5px;font-weight:800;margin-top:2px;">${a.event}</div>
-          <div style="font-size:12.5px;color:var(--muted);">${a.headline || a.areaDesc}</div>
+      <details class="nws-alert" role="alert">
+        <summary>
+          <span class="nws-alert-tag">⚠ NWS ${a.severity}</span>
+          <span class="nws-alert-event">${a.event}</span>
+          <span class="nws-alert-chev" aria-hidden="true">▸</span>
+        </summary>
+        <div class="nws-alert-body">
+          <p>${a.headline || a.areaDesc || ''}</p>
+          <button class="nws-alert-view alert-view-btn" data-alert-idx="${idx}" type="button">View bulletin</button>
         </div>
-        <button class="icon-btn alert-view-btn" data-alert-idx="${idx}" type="button">View Bulletin ▸</button>
-      </div>
+      </details>
     `
     )
     .join('');
@@ -884,9 +897,9 @@ function renderWeatherMeterArcSvg(score) {
     <svg class="meter-arc-svg" viewBox="0 0 112 60" role="img" aria-label="Weather Meter ${score} out of 100">
       <defs>
         <linearGradient id="wm-arc-grad" x1="0%" y1="0%" x2="100%" y2="0%">
-          <stop offset="0%" stop-color="#78c6a3"/>
-          <stop offset="55%" stop-color="#e4c77b"/>
-          <stop offset="100%" stop-color="#dc8f6c"/>
+          <stop offset="0%" stop-color="#f0786a"/>
+          <stop offset="55%" stop-color="#ffd470"/>
+          <stop offset="100%" stop-color="#5ce0a0"/>
         </linearGradient>
       </defs>
       <path d="M ${cx - r} ${cy} A ${r} ${r} 0 0 1 ${cx + r} ${cy}" fill="none" stroke="rgba(255,255,255,0.16)" stroke-width="5.5" stroke-linecap="round"/>
@@ -1024,7 +1037,6 @@ function renderHeroAndBriefing(f) {
   if (summary) {
     const headline = twoDayHeadlineFor(f);
     summary.textContent = headline || todaySummary(todayHours(f),f.canonical?.days?.[0]?.high,{observedRain});
-    summary.classList.toggle('is-headline', Boolean(headline));
     summary.hidden = !summary.textContent;
   }
   if (sceneEl) sceneEl.innerHTML = renderWeatherIconSvg(observedRain ? 'rain' : cur.icon, 68);

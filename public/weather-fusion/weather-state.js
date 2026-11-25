@@ -4,7 +4,7 @@ export function weatherState(condition = '', skyCover = null) {
   const text = String(condition || '').trim(), lower = text.toLowerCase();
   let kind = 'unknown', label = 'Sky conditions unavailable';
   if (/thunder|\btstm\b|\bstorm/.test(lower)) { kind = 'storm'; label = 'Thunderstorms'; }
-  else if (/snow|sleet|flurr|ice pellets|freezing rain/.test(lower)) { kind = 'snow'; label = 'Snow or ice'; }
+  else if (/snow|sleet|flurr|ice pellets|freezing|wintry|blizzard|\bice\b/.test(lower)) { kind = 'snow'; label = 'Snow or ice'; }
   else if (/rain|shower|drizzle/.test(lower)) { kind = 'rain'; label = 'Rain'; }
   else if (/fog|mist|haze|smoke|obscured/.test(lower)) { kind = 'fog'; label = 'Obscured sky'; }
   else if (/partly|scattered/.test(lower)) { kind = 'partly-cloudy'; label = 'Partly cloudy'; }

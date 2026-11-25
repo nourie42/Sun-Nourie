@@ -3679,4 +3679,19 @@ body.awaiting-location .v3-main-stack > :not(#location-needed-card) {
 .d7-col-wind{display:grid;justify-items:center;font-size:11px;color:var(--muted);white-space:nowrap;font-variant-numeric:tabular-nums}
 .d7-col-wind small{font-size:10px;color:var(--faint)}
 
-.hero-day-summary.is-headline{max-width:30ch;font-size:clamp(18px,5.2vw,24px);font-weight:700;line-height:1.2;letter-spacing:-.01em;color:#f5faff;text-shadow:0 2px 10px rgba(6,18,40,.75)}
+
+.nws-alert{margin:6px 0;border-radius:12px;border:1px solid rgba(255,150,150,.38);background:rgba(120,28,40,.32);color:#ffe6e6}
+.nws-alert summary{display:flex;align-items:center;gap:8px;padding:8px 12px;font-size:12px;cursor:pointer;list-style:none}
+.nws-alert summary::-webkit-details-marker{display:none}
+.nws-alert-tag{font-size:10.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#ffc4c4;white-space:nowrap}
+.nws-alert-event{font-weight:700;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nws-alert-chev{transition:transform .15s}
+.nws-alert[open] .nws-alert-chev{transform:rotate(90deg)}
+.nws-alert-body{padding:0 12px 10px;font-size:12px;color:#f3d6d6}
+.nws-alert-body p{margin:0 0 8px;line-height:1.4}
+.nws-alert-view{font:inherit;font-size:12px;font-weight:700;padding:5px 12px;border-radius:999px;border:1px solid rgba(255,190,190,.5);background:rgba(255,255,255,.08);color:#fff;cursor:pointer}
+.rem-tile{background-size:cover;background-position:center;position:relative}
+.rem-tile.is-night::before{content:"";position:absolute;inset:0;border-radius:inherit;background:rgba(3,10,28,.55)}
+.rem-tile span{position:relative}
+.rem-hours{display:flex;gap:6px;overflow-x:auto;scroll-snap-type:x proximity;padding-bottom:4px;-webkit-overflow-scrolling:touch;scrollbar-width:thin}
+.rem-hour{flex:0 0 68px;scroll-snap-align:start}
