@@ -3662,14 +3662,15 @@ body.awaiting-location .v3-main-stack > :not(#location-needed-card) {
 .remainder-more{justify-self:center;background:none;border:0;color:#7fd3ff;font:inherit;font-size:14px;cursor:pointer;padding:2px 8px}
 #daily-panel .card-title-clean{display:flex;align-items:center;gap:10px}
 #daily-panel .card-title-clean::before{content:"";width:4px;height:26px;border-radius:2px;background:#4fb8ff}
-.d7-columns{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;margin-top:10px}
-.d7-col{display:grid;justify-items:center;gap:3px;min-width:0;padding:10px 2px;border-radius:14px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.04);color:var(--text);font:inherit;cursor:pointer}
+.d7-columns{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:3px;margin-top:10px}
+.d7-col{display:grid;justify-items:center;gap:3px;min-width:0;padding:10px 0;overflow:hidden;border-radius:14px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.04);color:var(--text);font:inherit;cursor:pointer}
 .d7-col.is-selected{border-color:var(--blue);background:rgba(103,196,255,.14)}
-.d7-col-day{font-size:13px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.d7-col-date{font-size:11px;color:var(--faint);white-space:nowrap}
-.d7-col-icon svg{width:44px;height:44px}
-.d7-col-rain{display:flex;align-items:center;gap:1px;font-size:12px;color:#7fd3ff;white-space:nowrap}
-.d7-col-amt{font-size:12px;color:var(--muted)}
-.d7-col-temps{display:grid;justify-items:center;font-size:15px;font-weight:700;color:var(--gold);font-variant-numeric:tabular-nums}
+.d7-col-day{font-size:12.5px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.d7-col-date{font-size:10.5px;color:var(--faint);white-space:nowrap}
+.d7-col-icon svg{width:40px;height:40px}
+.d7-col-rain{display:flex;align-items:center;gap:0;font-size:11px;color:#7fd3ff;white-space:nowrap}
+.d7-col-amt{font-size:11px;color:var(--muted)}
+.d7-col-temps{display:grid;justify-items:center;font-size:14px;font-weight:700;color:var(--gold);font-variant-numeric:tabular-nums}
 .d7-col-temps small{font-size:12px;font-weight:500;color:var(--muted)}
-.d7-col-wind{font-size:10.5px;color:var(--muted);white-space:nowrap}
+.d7-col-wind{display:grid;justify-items:center;font-size:11px;color:var(--muted);white-space:nowrap;font-variant-numeric:tabular-nums}
+.d7-col-wind small{font-size:10px;color:var(--faint)}

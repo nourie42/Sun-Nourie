@@ -378,15 +378,20 @@ function remIcon(name, size = 16) {
   return `<svg class="rem-ico" width="${size}" height="${size}" viewBox="0 0 24 24" fill="${filled ? 'currentColor' : 'none'}" stroke="${filled ? 'none' : 'currentColor'}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${REMAINDER_ICON_PATHS[name]}</svg>`;
 }
 
+function overcastSkyBackground(top, bottom) {
+  const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='320' height='220' viewBox='0 0 320 220'><defs><linearGradient id='g' x1='0' y1='0' x2='0' y2='1'><stop offset='0' stop-color='${top}'/><stop offset='1' stop-color='${bottom}'/></linearGradient><filter id='n' x='0' y='0' width='100%' height='100%'><feTurbulence type='fractalNoise' baseFrequency='0.006 0.012' numOctaves='5' seed='9' result='t'/><feColorMatrix in='t' type='matrix' values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  2.6 0 0 0 -1.25'/></filter></defs><rect width='320' height='220' fill='url(#g)'/><rect width='320' height='220' filter='url(#n)' opacity='0.85'/></svg>`;
+  const encoded = encodeURIComponent(svg).replace(/[()']/g, c => `%${c.charCodeAt(0).toString(16).toUpperCase()}`);
+  return `url(data:image/svg+xml,${encoded}) center/cover`;
+}
+
 function remainderSkyBackground(condition, isDay) {
   const c = String(condition || '').toLowerCase();
-  const tone = /thunder|storm/.test(c) ? ['#3a3f5e', '#14172e']
-    : /rain|shower|drizzle|snow|sleet|freez/.test(c) ? ['#4b5d70', '#1e2c3d']
-    : /cloud|overcast|fog|mist/.test(c) ? ['#737e8e', '#333d4c']
-    : !isDay ? ['#1a2c58', '#080f22']
-    : /sunny|clear|fair/.test(c) ? ['#3a8ae0', '#1b4f9c']
-    : ['#6a7689', '#2d3645'];
-  return `radial-gradient(circle at 30% 35%, rgba(255,255,255,.22), transparent 42%), linear-gradient(170deg, ${tone[0]}, ${tone[1]})`;
+  if (/thunder|storm/.test(c)) return overcastSkyBackground('#3c4256', '#171a2a');
+  if (/rain|shower|drizzle|snow|sleet|freez/.test(c)) return overcastSkyBackground('#4a5a6c', '#222e3d');
+  if (/cloud|overcast|fog|mist/.test(c)) return overcastSkyBackground('#566073', '#2c3443');
+  if (!isDay) return 'radial-gradient(circle at 30% 35%, rgba(255,255,255,.18), transparent 42%), linear-gradient(170deg, #1a2c58, #080f22)';
+  if (/sunny|clear|fair/.test(c)) return 'linear-gradient(170deg, #3a8ae0, #1b4f9c)';
+  return overcastSkyBackground('#566073', '#2c3443');
 }
 
 function remainderHours(f) {
@@ -1255,7 +1260,7 @@ function renderSevenDayForecast(f) {
         <span class="d7-col-rain">${remIcon('drop', 12)}${rainPercent(day.rainChance)}</span>
         <span class="d7-col-amt">${Number(day.totalQpfIn ?? 0).toFixed(2)}"</span>
         <span class="d7-col-temps"><b>${fmtTemp(day.highF)}</b><small>${fmtTemp(day.lowF)}</small></span>
-        <span class="d7-col-wind">${windText}</span>
+        <span class="d7-col-wind">${windText.replace(' mph', '')}<small>mph</small></span>
       </button>`;
     }).join('')}</div>`;
     dualStage.querySelectorAll('[data-d7-idx]').forEach(el => {
