@@ -34,10 +34,11 @@ export function currentWeatherDisplay(forecast,now=Date.now()){
  const rainExpected=pointRainForecast&&(!weatherState(currentHour.condition).chance||(chance!==null&&chance>=50));
  const direction={N:'north',NE:'northeast',E:'east',SE:'southeast',S:'south',SW:'southwest',W:'west',NW:'northwest'}[radar?.nearestRainDirection];
  const areaDistance=finite(radar?.nearestRainMiles)?` about ${Math.round(radar.nearestRainMiles)} miles${direction?` ${direction}`:''}`:'';
+ const radarPrecipLabel=isFreezing?'Snow now':'Rain now';
  const currentPrecipitation=activePrecipitation
   ? {active:true,label:effectiveKind==='snow'?'Snow now':'Rain now',source:'Current station reports precipitation.'}
   : radarHere
-   ? {active:true,nearby:false,label:'Rain now',source:'NOAA observed radar shows precipitation over the selected location.'}
+   ? {active:true,nearby:false,label:radarPrecipLabel,source:'NOAA observed radar shows precipitation over the selected location.'}
    : radarThreat
     ? {active:true,nearby:true,label:'Rain Around',source:radarClose?'NOAA observed radar shows rain within 5 miles of the selected location.':'NOAA observed radar shows rain moving toward the selected location.'}
     : pointRainForecast
