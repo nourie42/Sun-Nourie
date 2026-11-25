@@ -30,7 +30,7 @@ import {GlobePanel} from './globe-panel.js?v=wind-flow-v2';
 import {outlookItems,renderOutlookPanel,openOutlookNote} from '../../outlook-panel.js?v=snow-aware-v3';
 import { todayRainDisplay } from '../../today-card.js?v=hour-details-v1';
 import {applyLocalRadar, displayedRainChance, observedRainLabel} from '../../rain-display.js?v=local-radar-v2';
-import {currentWeatherDisplay} from '../../current-weather.js?v=local-radar-v2';
+import {currentWeatherDisplay} from '../../current-weather.js?v=freezing-aware-v1';
 import { dayGraphHTML, installDayGraph } from '../../day-graph.js?v=hourly-rain-v5';
 import { dewpointFeelLevel, renderDewpointMeter } from '../../dewpoint-meter.js?v=air-moisture-v2';
 import { TREND_METRICS, mainTrendSeries, trendReading } from '../../main-hourly-trend.js?v=beta-glass-48h-v2';
@@ -415,6 +415,7 @@ function remainderSky(hours, cur) {
   const qpf = sum('precipIn'), snowIn = sum('snowfallIn'), chance = peak('rainChance');
   const wind = peak('forecastWindMph'), gust = peak('windGustMph');
   const clouds = hours.length ? hours.reduce((t, h) => t + (Number(h.forecastCloudCover) || 0), 0) / hours.length : (cur.cloudCover ?? 50);
+  const isFreezing = cur.tempF !== null && cur.tempF !== undefined && cur.tempF < 32;
   const storm = /thunder|t-storm|storm/.test(text);
   const freezing = /freezing|ice storm/.test(text);
   const snowy = /snow|sleet|wintry|flurr|blizzard/.test(text) || snowIn >= 0.1;
@@ -428,6 +429,7 @@ function remainderSky(hours, cur) {
     return snowIn >= 0.5 ? { image: 'snow', label: 'Snow' } : { image: 'light-snow', label: 'Light Snow' };
   }
   if (rainy) {
+    if (isFreezing) return { image: 'snow', label: 'Snow' };
     if (wind >= 25 || gust >= 40) return { image: 'rain-windy', label: 'Rain & Wind' };
     if (qpf >= 0.75 || (qpf >= 0.5 && chance >= 80)) return { image: 'rain', label: 'Heavy Rain' };
     if (qpf >= 0.1 || chance >= 60) return { image: 'rain', label: 'Rain' };
@@ -447,14 +449,17 @@ function remainderSky(hours, cur) {
 function remainderHourIcon(h, d) {
   const c = String(h.condition || h.forecastCondition || '').toLowerCase();
   const rain = Number(h.rainChance) || 0;
+  const tempF = Number(h.tempF) !== undefined ? h.tempF : Number(h.forecastTempF);
+  const isFreezing = tempF < 32 && Number.isFinite(tempF);
   if (/snow|sleet|wintry|flurr|blizzard/.test(c) || (Number(h.snowfallIn) || 0) > 0) return 'snow';
   if (/freez|ice/.test(c)) return 'snow';
   if (/thunder|t-storm|storm/.test(c)) return 'storm';
-  if (/rain|shower|drizzle/.test(c)) return rain >= 55 ? 'rain' : 'drizzle';
+  if (/rain|shower|drizzle/.test(c)) return isFreezing ? 'snow' : rain >= 55 ? 'rain' : 'drizzle';
   if (/fog|mist|haze|smoke/.test(c)) return 'fog';
   if (/overcast|mostly cloudy|\bcloudy\b/.test(c) && !/partly/.test(c)) return 'cloudy';
   if (/partly|scattered|few clouds|mostly sunny/.test(c)) return h.isDay ? 'partly-day' : 'partly-night';
   if (/sunny|clear|fair/.test(c)) return h.isDay ? 'clear-day' : 'clear-night';
+  if (isFreezing && rain >= 35) return 'snow';
   if (rain >= 55) return 'rain';
   if (rain >= 35) return 'drizzle';
   return h.icon || d.icon;

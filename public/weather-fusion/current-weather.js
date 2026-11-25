@@ -12,6 +12,9 @@ export function currentWeatherDisplay(forecast,now=Date.now()){
  const currentHour=forecast?.hours?.find(h=>{const t=Date.parse(h.time);return t<=now&&now<t+3600000;});
  const assembled=Date.parse(forecast?.assembledAt),fresh=finite(assembled)&&now-assembled<=90*60000&&now>=assembled-5*60000;
  const stationCondition=!freshness.expired&&(current.type==='observation'||(/observation/i.test(current.conditionSource||'')&&!/forecast \(sky only\)/i.test(current.conditionSource||'')))&&kind!=='unknown';
+ // If temp is below freezing and condition is rain, it's frozen precipitation
+ const isFreezing=finite(current.tempF)&&current.tempF<32;
+ const effectiveKind=isFreezing&&kind==='rain'?'snow':kind;
  const activePrecipitation=stationCondition&&['rain','storm','snow'].includes(kind);
  // Radar refreshes independently from station and forecast clocks. Fresh rain
  // evidence survives an expired thermal reading; an old radar image does not.
@@ -32,7 +35,7 @@ export function currentWeatherDisplay(forecast,now=Date.now()){
  const direction={N:'north',NE:'northeast',E:'east',SE:'southeast',S:'south',SW:'southwest',W:'west',NW:'northwest'}[radar?.nearestRainDirection];
  const areaDistance=finite(radar?.nearestRainMiles)?` about ${Math.round(radar.nearestRainMiles)} miles${direction?` ${direction}`:''}`:'';
  const currentPrecipitation=activePrecipitation
-  ? {active:true,label:kind==='snow'?'Snow now':'Rain now',source:'Current station reports precipitation.'}
+  ? {active:true,label:effectiveKind==='snow'?'Snow now':'Rain now',source:'Current station reports precipitation.'}
   : radarHere
    ? {active:true,nearby:false,label:'Rain now',source:'NOAA observed radar shows precipitation over the selected location.'}
    : radarThreat
