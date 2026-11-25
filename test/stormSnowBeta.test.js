@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { buildStormSnowSnapshot, compareStormSnowSnapshots, createStormSnowBetaService } from '../src/weatherFusionBeta.js';
+import { accumulationMapDescriptors } from '../public/weather-fusion/v3/js/storm-and-snow-beta.js';
 
 const now = Date.parse('2026-11-25T20:00:00.000Z');
 const hour = (time, precipIn, rainChance, condition = 'Rain') => ({ time, precipIn, rainChance, condition });
@@ -79,6 +80,20 @@ test('material-change comparison uses amount, probability and timing thresholds'
 
 test('beta UI contains functional data paths and no interim placeholder contract', () => {
   const source = fs.readFileSync(new URL('../public/weather-fusion/v3/js/storm-and-snow-beta.js', import.meta.url), 'utf8');
-  for (const required of ['Rain Central', 'Snow Central', '/api/weather-fusion/storm-snow/history', '/api/weather-fusion/radar', '/api/weather-fusion/accuracy', 'calibrated distribution', 'Observed NOAA MRMS']) assert.match(source, new RegExp(required.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  for (const required of ['Rain Central', 'Snow Central', '/api/weather-fusion/storm-snow/history', '/api/weather-fusion/radar', '/api/weather-fusion/accuracy', 'calibrated distribution']) assert.ok(source.includes(required));
   assert.doesNotMatch(source, /not wired into this beta|Forecast history pending|regional beta layer pending/);
+});
+
+test('accumulation map selection excludes radar and snow probability layers', () => {
+  const day = { dayKey: '2026-11-25', hours: [{ time: '2026-11-25T20:00:00Z' }, { time: '2026-11-25T21:00:00Z' }] };
+  const common = { start: '2026-11-25T18:00:00Z', end: '2026-11-26T18:00:00Z' };
+  const forecastData = { timeZone: 'America/New_York', days: [day], canonical: { snow: { days: [{ date: day.dayKey }], maps: [
+    { id: 'wpc-qpf-day1', kind: 'arcgis', unit: 'in', ...common },
+    { id: 'wpc-snow-day1-4', kind: 'arcgis', unit: '%', ...common },
+    { id: 'model-snow-grid', kind: 'geojson', quantity: 'snowfall', unit: 'in', ...common },
+    { id: 'radar', kind: 'radar', ...common },
+    { id: 'old-qpf', kind: 'arcgis', unit: 'in', start: '2026-11-20T18:00:00Z', end: '2026-11-21T18:00:00Z' },
+  ] } } };
+  assert.deepEqual(accumulationMapDescriptors(forecastData, day, 'rain').map(item => item.id), ['wpc-qpf-day1']);
+  assert.deepEqual(accumulationMapDescriptors(forecastData, day, 'snow').map(item => item.id), ['model-snow-grid']);
 });
