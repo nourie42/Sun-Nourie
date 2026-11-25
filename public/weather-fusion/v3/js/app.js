@@ -2708,33 +2708,19 @@ function initModalSystem() {
 
   document.getElementById('open-48h-explorer-btn')?.addEventListener('click', () => { if (state.forecast) open48hExplorerModal(state.forecast); });
 
-  document.getElementById('open-snow-modal')?.addEventListener('click', () => {
+  document.getElementById('open-snow-modal')?.addEventListener('click', async () => {
     closeTools();
-    const f = state.forecast;
-    if (!f) return;
-    const total10dSnow = f.days.reduce((s, d) => s + (d.totalSnowIn || 0), 0).toFixed(1);
-    openModal(
-      `❄️ Snow Outlook · ${f.location.name}`,
-      `
-        <div style="font-size:20px;font-weight:800;margin-bottom:8px;">
-          ${Number(total10dSnow) > 0 ? `${total10dSnow}" snow possible over the next 10 days` : 'No snow expected in the next 10 days'}
-        </div>
-        <table class="math-table">
-          <thead><tr><th>Day</th><th>High / Low</th><th>Rain Chance</th><th>Snow</th><th>Outlook Confidence</th></tr></thead>
-          <tbody>
-            ${f.days.slice(0, 7).map((d) => `
-              <tr>
-                <td><strong>${d.shortWeekday} · ${d.dateLabel}</strong></td>
-                <td>${fmtTemp(d.highF)} / ${fmtTemp(d.lowF)}</td>
-                <td>${rainPercent(d.rainChance)}</td>
-                <td><strong>${d.totalSnowIn}"</strong></td>
-                <td style="color:${d.confidence.color};">${d.confidence.level}</td>
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>
-      `
-    );
+    if (!state.forecast) {
+      openModal('Storm and Snow Beta', '<p>Forecast data is not available yet. Refresh the forecast and try again.</p>');
+      return;
+    }
+    try {
+      const { openStormAndSnowBeta } = await import('./storm-and-snow-beta.js?v=storm-snow-beta-v1');
+      if (!document.getElementById('nourie-dialog')?.open) openStormAndSnowBeta(state.forecast, openModal);
+    } catch (error) {
+      console.error('Storm and Snow Beta:', error);
+      if (!document.getElementById('nourie-dialog')?.open) openModal('Storm and Snow Beta', '<p>The beta could not load. Please try again.</p>');
+    }
   });
 }
 
