@@ -411,7 +411,8 @@ function remainderSky(hours, cur) {
   const rainy = qpf >= 0.05 || chance >= 50 || /rain|shower|drizzle/.test(text);
   if (storm) return gust >= 40 ? { tile: 'severe-storms', label: 'Severe Storms' } : { tile: 'thunderstorms', label: 'Thunderstorms' };
   if (freezing) return { tile: 'freezing-rain', label: 'Freezing Rain' };
-  if (snowy && rainy) return { tile: 'wintry-mix', label: 'Wintry Mix' };
+  const explicitMix = /wintry|sleet|mix/.test(text);
+  if (snowy && explicitMix) return { tile: 'wintry-mix', label: 'Wintry Mix' };
   if (snowy) {
     if (wind >= 25) return { tile: 'blowing-snow', label: 'Blowing Snow' };
     return snowIn >= 0.5 ? { tile: 'snow', label: 'Snow' } : { tile: 'light-snow', label: 'Light Snow' };
@@ -431,6 +432,26 @@ function remainderSky(hours, cur) {
   return cur.isDay ? { tile: 'sunny', label: 'Sunny' } : { tile: 'sunny', label: 'Clear' };
 }
 
+
+function remainderHourIcon(h, d) {
+  const c = String(h.condition || h.forecastCondition || '').toLowerCase();
+  const rain = Number(h.rainChance) || 0;
+  if (/snow|sleet|wintry|flurr|blizzard/.test(c) || (Number(h.snowfallIn) || 0) > 0) return 'snow';
+  if (/freez|ice/.test(c)) return 'snow';
+  if (/thunder|t-storm|storm/.test(c)) return 'storm';
+  if (/rain|shower|drizzle/.test(c)) return rain >= 55 ? 'rain' : 'drizzle';
+  if (/fog|mist|haze|smoke/.test(c)) return 'fog';
+  if (/overcast|mostly cloudy|\bcloudy\b/.test(c) && !/partly/.test(c)) return 'cloudy';
+  if (/partly|scattered|few clouds|mostly sunny/.test(c)) return h.isDay ? 'partly-day' : 'partly-night';
+  if (/sunny|clear|fair/.test(c)) return h.isDay ? 'clear-day' : 'clear-night';
+  if (rain >= 55) return 'rain';
+  if (rain >= 35) return 'drizzle';
+  return h.icon || d.icon;
+}
+
+function snowyHour(h) {
+  return /snow|sleet|wintry|flurr|blizzard|freez/.test(String(h.condition || h.forecastCondition || '').toLowerCase()) || (Number(h.snowfallIn) || 0) > 0;
+}
 
 function remainderHours(f) {
   const cutoff = Date.now() - 30 * 60 * 1000;
@@ -453,6 +474,8 @@ function renderBetaTodayCard(f) {
   const winds = hours.map(h => h.forecastWindMph).filter(Number.isFinite);
   const gusts = hours.map(h => h.windGustMph).filter(Number.isFinite);
   const totalRain = hours.reduce((sum, h) => sum + (Number(h.precipIn) || 0), 0);
+  const totalSnow = hours.reduce((sum, h) => sum + (Number(h.snowfallIn) || 0), 0);
+  const snowDay = hours.some(snowyHour);
   const avgWind = winds.length ? Math.round(winds.reduce((a, b) => a + b, 0) / winds.length) : null;
   const windRange = winds.length ? `${Math.round(Math.min(...winds))}–${Math.round(Math.max(...winds))}` : '—';
   const gustMax = gusts.length ? Math.round(Math.max(...gusts)) : null;
@@ -498,17 +521,17 @@ function renderBetaTodayCard(f) {
       </div>
       <div class="rem-strip">
         <span>Feels Like <b>${fmtTemp(feelsHour?.feelsLikeF ?? d.peakFeelsF)}</b>${feelsHour ? ` at ${fmtHour(feelsHour.time, { hour: 'numeric' })}` : ''}</span>
-        <span>${remIcon('cloud', 22)}<span>Total Rain: <b>${totalRain.toFixed(2)}"</b></span></span>
+        <span>${remIcon('cloud', 22)}<span>${snowDay ? 'Total Snow' : 'Total Rain'}: <b>${snowDay ? totalSnow.toFixed(1) : totalRain.toFixed(2)}"</b></span></span>
         <span>${remIcon('wind', 22)}<span><b>Wind: ${windRange} mph</b><small>Gusts: ${num(gustMax, x => `${x} mph`)}</small></span></span>
       </div>
       <div class="rem-hours">
         ${hours.map(h => `
           <div class="rem-hour">
             <small>${fmtHour(h.time, { hour: 'numeric' })}</small>
-            ${renderWeatherIconSvg(h.icon || d.icon, 46)}
+            ${renderWeatherIconSvg(remainderHourIcon(h, d), 46)}
             <strong>${fmtTemp(hourTemp(h))}</strong>
             <span class="rem-rainline">${remIcon('drop', 12)}${num(h.rainChance, x => `${x}%`)}</span>
-            <span>${Number.isFinite(h.precipIn) ? h.precipIn.toFixed(2) + '"' : '—'}</span>
+            <span>${snowyHour(h) ? `❄ ${Number.isFinite(h.snowfallIn) ? h.snowfallIn.toFixed(1) : '—'}"` : (Number.isFinite(h.precipIn) ? h.precipIn.toFixed(2) + '"' : '—')}</span>
             <span>${remIcon('wind', 12)}${num(h.forecastWindMph, x => `${x} mph`)}</span>
           </div>`).join('')}
       </div>

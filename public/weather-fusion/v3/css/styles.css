@@ -3694,3 +3694,10 @@ body.awaiting-location .v3-main-stack > :not(#location-needed-card) {
 .rem-tile span{position:relative}
 .rem-hours{display:flex;gap:6px;overflow-x:auto;scroll-snap-type:x proximity;padding-bottom:4px;-webkit-overflow-scrolling:touch;scrollbar-width:thin}
 .rem-hour{flex:0 0 68px;scroll-snap-align:start}
+
+#urgent-alerts-container{gap:6px;align-items:start}
+.nws-alert{margin:0}
+.rem-pill{font-size:10px;padding:2px 6px;max-width:100%;overflow:hidden;text-overflow:ellipsis}
+.rem-foot>span{min-width:0;overflow:hidden}
+.rem-strip b{white-space:normal;font-size:13px}
+.rem-pill{font-size:9.5px;padding:2px 4px;letter-spacing:0}
