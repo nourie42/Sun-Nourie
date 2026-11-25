@@ -1708,7 +1708,8 @@ function renderOutdoorExposureCards(f) {
     const isOpen=state.expandedExposureIds.has(item.id),pets=item.id==='pets';
     const value=item.badgeVal;
     const humanFeels=item.id==='shade'?shade:outdoor;
-    const subtitle=pets?'Paw heat safety':Number.isFinite(humanFeels)?getFeelsVerdict(humanFeels,isRaining).label:'Estimate unavailable';
+    const snowExpected=/snow|flurr|blizzard/i.test(cur.condition||'');
+    const subtitle=pets?snowExpected?'Protect paws from cold':'Paw heat safety':Number.isFinite(humanFeels)?getFeelsVerdict(humanFeels,isRaining).label:'Estimate unavailable';
     const caption=pets?'Pavement conditions':item.id==='shade'?(compareSun?'Feels like in shade':'Same outdoor estimate'):!cur.isDay&&!isRaining?'Feels like at night':compareSun?'Feels like in sun':'Feels like outdoors';
     return `<article class="glass exposure-person-card" data-exp-card="${item.id}"><button type="button" class="exposure-person-button" data-exp-toggle="${item.id}" aria-expanded="${isOpen}" aria-controls="exposure-detail-${item.id}"><span class="person-card-title">${titles[item.id]}</span><span class="person-card-scene">${item.svg}</span><span class="person-card-reading"><strong${pets?' class="pet-surface-status"':''}>${value}</strong><span>${caption}</span></span><span class="person-card-description"${pets?` style="color:${pave.pawSafety.color}"`:''}>${subtitle}</span><small class="person-card-detail-hint">${isOpen?'Close details':'Details'} ›</small></button></article>`;
   }).join('')+items.filter(item=>state.expandedExposureIds.has(item.id)).map(item=>`<section class="exposure-expanded-body" id="exposure-detail-${item.id}" data-exp-id="${item.id}" aria-label="${titles[item.id]} details">${item.detailsHtml}</section>`).join('');
