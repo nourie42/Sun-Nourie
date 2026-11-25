@@ -2,6 +2,10 @@ import {weatherState} from './weather-state.js?v=current-rain-20261017-v3';
 import {currentReadingFreshness} from './weather-freshness.js?v=accuracy-20261019-v1';
 const finite=v=>typeof v==='number'&&Number.isFinite(v);
 const liquid=condition=>['rain','storm'].includes(weatherState(condition).kind);
+const cleanForecastCondition=text=>{
+ if(!text)return text;
+ return String(text).toLowerCase().replace(/^(?:slight )?chance of |^chance (?:of |for )?|^scattered /i,'').replace(/\b(?:possible|likely|possible precipitation)\b/gi,'').trim()||'Precipitation possible';
+};
 
 /** Radar describes detected precipitation, not the probability for the current
  * forecast hour. A radar gap must not erase a supported forecast at this point. */
@@ -59,6 +63,6 @@ export function currentWeatherDisplay(forecast,now=Date.now()){
   :stationCondition?{value:0,source:'Current station observation'}
   :radarReady?{value:0,source:'NOAA observed radar'}:{value:null,source:'Current precipitation not yet confirmed'};
  const dryRadarSky=radarReady&&!radarThreat&&!stationCondition&&['rain','storm','snow'].includes(kind)?weatherState('',currentHour?.skyCover).label:current.condition;
- const condition=activePrecipitation?current.condition:radarHere?'Rain':radarThreat?'Rain Around':pointRainForecast?currentHour.condition:dryRadarSky;
+ const condition=activePrecipitation?current.condition:radarHere?'Rain':radarThreat?'Rain Around':pointRainForecast?cleanForecastCondition(currentHour.condition):dryRadarSky;
  return {currentHour,condition,currentLikelihood,currentPrecipitation,rainExpected,radarThreat,rainAround:radarThreat,pointRainForecast,precipitation};
 }
