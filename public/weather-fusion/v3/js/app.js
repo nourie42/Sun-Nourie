@@ -415,7 +415,7 @@ function remainderSky(hours, cur) {
   const qpf = sum('precipIn'), snowIn = sum('snowfallIn'), chance = peak('rainChance');
   const wind = peak('forecastWindMph'), gust = peak('windGustMph');
   const clouds = hours.length ? hours.reduce((t, h) => t + (Number(h.forecastCloudCover) || 0), 0) / hours.length : (cur.cloudCover ?? 50);
-  const isFreezing = cur.tempF !== null && cur.tempF !== undefined && cur.tempF < 32;
+  const isFreezing = cur.temperature !== null && cur.temperature !== undefined && cur.temperature < 32;
   const storm = /thunder|t-storm|storm/.test(text);
   const freezing = /freezing|ice storm/.test(text);
   const snowy = /snow|sleet|wintry|flurr|blizzard/.test(text) || snowIn >= 0.1;

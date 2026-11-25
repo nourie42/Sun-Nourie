@@ -13,7 +13,7 @@ export function currentWeatherDisplay(forecast,now=Date.now()){
  const assembled=Date.parse(forecast?.assembledAt),fresh=finite(assembled)&&now-assembled<=90*60000&&now>=assembled-5*60000;
  const stationCondition=!freshness.expired&&(current.type==='observation'||(/observation/i.test(current.conditionSource||'')&&!/forecast \(sky only\)/i.test(current.conditionSource||'')))&&kind!=='unknown';
  // If temp is below freezing and condition is rain, it's frozen precipitation
- const isFreezing=finite(current.tempF)&&current.tempF<32;
+ const isFreezing=finite(current.temperature)&&current.temperature<32;
  const effectiveKind=isFreezing&&kind==='rain'?'snow':kind;
  const activePrecipitation=stationCondition&&['rain','storm','snow'].includes(kind);
  // Radar refreshes independently from station and forecast clocks. Fresh rain
