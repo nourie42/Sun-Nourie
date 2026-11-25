@@ -1108,7 +1108,20 @@ function renderHeroAndBriefing(f) {
   }
   if (sceneEl) sceneEl.innerHTML = renderWeatherIconSvg(observedRain ? 'rain' : cur.icon, 68);
   if (tempEl) tempEl.textContent = fmtTemp(cur.tempF);
-  if (condEl) condEl.textContent = observedRain ? 'Rain now' : cur.condition;
+  if (condEl) {
+    let displayCondition = cur.condition || '';
+    if (!observedRain && displayCondition) {
+      displayCondition = displayCondition.toLowerCase()
+        .replace(/^slight\s+chance\s+(?:of\s+)?/i, '')
+        .replace(/^chance\s+(?:of\s+)?/i, '')
+        .replace(/^scattered\s+/i, '')
+        .replace(/\b(?:possible|likely|precipitation)\b/gi, '')
+        .trim() || 'Precipitation possible';
+      // Capitalize first letter
+      displayCondition = displayCondition.charAt(0).toUpperCase() + displayCondition.slice(1);
+    }
+    condEl.textContent = observedRain ? 'Rain now' : displayCondition;
+  }
   if (feelsLineEl) feelsLineEl.textContent = `Feels Like ${fmtTemp(cur.feelsLikeF)}`;
   if (hiloEl) {
     hiloEl.innerHTML = `High <strong>${fmtTemp(today.highF)}</strong> &nbsp;|&nbsp; Low <strong>${fmtTemp(today.lowF)}</strong>`;
