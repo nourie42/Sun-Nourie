@@ -365,6 +365,30 @@ function todayHours(f) {
   return f.hours48.filter(hour=>hour.dayKey===f.days[0]?.dayKey);
 }
 
+const REMAINDER_ICON_PATHS = {
+  drop: '<path d="M12 2.5C12 2.5 5 10.5 5 15.2a7 7 0 0 0 14 0C19 10.5 12 2.5 12 2.5z"/>',
+  wind: '<path d="M3 8h11a3 3 0 1 0-3-3"/><path d="M3 12h15a3 3 0 1 1-3 3"/><path d="M3 16h7"/>',
+  cloud: '<path d="M7 18h10a4 4 0 0 0 0-8 6 6 0 0 0-11.5 1.5A3.5 3.5 0 0 0 7 18z"/>',
+  leaf: '<path d="M5 19c0-8 5-13 14-14-1 9-6 14-14 14z"/><path d="M5 19l7-7"/>',
+  sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/>',
+};
+
+function remIcon(name, size = 16) {
+  const filled = name === 'drop';
+  return `<svg class="rem-ico" width="${size}" height="${size}" viewBox="0 0 24 24" fill="${filled ? 'currentColor' : 'none'}" stroke="${filled ? 'none' : 'currentColor'}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${REMAINDER_ICON_PATHS[name]}</svg>`;
+}
+
+function remainderSkyBackground(condition, isDay) {
+  const c = String(condition || '').toLowerCase();
+  const tone = /thunder|storm/.test(c) ? ['#3a3f5e', '#14172e']
+    : /rain|shower|drizzle|snow|sleet|freez/.test(c) ? ['#4b5d70', '#1e2c3d']
+    : /cloud|overcast|fog|mist/.test(c) ? ['#737e8e', '#333d4c']
+    : !isDay ? ['#1a2c58', '#080f22']
+    : /sunny|clear|fair/.test(c) ? ['#3a8ae0', '#1b4f9c']
+    : ['#6a7689', '#2d3645'];
+  return `radial-gradient(circle at 30% 35%, rgba(255,255,255,.22), transparent 42%), linear-gradient(170deg, ${tone[0]}, ${tone[1]})`;
+}
+
 function remainderHours(f) {
   const cutoff = Date.now() - 30 * 60 * 1000;
   return (f.hours48 || []).filter(h => Date.parse(h.time) >= cutoff).slice(0, 5);
@@ -379,57 +403,80 @@ function renderBetaTodayCard(f) {
     return;
   }
   const cur = f.current;
+  const tz = f.timeZone;
+  const fmtHour = (t, opts) => new Intl.DateTimeFormat('en-US', { timeZone: tz, ...opts }).format(new Date(Date.parse(t)));
   const hours = remainderHours(f);
-  const hourTemp = h => (Object.hasOwn(h, 'forecastTempF') ? h.forecastTempF : h.tempF);
-  const hourWinds = hours.map(h => h.forecastWindMph).filter(Number.isFinite);
+  const dayHours = todayHours(f);
+  const winds = hours.map(h => h.forecastWindMph).filter(Number.isFinite);
+  const gusts = hours.map(h => h.windGustMph).filter(Number.isFinite);
   const totalRain = hours.reduce((sum, h) => sum + (Number(h.precipIn) || 0), 0);
-  const windRange = hourWinds.length
-    ? `${Math.round(Math.min(...hourWinds))}–${Math.round(Math.max(...hourWinds))} mph`
-    : '—';
-  const avgWind = hourWinds.length ? hourWinds.reduce((a, b) => a + b, 0) / hourWinds.length : null;
-  const num = (value, format = v => Math.round(v)) => (Number.isFinite(value) ? format(value) : '—');
-  const hourLabel = h => new Intl.DateTimeFormat('en-US', { timeZone: f.timeZone, hour: 'numeric' }).format(new Date(Date.parse(h.time)));
+  const avgWind = winds.length ? Math.round(winds.reduce((a, b) => a + b, 0) / winds.length) : null;
+  const windRange = winds.length ? `${Math.round(Math.min(...winds))}–${Math.round(Math.max(...winds))}` : '—';
+  const gustMax = gusts.length ? Math.round(Math.max(...gusts)) : null;
+  const num = (v, fmt = x => `${Math.round(x)}`) => (Number.isFinite(v) ? fmt(v) : '—');
+  const hourTemp = h => (Object.hasOwn(h, 'forecastTempF') ? h.forecastTempF : h.tempF);
+  const feelsHour = hours.reduce((best, h) => (best && best.feelsLikeF >= h.feelsLikeF ? best : h), null);
+  const rainPeak = dayHours.reduce((best, h) => (best && best.rainChance >= h.rainChance ? best : h), null);
+  const rainPeakText = rainPeak && rainPeak.rainChance >= 5
+    ? `Peak: ${fmtHour(rainPeak.time, { weekday: 'short' })} ${fmtHour(rainPeak.time, { hour: 'numeric' })}`
+    : 'Peak: none';
+  const uv = Math.round(d.maxUvIndex ?? cur.uvIndex ?? 0);
+  const uvLabel = uv <= 2 ? 'Low' : uv <= 5 ? 'Moderate' : uv <= 7 ? 'High' : uv <= 10 ? 'Very High' : 'Extreme';
+  const uvTone = uv <= 2 ? 'good' : uv <= 5 ? 'mod' : 'bad';
+  const aqi = f.airQuality?.currentAqi;
+  const aqiTone = aqi > 100 ? 'bad' : aqi > 50 ? 'mod' : 'good';
+  const aqiLabel = f.airQuality?.label || (aqi > 100 ? 'Unhealthy' : aqi > 50 ? 'Moderate' : 'Good');
+  const pill = (label, tone) => `<em class="rem-pill rem-${tone}">${escapeAttr(label)}</em>`;
+  const condition = d.condition || cur.condition;
 
   host.hidden = false;
   host.innerHTML = `
-    <div class="remainder-card">
-      <div class="remainder-head">
-        <div>
-          <span class="day-name">Remainder of Today</span>
-          <span class="today-condition">${escapeAttr(d.condition || cur.condition)}</span>
+    <section class="remainder-card" aria-label="Remainder of Today">
+      <header class="rem-title">
+        <span class="rem-bar" aria-hidden="true"></span>
+        <h2>Remainder of Today</h2>
+        <time>Updated ${fmtHour(new Date().toISOString(), { hour: 'numeric', minute: '2-digit' })}</time>
+      </header>
+      <div class="rem-top">
+        <div class="rem-tile" style="background:${remainderSkyBackground(condition, cur.isDay)}">
+          <span>${escapeAttr(condition)}</span>
         </div>
-        <span class="remainder-icon">${renderWeatherIconSvg(d.icon || cur.icon, 56)}</span>
+        <div class="rem-temps">
+          <span><strong>${fmtTemp(d.lowF)}</strong><small>Low</small></span>
+          <span><strong>${fmtTemp(d.highF)}</strong><small>High</small></span>
+        </div>
+        <div class="rem-rain">
+          ${remIcon('drop', 30)}
+          <strong>${num(d.rainChance, x => `${x}%`)}</strong>
+          <small>Rain Chance</small>
+          <small>${escapeAttr(rainPeakText)}</small>
+        </div>
       </div>
-      <div class="remainder-temps">
-        <span><strong>${fmtTemp(d.lowF)}</strong><small>Low</small></span>
-        <span><strong>${fmtTemp(d.highF)}</strong><small>High</small></span>
+      <div class="rem-strip">
+        <span>Feels Like <b>${fmtTemp(feelsHour?.feelsLikeF ?? d.peakFeelsF)}</b>${feelsHour ? ` at ${fmtHour(feelsHour.time, { hour: 'numeric' })}` : ''}</span>
+        <span>${remIcon('cloud', 22)}<span>Total Rain: <b>${totalRain.toFixed(2)}"</b></span></span>
+        <span>${remIcon('wind', 22)}<span><b>Wind: ${windRange} mph</b><small>Gusts: ${num(gustMax, x => `${x} mph`)}</small></span></span>
       </div>
-      <div class="remainder-feels">Peak feels like <b>${fmtTemp(d.peakFeelsF)}</b> <small>outdoors</small></div>
-      <div class="remainder-summary">
-        <span><small>Rain chance</small><strong>${num(d.rainChance, v => `${v}%`)}</strong></span>
-        <span><small>Total rain</small><strong>${totalRain.toFixed(2)}"</strong></span>
-        <span><small>Wind</small><strong>${windRange}</strong></span>
-      </div>
-      <div class="remainder-hours">
+      <div class="rem-hours">
         ${hours.map(h => `
-          <span class="remainder-hour">
-            <small>${hourLabel(h)}</small>
-            ${renderWeatherIconSvg(h.icon || d.icon, 28)}
+          <div class="rem-hour">
+            <small>${fmtHour(h.time, { hour: 'numeric' })}</small>
+            ${renderWeatherIconSvg(h.icon || d.icon, 46)}
             <strong>${fmtTemp(hourTemp(h))}</strong>
-            <em>${num(h.rainChance, v => `${v}%`)}</em>
+            <span class="rem-rainline">${remIcon('drop', 12)}${num(h.rainChance, x => `${x}%`)}</span>
             <span>${Number.isFinite(h.precipIn) ? h.precipIn.toFixed(2) + '"' : '—'}</span>
-            <span>${num(h.forecastWindMph, v => `${v} mph`)}</span>
-          </span>`).join('')}
+            <span>${remIcon('wind', 12)}${num(h.forecastWindMph, x => `${x} mph`)}</span>
+          </div>`).join('')}
       </div>
-      <div class="remainder-footer">
-        <span><small>Avg wind</small><strong>${num(avgWind, v => `${v} mph`)}</strong></span>
-        <span><small>Dew point</small><strong>${fmtTemp(d.dewPointF ?? cur.dewPointF)}</strong></span>
-        <span><small>Cloud cover</small><strong>${num(cur.cloudCover, v => `${v}%`)}</strong></span>
-        <span><small>AQI</small><strong>${num(f.airQuality?.currentAqi)}</strong></span>
-        <span><small>UV</small><strong>${num(d.maxUvIndex ?? cur.uvIndex)}</strong></span>
+      <div class="rem-foot">
+        <span>${remIcon('wind', 20)}<b>${num(avgWind, x => `${x} mph`)}</b>Avg Wind</span>
+        <span>${remIcon('drop', 20)}<b>${fmtTemp(d.dewPointF ?? cur.dewPointF)}</b>Dew Point</span>
+        <span>${remIcon('cloud', 20)}<b>${num(cur.cloudCover, x => `${x}%`)}</b>Cloud Cover</span>
+        <span>${remIcon('leaf', 20)}<b>AQI ${num(aqi)}</b>${Number.isFinite(aqi) ? pill(aqiLabel, aqiTone) : ''}</span>
+        <span>${remIcon('sun', 20)}<b>UV ${num(uv)}</b>${pill(uvLabel, uvTone)}</span>
       </div>
       <button class="remainder-more" type="button" aria-haspopup="dialog">View 48-hour graph ›</button>
-    </div>
+    </section>
   `;
   host.querySelector('.remainder-more').onclick = () => {
     state.selectedHourIdx = 0;
@@ -1185,7 +1232,7 @@ function renderSevenDayForecast(f) {
 
   const chipEl = document.getElementById('d7-selected-chip');
   if (chipEl && d) {
-    chipEl.textContent = isExpanded ? `${d.dayName} · Hide details ▴` : 'Tap a day for details ▾';
+    chipEl.textContent = isExpanded ? `${d.dayName} · Hide details ▴` : 'Expand Details ▾';
     chipEl.setAttribute('aria-expanded', String(isExpanded));
     chipEl.style.cursor = 'pointer';
     chipEl.onclick = () => {
@@ -1195,16 +1242,22 @@ function renderSevenDayForecast(f) {
   }
 
   if (dualStage) {
-    dualStage.innerHTML = `<div class="d7-columns">${days7.map((day, idx) => `
-      <button type="button" class="d7-col${isExpanded && idx === selIdx ? ' is-selected' : ''}" data-d7-idx="${idx}" aria-label="${escapeAttr(day.dayName)}, ${escapeAttr(day.dateLabel)}">
-        <strong class="d7-col-day">${escapeAttr(day.dayName)}</strong>
+    dualStage.innerHTML = `<div class="d7-columns">${days7.map((day, idx) => {
+      const dayWinds = (f.hours48 || []).filter(h => h.dayKey === day.dayKey).map(h => h.forecastWindMph).filter(Number.isFinite);
+      const windText = dayWinds.length
+        ? `${Math.round(Math.min(...dayWinds))}–${Math.round(Math.max(...dayWinds))} mph`
+        : `${Math.round(day.maxWindMph ?? 0)} mph`;
+      return `
+      <button type="button" class="d7-col${isExpanded && idx === selIdx ? ' is-selected' : ''}" data-d7-idx="${idx}" aria-label="${escapeAttr(day.shortWeekday)}, ${escapeAttr(day.dateLabel)}">
+        <strong class="d7-col-day">${escapeAttr(day.shortWeekday)}</strong>
         <small class="d7-col-date">${escapeAttr(day.dateLabel)}</small>
-        <span class="d7-col-icon">${renderWeatherIconSvg(day.icon, 40)}</span>
-        <span class="d7-col-rain">💧 ${rainPercent(day.rainChance)}</span>
+        <span class="d7-col-icon">${renderWeatherIconSvg(day.icon, 44)}</span>
+        <span class="d7-col-rain">${remIcon('drop', 12)}${rainPercent(day.rainChance)}</span>
         <span class="d7-col-amt">${Number(day.totalQpfIn ?? 0).toFixed(2)}"</span>
         <span class="d7-col-temps"><b>${fmtTemp(day.highF)}</b><small>${fmtTemp(day.lowF)}</small></span>
-        <span class="d7-col-wind">${Math.round(day.maxWindMph ?? 0)} mph</span>
-      </button>`).join('')}</div>`;
+        <span class="d7-col-wind">${windText}</span>
+      </button>`;
+    }).join('')}</div>`;
     dualStage.querySelectorAll('[data-d7-idx]').forEach(el => {
       el.onclick = () => {
         const idx = Number(el.dataset.d7Idx);
