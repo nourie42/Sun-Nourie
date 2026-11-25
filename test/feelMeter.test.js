@@ -35,3 +35,14 @@ test('dry forecast counts available hours, keeps missing values unknown and repo
  assert.match(result.note,/doorknob zap/i);
  assert.equal(dryForecastSummary({},now,6).available,0);
 });
+
+test('Feel Meter does not call low dew points dry when it is raining or wet',()=>{
+ const current=dewpointFeelLevel(47,15,{wet:true});
+ assert.equal(current.key,'damp');
+ assert.match(current.label,/damp/i);
+ assert.doesNotMatch(current.label,/ashy|dry/i);
+ const forecast=forecastFeelLevel(48,12,{wet:true});
+ assert.equal(forecast.key,'damp');
+ assert.match(forecast.label,/damp/i);
+ assert.doesNotMatch(forecast.label,/pleasantly dry/i);
+});

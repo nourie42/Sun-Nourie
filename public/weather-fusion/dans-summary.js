@@ -28,7 +28,7 @@ const standalone=text=>{
  else if(/^if so\b/i.test(value))return '';
  return value.replace(/^(?:(?:however|consequently|therefore|nevertheless|thus|as a result|in addition|meanwhile)[,:]?\s+)+/i,'').replace(/^[a-z]/,letter=>letter.toUpperCase());
 };
-const plain=text=>standalone(norm(text).replace(/\ba return to below normal temperatures and gusty winds today behind a cold front\b/gi,'It will be cooler and windy today').replace(/\ba potent storm system will affect much of the eastern United States including our region beginning Wednesday and lasting into Thanksgiving Day\b/gi,'A strong storm will bring rain and wind Wednesday into Thanksgiving Day').replace(/\binto the I-40 corridor of central NC\b/gi,'across central North Carolina').replace(/\bsome of the models\b/gi,'some forecasts').replace(/\btemperatures expected\b/gi,'temperatures are expected').replace(/\b(patchy frost) possible\b/gi,'$1 is possible').replace(/\s+and following sharply cooler and wet conditions that will develop\b/gi,'. Much cooler, wet weather will follow').replace(/\binto Sat\b/g,'into Saturday').replace(/\bfrost Sun morning\b/g,'frost Sunday morning').replace(/\bMon morning\b/g,'Monday morning').replace(/\bconvection\b/gi,'showers and storms').replace(/\bprecipitation\b/gi,'wet weather').replace(/\btemps\b/gi,'temperatures').replace(/\bPoPs\b/g,'rain chances').replace(/\bQPF\b/g,'rainfall amounts').replace(/\bwrt(?:\s+to)?\b/gi,'about'));
+const plain=text=>standalone(norm(text).replace(/\ba return to below normal temperatures and gusty winds today behind a cold front\b/gi,'It will be cooler and windy today').replace(/\ba potent storm system will affect much of the eastern United States including our region beginning Wednesday and lasting into Thanksgiving Day\b/gi,'A strong storm will bring rain and wind Wednesday into Thanksgiving Day').replace(/\binto the I-40 corridor of central NC\b/gi,'across central North Carolina').replace(/\bsome of the models\b/gi,'some forecasts').replace(/\btemperatures expected\b/gi,'temperatures are expected').replace(/\b(patchy frost) possible\b/gi,'$1 is possible').replace(/\s+and following sharply cooler and wet conditions that will develop\b/gi,'. Much cooler, wet weather will follow').replace(/\binto Sat\b/g,'into Saturday').replace(/\bfrost Sun morning\b/g,'frost Sunday morning').replace(/\bMon morning\b/g,'Monday morning').replace(/\bnely\b/gi,'northeast').replace(/\bswly\b/gi,'southwest').replace(/\bnwly\b/gi,'northwest').replace(/\bsely\b/gi,'southeast').replace(/\bcntl\b/gi,'central').replace(/\bern\b/gi,'eastern').replace(/\bwrn\b/gi,'western').replace(/\bnrn\b/gi,'northern').replace(/\bsrn\b/gi,'southern').replace(/\bwinds\/gusts\b/gi,'winds and gusts').replace(/\bThu\b/g,'Thursday').replace(/\bFri\b/g,'Friday').replace(/\bSat\b/g,'Saturday').replace(/\bSun\b/g,'Sunday').replace(/\bMon\b/g,'Monday').replace(/\bTue\b/g,'Tuesday').replace(/\bWed\b/g,'Wednesday').replace(/\bconvection\b/gi,'showers and storms').replace(/\bprecipitation\b/gi,'wet weather').replace(/\btemps\b/gi,'temperatures').replace(/\bPoPs\b/g,'rain chances').replace(/\bQPF\b/g,'rainfall amounts').replace(/\bwrt(?:\s+to)?\b/gi,'about'));
 // Remove reporting clauses from the take, including previously cached AI prose.
 // Keep the weather claim and all uncertainty words intact.
 export function directTakeWording(text){
@@ -100,11 +100,12 @@ export function danOverview(briefing,forecast,now=Date.now()){
 export function danTakeDisplay(briefing,forecast,now=Date.now()){
  if(forecast?.comparison?.source==='google')return 'Nourie Weather Take summarizes the NWS discussion on the regular weather page. This page shows the experimental model forecast.';
  const card=danCard(briefing,forecast,now);
- if(card.items?.[0]?.official)return card.text;
  const summary=briefing?.signature===forecast?.signature&&typeof briefing?.danSummary==='string'?weatherOnlyProse(briefing.danSummary):'';
  const directSummary=standalone(directTakeWording(summary));
  if(directSummary&&!hasDanJargon(directSummary)&&!hasNumericQuantity(directSummary)&&!forecastProseConflict(directSummary,forecast,now))return directSummary+(card.text?'\n\n'+card.text:'');
  const overview=danOverview(null,forecast,now);
+ const hasDiscussion=overview.text&&!/unavailable right now/i.test(overview.text);
+ if(card.items?.[0]?.official&&!hasDiscussion)return card.text;
  return directTakeWording(overview.text)+(card.text?'\n\n'+card.text:'');
 }
 export function danCard(briefing,forecast,now=Date.now()){

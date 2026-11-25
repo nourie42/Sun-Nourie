@@ -19,7 +19,7 @@ main .weather-outlook-panel.glass{padding:13px 16px!important;text-align:left;ov
 .weather-note-dialog{background:#193a51;color:#f7fbff;border:1px solid #bfdce24d;border-radius:20px;padding:24px;max-width:650px;width:calc(100% - 30px);max-height:88dvh;font:15px/1.6 system-ui}
 .weather-note-dialog::backdrop{background:#061725aa;backdrop-filter:blur(5px)}.weather-note-dialog>button{float:right;border:0;background:none;color:white;font-size:28px;min-width:44px;min-height:44px;cursor:pointer}.weather-note-dialog h2{font-size:22px;margin:6px 40px 14px 0}.weather-note-content p{margin:10px 0}
 .weather-main #weather-change-banner,.weather-main #risk-outlooks,.weather-main #forecast-window-banners{display:none!important}
-body:has(.v3-main-stack) #weather-take-banner,body:has(.v3-main-stack) #weather-hazards-strip,body:has(.v3-main-stack) #top-compact-pills{display:none!important}
+body:has(.v3-main-stack) #weather-take-banner,body:has(.v3-main-stack) #top-compact-pills{display:none!important}
 @media(max-width:640px){
   main .weather-outlook-panel.glass{padding:11px 12px!important}
   .outlook-take{gap:9px;grid-template-columns:3px auto minmax(0,1fr) 10px;min-height:38px}

@@ -207,11 +207,184 @@ function validQuery(query = {}) {
   return { latitude, longitude, center, date: dates[0], dates };
 }
 
-export function createStormSnowBetaService({ now = Date.now } = {}) {
+import fs from 'node:fs';
+import { fileURLToPath } from 'node:url';
+
+const DEFAULT_HISTORY_FILE = fileURLToPath(new URL('../data/storm-snow-history.json', import.meta.url));
+const PREVIOUS_RUNS_URL = 'https://previous-runs-api.open-meteo.com/v1/forecast';
+
+function blendArchiveHourly({ hrrr, nbm, ecmwf, isSameDay }) {
+  const raw = isSameDay
+    ? [['hrrr', hrrr, 0.50], ['nbm', nbm, 0.3333], ['ecmwf', ecmwf, 0.1667]]
+    : [['ecmwf', ecmwf, 0.7059], ['nbm', nbm, 0.2941]];
+  let wSum = 0, valSum = 0;
+  for (const [, val, w] of raw) {
+    if (finite(val)) { wSum += w; valSum += val * w; }
+  }
+  return wSum > 0 ? valSum / wSum : null;
+}
+
+async function fetchArchivedRunSnapshots({ latitude, longitude, dates, timeZone = 'America/New_York', fetchImpl, nowMs }) {
+  if (typeof fetchImpl !== 'function' || !dates.length) return [];
+  const params = new URLSearchParams({
+    latitude: String(latitude),
+    longitude: String(longitude),
+    hourly: [
+      'precipitation', 'precipitation_previous_day1', 'precipitation_previous_day2',
+      'snowfall', 'snowfall_previous_day1', 'snowfall_previous_day2',
+      'precipitation_probability', 'precipitation_probability_previous_day1', 'precipitation_probability_previous_day2',
+    ].join(','),
+    models: 'ncep_hrrr_conus,ncep_nbm_conus,ecmwf_ifs025',
+    precipitation_unit: 'inch',
+    forecast_days: '6',
+    timezone: 'UTC',
+  });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 7000);
+  try {
+    const res = await fetchImpl(`${PREVIOUS_RUNS_URL}?${params}`, { signal: controller.signal });
+    if (!res?.ok) return [];
+    const data = await res.json();
+    const h = data?.hourly;
+    if (!Array.isArray(h?.time) || !h.time.length) return [];
+    const zone = timeZone || 'America/New_York';
+    const times = h.time.map(t => Date.parse(t.endsWith('Z') ? t : `${t}:00Z`));
+    const todayKey = dateKey(nowMs, zone);
+    // Reconstruct snapshots for 48h ago (day2) and 24h ago (day1) + morning anchor (today 12Z / 7-8 AM local)
+    const variants = [
+      { suffix: '_previous_day2', issuedAtMs: nowMs - 48 * HOUR, tag: 'archive-48h' },
+      { suffix: '_previous_day1', issuedAtMs: nowMs - 24 * HOUR, tag: 'archive-24h' },
+    ];
+    const snapshots = [];
+    for (const v of variants) {
+      const days = [];
+      for (let index = 0; index < dates.length; index += 1) {
+        const date = dates[index];
+        const midnight = localMidnight(date, zone);
+        const end = localMidnight(nextDate(date), zone);
+        const isSameDay = date === dateKey(v.issuedAtMs, zone) || date === todayKey;
+        const rainHours = [], snowIntervals = [], chances = [];
+        for (let i = 0; i < times.length; i += 1) {
+          const t = times[i];
+          if (!finite(t) || t < midnight || t >= end) continue;
+          const pHrrr = h[`precipitation${v.suffix}_ncep_hrrr_conus`]?.[i];
+          const pNbm = h[`precipitation${v.suffix}_ncep_nbm_conus`]?.[i];
+          const pEcmwf = h[`precipitation${v.suffix}_ecmwf_ifs025`]?.[i];
+          const amt = blendArchiveHourly({ hrrr: pHrrr, nbm: pNbm, ecmwf: pEcmwf, isSameDay });
+          rainHours.push({ time: iso(t), amount: finite(amt) ? round(amt, 3) : null });
+
+          const sHrrr = h[`snowfall${v.suffix}_ncep_hrrr_conus`]?.[i];
+          const sNbm = h[`snowfall${v.suffix}_ncep_nbm_conus`]?.[i];
+          const sEcmwf = h[`snowfall${v.suffix}_ecmwf_ifs025`]?.[i];
+          const sAmt = blendArchiveHourly({ hrrr: sHrrr, nbm: sNbm, ecmwf: sEcmwf, isSameDay });
+          if (finite(sAmt)) snowIntervals.push({ start: iso(t), end: iso(t + HOUR), value: round(sAmt, 2) });
+
+          const popNbm = h[`precipitation_probability${v.suffix}_ncep_nbm_conus`]?.[i];
+          const popEcmwf = h[`precipitation_probability${v.suffix}_ecmwf_ifs025`]?.[i];
+          const pop = finite(popNbm) && finite(popEcmwf) ? (popNbm + popEcmwf) / 2 : finite(popNbm) ? popNbm : finite(popEcmwf) ? popEcmwf : null;
+          if (finite(pop)) chances.push(pop);
+        }
+        const validRain = rainHours.map(r => r.amount).filter(finite);
+        const validSnow = snowIntervals.map(r => r.value).filter(finite);
+        if (!validRain.length && !validSnow.length) continue;
+        const rainAmount = validRain.length ? round(validRain.reduce((a, b) => a + b, 0), 3) : null;
+        const snowAmount = validSnow.length ? round(validSnow.reduce((a, b) => a + b, 0), 3) : null;
+        const maxPop = chances.length ? Math.round(Math.max(...chances)) : null;
+        days.push({
+          date,
+          index,
+          label: date,
+          period: { start: iso(midnight), end: iso(end), localDate: date, timeZone: zone },
+          rain: {
+            amount: rainAmount,
+            amountUnit: 'in liquid-equivalent precipitation',
+            chance: maxPop,
+            chanceKind: 'occurrence',
+            probabilitySource: 'Archived NBM/HRRR/ECMWF prior run blend',
+            timing: { status: 'unavailable', onset: null, peak: null, end: null, windows: [] },
+            confidence: null,
+            supportHours: validRain.length,
+            expectedHours: rainHours.length,
+            hours: rainHours,
+            range: null,
+            quantiles: null,
+            sourceWindow: { start: iso(midnight), end: iso(end) },
+          },
+          snow: {
+            amount: snowAmount,
+            amountUnit: 'in snowfall depth',
+            amountSource: 'Archived NBM/HRRR prior run blend',
+            chance: snowAmount > 0 ? maxPop : (maxPop !== null ? 0 : null),
+            chanceKind: 'peak hourly snow-type occurrence',
+            probabilitySource: 'Archived NBM/HRRR prior run blend',
+            timing: { status: 'unavailable', onset: null, peak: null, end: null, windows: [] },
+            confidence: { level: null, score: null, spreadF: null },
+            intervals: snowIntervals,
+            supportHours: validSnow.length,
+            expectedHours: rainHours.length,
+            range: null,
+            quantiles: null,
+            sourceWindow: { start: iso(midnight), end: iso(end) },
+            type: { snow: (snowAmount || 0) >= 0.1, freezingRain: false, sleet: false },
+          },
+        });
+      }
+      if (days.length) {
+        snapshots.push({
+          version: STORM_SNOW_BETA_VERSION,
+          signature: `${v.tag}:${round(latitude, 2)}:${round(longitude, 2)}:${iso(Math.floor(v.issuedAtMs / HOUR) * HOUR)}`,
+          issuedAt: iso(Math.floor(v.issuedAtMs / HOUR) * HOUR),
+          retrievedAt: iso(nowMs),
+          location: { name: 'Selected location', latitude: round(latitude, 4), longitude: round(longitude, 4), timeZone: zone },
+          source: { forecastVersion: 'previous-runs-backfill', accuracyVersion: null, snowVersion: null, methodology: 'Archived prior model runs' },
+          days,
+        });
+      }
+    }
+    return snapshots;
+  } catch {
+    return [];
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+export function createStormSnowBetaService({ now = Date.now, fetchImpl = null, storagePath = null } = {}) {
   const histories = new Map();
-  function recordForecast(forecast) {
-    const snapshot = buildStormSnowSnapshot(forecast, now());
-    if (!snapshot) return null;
+  const backfilledLocations = new Map();
+  let saveTimer = null;
+
+  if (storagePath) {
+    try {
+      if (fs.existsSync(storagePath)) {
+        const raw = JSON.parse(fs.readFileSync(storagePath, 'utf8'));
+        if (raw && typeof raw === 'object') {
+          const cutoff = now() - 7 * DAY;
+          for (const [k, list] of Object.entries(raw)) {
+            if (Array.isArray(list)) {
+              const recent = list.filter(item => Date.parse(item?.issuedAt || '') > cutoff);
+              if (recent.length) histories.set(k, recent.slice(-48));
+            }
+          }
+        }
+      }
+    } catch {}
+  }
+
+  function scheduleSave() {
+    if (!storagePath || saveTimer) return;
+    saveTimer = setTimeout(() => {
+      saveTimer = null;
+      try {
+        const obj = Object.fromEntries(histories.entries());
+        fs.writeFileSync(storagePath, JSON.stringify(obj));
+      } catch {}
+    }, 1500);
+    saveTimer.unref?.();
+  }
+
+  function insertSnapshot(snapshot) {
+    if (!snapshot) return;
     for (const row of snapshot.days) {
       for (const center of ['rain', 'snow']) {
         const key = historyKey({ latitude: snapshot.location.latitude, longitude: snapshot.location.longitude, center, date: row.date });
@@ -222,8 +395,6 @@ export function createStormSnowBetaService({ now = Date.now } = {}) {
         // per 30-minute bucket lets 48 records span a day of real revisions.
         const last = list.at(-1);
         if (last && Date.parse(entry.issuedAt) >= Date.parse(last.issuedAt) && Date.parse(entry.issuedAt) - Date.parse(last.issuedAt) < HISTORY_BUCKET_MS && list.length > 1) list.pop();
-        // JSON cloning gives callers a detached immutable response while the
-        // retained record remains untouched by route serialization.
         list.push(JSON.parse(JSON.stringify(entry)));
         list.sort((a, b) => Date.parse(a.issuedAt) - Date.parse(b.issuedAt));
         while (list.length > 48) list.shift();
@@ -231,10 +402,17 @@ export function createStormSnowBetaService({ now = Date.now } = {}) {
       }
     }
     if (histories.size > 2500) histories.delete(histories.keys().next().value);
+    scheduleSave();
+  }
+
+  function recordForecast(forecast) {
+    const snapshot = buildStormSnowSnapshot(forecast, now());
+    if (!snapshot) return null;
+    insertSnapshot(snapshot);
     return snapshot;
   }
-  function getHistory(query) {
-    const input = validQuery(query);
+
+  function buildHistoryResponse(input) {
     const list = date => (histories.get(historyKey({ ...input, date })) || []).map(row => ({
       version: row.version,
       center: row.center,
@@ -245,12 +423,34 @@ export function createStormSnowBetaService({ now = Date.now } = {}) {
       source: row.source,
       day: row.day,
     }));
-    // One request can cover every local date of a forecast period.
     const byDate = Object.fromEntries(input.dates.map(date => [date, list(date)]));
     return { version: STORM_SNOW_BETA_VERSION, key: historyKey(input), location: { latitude: input.latitude, longitude: input.longitude }, center: input.center, date: input.date, dates: input.dates, thresholds: MATERIAL_CHANGE_THRESHOLDS, snapshots: byDate[input.date], byDate };
   }
-  return { recordForecast, getHistory, size: () => histories.size };
+
+  function getHistory(query) {
+    const input = validQuery(query);
+    const current = buildHistoryResponse(input);
+    if (!fetchImpl || current.snapshots.length >= 2) return current;
+    const locKey = `${Number(input.latitude).toFixed(2)}:${Number(input.longitude).toFixed(2)}`;
+    const lastTry = backfilledLocations.get(locKey) || 0;
+    if (now() - lastTry < 10 * 60000) return current;
+    backfilledLocations.set(locKey, now());
+    const sampleTz = current.snapshots[0]?.location?.timeZone || 'America/New_York';
+    return fetchArchivedRunSnapshots({
+      latitude: input.latitude,
+      longitude: input.longitude,
+      dates: input.dates,
+      timeZone: sampleTz,
+      fetchImpl,
+      nowMs: now(),
+    }).then(archived => {
+      for (const snap of archived) insertSnapshot(snap);
+      return buildHistoryResponse(input);
+    });
+  }
+  return { recordForecast, getHistory, size: () => histories.size, DEFAULT_HISTORY_FILE };
 }
+export { DEFAULT_HISTORY_FILE };
 
 export function compareStormSnowSnapshots(previous, current, center) {
   const a = previous?.day?.[center], b = current?.day?.[center];

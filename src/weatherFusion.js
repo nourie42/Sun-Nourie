@@ -26,7 +26,7 @@ import {forecastPeriodSummary} from '../public/weather-fusion/forecast-story.js'
 import {isTonightPeriod} from '../public/weather-fusion/weather-math.js';
 import {bannerStateFromNwsPeriods} from '../public/weather-fusion/alert-banners.js';
 import {createAccuracyService} from './weatherFusionAccuracy.js';
-import {createStormSnowBetaService} from './weatherFusionBeta.js';
+import {createStormSnowBetaService, DEFAULT_HISTORY_FILE} from './weatherFusionBeta.js';
 /** Weather Fusion: isolated, dependency-free Express route registration.
  * Numeric forecasts stay deterministic. AI explains supplied facts; it cannot edit them.
  * Source contracts and deployment requirements: docs/weather-fusion.md.
@@ -786,7 +786,11 @@ export function registerWeatherFusionRoutes(app, options = {}) {
   registerGlobeRoutes(app,{fetchImpl:options.fetchImpl,now:options.now,parseRadarTimes});
   const service = createWeatherService({env:{...process.env,WEATHER_NOURIE_BLEND_V2:process.env.WEATHER_NOURIE_BLEND_V2||'true'},...options});
   const accuracy = createAccuracyService({fetchImpl: options.fetchImpl || fetch, now: options.now || Date.now});
-  const stormSnowBeta = createStormSnowBetaService({now: options.now || Date.now});
+  const stormSnowBeta = createStormSnowBetaService({
+    now: options.now || Date.now,
+    fetchImpl: options.fetchImpl || fetch,
+    storagePath: options.fetchImpl ? null : DEFAULT_HISTORY_FILE,
+  });
   const getForecastRecorded = async (query) => {
     const forecast = await service.getForecast(query);
     try { accuracy.recordRuntimeForecast(forecast); } catch {}

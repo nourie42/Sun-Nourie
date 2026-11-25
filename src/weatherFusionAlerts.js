@@ -1,6 +1,6 @@
 const INTERVAL=30000;
 const countyId=value=>typeof value==='string'?value.match(/^https:\/\/api\.weather\.gov\/zones\/county\/([A-Z]{2}C\d{3})$/)?.[1]:null;
-const active=(a,now)=>a.status==='Actual'&&a.messageType!=='Cancel'&&Date.parse(a.expires)>now&&(!a.ends||Date.parse(a.ends)>now)&&(!a.sent||Date.parse(a.sent)<=now+60000);
+const active=(a,now)=>{const end=Date.parse(a.ends||a.expires);return a.status==='Actual'&&a.messageType!=='Cancel'&&end>now&&(!a.sent||Date.parse(a.sent)<=now+60000);};
 
 export function mergeOfficialAlerts(pointFeatures,countyFeatures,county,now){
   const features=[...countyFeatures.map(f=>({feature:f,scope:'county'})),...pointFeatures.map(f=>({feature:f,scope:'point'}))];

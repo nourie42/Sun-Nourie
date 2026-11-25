@@ -19,8 +19,7 @@ export function bulletinSourceKey(item){
 export function bulletinFacts(forecast,now=Date.now()){
  const byId=new Map();
  for(const a of forecast?.alerts||[]){
-  if(!a.id||a.status&&a.status!=='Actual'||a.messageType==='Cancel'||!(Date.parse(a.expires)>now)||Date.parse(a.sent)>now+60000)continue;
-  if(a.ends&&Date.parse(a.ends)<=now)continue;
+  if(!a.id||a.status&&a.status!=='Actual'||a.messageType==='Cancel'||!(Date.parse(a.ends||a.expires)>now)||Date.parse(a.sent)>now+60000)continue;
   const detection=a.parameters?.tornadoDetection?.[0]||'';
   const emergency=/tornado warning/i.test(a.event||'')&&(/tornado emergency/i.test(`${a.headline||''} ${a.description||''}`)||a.parameters?.tornadoDamageThreat?.includes('CATASTROPHIC'));
   const item={id:String(a.id),kind:bulletinKind(a.event),title:a.event||'NWS notice',headline:a.headline||'',area:a.areaDesc||'',issuedAt:a.sent||'',expires:a.expires,severity:a.severity||'',description:a.description||'',instruction:a.instruction||'',scope:a.scope||'point',detection,emergency,url:officialBulletinUrl(a.url||a.id)};

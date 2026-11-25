@@ -22,7 +22,7 @@ import {
   WeatherMapController
 } from './map.js?v=smooth-radar-v1';
 import { dogWalkerScene, referenceScene } from '../../exposure-scene.js?v=true-night-art-v6';
-import { danCard, danOverview, danTakeDisplay } from '../../dans-summary.js?v=warning-first-v1';
+import { danCard, danOverview, danTakeDisplay } from '../../dans-summary.js?v=discussion-first-v2';
 import { activeRiskOutlooks, outlookDetailHTML } from '../../risk-outlooks.js?v=risk-outlooks-v5';
 import { forecastWindowBannerHTML, forecastWindowDetailHTML } from '../../forecast-window-banners.js?v=rain-hours-only-v1';
 import {confidenceWarningDetailHTML,confidenceWarningHTML,lowConfidenceWarning} from '../../confidence-bar.js?v=multi-event-confidence-v4';
@@ -32,7 +32,7 @@ import { todayRainDisplay } from '../../today-card.js?v=hour-details-v1';
 import {applyLocalRadar, displayedRainChance, observedRainLabel} from '../../rain-display.js?v=local-radar-v2';
 import {currentWeatherDisplay} from '../../current-weather.js?v=clean-forecast-v1';
 import { dayGraphHTML, installDayGraph } from '../../day-graph.js?v=hourly-rain-v5';
-import { dewpointFeelLevel, renderDewpointMeter } from '../../dewpoint-meter.js?v=air-moisture-v2';
+import { dewpointFeelLevel, renderDewpointMeter } from '../../dewpoint-meter.js?v=wet-aware-v3';
 import { TREND_METRICS, mainTrendSeries, trendReading } from '../../main-hourly-trend.js?v=beta-glass-48h-v2';
 import { mountChart, solarDays, nightBands, fmt as haloFmt, H as HALO_H } from '../../halo.js?v=smooth-trend-v4';
 
@@ -696,18 +696,19 @@ function renderStatusAndAlerts(f) {
 
   const alertsWrap = document.getElementById('urgent-alerts-container');
   if (!alertsWrap) return;
-  if (!f.alerts || f.alerts.length === 0) {
+  const canonical = f.canonical || f;
+  const mergedAlerts = Array.isArray(f.alerts) && f.alerts.length ? f.alerts : (canonical?.alerts || []);
+  if (mergedAlerts.length === 0) {
     alertsWrap.innerHTML = '';
     return;
   }
 
-  alertsWrap.innerHTML = f.alerts
-    .slice(0, 2)
+  alertsWrap.innerHTML = mergedAlerts
     .map(
       (a, idx) => `
       <details class="nws-alert" role="alert">
         <summary>
-          <span class="nws-alert-tag">⚠ NWS ${a.severity}</span>
+          <span class="nws-alert-tag">⚠ NWS ${a.severity || 'ALERT'}</span>
           <span class="nws-alert-event">${a.event}</span>
           <span class="nws-alert-chev" aria-hidden="true">▸</span>
         </summary>
@@ -722,7 +723,7 @@ function renderStatusAndAlerts(f) {
 
   alertsWrap.querySelectorAll('.alert-view-btn').forEach((btn) => {
     btn.addEventListener('click', () => {
-      const a = f.alerts[Number(btn.dataset.alertIdx)] || f.alerts[0];
+      const a = mergedAlerts[Number(btn.dataset.alertIdx)] || mergedAlerts[0];
       if (!a) return;
       openModal(
         a.event,
@@ -736,34 +737,67 @@ function renderStatusAndAlerts(f) {
 function renderWeatherHazards(f) {
   const strip = document.getElementById('weather-hazards-strip');
   const canonical = f.canonical || f;
-  const risks = activeRiskOutlooks(canonical, Date.now());
+  const now = Date.now();
+  const risks = activeRiskOutlooks(canonical, now);
+  const discussions = [
+    ...(canonical?.specialDiscussions || []).filter((d) => d?.applicable === true && Date.parse(d.expires) > now && d.description),
+    ...(canonical?.precipitationDiscussions || []).filter((d) => d?.applicable === true && Date.parse(d.expires) > now && d.description)
+  ];
 
   if (strip) {
-    if (!risks.length) {
+    if (!risks.length && !discussions.length) {
       strip.hidden = true;
       strip.innerHTML = '';
     } else {
       strip.hidden = false;
-      strip.innerHTML = risks
+      const riskHtml = risks
         .map((r, idx) => {
           const isSevere = /Moderate|Enhanced|High/i.test(r.level);
           const color = RISK_COLORS[r.level] || '#f4e14a';
+          const agency = r.kind === 'wpc' ? 'WPC' : r.kind === 'spc' ? 'SPC' : 'WPC Winter';
           const shortTitle = r.title || `${r.level} Weather Risk`;
           return `
             <button type="button" class="hazard-slim-btn ${isSevere ? 'severe' : ''}" data-risk-kind="${r.kind}" data-risk-index="${idx}" style="border-left:4px solid ${color};">
               <span class="hazard-slim-left">
                 <span class="hazard-slim-dot" style="background:${color};"></span>
-                <span>${shortTitle}</span>
+                <span>${agency} · ${shortTitle}</span>
               </span>
               <span class="hazard-slim-action">Map ›</span>
             </button>
           `;
         })
         .join('');
+      const discHtml = discussions
+        .map((d, idx) => {
+          const agency = d.productType === 'WPC-MPD' ? 'WPC' : 'SPC';
+          const title = d.event || (d.productType === 'WPC-MPD' ? 'Heavy Rain & Flash Flooding Discussion' : 'Mesoscale Discussion');
+          return `
+            <button type="button" class="hazard-slim-btn" data-disc-index="${idx}" style="border-left:4px solid #38bdf8;">
+              <span class="hazard-slim-left">
+                <span class="hazard-slim-dot" style="background:#38bdf8;"></span>
+                <span>${agency} · ${title}</span>
+              </span>
+              <span class="hazard-slim-action">View ›</span>
+            </button>
+          `;
+        })
+        .join('');
+      strip.innerHTML = riskHtml + discHtml;
       strip.querySelectorAll('[data-risk-kind]').forEach((btn) => {
         btn.addEventListener('click', () => {
           const r = risks[Number(btn.dataset.riskIndex)];
           if (r) openRiskOutlookModal(r, f);
+        });
+      });
+      strip.querySelectorAll('[data-disc-index]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const d = discussions[Number(btn.dataset.discIndex)];
+          if (!d) return;
+          openModal(
+            d.event || 'Special Weather Discussion',
+            `${d.plainSummary ? `<p style="margin:0 0 10px;line-height:1.45;">${d.plainSummary}</p>` : ''}
+             <pre class="afd-pre">${d.description || ''}</pre>`
+          );
         });
       });
     }
@@ -837,7 +871,7 @@ function renderTopCompactPills(f) {
   if(!f.canonical){host.hidden=true;if(perfectHost){perfectHost.hidden=true;perfectHost.replaceChildren();}return;}
   const now=Date.now(),items=outlookItems(withAlerts(f.canonical,f.alerts),now);
   const perfect=items.find(item=>item.kind==='perfect');
-  const summary=items.find(item=>item.kind==='risk')?.risk.title||document.getElementById('take-banner-copy')?.textContent||'';
+  const summary=document.getElementById('take-banner-copy')?.textContent||items.find(item=>item.kind==='risk')?.risk.title||'';
   renderOutlookPanel(host,{summary,items:items.filter(item=>item.kind!=='perfect'),onTake:()=>openWeatherTakeModal(f),onItem:item=>{
     if(item.kind==='risk'){
       if(item.risk.kind==='wssi')openOutlookNote(item.risk.title,[item.risk.summary,item.risk.url]);
@@ -1042,7 +1076,8 @@ function getFeelsVerdict(feelsF, isRain) {
   return { label: 'Hot & Humid', note: 'Stay hydrated & shaded' };
 }
 
-function getDewPointVerdict(dpF) {
+function getDewPointVerdict(dpF, isWet = false) {
+  if (isWet && dpF < 50) return dpF < 35 ? 'Cold & Damp' : 'Cool & Damp';
   if (dpF < 35) return 'Very Dry';
   if (dpF < 50) return 'Crisp & Dry';
   if (dpF < 60) return 'Comfortable';
@@ -1152,7 +1187,7 @@ function renderHeroAndBriefing(f) {
 
   const takeBannerCopy = document.getElementById('take-banner-copy');
   if (takeBannerCopy) {
-    takeBannerCopy.textContent = card?.text ? cleanTakeJargon(card.text.replace(/\n+/g, ' · ')) : firstSentence;
+    takeBannerCopy.textContent = validTakeText ? firstSentence : (card?.text ? cleanTakeJargon(card.text.replace(/\n+/g, ' · ')) : firstSentence);
   }
 
   // 4-Column Quick Stats Glass Strip (use exact canonical 24-hour QPF sum when available so Main and Beta match identically)
@@ -1271,8 +1306,8 @@ function renderFeelsTimeAndTrio(f) {
     trioOutfitEl.innerHTML = referenceScene(1, Boolean(h.isDay), h.condition || 'Clear', h.feelsLikeF ?? h.tempF, sceneCtx);
   }
   if (trioDpVal) trioDpVal.textContent = fmtTemp(h.dewPointF);
-  const feelMeterVerdict = dewpointFeelLevel(h.dewPointF ?? 50, h.windMph ?? 0);
-  if (trioDpLbl) trioDpLbl.textContent = feelMeterVerdict?.label || getDewPointVerdict(h.dewPointF ?? 50);
+  const feelMeterVerdict = dewpointFeelLevel(h.dewPointF ?? 50, h.windMph ?? 0, { wet: isRain });
+  if (trioDpLbl) trioDpLbl.textContent = feelMeterVerdict?.label || getDewPointVerdict(h.dewPointF ?? 50, isRain);
   if (trioWindSpd) trioWindSpd.textContent = String(Math.round(h.windMph ?? 0));
   if (trioWindUnit) trioWindUnit.textContent = `mph ${h.windCardinal || 'N'}`;
   if (trioWindGust) trioWindGust.textContent = `Gusts ${Math.round(h.windGustMph ?? h.windMph ?? 0)} mph`;
@@ -2137,7 +2172,7 @@ function renderAqiAndGlanceTiles(f) {
         id: 'humidity',
         label: '💧 Humidity',
         val: `${cur.humidity}%`,
-        badge: getDewPointVerdict(cur.dewPointF),
+        badge: getDewPointVerdict(cur.dewPointF, hasObservedRain(f) || (cur.precipIn || 0) >= 0.01 || (cur.rainChance || 0) >= 55 || /rain|shower|drizzle|storm|snow|sleet|flurr|ice|wintry/i.test(cur.condition || '')),
         visual: `<div class="apple-meter-track"><div class="apple-meter-fill" style="width:${humPct.toFixed(0)}%;background:linear-gradient(90deg,#38bdf8,#818cf8);"></div></div>`,
         sub: `Dew point ${fmtTemp(cur.dewPointF)}`
       },
@@ -2891,7 +2926,7 @@ function openWardrobeModal(f) {
     const sceneCtx = { pop: cur.rainChance, rainExpected: isRaining, snowExpected: /snow|flurr/i.test(cur.condition || '') };
     const cartoonHtml = referenceScene(1, Boolean(cur.isDay), cur.condition || 'Clear', cur.feelsLikeF ?? cur.tempF, sceneCtx);
     const advice = buildWardrobeAdvice(cur.feelsLikeF ?? cur.tempF, cur);
-    const dpDesc = getDewPointVerdict(cur.dewPointF ?? 50);
+    const dpDesc = getDewPointVerdict(cur.dewPointF ?? 50, isRaining);
     const presets = getFeelsTimePresets(f);
 
     const bodyEl = document.getElementById('modal-body');
@@ -2962,7 +2997,8 @@ function openDewPointFeelMeterModal(f) {
   } else {
     const host = document.getElementById('dewpoint-gross-meter');
     const cur = f.current;
-    const verdict = dewpointFeelLevel(cur?.dewPointF, cur?.windMph);
+    const isCurWet = hasObservedRain(f) || (cur?.precipIn || 0) >= 0.01 || (cur?.rainChance || 0) >= 55 || /rain|shower|drizzle|storm|snow|sleet|flurr|ice|wintry/i.test(cur?.condition || '');
+    const verdict = dewpointFeelLevel(cur?.dewPointF, cur?.windMph, { wet: isCurWet });
     if (host) {
       host.innerHTML = `
         <div style="padding:12px;">

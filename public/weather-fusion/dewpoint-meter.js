@@ -4,8 +4,10 @@ const finite=v=>typeof v==='number'&&Number.isFinite(v);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const HOUR=3600000;
 let horizon=48,selectedEpoch=null,latest=null,lastNow=0,resizeInstalled=false,chartResizeObserver=null;
-export function dewpointFeelLevel(dewpoint,wind=0){
+export function dewpointFeelLevel(dewpoint,wind=0,{wet=false}={}){
   if(!finite(dewpoint))return {key:'unknown',label:'Waiting on the dew point',note:'We need a dew-point reading before calling it.'};
+  if(wet&&dewpoint<35)return {key:'damp',label:'Cold & damp, not dry',note:'The dew point is low because the air is cold, not dry—precipitation is keeping it damp outside. Heated indoor air can still feel dry.'};
+  if(wet&&dewpoint<50)return {key:'damp',label:'Cool & damp, not muggy',note:'The dew point is low because the air is cool, not dry—rain is keeping it damp outside without feeling sticky.'};
   if(dewpoint<35)return {key:'parched',label:'So dry, your doorknob may zap you',note:'Low moisture in the air. Heating it indoors can lower relative humidity and bring dry skin and static shocks; outdoor humidity can still be high.'};
   if(dewpoint<45)return {key:'crisp',label:'Lotion weather. Your elbows have entered the chat',note:'Crisp, low-moisture air. Heated indoor air may feel dry; the temperature still decides whether you need a coat.'};
   if(dewpoint<50)return {key:'dry',label:'You’re either cold or you’re gettin’ ashy',note:'On the dry side. This describes air moisture, not how warm or cold it feels.'};
@@ -20,9 +22,9 @@ export function dewpointFeelLevel(dewpoint,wind=0){
 export const dewpointGrossLevel=dewpointFeelLevel;
 
 
-export function forecastFeelLevel(dewpoint,wind=0){
- const level=dewpointFeelLevel(dewpoint,wind);
- const labels={parched:'Very dry air ahead — your doorknob may bring the sparks',crisp:'Crisp, dry air ahead — lotion gets a starring role',dry:'It should feel pleasantly dry',nice:'Moisture should feel pretty comfortable','nice-breeze':'The breeze should help with the humidity',humid:'It will feel a bit humid',gross:'It will feel sticky',nogo:'It will feel very muggy',nope:'It will feel extremely muggy',unknown:'The dew-point forecast is unavailable'};
+export function forecastFeelLevel(dewpoint,wind=0,{wet=false}={}){
+ const level=dewpointFeelLevel(dewpoint,wind,{wet});
+ const labels={damp:'Cool and damp — wet from rain, not muggy',parched:'Very dry air ahead — your doorknob may bring the sparks',crisp:'Crisp, dry air ahead — lotion gets a starring role',dry:'It should feel pleasantly dry',nice:'Moisture should feel pretty comfortable','nice-breeze':'The breeze should help with the humidity',humid:'It will feel a bit humid',gross:'It will feel sticky',nogo:'It will feel very muggy',nope:'It will feel extremely muggy',unknown:'The dew-point forecast is unavailable'};
  return {...level,label:labels[level.key]||labels.unknown};
 }
 export const forecastGrossLevel=forecastFeelLevel;
@@ -147,7 +149,18 @@ export function renderDewpointMeter(forecast,now=Date.now()){
  if(!panel){const anchor=document.getElementById('car-wash-forecast')||host;panel=document.createElement('section');panel.id='dewpoint-gross-meter';panel.className='glass dewpoint-gross-meter';panel.setAttribute('aria-labelledby','gross-title');anchor.insertAdjacentElement('afterend',panel);}
  const all=dewpointPoints(forecast,now,240),pts=dewpointPoints(forecast,now,horizon),valid=pts.filter(p=>finite(p.value));
  const facts=currentFeelMeterFacts(forecast,now);
- const zone=forecast.location.timeZone||'America/New_York',dp=facts.dewpoint,level=dewpointFeelLevel(dp,facts.wind),dryFocus=finite(dp)&&dp<50;
+ const WET_RE=/rain|shower|drizzle|storm|thunder|snow|sleet|flurr|ice|freez|wintry|mist/i;
+ const curCond=String(forecast?.current?.condition||'');
+ const curHour=forecast?.hours?.[0];
+ const currentWet=WET_RE.test(curCond)||forecast?.current?.localRadar?.status==='rain-here'||(finite(curHour?.precipitation)&&curHour.precipitation>=0.01)||(finite(curHour?.pop)&&curHour.pop>=60)||(finite(curHour?.rainChance)&&curHour.rainChance>=60);
+ const hourWetAt=epoch=>{
+  const h=(forecast?.hours||[]).find(row=>Date.parse(row.time)===epoch);
+  if(h)return WET_RE.test(String(h.condition||h.forecastCondition||''))||(finite(h.precipitation)&&h.precipitation>=0.01)||(finite(h.precipIn)&&h.precipIn>=0.01)||(finite(h.pop)&&h.pop>=55)||(finite(h.rainChance)&&h.rainChance>=55);
+  const pSeries=forecast?.metricForecasts?.series?.precipitation?.find(row=>Date.parse(row.time)===epoch)?.value;
+  const popSeries=forecast?.metricForecasts?.series?.pop?.find(row=>Date.parse(row.time)===epoch)?.value;
+  return (finite(pSeries)&&pSeries>=0.01)||(finite(popSeries)&&popSeries>=55);
+ };
+ const zone=forecast.location.timeZone||'America/New_York',dp=facts.dewpoint,level=dewpointFeelLevel(dp,facts.wind,{wet:currentWet}),dryFocus=finite(dp)&&dp<50&&!currentWet;
  const extreme=valid.reduce((best,p)=>!best||(dryFocus?p.value<best.value:p.value>best.value)?p:best,null),coverage=all.filter(p=>finite(p.value)).at(-1);
  const hoursAvailable=coverage?Math.max(0,Math.floor((coverage.epoch-now)/HOUR)):0;
  chartResizeObserver?.disconnect();chartResizeObserver=null;
@@ -156,7 +169,7 @@ export function renderDewpointMeter(forecast,now=Date.now()){
  // as the coordinate system for the subsequently visible chart.
  let built=graph(pts,horizon,zone,Math.max(240,Math.min(640,window.innerWidth-76)),start);
  const marker=finite(dp)?Math.max(0,Math.min(100,(dp-20)/60*100)):0;
- const pill=({'nice-breeze':'BREEZE HELPS',gross:'STICKY',nogo:'MUGGY',nope:'VERY MUGGY'})[level.key]||level.key.toUpperCase();
+ const pill=({damp:'COOL & DAMP','nice-breeze':'BREEZE HELPS',gross:'STICKY',nogo:'MUGGY',nope:'VERY MUGGY'})[level.key]||level.key.toUpperCase();
  const {humidity,temperature:air,feels}=facts;
  const dryness=dryForecastSummary(forecast,now,horizon),indoorRH=finite(air)&&air<60?heatedIndoorHumidity(dp):null;
  const indoorNote=finite(indoorRH)&&dp<45?`Heating this outdoor air to 68°F without adding moisture would put it near ${indoorRH}% relative humidity. Your actual indoor humidity depends on moisture sources and ventilation.`:'';
@@ -182,7 +195,7 @@ export function renderDewpointMeter(forecast,now=Date.now()){
   </div>`;
  const select=i=>{
   const p=pts[Math.max(0,Math.min(pts.length-1,i))];if(!p)return;selectedEpoch=p.epoch;
-  const v=forecastFeelLevel(p.value,pairedWind(forecast,p.time));
+  const v=forecastFeelLevel(p.value,pairedWind(forecast,p.time),{wet:hourWetAt(p.epoch)});
   panel.querySelector('.gross-selected-value').textContent=finite(p.value)?Math.round(p.value)+'°':'Unavailable';
   panel.querySelector('.gross-selected-time').textContent=`${dayText(p.time,zone)} · ${hourText(p.time,zone)} forecast`;
   panel.querySelector('.gross-selected-label').textContent=v.label;
