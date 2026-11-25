@@ -100,6 +100,7 @@ export function danOverview(briefing,forecast,now=Date.now()){
 export function danTakeDisplay(briefing,forecast,now=Date.now()){
  if(forecast?.comparison?.source==='google')return 'Nourie Weather Take summarizes the NWS discussion on the regular weather page. This page shows the experimental model forecast.';
  const card=danCard(briefing,forecast,now);
+ if(card.items?.[0]?.official)return card.text;
  const summary=briefing?.signature===forecast?.signature&&typeof briefing?.danSummary==='string'?weatherOnlyProse(briefing.danSummary):'';
  const directSummary=standalone(directTakeWording(summary));
  if(directSummary&&!hasDanJargon(directSummary)&&!hasNumericQuantity(directSummary)&&!forecastProseConflict(directSummary,forecast,now))return directSummary+(card.text?'\n\n'+card.text:'');

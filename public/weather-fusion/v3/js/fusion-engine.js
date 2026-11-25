@@ -1905,7 +1905,8 @@ function buildNourieWeatherTake(loc, hours, days, windows, pavement, nwsData, ca
 
   let riskOutlook;
   const activeAlerts = canonicalData?.alerts?.length ? canonicalData.alerts : (nwsData.alerts || []);
-  if (activeRisks.length > 0) {
+  const activeWarning = activeAlerts.find(a => /warning/i.test(a?.event || ''));
+  if (activeRisks.length > 0 && !activeWarning) {
     const top = activeRisks[0];
     const kindLabel = top.kind === 'wpc'
       ? 'Flooding'

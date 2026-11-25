@@ -3,7 +3,7 @@ import {applyLocalRadar} from './rain-display.js?v=local-radar-v2';
 import {confidenceDetailsHTML} from './forecast-confidence.js?v=ensemble-confidence-v1';
 import {rainTiming,rainTimingHTML} from './rain-timing.js?v=current-rain-20261017-v3';
 import {DAN_TAKE_VERSION,visibleDanTakeItems,danTakeText,rebindDanTake} from './dans-take.js?v=audit-20261017-v1';
-import {danCard,danTakeDisplay} from './dans-summary.js?v=complete-discussion-context-v2';
+import {danCard,danTakeDisplay} from './dans-summary.js?v=warning-first-v1';
 import {fetchJsonWithDeadline} from './request-deadline.js?v=loading-recovery-v1';
 import {dailyUvHTML} from './daily-uv.js?v=weather-art-labels-v10';
 import {currentReadingFreshness} from './weather-freshness.js?v=accuracy-20261019-v1';
@@ -35,7 +35,7 @@ import {createSevenDayCarousel} from './seven-day.js?v=low-rain-display-v1';
 import {forecastSourceHealth} from './forecast-status.js?v=source-health-v1';
 import {forecastRefreshDue} from './forecast-refresh.js?v=coverage-recovery-v2';
 import {forecastSky} from './sky-display.js?v=radar-sky-v5-local-observation-v2';
-import {outlookItems,renderOutlookPanel,openOutlookNote} from './outlook-panel.js?v=daily-hourly-v1';
+import {outlookItems,renderOutlookPanel,openOutlookNote} from './outlook-panel.js?v=snow-aware-v3';
 /* Weather Nourie browser client. Forecast values never originate in AI prose. */
 const $ = (id) => document.getElementById(id);
 const experimentalPage = isExperimentalWeatherPage();

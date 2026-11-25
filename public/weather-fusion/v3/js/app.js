@@ -8,8 +8,9 @@ import {
   nextSunnyBreak,
   outdoorExposureReadings,
   searchLocations
-} from './fusion-engine.js?v=today-dewpoint-v1';
+} from './fusion-engine.js?v=warning-first-v1';
 import {todaySummary, twoDayHeadline} from './today-preview.js?v=two-day-headline-v1';
+import {skySceneSvg} from './sky-scenes.js?v=scenes-v1';
 import {hourlyRainInputsHTML, rainPercent} from './hourly-rain.js?v=local-hourly-v1';
 import { getLunarPhaseFraction, renderWeatherIconSvg } from './icons.js?v=v3-sky-8';
 import {
@@ -22,12 +23,12 @@ import {
   WeatherMapController
 } from './map.js?v=smooth-radar-v1';
 import { dogWalkerScene, referenceScene } from '../../exposure-scene.js?v=true-night-art-v6';
-import { danCard, danOverview, danTakeDisplay } from '../../dans-summary.js?v=complete-discussion-context-v2';
+import { danCard, danOverview, danTakeDisplay } from '../../dans-summary.js?v=warning-first-v1';
 import { activeRiskOutlooks, outlookDetailHTML } from '../../risk-outlooks.js?v=risk-outlooks-v5';
 import { forecastWindowBannerHTML, forecastWindowDetailHTML } from '../../forecast-window-banners.js?v=rain-hours-only-v1';
 import {confidenceWarningDetailHTML,confidenceWarningHTML,lowConfidenceWarning} from '../../confidence-bar.js?v=multi-event-confidence-v4';
 import {GlobePanel} from './globe-panel.js?v=wind-flow-v2';
-import {outlookItems,renderOutlookPanel,openOutlookNote} from '../../outlook-panel.js?v=daily-hourly-v1';
+import {outlookItems,renderOutlookPanel,openOutlookNote} from '../../outlook-panel.js?v=snow-aware-v3';
 import { todayRainDisplay } from '../../today-card.js?v=hour-details-v1';
 import {applyLocalRadar, displayedRainChance, observedRainLabel} from '../../rain-display.js?v=local-radar-v2';
 import {currentWeatherDisplay} from '../../current-weather.js?v=local-radar-v2';
@@ -398,6 +399,16 @@ function remIcon(name, size = 16) {
   return `<svg class="rem-ico" width="${size}" height="${size}" viewBox="0 0 24 24" fill="${filled ? 'currentColor' : 'none'}" stroke="${filled ? 'none' : 'currentColor'}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${REMAINDER_ICON_PATHS[name]}</svg>`;
 }
 
+function withAlerts(forecast, alerts) {
+  if (!forecast) return forecast;
+  return forecast.alerts?.length || !alerts?.length ? forecast : { ...forecast, alerts };
+}
+
+function svgCoverBackground(svg) {
+  const encoded = encodeURIComponent(svg).replace(/[()']/g, c => `%${c.charCodeAt(0).toString(16).toUpperCase()}`);
+  return `url(data:image/svg+xml,${encoded}) center/cover no-repeat`;
+}
+
 function remainderSky(hours, cur) {
   const text = hours.map(h => String(h.condition || h.forecastCondition || '').toLowerCase()).join(' ');
   const sum = key => hours.reduce((total, h) => total + (Number(h[key]) || 0), 0);
@@ -505,7 +516,7 @@ function renderBetaTodayCard(f) {
         <time>Updated ${fmtHour(new Date().toISOString(), { hour: 'numeric', minute: '2-digit' })}</time>
       </header>
       <div class="rem-top">
-        <div class="rem-tile" style="background-image:url(/weather-fusion/tile-${sky.tile}.jpg)">
+        <div class="rem-tile" style="background:${svgCoverBackground(skySceneSvg(sky.tile, cur.isDay))}">
           <span>${escapeAttr(sky.label)}</span>
         </div>
         <div class="rem-temps">
@@ -515,7 +526,7 @@ function renderBetaTodayCard(f) {
         <div class="rem-rain">
           ${remIcon('drop', 30)}
           <strong>${num(d.rainChance, x => `${x}%`)}</strong>
-          <small>Rain Chance</small>
+          <small>${snowDay ? 'Snow Chance' : 'Rain Chance'}</small>
           <small>${escapeAttr(rainPeakText)}</small>
         </div>
       </div>
@@ -802,7 +813,7 @@ function renderTopCompactPills(f) {
   const perfectHost=document.getElementById('perfect-weather-window');
   if(!host)return;
   if(!f.canonical){host.hidden=true;if(perfectHost){perfectHost.hidden=true;perfectHost.replaceChildren();}return;}
-  const now=Date.now(),items=outlookItems(f.canonical,now);
+  const now=Date.now(),items=outlookItems(withAlerts(f.canonical,f.alerts),now);
   const perfect=items.find(item=>item.kind==='perfect');
   const summary=items.find(item=>item.kind==='risk')?.risk.title||document.getElementById('take-banner-copy')?.textContent||'';
   renderOutlookPanel(host,{summary,items:items.filter(item=>item.kind!=='perfect'),onTake:()=>openWeatherTakeModal(f),onItem:item=>{
@@ -1083,10 +1094,11 @@ function renderHeroAndBriefing(f) {
 
   // Top Slim Clickable Nourie Take Preview
   const canonical = f.canonical;
+  const takeSource = withAlerts(canonical, f.alerts);
   const b = state.liveBriefing || canonical;
-  const card = canonical ? danCard(b, canonical, Date.now()) : null;
-  const overview = canonical ? danOverview(b, canonical, Date.now()) : null;
-  const takeDisplay = canonical ? danTakeDisplay(b, canonical, Date.now()) : '';
+  const card = canonical ? danCard(b, takeSource, Date.now()) : null;
+  const overview = canonical ? danOverview(b, takeSource, Date.now()) : null;
+  const takeDisplay = canonical ? danTakeDisplay(b, takeSource, Date.now()) : '';
 
   const validTakeText =
     takeDisplay && !/unavailable right now/i.test(takeDisplay)
@@ -2794,11 +2806,12 @@ function openWeatherMeterModal(f) {
 
 function openWeatherTakeModal(f) {
   const canonical = f.canonical;
+  const takeSource = withAlerts(canonical, f.alerts);
   const b = state.liveBriefing || canonical;
   const risks = canonical ? activeRiskOutlooks(canonical, Date.now()) : [];
-  const card = canonical ? danCard(b, canonical, Date.now()) : null;
-  const overview = canonical ? danOverview(b, canonical, Date.now()) : null;
-  const takeDisplay = canonical ? danTakeDisplay(b, canonical, Date.now()) : '';
+  const card = canonical ? danCard(b, takeSource, Date.now()) : null;
+  const overview = canonical ? danOverview(b, takeSource, Date.now()) : null;
+  const takeDisplay = canonical ? danTakeDisplay(b, takeSource, Date.now()) : '';
 
   const rawTake = cleanTakeJargon(
     takeDisplay && !/unavailable right now/i.test(takeDisplay)

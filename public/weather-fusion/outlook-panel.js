@@ -5,11 +5,12 @@ const esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&
 const icons={risk:'<svg viewBox="0 0 24 24"><path d="M12 22S3 13 3 9a9 9 0 0 1 18 0c0 4-9 13-9 13Z"/><circle cx="12" cy="9" r="3" fill="#153d49"/></svg>',change:'⚡',rain:'🌧',perfect:'🌤'};
 export function outlookItems(data,now=Date.now(),providedView=null){
  const view=providedView||buildForecastWindows(data,now),items=[];
- for(const risk of activeRiskOutlooks(data,now))items.push({id:'risk-'+risk.id,kind:'risk',label:risk.kind==='wpc'?'Flood Risk':risk.kind==='spc'?'Storm Risk':'Winter Risk',preview:risk.level||risk.title,risk});
+ const warned=(data?.alerts||[]).some(a=>/warning/i.test(a?.event||''));
+ for(const risk of activeRiskOutlooks(data,now)){if(warned&&!['wpc','spc'].includes(risk.kind))continue;items.push({id:'risk-'+risk.id,kind:'risk',label:risk.kind==='wpc'?'Flood Risk':risk.kind==='spc'?'Storm Risk':'Winter Risk',preview:risk.level||risk.title,risk});}
  const current=!view.snapshotFreshness||view.snapshotFreshness.status==='fresh';
  const changes=current?weatherChangeMessages(data,now):[];
  if(changes.length)items.push({id:'change',kind:'change',label:'Change Alert',preview:/less humid/i.test(changes[0])?'Air feels less humid':/more humid/i.test(changes[0])?'Air feels more humid':changes[0],messages:changes});
- if(current&&view.rain?.length){const values=view.rain.flatMap(w=>w.hours||[]).map(h=>h.rainChance).filter(Number.isFinite);items.push({id:'rain',kind:'rain',label:'Rain Outlook',preview:values.length?'Peak '+Math.round(Math.max(...values))+'%':'Rain ahead',view});}
+ if(current&&view.rain?.length){const allHours=view.rain.flatMap(w=>w.hours||[]);const values=allHours.map(h=>h.rainChance).filter(Number.isFinite);const snowRe=/snow|sleet|wintry|flurr|blizzard|freez/i;const snowy=allHours.some(h=>snowRe.test(String(h.condition||h.forecastCondition||''))||(h.snowfallIn||0)>0)||(data?.hours||[]).slice(0,24).some(h=>snowRe.test(String(h.condition||h.forecastCondition||'')))||snowRe.test(String(data?.days?.[0]?.condition||''));items.push({id:'rain',kind:'rain',label:snowy?'Snow Outlook':'Rain Outlook',preview:values.length?(snowy?'Peak snow chance ':'Peak ')+Math.round(Math.max(...values))+'%':(snowy?'Snow ahead':'Rain ahead'),view});}
  if(current&&view.perfect?.length){const first=view.perfect[0],hours=Math.ceil((first.start-now)/3600000),preview=first.start<=now?'Now':hours<24?`In ${hours} hour${hours===1?'':'s'}`:new Intl.DateTimeFormat('en-US',{timeZone:view.timeZone||data.location?.timeZone,weekday:'short',hour:'numeric'}).format(new Date(first.start));items.push({id:'perfect',kind:'perfect',label:'Perfect Weather',preview,view});}
  return items;
 }
