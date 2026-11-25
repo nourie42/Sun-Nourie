@@ -51797,6 +51797,1426 @@
       "price": 999.99,
       "tier": "Level 1 (best)",
       "sourceType": "expansion-bot"
+    },
+    {
+      "name": "La Crosse Technology Weather Station 327-1418BW",
+      "recipient": "Bear",
+      "retailerName": "Ace Hardware",
+      "sourceUrl": "https://www.acehardware.com/departments/outdoor-living/outdoor-decor/weather-stations/6084568",
+      "preferredPrice": 89.99,
+      "price": 89.99,
+      "tier": "Level 2 (mid)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "YETI Lowlands Blanket",
+      "recipient": "Family",
+      "retailerName": "YETI",
+      "sourceUrl": "https://www.yeti.com/26010000343.html",
+      "preferredPrice": 200.0,
+      "price": 200.0,
+      "tier": "Level 1 (best)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "Philips Hue Lily Outdoor Black Spot Light Smart Color Changing Low Voltage Plug-In Base Kit with Integrated LED (3-Pack)",
+      "recipient": "Family",
+      "retailerName": "Home Depot",
+      "sourceUrl": "https://www.homedepot.com/p/Philips-Hue-Lily-Outdoor-Black-Spot-Light-Smart-Color-Changing-Low-Voltage-Plug-In-Base-Kit-with-Integrated-LED-3-Pack-1746730V7/316371204",
+      "preferredPrice": 242.34,
+      "price": 242.34,
+      "tier": "Level 1 (best)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "ELEY Free-Standing Garden Hose Reel",
+      "recipient": "Family",
+      "retailerName": "ELEY",
+      "sourceUrl": "https://www.eleyhosereels.com/products/free-standing-garden-hose-reel",
+      "preferredPrice": 194.92,
+      "price": 194.92,
+      "tier": "Level 1 (best)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "Gorilla Carts Poly Garden Dump Cart Camping Beach Wagon, 1200 Pound Capacity - Black",
+      "recipient": "Family",
+      "retailerName": "Best Buy",
+      "sourceUrl": "https://www.bestbuy.com/product/gorilla-carts-poly-garden-dump-cart-camping-beach-wagon-1200-pound-capacity-black/JXWYH8KHFY/sku/10877113",
+      "preferredPrice": 199.99,
+      "price": 199.99,
+      "tier": "Level 1 (best)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "Fable & Mane HoliRoots Pre-Wash Scalp & Hair Treatment Oil, 1.8 oz / 55 ml",
+      "recipient": "Ali",
+      "retailerName": "Sephora",
+      "sourceUrl": "https://www.sephora.com/product/fable-and-mane-holiroots-trade-hair-treatment-oil-P456953?skuId=2350973",
+      "preferredPrice": 38.0,
+      "price": 38.0,
+      "tier": "Level 2 (mid)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "shu uemura Ultimate Reset Strengthening Hair Mask for Very Damaged Hair, 6 oz / 200 mL",
+      "recipient": "Ali",
+      "retailerName": "Sephora",
+      "sourceUrl": "https://www.sephora.com/product/ultimate-reset-mask-treatment-P434206?skuId=2083251",
+      "preferredPrice": 73.0,
+      "price": 73.0,
+      "tier": "Level 2 (mid)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "TAN-LUXE The Face Illuminating Self-Tan Drops, Light/Medium",
+      "recipient": "Ali",
+      "retailerName": "Ulta Beauty",
+      "sourceUrl": "https://www.ulta.com/p/face-illuminating-self-tan-drops-xlsImpprod16171001?sku=2512293",
+      "preferredPrice": 38.5,
+      "price": 38.5,
+      "tier": "Level 2 (mid)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "EltaMD UV Clear Broad-Spectrum SPF 46 Sunscreen, 1.7 fl oz",
+      "recipient": "Ali",
+      "retailerName": "Dermstore",
+      "sourceUrl": "https://www.dermstore.com/p/eltamd-uv-clear-broad-spectrum-spf46-48g/11370303/",
+      "preferredPrice": 46.0,
+      "price": 46.0,
+      "tier": "Level 2 (mid)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "Ohuhu Color by Numbers Acrylic Marker Kit",
+      "recipient": "Angel",
+      "retailerName": "Ohuhu",
+      "sourceUrl": "https://ohuhu.com/products/ohuhu-color-by-numbers-acrylic-marker-kit",
+      "preferredPrice": 29.99,
+      "price": 29.99,
+      "tier": "Level 2 (mid)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "Midland ER310PRO Emergency Radio with Power Bank",
+      "recipient": "Bear",
+      "retailerName": "Amazon",
+      "sourceUrl": "https://www.amazon.com/dp/B0FX3GFYJP",
+      "preferredPrice": 99.99,
+      "price": 99.99,
+      "tier": "Level 2 (mid)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "Kaito KA500 5-Way Powered Emergency Weather Radio",
+      "recipient": "Bear",
+      "retailerName": "Amazon",
+      "sourceUrl": "https://www.amazon.com/dp/B003A21DQA",
+      "preferredPrice": 49.99,
+      "price": 49.99,
+      "tier": "Level 2 (mid)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "FosPower A1 NOAA Emergency Weather Radio",
+      "recipient": "Bear",
+      "retailerName": "Amazon",
+      "sourceUrl": "https://www.amazon.com/dp/B07FKYHTWP",
+      "preferredPrice": 32.98,
+      "price": 32.98,
+      "tier": "Level 2 (mid)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "BlissLights Sky Lite Evolve Galaxy Projector",
+      "recipient": "Ali",
+      "retailerName": "BlissLights",
+      "sourceUrl": "https://blisslights.com/products/sky-lite-evolve",
+      "preferredPrice": 24.99,
+      "price": 24.99,
+      "tier": "Level 2 (mid)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "Cubii JR1 Under Desk Elliptical, Seated Bike Pedal Exerciser",
+      "recipient": "Ali",
+      "retailerName": "Amazon",
+      "sourceUrl": "https://www.amazon.com/dp/B074F1S194?tag=9900basket-20&linkCode=ogi&th=1&psc=1",
+      "preferredPrice": 139.99,
+      "price": 139.99,
+      "tier": "Level 1 (best)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "Decibel Meter, Tadeto Digital Sound Level Meter Portable SPL Meter 30dB to 130dB MAX Data Hold with LCD Display Backlight A/C Weighted for Home Factories",
+      "recipient": "Kish",
+      "retailerName": "Amazon",
+      "sourceUrl": "https://www.amazon.com/dp/B09G6HLNVV/ref=ppx_hzsearch_conn_dt_b_fed_asin_title_3",
+      "preferredPrice": 23.39,
+      "price": 23.39,
+      "tier": "Level 2 (mid)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "Motorized Ship Wave Machine, Weather Controlled, Unsinkable Ship Fluid Drift Bottle, Nautical Desk Decor, Sailor Gift",
+      "recipient": "Kish",
+      "retailerName": "Etsy",
+      "sourceUrl": "https://www.etsy.com/listing/4471146712/motorized-ship-in-a-bottle-weather?utm_source=OpenGraph&utm_medium=PageTools&utm_campaign=Share",
+      "preferredPrice": 48.72,
+      "price": 48.72,
+      "tier": "Level 2 (mid)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "Jacquard Cyanotype Kit",
+      "recipient": "Kish",
+      "retailerName": "Dharma Trading Co.",
+      "sourceUrl": "https://www.dharmatrading.com/products/jacquard-cyanotype-kit?lnav=explorecyanotype.html",
+      "preferredPrice": 39.99,
+      "price": 39.99,
+      "tier": "Level 2 (mid)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "(Goods - Keychain) Original TV Anime - SK8 the Infinity Manmaru Animal Embroidery Keychain SNOW",
+      "recipient": "Angel",
+      "retailerName": "animate USA Online Shop",
+      "sourceUrl": "https://animateusaonlineshop.com/products/4535388160825?variant=43038392156278",
+      "preferredPrice": 19.99,
+      "price": 19.99,
+      "tier": "Level 3 (under $20)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "Link Click Photo Film Logo Adult T-Shirt White Medium",
+      "recipient": "Angel",
+      "retailerName": "Target",
+      "sourceUrl": "https://www.target.com/p/link-click-photo-film-logo-adult-t-shirt-white-medium/-/A-1003580681",
+      "preferredPrice": 19.99,
+      "price": 19.99,
+      "tier": "Level 3 (under $20)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "Link Click Xiaoshi, Guang, Ling Photos Adult T-Shirt Navy Medium",
+      "recipient": "Angel",
+      "retailerName": "Target",
+      "sourceUrl": "https://www.target.com/p/link-click-xiaoshi-guang-ling-photos-adult-t-shirt-navy-medium/-/A-1003581146",
+      "preferredPrice": 19.99,
+      "price": 19.99,
+      "tier": "Level 3 (under $20)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "TP-Link Deco XE75 AXE5400 Tri-Band WiFi 6E Mesh System - Covers up to 5500 Sq.Ft, Replaces WiFi Router and Extender, AI-Driven Mesh, 6GHz Band, 2-Pack",
+      "recipient": "Family",
+      "retailerName": "Amazon",
+      "sourceUrl": "https://www.amazon.com/dp/B09VW5JHPH",
+      "preferredPrice": 149.99,
+      "price": 149.99,
+      "tier": "Level 1 (best)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "Reolink Argus 4 Pro - 4K 180\u00b0 Wireless Solar Security Camera",
+      "recipient": "Family",
+      "retailerName": "Reolink",
+      "sourceUrl": "https://reolink.com/us/product/argus-4-pro-d/",
+      "preferredPrice": 150.49,
+      "price": 150.49,
+      "tier": "Level 1 (best)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "Traeger Pro 575 Wi-Fi Pellet Grill and Smoker in Bronze",
+      "recipient": "Bear",
+      "retailerName": "Traeger",
+      "sourceUrl": "https://www.traeger.com/pellet-grills/pro/575-bronze",
+      "preferredPrice": 799.99,
+      "price": 799.99,
+      "tier": "Level 1 (best)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "TOPDON AD600S OBD2 Scanner Diagnostic Tool with 9 Reset Services",
+      "recipient": "Bear",
+      "retailerName": "Amazon",
+      "sourceUrl": "https://www.amazon.com/dp/B0CTHJW813/ref=mp_s_a_1_9_sspa",
+      "preferredPrice": 215.99,
+      "price": 215.99,
+      "tier": "Level 1 (best)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "Innova 5610 OBD2 Bidirectional Scan Tool",
+      "recipient": "Bear",
+      "retailerName": "Walmart",
+      "sourceUrl": "https://www.walmart.com/ip/Innova-5610-OBD2-Bidirectional-Scanner-Diagnostic-Tool-Pro-Check-Engine-Code-Reader-Reset-Tool-Vehicles-Live-Data-ABS-SRS-TPMS-Updates-Included/445064798",
+      "preferredPrice": 255.52,
+      "price": 255.52,
+      "tier": "Level 1 (best)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "NEST New York Indian Jasmine Classic Candle",
+      "recipient": "Ali",
+      "retailerName": "NEST New York",
+      "sourceUrl": "https://www.nestnewyork.com/products/indian-jasmine-classic-candle-1",
+      "preferredPrice": 50.0,
+      "price": 50.0,
+      "tier": "Level 2 (mid)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "Medik8 Crystal Retinal 3 Serum 30ml",
+      "recipient": "Ali",
+      "retailerName": "Dermstore",
+      "sourceUrl": "https://www.dermstore.com/p/medik8-crystal-retinal-3-serum-30ml/12810724/",
+      "preferredPrice": 66.0,
+      "price": 66.0,
+      "tier": "Level 2 (mid)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "Pyrolytic Graphite Diamagnetism Levitation Kit",
+      "recipient": "Kish",
+      "retailerName": "Imagesco",
+      "sourceUrl": "https://www.imagesco.com/magnetism/graphite-levitation-kit.html",
+      "preferredPrice": 49.95,
+      "price": 49.95,
+      "tier": "Level 2 (mid)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "Netatmo Weather Station Indoor Outdoor with Wireless Outdoor Sensor - Compatible with Amazon Alexa & Apple HomeKit",
+      "recipient": "Kish",
+      "retailerName": "Amazon",
+      "sourceUrl": "https://www.amazon.com/dp/B0095HVAKS/ref=tsm_1_fb_lk",
+      "preferredPrice": 179.99,
+      "price": 179.99,
+      "tier": "Level 1 (best)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "Eve Weather (Matter) \u2013 Smart Weather Station",
+      "recipient": "Kish",
+      "retailerName": "ShopAbunda",
+      "sourceUrl": "https://www.shopabunda.com/products/eve-weather-matter-smart-weather-station-for-temperature-humidity-weather-trend-ipx4-water-resistance-display-wireless-google-alexa-siri-voice-access-requires-thread-border-router",
+      "preferredPrice": 87.95,
+      "price": 87.95,
+      "tier": "Level 2 (mid)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "Tymate TM8 RV Tire Pressure Monitoring System, TPMS Set of 4 Sensors",
+      "recipient": "Bear",
+      "retailerName": "ShopAbunda",
+      "sourceUrl": "https://www.shopabunda.com/products/tymate-tm8-tire-pressure-monitoring-system-wireless-solar-tpms-with-4-external-sensors-6-alarm-modes-colorful-display-easy-to-intall-on-windshield-ideal-for-rv-sedan-suv-mpv-truck-0-87-psi",
+      "preferredPrice": 33.97,
+      "price": 33.97,
+      "tier": "Level 2 (mid)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "Redtiger F7NT Touch Screen 4K Dual Dash Cam w/ 128GB MicroSD Card",
+      "recipient": "Bear",
+      "retailerName": "EzDashcam",
+      "sourceUrl": "https://ezdashcam.com/products/redtiger-f7nt-touch-screen-4k-dual-dash-cam",
+      "preferredPrice": 161.49,
+      "price": 161.49,
+      "tier": "Level 1 (best)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "SK SYUKUYU RF Remote Control Page Turner for Kindle Reading Ipad Surface Comics, iPhone Android Tablets Reading Novels Taking Photos",
+      "recipient": "Ali",
+      "retailerName": "Amazon",
+      "sourceUrl": "https://www.amazon.com/dp/B08T8CZYF3/ref=cm_sw_r_apan_dp_DZB369AHN2V0QCX491WQ",
+      "preferredPrice": 29.99,
+      "price": 29.99,
+      "tier": "Level 2 (mid)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "Husband Pillow XXL The Original for Adults - 30\" Tall Backrest for Sitting Up in Bed - Firm Support Reading & Bed Rest Pillows for Adults, Neck Roll, Removable Cover - Pink",
+      "recipient": "Ali",
+      "retailerName": "ShopAbunda",
+      "sourceUrl": "https://www.shopabunda.com/products/husband-pillow-xxl-pink-backrest-with-arms-adult-reading-pillow-with-shredded-memory-foam-ultra-comfy-removable-microplush-cover-detachable-neck-roll-unmatched-support-for-bed-rest-sit-up-pillow",
+      "preferredPrice": 71.95,
+      "price": 71.95,
+      "tier": "Level 2 (mid)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "Wind Walker Strandbeest Kit",
+      "recipient": "Kish",
+      "retailerName": "Into The Wind",
+      "sourceUrl": "https://intothewind.com/products/wind-walker-kit",
+      "preferredPrice": 29.95,
+      "price": 29.95,
+      "tier": "Level 2 (mid)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "Olight Arkfeld Pro Rechargeable Cool White LED Flat Flashlight, Black, 1300 Max Lumens",
+      "recipient": "Kish",
+      "retailerName": "KnifeCenter",
+      "sourceUrl": "https://www.knifecenter.com/item/OLARKFELDPROCW/olight-arkfeld-pro-rechargeable-cool-white-led-flat-flashlight-black-1300-max-lumens",
+      "preferredPrice": 99.99,
+      "price": 99.99,
+      "tier": "Level 2 (mid)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "Leatherman Wave Plus Multi-Tool",
+      "recipient": "Kish",
+      "retailerName": "Leatherman",
+      "sourceUrl": "https://www.leatherman.com/products/wave",
+      "preferredPrice": 129.95,
+      "price": 129.95,
+      "tier": "Level 1 (best)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "Elephant Automata",
+      "recipient": "Kish",
+      "retailerName": "Paxton Gate",
+      "sourceUrl": "https://paxtongate.com/products/elephant-automata",
+      "preferredPrice": 58.0,
+      "price": 58.0,
+      "tier": "Level 2 (mid)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "ORORO Men's Heated Full-Zip Fleece Jacket",
+      "recipient": "Bear",
+      "retailerName": "ororo",
+      "sourceUrl": "https://www.ororowear.com/products/mens-heated-full-zip-fleece-jacket-flecking-gray-with-3-heating-zones",
+      "preferredPrice": 79.99,
+      "price": 79.99,
+      "tier": "Level 2 (mid)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "BCA BC Link 2.0 Radio",
+      "recipient": "Bear",
+      "retailerName": "SpokeX",
+      "sourceUrl": "https://spokex.com/products/bca-bc-link-2-0?utm_content=Facebook_UA&utm_source=facebook&variant=68040669364544",
+      "preferredPrice": 205.95,
+      "price": 205.95,
+      "tier": "Level 1 (best)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "Canopy Bedside Humidifier 2.0",
+      "recipient": "Ali",
+      "retailerName": "Canopy",
+      "sourceUrl": "https://getcanopy.co/products/canopy/?srsltid=AfmBOopYRcQeJHhr5pS_BzrmuZF8cDFdI2q-FfXp2yW9cDKzNeOIYO0f",
+      "preferredPrice": 159.0,
+      "price": 159.0,
+      "tier": "Level 1 (best)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "Grown Alchemist Age-Repair Hand Cream 1.35 oz (40 ml) - Phyto-Peptide, Sweet Almond & Sage",
+      "recipient": "Ali",
+      "retailerName": "Target",
+      "sourceUrl": "https://www.target.com/p/grown-alchemist-age-repair-hand-cream-1-35-oz-40-ml-phyto-peptide-sweet-almond-sage/-/A-1007164869",
+      "preferredPrice": 34.99,
+      "price": 34.99,
+      "tier": "Level 2 (mid)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "Boka Ela Mint Nano-Hydroxyapatite Toothpaste, 4 oz",
+      "recipient": "Ali",
+      "retailerName": "Boka",
+      "sourceUrl": "https://www.boka.com/products/ela-mint-toothpaste?_pos=1&_sid=fdb983ac1&_ss=r",
+      "preferredPrice": 11.62,
+      "price": 11.62,
+      "tier": "Level 3 (under $20)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "Gazelle T4 Hub Tent",
+      "recipient": "Family",
+      "retailerName": "REI",
+      "sourceUrl": "https://www.rei.com/product/207747/gazelle-t4-hub-tent?sku=2077470001&irclickid=&cm_mmc=aff_IM-_-5804912-_--_--_-OutdoorGearLab%20LLC&irgwc=1&afsrc=1",
+      "preferredPrice": 539.95,
+      "price": 539.95,
+      "tier": "Level 1 (best)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "EXPED MegaMat Sleeping Pad",
+      "recipient": "Family",
+      "retailerName": "REI",
+      "sourceUrl": "https://www.rei.com/product/238242/exped-megamat-sleeping-pad",
+      "preferredPrice": 259.95,
+      "price": 259.95,
+      "tier": "Level 1 (best)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "Silver Ticket Products STR Series 6 Piece White 1.1 Gain 120\" Diagonal 16:9 Format Projection Screen, Aluminum Frame, Wall Mounted STR-169120",
+      "recipient": "Family",
+      "retailerName": "Amazon",
+      "sourceUrl": "https://www.amazon.com/dp/B00CYLOTPK/ref=pfb_NUL_1_2_1457757021883YO",
+      "preferredPrice": 237.98,
+      "price": 237.98,
+      "tier": "Level 1 (best)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "Fuumuui Magnetic Dual-Layer Watercolor Paint with 50 Colors, 3-in-1 Brush - Dual-Layer Blue Travel Box",
+      "recipient": "Angel",
+      "retailerName": "Fuumuui",
+      "sourceUrl": "https://fuumuui.com/products/50-color-watercolor-paint-set-blue",
+      "preferredPrice": 49.99,
+      "price": 49.99,
+      "tier": "Level 2 (mid)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "Fuumuui Color Wheel Watercolor Set - 24 Opaque Macaron Solid Watercolor Paints in Round Palette with Mixing Lid",
+      "recipient": "Angel",
+      "retailerName": "Fuumuui",
+      "sourceUrl": "https://fuumuui.com/products/24-macaron-color-wheel-watercolor-set?utm_content=Facebook_UA&utm_source=facebook&variant=50443619467456",
+      "preferredPrice": 81.99,
+      "price": 81.99,
+      "tier": "Level 2 (mid)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "Muchcute Micro Fineliner Drawing Art Pens: 12 Black Fine Line Waterproof Ink Set for Anime Manga Sketching",
+      "recipient": "Angel",
+      "retailerName": "Amazon",
+      "sourceUrl": "https://www.amazon.com/dp/B0BNDN87NX/ref=cm_sw_r_cso_fm_apin_dp_56082DKX6ZP0TJ9MX40T",
+      "preferredPrice": 9.49,
+      "price": 9.49,
+      "tier": "Stocking stuffers (<$10)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "Sk8 Acrylic Pins - Reki, Langa, and Miya from SK8 The Infinity",
+      "recipient": "Angel",
+      "retailerName": "Etsy",
+      "sourceUrl": "https://www.etsy.com/listing/1494465633/sk8-acrylic-pins?utm_source=OpenGraph&utm_medium=PageTools&utm_campaign=Share",
+      "preferredPrice": 7.5,
+      "price": 7.5,
+      "tier": "Stocking stuffers (<$10)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "Stillman & Birn Zeta Series Spiralbound Sketchbook - 8\" x 6\", Portrait",
+      "recipient": "Angel",
+      "retailerName": "Blick Art Materials",
+      "sourceUrl": "https://www.dickblick.com/items/stillman-birn-zeta-series-spiralbound-sketchbook-8-x-6-portrait/",
+      "preferredPrice": 20.6,
+      "price": 20.6,
+      "tier": "Level 2 (mid)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "Strathmore Watercolor Visual Journal - 140 lb, 8 x 5-1/2\"",
+      "recipient": "Angel",
+      "retailerName": "Blick Art Materials",
+      "sourceUrl": "https://www.dickblick.com/items/strathmore-visual-journal-8-x-5-12-140-lb-watercolor/",
+      "preferredPrice": 15.98,
+      "price": 15.98,
+      "tier": "Level 3 (under $20)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "(Goods - Keychain) Original TV Anime - SK8 the Infinity Yurayura Acrylic Keychain Langa",
+      "recipient": "Angel",
+      "retailerName": "animate USA Online Shop",
+      "sourceUrl": "https://animateusaonlineshop.com/products/4535388161037",
+      "preferredPrice": 19.99,
+      "price": 19.99,
+      "tier": "Level 3 (under $20)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "Discraft 175 Gram Ultra-Star Sport Disc (White)",
+      "recipient": "Family",
+      "retailerName": "Amazon",
+      "sourceUrl": "https://www.amazon.com/dp/B002QSIUUG/?tag=proreviews08-20",
+      "preferredPrice": 12.59,
+      "price": 12.59,
+      "tier": "Level 3 (under $20)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "Filson Men's Tin Cloth Short Lined Cruiser Jacket",
+      "recipient": "Bear",
+      "retailerName": "Mountain Sports",
+      "sourceUrl": "https://www.mountainsports.com/products/filson-mens-tin-cloth-short-lined-cruiser-jacket?utm_content=Facebook_UA&utm_source=facebook&variant=49585912021220",
+      "preferredPrice": 359.0,
+      "price": 359.0,
+      "tier": "Level 1 (best)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "Sea to Summit Aeros Premium Pillow",
+      "recipient": "Bear",
+      "retailerName": "REI",
+      "sourceUrl": "https://www.rei.com/product/C04276/sea-to-summit-aeros-premium-pillow",
+      "preferredPrice": 54.95,
+      "price": 54.95,
+      "tier": "Level 2 (mid)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "Retevis RT29 High-Vis Orange IP67 Waterproof Long Range Handheld Radio",
+      "recipient": "Bear",
+      "retailerName": "Retevis",
+      "sourceUrl": "https://www.retevis.com/products/retevis-rt29-ip67-waterproof-long-distance-handheld-radio-2pack",
+      "preferredPrice": 517.99,
+      "price": 517.99,
+      "tier": "Level 1 (best)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "Briogeo Scalp Revival Moisture + Detox + Refresh Minis Kit for Dry, Flaky Scalp",
+      "recipient": "Ali",
+      "retailerName": "Sephora",
+      "sourceUrl": "https://www.sephora.com/product/scalp-revival-tm-moisture-detox-refresh-minis-kit-for-dry-flaky-scalp-P516796?skuId=2860187",
+      "preferredPrice": 32.0,
+      "price": 32.0,
+      "tier": "Level 2 (mid)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "The Levitating Illuminated Bluetooth Speaker",
+      "recipient": "Kish",
+      "retailerName": "Hammacher Schlemmer",
+      "sourceUrl": "https://hammacher.com/deals/the-levitating-illuminated-bluetooth-speaker-classics",
+      "preferredPrice": 149.95,
+      "price": 149.95,
+      "tier": "Level 1 (best)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "Princeton Aqua Elite Short Handle Watercolor Synthetic Round Brush (PBXP4850R16)",
+      "recipient": "Angel",
+      "retailerName": "Staples",
+      "sourceUrl": "https://www.staples.com/princeton-aqua-elite-short-handle-watercolor-synthetic-round-brush-pbxp4850r16/product_24625022",
+      "preferredPrice": 22.59,
+      "price": 22.59,
+      "tier": "Level 2 (mid)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "Rumpl Original Puffy Recycled Blanket",
+      "recipient": "Family",
+      "retailerName": "REI",
+      "sourceUrl": "https://www.rei.com/product/160276/rumpl-original-puffy-recycled-blanket?sku=1602760021",
+      "preferredPrice": 99.95,
+      "price": 99.95,
+      "tier": "Level 2 (mid)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "Grand Trunk TRUNKTECH Double Hammock",
+      "recipient": "Family",
+      "retailerName": "Academy Sports + Outdoors",
+      "sourceUrl": "https://www.academy.com/p/grand-trunk-trunktech-double-hammock?sku=light-green-purple",
+      "preferredPrice": 69.99,
+      "price": 69.99,
+      "tier": "Level 2 (mid)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "RENPHO Leg Compression Massager for Circulation and Pain Relief, Grey",
+      "recipient": "Ali",
+      "retailerName": "Amazon",
+      "sourceUrl": "https://www.amazon.com/dp/B07R9Z94CL/ref=as_sl_pc_qf_sp_asin_til",
+      "preferredPrice": 65.99,
+      "price": 65.99,
+      "tier": "Level 2 (mid)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "Chirp Wheel for Back and Neck Pain \u2013 3 pk",
+      "recipient": "Ali",
+      "retailerName": "Target",
+      "sourceUrl": "https://WWW.TARGET.COM/p/chirp-wheel-for-back-and-neck-pain-8211-3-pk/-/A-82826301",
+      "preferredPrice": 76.49,
+      "price": 76.49,
+      "tier": "Level 2 (mid)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "Everlasting Comfort Memory Foam Knee Pillow for Side Sleepers",
+      "recipient": "Ali",
+      "retailerName": "Amazon",
+      "sourceUrl": "https://www.amazon.com/dp/B07995B8L1/ref=cm_sw_r_apin_dp_NZ5H2SFNVKQHEBEB1BHH",
+      "preferredPrice": 22.79,
+      "price": 22.79,
+      "tier": "Level 2 (mid)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "O'Keeffe's Healthy Feet Foot Cream Unscented - 3oz",
+      "recipient": "Ali",
+      "retailerName": "Target",
+      "sourceUrl": "https://www.target.com/p/o-39-keeffe-39-s-healthy-feet-foot-cream-unscented-3oz/-/A-75558420",
+      "preferredPrice": 7.29,
+      "price": 7.29,
+      "tier": "Stocking stuffers (<$10)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "wowstick Lithium Precision Screwdriver wowstick 1F+ With LED Light And Magnetic Mat, Electric Screwdriver Rechargeable Repair Tool kits Including 56 Bits Extend Bar For Most Electronics Devices",
+      "recipient": "Kish",
+      "retailerName": "Amazon",
+      "sourceUrl": "https://www.amazon.com/dp/B07DB7ZT5P/ref=tsm_1_fb_lk",
+      "preferredPrice": 49.99,
+      "price": 49.99,
+      "tier": "Level 2 (mid)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "Ohuhu Alcohol Markers: 60 Colors Slim Broad and Fine Double Tipped Kaala Marker for Artists Adults Coloring Drawing Cartoon Anime Comic",
+      "recipient": "Angel",
+      "retailerName": "Amazon",
+      "sourceUrl": "https://www.amazon.com/dp/B0B6GKW5TF/ref=cm_sw_r_as_gl_apa_gl_i_dl_8T7WB5TQWHZT1TK43EFW",
+      "preferredPrice": 35.99,
+      "price": 35.99,
+      "tier": "Level 2 (mid)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "Solo Stove Bonfire 19.5\" Fire Pit + Stand Bundle - Smokeless, Ash",
+      "recipient": "Family",
+      "retailerName": "Solo Stove",
+      "sourceUrl": "https://www.solostove.com/us/en-us/p/bonfire-plus-stand?sku=SSBON-SD-2.0&color=Ash",
+      "preferredPrice": 254.99,
+      "price": 254.99,
+      "tier": "Level 1 (best)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "GoSports Graphic Cornhole Toss Game Set - America",
+      "recipient": "Family",
+      "retailerName": "Target",
+      "sourceUrl": "https://Www.Target.com/p/gosports-graphic-cornhole-toss-game-set-america/-/A-87567799",
+      "preferredPrice": 99.99,
+      "price": 99.99,
+      "tier": "Level 2 (mid)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "Bose SoundLink Max Portable Speaker + Rope Handle Set",
+      "recipient": "Family",
+      "retailerName": "Bose",
+      "sourceUrl": "https://www.bose.com/p/product-sets/SET-SLMAX-HANDLE.html",
+      "preferredPrice": 308.0,
+      "price": 308.0,
+      "tier": "Level 1 (best)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "Women's Bombas Floral Compression (15-20) Knee High Socks",
+      "recipient": "Ali",
+      "retailerName": "SCHEELS",
+      "sourceUrl": "https://www.scheels.com/p/19586338585",
+      "preferredPrice": 22.5,
+      "price": 22.5,
+      "tier": "Level 2 (mid)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "RevAir Reverse-Air Hair Dryer",
+      "recipient": "Ali",
+      "retailerName": "RevAir",
+      "sourceUrl": "https://myrevair.com/products/revair?variant=40424316600362&country=US&currency=USD&tw_source=google&tw_adid=765475260176&tw_campaign=22817284047&tw_kwdid=pla-2485900480541&gad_source=1&gad_campaignid=22817284047&gbraid=0AAAAAC9Yg70dlCkY-4fGMX7KHBdLfRCEw",
+      "preferredPrice": 359,
+      "price": 359,
+      "tier": "Level 1 (best)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "TriggerPoint GRID Foam Roller, Original 13-inch, Orange",
+      "recipient": "Ali",
+      "retailerName": "Amazon",
+      "sourceUrl": "https://www.amazon.com/dp/B0040EKZDY/ref=cm_sw_r_cp_ud_dp_2JHAFMXFVZHGJB8P40DY",
+      "preferredPrice": 39.99,
+      "price": 39.99,
+      "tier": "Level 2 (mid)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "Theragun Mini 3rd Gen (Desert Rose) | Small Percussion Massage Gun for Pain Relief",
+      "recipient": "Kish",
+      "retailerName": "Therabody",
+      "sourceUrl": "https://www.therabody.com/products/theragun-mini-gen-3-desert-rose",
+      "preferredPrice": 154.99,
+      "price": 154.99,
+      "tier": "Level 1 (best)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "KEF LSX II LT Wireless HiFi Speakers",
+      "recipient": "Kish",
+      "retailerName": "KEF US",
+      "sourceUrl": "https://us.kef.com/products/lsx-2-lt",
+      "preferredPrice": 999.99,
+      "price": 999.99,
+      "tier": "Level 1 (best)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "ThermoWorks Signals BBQ Alarm Thermometer with Wi-Fi and Bluetooth Wireless Technology",
+      "recipient": "Bear",
+      "retailerName": "ThermoWorks",
+      "sourceUrl": "https://www.thermoworks.com/products/signals",
+      "preferredPrice": 161.85,
+      "price": 161.85,
+      "tier": "Level 1 (best)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "Shimano Vanford FA Spinning Reel",
+      "recipient": "Bear",
+      "retailerName": "Tackle Warehouse",
+      "sourceUrl": "https://www.tacklewarehouse.com/descpage-SVFA.html?from=ig&utm_content=tackle&utm_campaign=2412_shimano_vanford_reels_newprod",
+      "preferredPrice": 284.99,
+      "price": 284.99,
+      "tier": "Level 1 (best)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "Dakota Lithium 12V 10Ah Mini LiFePO4 Deep Cycle Battery",
+      "recipient": "Bear",
+      "retailerName": "Dakota Lithium",
+      "sourceUrl": "https://dakotalithium.com/products/12V-10Ah-Mini-LiFePO4-Deep-Cycle-Battery",
+      "preferredPrice": 85.0,
+      "price": 85.0,
+      "tier": "Level 2 (mid)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "Lavatools Javelin PRO Classic Ultra-Fast 2-Second Professional Digital Instant Read Meat Thermometer, Sambal",
+      "recipient": "Bear",
+      "retailerName": "ShopAbunda",
+      "sourceUrl": "https://www.shopabunda.com/products/lavatools-px1d-javelin-pro-duo-ultra-fast-professional-digital-instant-read-meat-thermometer-for-grill-and-cooking-4-5-probe-auto-rotating-backlit-display-splash-resistant-sambal?s_id=12215155",
+      "preferredPrice": 43.99,
+      "price": 43.99,
+      "tier": "Level 2 (mid)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "Wheeler FAT Wrench with 10 Bit Set",
+      "recipient": "Bear",
+      "retailerName": "KYGUNCO",
+      "sourceUrl": "https://www.kygunco.com/product/113853",
+      "preferredPrice": 57.49,
+      "price": 57.49,
+      "tier": "Level 2 (mid)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "Coast PolySteel 600 LED Flashlight",
+      "recipient": "Bear",
+      "retailerName": "Officer Store",
+      "sourceUrl": "https://officerstore.com/coast-polysteel-600-led-flashlight",
+      "preferredPrice": 32.59,
+      "price": 32.59,
+      "tier": "Level 2 (mid)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "Silva Ranger 2.0 Compass",
+      "recipient": "Bear",
+      "retailerName": "KeepShooting",
+      "sourceUrl": "https://www.keepshooting.com/silva-ranger-2-0-compass.html",
+      "preferredPrice": 65.39,
+      "price": 65.39,
+      "tier": "Level 2 (mid)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "GCI Outdoor Freestyle Rocker XL Oversized Foldable Rocking Outdoor Portable Camping Chair - Indigo",
+      "recipient": "Bear",
+      "retailerName": "Target",
+      "sourceUrl": "https://www.target.com/p/-/-/A-1010453793",
+      "preferredPrice": 85.0,
+      "price": 85.0,
+      "tier": "Level 2 (mid)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "Ultimate Ears MEGABOOM 4 Portable Wireless Bluetooth Speaker with Waterproof, Dustproof and Floatable design - Active Black",
+      "recipient": "Family",
+      "retailerName": "Best Buy",
+      "sourceUrl": "https://www.bestbuy.com/product/ultimate-ears-megaboom-4-portable-wireless-bluetooth-speaker-with-waterproof-dustproof-and-floatable-design-active-black/J7H7ZYGHJ2/sku/6585548/reviews",
+      "preferredPrice": 169.99,
+      "price": 169.99,
+      "tier": "Level 1 (best)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "soundcore Nebula Cosmos 4K SE Projector with Dolby Vision and Google TV",
+      "recipient": "Family",
+      "retailerName": "Soundcore",
+      "sourceUrl": "https://www.soundcore.com/products/d2342-cosmos-4k-se-projector?ref=d2351-nebula-x1-4k-triple-laser-projector?variant=45548875022526&utm_source=google&utm_medium=pmax&utm_content=D2351&utm_campaign=us_nebula_projector_m3_google-pmax_launch_D2351_purchase_web_audience_internal_20260826&utm_term=24175847934_6743011887_&gad_source=5&gad_campaignid=24175853937&gclid=EAIaIQobChMIyruj8I7RlgMVGSVPCB25QxvtEAEYASABEgJlefD_BwE",
+      "preferredPrice": 1299.99,
+      "price": 1299.99,
+      "tier": "Level 1 (best)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "Dangbei Atom Portable Laser Projector, Google TV with Official Netflix, 1200 ISO Lumens",
+      "recipient": "Family",
+      "retailerName": "Amazon",
+      "sourceUrl": "https://www.amazon.com/gp/product/B0CLP5WMXC?th=1",
+      "preferredPrice": 549.99,
+      "price": 549.99,
+      "tier": "Level 1 (best)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "Printfresh Bagheera Organic Cotton Pajamas in Raisin - Long PJ Set",
+      "recipient": "Ali",
+      "retailerName": "Paula & Chlo",
+      "sourceUrl": "https://paulaandchlo.com/products/long-pj-set-in-bagheera-raisin",
+      "preferredPrice": 168.0,
+      "price": 168.0,
+      "tier": "Level 1 (best)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "Howard Leight Impact Sport Electronic Earmuff \u2014 OD Green (R-02524)",
+      "recipient": "Bear",
+      "retailerName": "Cabela's",
+      "sourceUrl": "https://www.cabelas.com/shop/en/howard-leight-impact-sport-electronic-earmuff",
+      "preferredPrice": 69.99,
+      "price": 69.99,
+      "tier": "Level 2 (mid)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "Kershaw Leek 3\" USA Flag/Silver Assisted Opening Knife (1660USA, 14C28N steel, made in USA)",
+      "recipient": "Bear",
+      "retailerName": "Hudson Valley Arms",
+      "sourceUrl": "https://hudsonvalleyarms.com/product/kershaw-leek-3-usa-flag-slv/",
+      "preferredPrice": 76.99,
+      "price": 76.99,
+      "tier": "Level 2 (mid)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "Radioddity GM-30 GMRS Radio 2-Pack + Programming Cable (5W, NOAA weather scan, USB-C, repeater capable)",
+      "recipient": "Bear",
+      "retailerName": "Radioddity",
+      "sourceUrl": "https://www.radioddity.com/collections/display-code-all-exclude-xiegu-sec-new/products/radioddity-gm-30-2-pack",
+      "preferredPrice": 59.99,
+      "price": 59.99,
+      "tier": "Level 2 (mid)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "Sony - HTA3000 3.1 ch Dolby Atmos Soundbar - Black",
+      "recipient": "Family",
+      "retailerName": "Best Buy",
+      "sourceUrl": "https://www.bestbuy.com/product/sony-hta3000-3-1-ch-dolby-atmos-soundbar-black/J7XSRH52GP/sku/6515725/reviews?page=11",
+      "preferredPrice": 148.99,
+      "price": 148.99,
+      "tier": "Level 1 (best)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "10ct LED Drop Indoor Outdoor Cafe String Lights Clear Bulbs with Black Wire - Threshold\u2122",
+      "recipient": "Family",
+      "retailerName": "Target",
+      "sourceUrl": "https://WWW.TARGET.COM/p/10ct-led-drop-indoor-outdoor-caf-233-string-lights-clear-bulbs-with-black-wire-threshold-8482/-/A-88012790",
+      "preferredPrice": 20.0,
+      "price": 20.0,
+      "tier": "Level 2 (mid)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "Est\u00e9e Lauder Advanced Night Repair Synchronized Multi-Recovery Complex Serum, 1.0 oz / 30 ml",
+      "recipient": "Ali",
+      "retailerName": "Sephora",
+      "sourceUrl": "https://www.sephora.com/product/estee-lauder-advanced-night-repair-synchronized-multi-recovery-complex-P461159?skuId=2379675&om_mmc=coop",
+      "preferredPrice": 61.6,
+      "price": 61.6,
+      "tier": "Level 2 (mid)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "Dr. Dennis Gross Skincare DRx SpectraLite FaceWare Pro 3-Minute LED Device",
+      "recipient": "Ali",
+      "retailerName": "Sephora",
+      "sourceUrl": "https://www.sephora.com/product/spectralite-faceware-pro-P435378?skuId=2109718&icid2=products+grid%3Ap435378%3Aproduct",
+      "preferredPrice": 341.25,
+      "price": 341.25,
+      "tier": "Level 1 (best)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "Womens Birkenstock Zermatt Slipper - Toffee",
+      "recipient": "Ali",
+      "retailerName": "Journeys",
+      "sourceUrl": "https://www.journeys.com/product/womens-birkenstock-zermatt-slipper-toffee-850999",
+      "preferredPrice": 99.99,
+      "price": 99.99,
+      "tier": "Level 2 (mid)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "Shiseido Ultimune Power Infusing Antioxidant Face Serum",
+      "recipient": "Ali",
+      "retailerName": "Shiseido",
+      "sourceUrl": "https://www.shiseido.com/us/en/ultimune-power-infusing-serum-9990000000232.html?attn_lid=10&attn_pos=0&externalId=T2qFq",
+      "preferredPrice": 165.0,
+      "price": 165.0,
+      "tier": "Level 1 (best)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "LitiHolo Hologram Kit - 20-Pack",
+      "recipient": "Kish",
+      "retailerName": "LitiHolo",
+      "sourceUrl": "https://litiholo.com/litiholo-hologram-kit.html",
+      "preferredPrice": 239.99,
+      "price": 239.99,
+      "tier": "Level 1 (best)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "Raspberry Shake RS1D Vertical Motion Seismograph (Turnkey)",
+      "recipient": "Kish",
+      "retailerName": "Raspberry Shake",
+      "sourceUrl": "https://shop.raspberryshake.org/product/turnkey-iot-home-earth-monitor-rs-1d/",
+      "preferredPrice": 584.99,
+      "price": 584.99,
+      "tier": "Level 1 (best)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "Prodi DIY Automatic Dive Watch Kit, 40mm NH35",
+      "recipient": "Kish",
+      "retailerName": "Prodi",
+      "sourceUrl": "https://www.prodi.store/products/prodi-dive-kit-40mm-automatic",
+      "preferredPrice": 299.0,
+      "price": 299.0,
+      "tier": "Level 1 (best)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "RainWise Long Range Wireless Weather Transmitter W/Rain Gauge 800-0009 (MK-III-RTI-LR)",
+      "recipient": "Bear",
+      "retailerName": "Scientific Sales",
+      "sourceUrl": "https://scientificsales.com/products/rainwise-long-range-wireless-weather-transmitter-mk-iii-rti-lr",
+      "preferredPrice": 1099.0,
+      "price": 1099.0,
+      "tier": "Level 1 (best)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "Davis Instruments Sonic Anemometer Ultrasonic Wind Sensor - SKU 6415",
+      "recipient": "Bear",
+      "retailerName": "Davis Instruments",
+      "sourceUrl": "https://www.davisinstruments.com/products/sonic-anemometer",
+      "preferredPrice": 580.0,
+      "price": 580.0,
+      "tier": "Level 1 (best)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "Fischer Maritime Barometer Black, 125 mm / 4.9\" (Face 85 mm/3.3\") - 1508B-06-US",
+      "recipient": "Bear",
+      "retailerName": "Loewen META",
+      "sourceUrl": "https://www.loewen-meta.com/products/fischer-maritime-barometer-black-1508b-06-us",
+      "preferredPrice": 109.5,
+      "price": 109.5,
+      "tier": "Level 1 (best)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "DI Accessories MTM Hydro PF22.2 Wide Mouth Foam Cannon - Standard",
+      "recipient": "Bear",
+      "retailerName": "Detailed Image",
+      "sourceUrl": "https://www.detailedimage.com/DI-Accessories-M12/Foam-Cannon-P1338/",
+      "preferredPrice": 89.99,
+      "price": 89.99,
+      "tier": "Level 2 (mid)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "Gansai Tambi Starry Colors",
+      "recipient": "Angel",
+      "retailerName": "Good Gray",
+      "sourceUrl": "https://www.goodgray.com/new-products/x9hgmicoeb6lkwo8s6o63vm20hbpgi",
+      "preferredPrice": 22.0,
+      "price": 22.0,
+      "tier": "Level 2 (mid)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "Link Click Watch Blind Box",
+      "recipient": "Angel",
+      "retailerName": "PlayKun",
+      "sourceUrl": "https://playkun.com/product/link-click-watch-blind-box/",
+      "preferredPrice": 22.99,
+      "price": 22.99,
+      "tier": "Level 2 (mid)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "Letterpress Watercolor Postcards",
+      "recipient": "Angel",
+      "retailerName": "Good Gray",
+      "sourceUrl": "https://www.goodgray.com/products-3/fldobnau61j8zv2y0qkhat6hpodggv",
+      "preferredPrice": 16.0,
+      "price": 16.0,
+      "tier": "Level 3 (under $20)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "Caran d'Ache Mechanical Pencil",
+      "recipient": "Angel",
+      "retailerName": "Good Gray",
+      "sourceUrl": "https://www.goodgray.com/new-products-1/caran-dache-mechanical-pencil",
+      "preferredPrice": 35.0,
+      "price": 35.0,
+      "tier": "Level 2 (mid)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "BucketBall Original Outdoor Tailgate Game - Beach Edition Starter Pack (12 Buckets, 2 Hybrid Balls, Tote Bag)",
+      "recipient": "Family",
+      "retailerName": "ShopAbunda",
+      "sourceUrl": "https://www.shopabunda.com/products/ultimate-beach-pool-yard-camping-tailgate-bbq-backyard-lawn-water-wedding-events-indoor-giant-outdoor-game-best-gift-toy-for-boys-girls-teens-adults-family",
+      "preferredPrice": 59.99,
+      "price": 59.99,
+      "tier": "Level 2 (mid)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "Concise No. 280 Circular Slide Rule w/Case & Instructions (New)",
+      "recipient": "Kish",
+      "retailerName": "Sphere Research Corporation",
+      "sourceUrl": "https://sphere.bc.ca/type/concise/",
+      "preferredPrice": 55.0,
+      "price": 55.0,
+      "tier": "Level 2 (mid)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "Indigo 12 Base Pair DNA Molecule Model for Teaching",
+      "recipient": "Kish",
+      "retailerName": "Indigo Instruments",
+      "sourceUrl": "https://www.indigoinstruments.com/molecular_models/dna-rna/DNA-molecule-model-12-base-pairs-68795S.html",
+      "preferredPrice": 309.0,
+      "price": 309.0,
+      "tier": "Level 1 (best)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "Gelli Arts Gel Printing Plate - 8\" X 10\" Gel Plate, Reusable Gel Printing Plate, Printmaking Gelli Plate for Art, Clear Gel Monoprinting Plate",
+      "recipient": "Angel",
+      "retailerName": "Amazon",
+      "sourceUrl": "https://www.amazon.com/dp/B00CLALEJI",
+      "preferredPrice": 32.99,
+      "price": 32.99,
+      "tier": "Level 2 (mid)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "Tombow Fudenosuke Brush Pen, 6-Pack, Hard Tip (GCD-111) x3, Soft (GCD-112) x3 - for Precision Drawing, Sketch Notes & Calligraphy",
+      "recipient": "Angel",
+      "retailerName": "Amazon",
+      "sourceUrl": "https://www.amazon.com/dp/B07GMKZLCT",
+      "preferredPrice": 9.49,
+      "price": 9.49,
+      "tier": "Stocking stuffers (<$10)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "Link Click Trading Cards - LINE",
+      "recipient": "Angel",
+      "retailerName": "PlayKun",
+      "sourceUrl": "https://playkun.com/product/link-click-trading-cards-line/",
+      "preferredPrice": 24.99,
+      "price": 24.99,
+      "tier": "Level 2 (mid)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "Sangean CL-100 NOAA, S.A.M.E and Public Alert Certified Weather Alert Table-Top Radio with AM/FM-RBDS, and EEPROM Back Up for Preset Stations",
+      "recipient": "Bear",
+      "retailerName": "Capital Audio",
+      "sourceUrl": "https://capitalaudio.com/collections/sangean/products/sangean-cl-100-noaa-s-a-m-e-and-public-alert-certified-weather-alert-table-top-radio-with-am-fm-rbds-and-eeprom-back-up-for-preset-stations",
+      "preferredPrice": 179.99,
+      "price": 179.99,
+      "tier": "Level 1 (best)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "N-Fab Black EpYx Steps Fits 2007-2021 Toyota Tundra (NFB-EXT07QC-TX)",
+      "recipient": "Bear",
+      "retailerName": "RealTruck",
+      "sourceUrl": "https://realtruck.com/p/n-fab-black-epyx-steps/nfb-ext07qc-tx/",
+      "preferredPrice": 479.99,
+      "price": 479.99,
+      "tier": "Level 1 (best)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "Pit Boss Classic Wood Fired Pellet Grill and Smoker with Flame Broiler, 746 sq in cooking space, Onyx Series",
+      "recipient": "Family",
+      "retailerName": "Walmart",
+      "sourceUrl": "https://www.walmart.com/ip/Pit-Boss-Classic-Wood-Fired-Pellet-Grill-and-Smoker-with-Flame-Broiler-746-sq-in-cooking-space-Onyx-Series/1567830363",
+      "preferredPrice": 398.0,
+      "price": 398.0,
+      "tier": "Level 1 (best)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "Big Agnes Copper Spur UL2 XL Tent",
+      "recipient": "Family",
+      "retailerName": "REI",
+      "sourceUrl": "https://www.rei.com/product/245274/big-agnes-copper-spur-ul2-xl-tent?cm_mmc=aff_IM-_-5397739-_--_--_-Colorado+Modern+LLC&avad=267829_b41941989&irclickid&irgwc=1&afsrc=1",
+      "preferredPrice": 649.95,
+      "price": 649.95,
+      "tier": "Level 1 (best)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "Neso Grande Portable Beach Tent Sun Shelter - Lightweight Beach Shade Canopy - UPF 50+ Sun Protection - 7ft Tall, 9 x 9ft",
+      "recipient": "Family",
+      "retailerName": "Amazon",
+      "sourceUrl": "https://www.amazon.com/dp/B09MY1QNSP/ref=ppx_hzsearch_conn_dt_b_fed_asin_title_2",
+      "preferredPrice": 160.0,
+      "price": 160.0,
+      "tier": "Level 1 (best)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "Under Water City Triopolis Wild Environmental Science Kit",
+      "recipient": "Kish",
+      "retailerName": "Rainbow Resource Center",
+      "sourceUrl": "https://www.rainbowresource.com/082139.html",
+      "preferredPrice": 27.95,
+      "price": 27.95,
+      "tier": "Level 2 (mid)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "uvBeast Black Light UV Flashlight V3 365nm \u2013 FILTERED Ultraviolet - HIGH POWER and LONG RANGE Professional Grade 365nm Beam",
+      "recipient": "Kish",
+      "retailerName": "uvBeast",
+      "sourceUrl": "https://uvbeast.com/collections/frontpage/products/uvbeast-new-v3-365nm-black-light-uv-flashlight-filtered-ultraviolet-rechargeable-18650-high-power-and-long-range-professional-grade-beam-best-for-professional-commercial-use-usa-stock",
+      "preferredPrice": 79.99,
+      "price": 79.99,
+      "tier": "Level 2 (mid)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "PCE Instruments PCE-DRB 1 - Handheld Digital Refractometer (0 - 90% Brix)",
+      "recipient": "Kish",
+      "retailerName": "TEquipment",
+      "sourceUrl": "https://www.tequipment.net/PCE-Instruments/PCE-DRB-1/Refractometers/BRIX/?v=7551",
+      "preferredPrice": 510.0,
+      "price": 510.0,
+      "tier": "Level 1 (best)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "Aera Mini Diffuser with Silver Birch | Mini Diffuser Set",
+      "recipient": "Ali",
+      "retailerName": "Aera",
+      "sourceUrl": "https://www.aeraforhome.com/products/aera-mini-silver-birch?utm_content=Facebook_UA&utm_source=facebook&variant=45840140402754",
+      "preferredPrice": 125.0,
+      "price": 125.0,
+      "tier": "Level 1 (best)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "Drybar The Double Shot Blow-Dryer Brush",
+      "recipient": "Ali",
+      "retailerName": "Sephora",
+      "sourceUrl": "https://www.sephora.com/product/drybar-the-double-shot-blow-dryer-brush-P453282",
+      "preferredPrice": 116.25,
+      "price": 116.25,
+      "tier": "Level 1 (best)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "BondiBoost Wave Wand 3-Barrel Hair Waver 1 1/4\"",
+      "recipient": "Ali",
+      "retailerName": "Sephora",
+      "sourceUrl": "https://www.sephora.com/product/wave-wand-3-barrel-hair-waver-32mm-1-1-4-P506893",
+      "preferredPrice": 48.3,
+      "price": 48.3,
+      "tier": "Level 2 (mid)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "Breo Scalp3 Scalp Massaging Brush Hair Oil Applicator Waterproof Head Massager",
+      "recipient": "Ali",
+      "retailerName": "TikTok Shop",
+      "sourceUrl": "https://shop.tiktok.com/us/pdp/breo-s3-scalp-massager-hair-growth-stimulator-with-850nm-red-light-therapy/1729412990043066861?",
+      "preferredPrice": 149.99,
+      "price": 149.99,
+      "tier": "Level 1 (best)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "ICECO GO20 Dual Zone 12 Volt Refrigerator, Portable Fridge Freezer with Secop Compressor, 21 Quart, White",
+      "recipient": "Bear",
+      "retailerName": "ShopAbunda",
+      "sourceUrl": "https://www.shopabunda.com/products/iceco-go20-dual-zone-portable-refrigerator-separate-control-21-quart-20-liter-dc-ac-0-to-50-with-danfoss-compressor-mini-fridge-cooler-refrigerator-for-outdoor-home-use-white",
+      "preferredPrice": 449.0,
+      "price": 449.0,
+      "tier": "Level 1 (best)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "Dometic CFX2 28 Electric Cooler",
+      "recipient": "Bear",
+      "retailerName": "Dometic",
+      "sourceUrl": "https://www.dometic.com/en-us/product/cfx2-28-electric-cooler-97000040395",
+      "preferredPrice": 659.99,
+      "price": 659.99,
+      "tier": "Level 1 (best)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "60 Rolls Washi Tape Set, Aesthetic Decorative Masking Tape for Journaling Supplies, Scrapbooking Kit, DIY Arts & Crafts, Bullet Journal, Planner, Junk Journal, Gift Wrapping, School Supplies",
+      "recipient": "Angel",
+      "retailerName": "Amazon",
+      "sourceUrl": "https://www.amazon.com/dp/B0GG4F7338/ref=as_li_ss_tl",
+      "preferredPrice": 11.68,
+      "price": 11.68,
+      "tier": "Level 3 (under $20)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "Copic Marker I36B Ciao Markers Set B, 36-Piece",
+      "recipient": "Angel",
+      "retailerName": "Amazon",
+      "sourceUrl": "https://www.amazon.com/dp/B000MRSUUI/ref=pfb_NUL_1_2_1434743903442wA",
+      "preferredPrice": 140.4,
+      "price": 140.4,
+      "tier": "Level 1 (best)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "posca Paint Markers, 3M Fine Point Acrylic Paint Pens with Reversible Tips, Art Supplies For Gifts, Decorations Fabric, Metal, Glass, Wood and Canvas, Set of 15",
+      "recipient": "Angel",
+      "retailerName": "Amazon",
+      "sourceUrl": "https://www.amazon.com/dp/B001ANVDMA/ref=as_li_ss_tl",
+      "preferredPrice": 26.99,
+      "price": 26.99,
+      "tier": "Level 2 (mid)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "Ocean Tide \u2013 Wi-Fi NOAA Tide Clock, E-Ink Display",
+      "recipient": "Kish",
+      "retailerName": "UkieLab",
+      "sourceUrl": "https://ukielab.com/product/ocean-tide/",
+      "preferredPrice": 149.0,
+      "price": 149.0,
+      "tier": "Level 1 (best)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "Stroboscope PCE-OM 15 with xenon light bulb",
+      "recipient": "Kish",
+      "retailerName": "PCE Instruments",
+      "sourceUrl": "https://www.pce-instruments.com/us/measuring-instruments/test-meters/stroboscope-stroboscope-light-pce-instruments-stroboscope-pce-om-15-with-xenon-light-bulb-det_2132561.htm",
+      "preferredPrice": 625.0,
+      "price": 625.0,
+      "tier": "Level 1 (best)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "High Precision Gauss Meter PCE-MFM 2400+",
+      "recipient": "Kish",
+      "retailerName": "PCE Instruments",
+      "sourceUrl": "https://www.pce-instruments.com/us/measuring-instruments/test-meters/gauss-meter-tesla-meter-pce-instruments-high-precision-gauss-meter-pce-mfm-2400-det_5936808.htm",
+      "preferredPrice": 1200.0,
+      "price": 1200.0,
+      "tier": "Level 1 (best)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "Ontario Knives RAT II Linerlock Coyote Brown Folding Knife (D2 Tool Steel, 3\" Drop Point)",
+      "recipient": "Bear",
+      "retailerName": "Rangeek",
+      "sourceUrl": "https://rangeek.com/ontario-knives-rat-ii-linerlock-coyote-brown-ON8830CB/",
+      "preferredPrice": 41.48,
+      "price": 41.48,
+      "tier": "Level 2 (mid)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "Spyderco Paramilitary 2 Folding Knife G10 Handle (C81GP2, CPM S45VN)",
+      "recipient": "Bear",
+      "retailerName": "KYGUNCO",
+      "sourceUrl": "https://www.kygunco.com/product/103347",
+      "preferredPrice": 228.75,
+      "price": 228.75,
+      "tier": "Level 1 (best)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "Axil GS Extreme 2.0 Bluetooth Shooting Earbuds, Black",
+      "recipient": "Bear",
+      "retailerName": "Palmetto State Armory",
+      "sourceUrl": "https://palmettostatearmory.com/axil-gs-extreme-2-0-bluetooth-shooting-earbuds-black.html",
+      "preferredPrice": 49.99,
+      "price": 49.99,
+      "tier": "Level 2 (mid)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "Danner Pronghorn 8\" Realtree Edge 400G Insulated Waterproof Hunting Boots",
+      "recipient": "Bear",
+      "retailerName": "Danner",
+      "sourceUrl": "https://www.danner.com/pronghorn-g5-8-realtree-edge-400g.html?___store=default_danner",
+      "preferredPrice": 232.5,
+      "price": 232.5,
+      "tier": "Level 1 (best)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "Blackstone Original Pre-Seasoned Outdoor Griddle, 36 Inch 4-Burner Flat Top Grill with Omnivore Griddle Top and Hard Cover with Blackstone 36 inch Griddle Cover",
+      "recipient": "Family",
+      "retailerName": "Walmart",
+      "sourceUrl": "https://www.walmart.com/ip/Blackstone-Original-4-Burner-36-Propane-Omnivore-Griddle-With-Protective-Soft-Cover/15308304145",
+      "preferredPrice": 284.99,
+      "price": 284.99,
+      "tier": "Level 1 (best)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "Weber Original Kettle Premium 22-Inch Charcoal Grill - Green - 14407001",
+      "recipient": "Family",
+      "retailerName": "BBQGuys",
+      "sourceUrl": "https://www.bbqguys.com/weber/original-kettle-premium-22-inch-charcoal-grill-green",
+      "preferredPrice": 249.0,
+      "price": 249.0,
+      "tier": "Level 1 (best)",
+      "sourceType": "expansion-bot"
+    },
+    {
+      "name": "Google - Nest Learning Thermostat (4th gen) with Nest Temperature Sensor (2nd gen) - Polished Obsidian",
+      "recipient": "Family",
+      "retailerName": "Best Buy",
+      "sourceUrl": "https://www.bestbuy.com/product/google-nest-learning-thermostat-4th-gen-with-nest-temperature-sensor-2nd-gen-polished-obsidian/JJ8T5CCSRJ/sku/6587626",
+      "preferredPrice": 219.99,
+      "price": 219.99,
+      "tier": "Level 1 (best)",
+      "sourceType": "expansion-bot"
     }
   ]
 }
