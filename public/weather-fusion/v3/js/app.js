@@ -10,7 +10,6 @@ import {
   searchLocations
 } from './fusion-engine.js?v=warning-first-v1';
 import {todaySummary, twoDayHeadline} from './today-preview.js?v=two-day-headline-v1';
-import {skySceneSvg} from './sky-scenes.js?v=scenes-v1';
 import {hourlyRainInputsHTML, rainPercent} from './hourly-rain.js?v=local-hourly-v1';
 import { getLunarPhaseFraction, renderWeatherIconSvg } from './icons.js?v=v3-sky-8';
 import {
@@ -390,6 +389,9 @@ const REMAINDER_ICON_PATHS = {
   drop: '<path d="M12 2.5C12 2.5 5 10.5 5 15.2a7 7 0 0 0 14 0C19 10.5 12 2.5 12 2.5z"/>',
   wind: '<path d="M3 8h11a3 3 0 1 0-3-3"/><path d="M3 12h15a3 3 0 1 1-3 3"/><path d="M3 16h7"/>',
   cloud: '<path d="M7 18h10a4 4 0 0 0 0-8 6 6 0 0 0-11.5 1.5A3.5 3.5 0 0 0 7 18z"/>',
+  rain: '<path d="M7 14h10a4 4 0 0 0 0-8 6 6 0 0 0-11.5 1.5A3.3 3.3 0 0 0 7 14z"/><path d="M9 17.5l-1 2.5M13 17.5l-1 2.5M17 17.5l-1 2.5"/>',
+  snow: '<path d="M12 3v18M4.2 7.5l15.6 9M4.2 16.5l15.6-9"/>',
+  thermo: '<path d="M14 14.8V5a2 2 0 0 0-4 0v9.8a4 4 0 1 0 4 0z"/><path d="M12 9v7"/>',
   leaf: '<path d="M5 19c0-8 5-13 14-14-1 9-6 14-14 14z"/><path d="M5 19l7-7"/>',
   sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/>',
 };
@@ -404,12 +406,9 @@ function withAlerts(forecast, alerts) {
   return forecast.alerts?.length || !alerts?.length ? forecast : { ...forecast, alerts };
 }
 
-function svgCoverBackground(svg) {
-  const encoded = encodeURIComponent(svg).replace(/[()']/g, c => `%${c.charCodeAt(0).toString(16).toUpperCase()}`);
-  return `url(data:image/svg+xml,${encoded}) center/cover no-repeat`;
-}
-
+/** Picks the condition photograph and its label from the remaining hours of today. */
 function remainderSky(hours, cur) {
+  const night = !cur.isDay;
   const text = hours.map(h => String(h.condition || h.forecastCondition || '').toLowerCase()).join(' ');
   const sum = key => hours.reduce((total, h) => total + (Number(h[key]) || 0), 0);
   const peak = key => hours.reduce((top, h) => Math.max(top, Number(h[key]) || 0), 0);
@@ -420,29 +419,30 @@ function remainderSky(hours, cur) {
   const freezing = /freezing|ice storm/.test(text);
   const snowy = /snow|sleet|wintry|flurr|blizzard/.test(text) || snowIn >= 0.1;
   const rainy = qpf >= 0.05 || chance >= 50 || /rain|shower|drizzle/.test(text);
-  if (storm) return gust >= 40 ? { tile: 'severe-storms', label: 'Severe Storms' } : { tile: 'thunderstorms', label: 'Thunderstorms' };
-  if (freezing) return { tile: 'freezing-rain', label: 'Freezing Rain' };
-  const explicitMix = /wintry|sleet|mix/.test(text);
-  if (snowy && explicitMix) return { tile: 'wintry-mix', label: 'Wintry Mix' };
+  if (storm) return gust >= 40 ? { image: 'severe-storms', label: 'Severe Storms' } : { image: 'thunderstorms', label: 'Thunderstorms' };
+  if (freezing) return { image: 'freezing-rain', label: 'Freezing Rain' };
+  if (snowy && /wintry|sleet|mix/.test(text)) return { image: 'wintry-mix', label: 'Wintry Mix' };
   if (snowy) {
-    if (wind >= 25) return { tile: 'blowing-snow', label: 'Blowing Snow' };
-    return snowIn >= 0.5 ? { tile: 'snow', label: 'Snow' } : { tile: 'light-snow', label: 'Light Snow' };
+    if (wind >= 25 || gust >= 35) return { image: 'blowing-snow', label: 'Blowing Snow' };
+    if (snowIn >= 4) return { image: 'snow', label: 'Heavy Snow' };
+    return snowIn >= 0.5 ? { image: 'snow', label: 'Snow' } : { image: 'light-snow', label: 'Light Snow' };
   }
   if (rainy) {
-    if (wind >= 25 || gust >= 40) return { tile: 'rain-windy', label: 'Rain & Windy' };
-    if (qpf >= 0.75 || (qpf >= 0.5 && chance >= 80)) return { tile: 'rain', label: 'Heavy Rain' };
-    if (qpf >= 0.1 || chance >= 60) return { tile: 'rain', label: 'Rain' };
-    return { tile: 'light-rain', label: 'Light Rain' };
+    if (wind >= 25 || gust >= 40) return { image: 'rain-windy', label: 'Rain & Wind' };
+    if (qpf >= 0.75 || (qpf >= 0.5 && chance >= 80)) return { image: 'rain', label: 'Heavy Rain' };
+    if (qpf >= 0.1 || chance >= 60) return { image: 'rain', label: 'Rain' };
+    if (!night && clouds < 60) return { image: 'showers-sun', label: 'Sun & Showers' };
+    return { image: 'light-rain', label: 'Light Rain' };
   }
-  if (/fog|mist/.test(text)) return { tile: 'fog', label: 'Fog' };
-  if (/haze|smoke/.test(text)) return { tile: 'haze', label: 'Haze' };
-  if (/dust|sand/.test(text)) return { tile: 'dust', label: 'Dust' };
-  if (clouds >= 85) return { tile: 'cloudy', label: 'Cloudy' };
-  if (clouds >= 60) return { tile: 'mostly-cloudy', label: 'Mostly Cloudy' };
-  if (clouds >= 30) return { tile: 'partly-cloudy', label: 'Partly Cloudy' };
-  return cur.isDay ? { tile: 'sunny', label: 'Sunny' } : { tile: 'sunny', label: 'Clear' };
+  if (/fog|mist/.test(text)) return { image: 'fog', label: 'Fog' };
+  if (/haze|smoke/.test(text)) return { image: night ? 'fog' : 'haze', label: 'Haze' };
+  if (/dust|sand/.test(text)) return { image: 'dust', label: 'Dust' };
+  if (clouds >= 85) return { image: 'cloudy', label: 'Cloudy' };
+  if (clouds >= 60) return { image: night ? 'cloudy' : 'mostly-cloudy', label: 'Mostly Cloudy' };
+  if (clouds >= 30) return { image: night ? 'partly-cloudy-night' : 'partly-cloudy', label: 'Partly Cloudy' };
+  if (clouds >= 15) return night ? { image: 'mostly-clear-night', label: 'Mostly Clear' } : { image: 'mostly-sunny', label: 'Mostly Sunny' };
+  return night ? { image: 'clear-night', label: 'Clear' } : { image: 'sunny', label: 'Sunny' };
 }
-
 
 function remainderHourIcon(h, d) {
   const c = String(h.condition || h.forecastCondition || '').toLowerCase();
@@ -488,15 +488,15 @@ function renderBetaTodayCard(f) {
   const totalSnow = hours.reduce((sum, h) => sum + (Number(h.snowfallIn) || 0), 0);
   const snowDay = hours.some(snowyHour);
   const avgWind = winds.length ? Math.round(winds.reduce((a, b) => a + b, 0) / winds.length) : null;
-  const windRange = winds.length ? `${Math.round(Math.min(...winds))}–${Math.round(Math.max(...winds))}` : '—';
+  const windLow = winds.length ? Math.round(Math.min(...winds)) : null;
+  const windHigh = winds.length ? Math.round(Math.max(...winds)) : null;
+  const windValue = windLow === null ? '—' : windLow === windHigh ? `${windHigh}` : `${windLow}–${windHigh}`;
   const gustMax = gusts.length ? Math.round(Math.max(...gusts)) : null;
   const num = (v, fmt = x => `${Math.round(x)}`) => (Number.isFinite(v) ? fmt(v) : '—');
   const hourTemp = h => (Object.hasOwn(h, 'forecastTempF') ? h.forecastTempF : h.tempF);
   const feelsHour = hours.reduce((best, h) => (best && best.feelsLikeF >= h.feelsLikeF ? best : h), null);
-  const rainPeak = dayHours.reduce((best, h) => (best && best.rainChance >= h.rainChance ? best : h), null);
-  const rainPeakText = rainPeak && rainPeak.rainChance >= 5
-    ? `Peak: ${fmtHour(rainPeak.time, { weekday: 'short' })} ${fmtHour(rainPeak.time, { hour: 'numeric' })}`
-    : 'Peak: none';
+  const precipPeak = dayHours.reduce((best, h) => (best && best.rainChance >= h.rainChance ? best : h), null);
+  const peakText = precipPeak && precipPeak.rainChance >= 5 ? `Peak ${fmtHour(precipPeak.time, { hour: 'numeric' })}` : 'No peak';
   const uv = Math.round(d.maxUvIndex ?? cur.uvIndex ?? 0);
   const uvLabel = uv <= 2 ? 'Low' : uv <= 5 ? 'Moderate' : uv <= 7 ? 'High' : uv <= 10 ? 'Very High' : 'Extreme';
   const uvTone = uv <= 2 ? 'good' : uv <= 5 ? 'mod' : 'bad';
@@ -504,8 +504,8 @@ function renderBetaTodayCard(f) {
   const aqiTone = aqi > 100 ? 'bad' : aqi > 50 ? 'mod' : 'good';
   const aqiLabel = f.airQuality?.label || (aqi > 100 ? 'Unhealthy' : aqi > 50 ? 'Moderate' : 'Good');
   const pill = (label, tone) => `<em class="rem-pill rem-${tone}">${escapeAttr(label)}</em>`;
-  const condition = d.condition || cur.condition;
   const sky = remainderSky(hours, cur);
+  const metric = (icon, value, caption) => `<div class="rem-metric">${remIcon(icon, 18)}<b>${value}</b>${caption}</div>`;
 
   host.hidden = false;
   host.innerHTML = `
@@ -516,46 +516,63 @@ function renderBetaTodayCard(f) {
         <time>Updated ${fmtHour(new Date().toISOString(), { hour: 'numeric', minute: '2-digit' })}</time>
       </header>
       <div class="rem-top">
-        <div class="rem-tile" style="background:${svgCoverBackground(skySceneSvg(sky.tile, cur.isDay))}">
-          <span>${escapeAttr(sky.label)}</span>
-        </div>
+        <figure class="rem-cond" style="background-image:url(/weather-fusion/cond-${sky.image}.webp)" role="img" aria-label="${escapeAttr(sky.label)}">
+          <figcaption>${escapeAttr(sky.label)}</figcaption>
+        </figure>
         <div class="rem-temps">
-          <span><strong>${fmtTemp(d.lowF)}</strong><small>Low</small></span>
-          <span><strong>${fmtTemp(d.highF)}</strong><small>High</small></span>
+          <div><strong>${fmtTemp(d.highF)}</strong><small>High</small></div>
+          <span class="rem-divider" aria-hidden="true"></span>
+          <div><strong>${fmtTemp(d.lowF)}</strong><small>Low</small></div>
         </div>
-        <div class="rem-rain">
-          ${remIcon('drop', 30)}
+        <div class="rem-chance">
+          ${remIcon(snowDay ? 'snow' : 'drop', 20)}
           <strong>${num(d.rainChance, x => `${x}%`)}</strong>
           <small>${snowDay ? 'Snow Chance' : 'Rain Chance'}</small>
-          <small>${escapeAttr(rainPeakText)}</small>
+          <small class="rem-sub">${escapeAttr(peakText)}</small>
         </div>
       </div>
-      <div class="rem-strip">
-        <span>Feels Like <b>${fmtTemp(feelsHour?.feelsLikeF ?? d.peakFeelsF)}</b>${feelsHour ? ` at ${fmtHour(feelsHour.time, { hour: 'numeric' })}` : ''}</span>
-        <span>${remIcon('cloud', 22)}<span>${snowDay ? 'Total Snow' : 'Total Rain'}: <b>${snowDay ? totalSnow.toFixed(1) : totalRain.toFixed(2)}"</b></span></span>
-        <span>${remIcon('wind', 22)}<span><b>Wind: ${windRange} mph</b><small>Gusts: ${num(gustMax, x => `${x} mph`)}</small></span></span>
+      <div class="rem-stats">
+        <div class="rem-stat">
+          <span class="rem-stat-label">${remIcon('thermo', 15)}Feels Like</span>
+          <strong>${fmtTemp(feelsHour?.feelsLikeF ?? d.peakFeelsF)}</strong>
+          <small>${feelsHour ? `at ${fmtHour(feelsHour.time, { hour: 'numeric' })}` : 'peak today'}</small>
+        </div>
+        <div class="rem-stat">
+          <span class="rem-stat-label">${remIcon(snowDay ? 'snow' : 'rain', 15)}${snowDay ? 'Total Snow' : 'Total Rain'}</span>
+          <strong>${snowDay ? totalSnow.toFixed(1) : totalRain.toFixed(2)}<em>in</em></strong>
+          <small>rest of today</small>
+        </div>
+        <div class="rem-stat">
+          <span class="rem-stat-label">${remIcon('wind', 15)}Wind</span>
+          <strong>${windValue}<em>mph</em></strong>
+          <small>${gustMax === null ? 'Gusts —' : `Gusts ${gustMax} mph`}</small>
+        </div>
       </div>
-      <div class="rem-hours">
+      <div class="rem-hours" tabindex="0" aria-label="Hourly forecast for the rest of today">
         ${hours.map(h => `
           <div class="rem-hour">
             <small>${fmtHour(h.time, { hour: 'numeric' })}</small>
-            ${renderWeatherIconSvg(remainderHourIcon(h, d), 46)}
+            ${renderWeatherIconSvg(remainderHourIcon(h, d), 44)}
             <strong>${fmtTemp(hourTemp(h))}</strong>
-            <span class="rem-rainline">${remIcon('drop', 12)}${num(h.rainChance, x => `${x}%`)}</span>
+            <span class="rem-rainline">${remIcon('drop', 11)}${num(h.rainChance, x => `${x}%`)}</span>
             <span>${snowyHour(h) ? `❄ ${Number.isFinite(h.snowfallIn) ? h.snowfallIn.toFixed(1) : '—'}"` : (Number.isFinite(h.precipIn) ? h.precipIn.toFixed(2) + '"' : '—')}</span>
-            <span>${remIcon('wind', 12)}${num(h.forecastWindMph, x => `${x} mph`)}</span>
+            <span>${remIcon('wind', 11)}${num(h.forecastWindMph, x => `${x} mph`)}</span>
           </div>`).join('')}
       </div>
       <div class="rem-foot">
-        <span>${remIcon('wind', 20)}<b>${num(avgWind, x => `${x} mph`)}</b>Avg Wind</span>
-        <span>${remIcon('drop', 20)}<b>${fmtTemp(d.dewPointF ?? cur.dewPointF)}</b>Dew Point</span>
-        <span>${remIcon('cloud', 20)}<b>${num(cur.cloudCover, x => `${x}%`)}</b>Clouds</span>
-        <span>${remIcon('leaf', 20)}<b>AQI ${num(aqi)}</b>${Number.isFinite(aqi) ? pill(aqiLabel, aqiTone) : ''}</span>
-        <span>${remIcon('sun', 20)}<b>UV ${num(uv)}</b>${pill(uvLabel, uvTone)}</span>
+        ${metric('wind', num(avgWind, x => `${x} mph`), '<span>Avg Wind</span>')}
+        ${metric('drop', fmtTemp(d.dewPointF ?? cur.dewPointF), '<span>Dew Point</span>')}
+        ${metric('cloud', num(cur.cloudCover, x => `${x}%`), '<span>Clouds</span>')}
+        ${metric('leaf', `AQI ${num(aqi)}`, Number.isFinite(aqi) ? pill(aqiLabel, aqiTone) : '<span>Air quality</span>')}
+        ${metric('sun', `UV ${num(uv)}`, pill(uvLabel, uvTone))}
       </div>
       <button class="remainder-more" type="button" aria-haspopup="dialog">View 48-hour graph ›</button>
     </section>
   `;
+  const strip = host.querySelector('.rem-hours');
+  const markEnd = () => strip.classList.toggle('at-end', strip.scrollLeft + strip.clientWidth >= strip.scrollWidth - 4);
+  strip.addEventListener('scroll', markEnd, { passive: true });
+  markEnd();
   host.querySelector('.remainder-more').onclick = () => {
     state.selectedHourIdx = 0;
     state.selectedMetricId = 'temp';
