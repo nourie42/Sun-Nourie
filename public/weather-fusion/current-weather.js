@@ -4,7 +4,13 @@ const finite=v=>typeof v==='number'&&Number.isFinite(v);
 const liquid=condition=>['rain','storm'].includes(weatherState(condition).kind);
 const cleanForecastCondition=text=>{
  if(!text)return text;
- return String(text).toLowerCase().replace(/^(?:slight )?chance of |^chance (?:of |for )?|^scattered /i,'').replace(/\b(?:possible|likely|possible precipitation)\b/gi,'').trim()||'Precipitation possible';
+ let clean=String(text).toLowerCase()
+  .replace(/^slight\s+chance\s+(?:of\s+)?/i,'')
+  .replace(/^chance\s+(?:of\s+)?/i,'')
+  .replace(/^scattered\s+/i,'')
+  .replace(/\b(?:possible|likely|precipitation)\b/gi,'')
+  .trim();
+ return clean||'Precipitation possible';
 };
 
 /** Radar describes detected precipitation, not the probability for the current
