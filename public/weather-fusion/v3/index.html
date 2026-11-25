@@ -241,7 +241,17 @@
       </button>
     </section>
 
-    <!-- Interactive Time Selector for How It Feels, What to Wear & Outdoor Cartoon Cards -->
+    <!-- Outside Right Now -->
+    <section id="skin-exposure" class="glass comfort-people-panel">
+      <div class="section-inline-head">
+        <h2 id="exposure-section-title" class="card-title-clean">How it feels outside</h2>
+        <span id="exposure-time-note" class="subtle-note">Right now</span>
+      </div>
+      <p id="exposure-weather-context" class="comfort-current-context"></p>
+      <div id="exposure-cards-grid" class="exposure-teaser-stack"></div>
+    </section>
+
+    <!-- How It Feels & What to Wear (Below How It Feels Outside) -->
     <section id="feels-time-section" class="glass section-panel card-compact" aria-label="Choose time to preview how it feels and what to wear">
       <div class="feels-time-head">
         <div>
@@ -256,16 +266,6 @@
         <input id="feels-hour-slider" type="range" min="0" max="47" value="0" aria-label="Preview how it feels at another hour" />
         <span class="feels-slider-edge">+47h</span>
       </div>
-    </section>
-
-    <!-- Outside Right Now (Immediately Below How It Feels & What to Wear) -->
-    <section id="skin-exposure" class="glass comfort-people-panel">
-      <div class="section-inline-head">
-        <h2 id="exposure-section-title" class="card-title-clean">How it feels outside</h2>
-        <span id="exposure-time-note" class="subtle-note">Right now</span>
-      </div>
-      <p id="exposure-weather-context" class="comfort-current-context"></p>
-      <div id="exposure-cards-grid" class="exposure-teaser-stack"></div>
     </section>
 
     <!-- Car Wash Forecast Clickable Card (Immediately Below Outside Right Now) -->

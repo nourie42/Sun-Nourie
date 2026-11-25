@@ -383,16 +383,23 @@ function remIcon(name, size = 16) {
   return `<svg class="rem-ico" width="${size}" height="${size}" viewBox="0 0 24 24" fill="${filled ? 'currentColor' : 'none'}" stroke="${filled ? 'none' : 'currentColor'}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${REMAINDER_ICON_PATHS[name]}</svg>`;
 }
 
-function overcastSkyBackground(top, bottom) {
-  const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='320' height='220' viewBox='0 0 320 220'><defs><linearGradient id='g' x1='0' y1='0' x2='0' y2='1'><stop offset='0' stop-color='${top}'/><stop offset='1' stop-color='${bottom}'/></linearGradient><filter id='n' x='0' y='0' width='100%' height='100%'><feTurbulence type='fractalNoise' baseFrequency='0.006 0.012' numOctaves='5' seed='9' result='t'/><feColorMatrix in='t' type='matrix' values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  2.6 0 0 0 -1.25'/></filter></defs><rect width='320' height='220' fill='url(#g)'/><rect width='320' height='220' filter='url(#n)' opacity='0.85'/></svg>`;
+function overcastSkyBackground(top, bottom, { rain = false } = {}) {
+  const streaks = rain
+    ? Array.from({ length: 36 }, (_, i) => {
+        const x = (i * 97) % 320;
+        const y = (i * 53) % 220;
+        return `<line x1='${x}' y1='${y}' x2='${x - 7}' y2='${y + 18}'/>`;
+      }).join('')
+    : '';
+  const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='320' height='220' viewBox='0 0 320 220'><defs><linearGradient id='g' x1='0' y1='0' x2='0' y2='1'><stop offset='0' stop-color='${top}'/><stop offset='1' stop-color='${bottom}'/></linearGradient><filter id='n' x='0' y='0' width='100%' height='100%'><feTurbulence type='fractalNoise' baseFrequency='0.006 0.012' numOctaves='5' seed='9' result='t'/><feColorMatrix in='t' type='matrix' values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  2.6 0 0 0 -1.25'/></filter></defs><rect width='320' height='220' fill='url(#g)'/><rect width='320' height='220' filter='url(#n)' opacity='0.85'/><g stroke='#d6e8fb' stroke-opacity='0.5' stroke-width='1.1' stroke-linecap='round'>${streaks}</g></svg>`;
   const encoded = encodeURIComponent(svg).replace(/[()']/g, c => `%${c.charCodeAt(0).toString(16).toUpperCase()}`);
   return `url(data:image/svg+xml,${encoded}) center/cover`;
 }
 
 function remainderSkyBackground(condition, isDay) {
   const c = String(condition || '').toLowerCase();
-  if (/thunder|storm/.test(c)) return overcastSkyBackground('#3c4256', '#171a2a');
-  if (/rain|shower|drizzle|snow|sleet|freez/.test(c)) return overcastSkyBackground('#4a5a6c', '#222e3d');
+  if (/thunder|storm/.test(c)) return overcastSkyBackground('#3c4256', '#171a2a', { rain: true });
+  if (/rain|shower|drizzle|snow|sleet|freez/.test(c)) return overcastSkyBackground('#4a5a6c', '#222e3d', { rain: true });
   if (/cloud|overcast|fog|mist/.test(c)) return overcastSkyBackground('#566073', '#2c3443');
   if (!isDay) return 'radial-gradient(circle at 30% 35%, rgba(255,255,255,.18), transparent 42%), linear-gradient(170deg, #1a2c58, #080f22)';
   if (/sunny|clear|fair/.test(c)) return 'linear-gradient(170deg, #3a8ae0, #1b4f9c)';
