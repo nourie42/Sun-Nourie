@@ -3489,20 +3489,26 @@ function initSkyCanvas() {
         }
         if (p.x < -40) p.x = W + 20;
       });
-    } else if (mood === 'night' && (state.skyOverride === 'night' || (!isSkyCloudyOrWet(state.forecast) && !isPartlyCloudyCondition(state.forecast)))) {
-      // Twinkling stars & current moon phase only on clear/partly-cloudy nights (never when overcast cloudy)
-      particles.slice(0, 55).forEach((p) => {
-        const twinkle = 0.25 + 0.55 * (0.5 + 0.5 * Math.sin(ts * 0.002 + p.phase));
-        ctx.fillStyle = `rgba(220, 236, 255, ${twinkle.toFixed(2)})`;
-        ctx.beginPath();
-        ctx.arc(p.x, p.y * 0.65, p.radius, 0, Math.PI * 2);
-        ctx.fill();
-      });
+    } else if (mood === 'night' && (state.skyOverride === 'night' || !isSkyCloudyOrWet(state.forecast))) {
+      // Stars only on clear nights; partly cloudy nights keep the moon phase, seen through cloud
+      const partlyNight = state.skyOverride !== 'night' && isPartlyCloudyCondition(state.forecast);
+      if (!partlyNight) {
+        particles.slice(0, 55).forEach((p) => {
+          const twinkle = 0.25 + 0.55 * (0.5 + 0.5 * Math.sin(ts * 0.002 + p.phase));
+          ctx.fillStyle = `rgba(220, 236, 255, ${twinkle.toFixed(2)})`;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y * 0.65, p.radius, 0, Math.PI * 2);
+          ctx.fill();
+        });
+      }
       const moonR = W < 600 ? 25 : 32;
       const mImg = ensureMoonCanvas(moonR);
       const mx = W < 600 ? W * 0.23 : W * 0.22;
       const my = W < 600 ? 224 : 210;
+      ctx.save();
+      ctx.globalAlpha = partlyNight ? 0.72 : 1;
       ctx.drawImage(mImg, Math.round(mx - mImg.width / 2), Math.round(my - mImg.height / 2));
+      ctx.restore();
     } else if (mood !== 'cloudy' && mood !== 'sunset' && !isSkyCloudyOrWet(state.forecast)) {
       // Subtle floating solar light motes (never on overcast/cloudy days)
       particles.slice(0, 35).forEach((p) => {
