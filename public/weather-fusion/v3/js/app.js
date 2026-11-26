@@ -509,6 +509,10 @@ function renderBetaTodayCard(f) {
   const aqiTone = aqi > 100 ? 'bad' : aqi > 50 ? 'mod' : 'good';
   const aqiLabel = f.airQuality?.label || (aqi > 100 ? 'Unhealthy' : aqi > 50 ? 'Moderate' : 'Good');
   const pill = (label, tone) => `<em class="rem-pill rem-${tone}">${escapeAttr(label)}</em>`;
+  const cutoff = Date.now() - 30 * 60 * 1000;
+  const stripHours = (f.hours48 || []).filter(h => Date.parse(h.time) >= cutoff).slice(0, 24);
+  const displayStripHours = stripHours.length ? stripHours : hours;
+  const dayByKey = new Map((f.days || []).map(day => [day.dayKey, day]));
   const sky = remainderSky(hours, cur);
   const metric = (icon, value, caption) => `<div class="rem-metric">${remIcon(icon, 18)}<b>${value}</b>${caption}</div>`;
 
@@ -553,11 +557,11 @@ function renderBetaTodayCard(f) {
           <small>${gustMax === null ? 'Gusts —' : `Gusts ${gustMax} mph`}</small>
         </div>
       </div>
-      <div class="rem-hours" tabindex="0" aria-label="Hourly forecast for the rest of today">
-        ${hours.map(h => `
+      <div class="rem-hours" tabindex="0" aria-label="Next 24 hours hourly forecast">
+        ${displayStripHours.map(h => `
           <div class="rem-hour">
             <small>${fmtHour(h.time, { hour: 'numeric' })}</small>
-            ${renderWeatherIconSvg(remainderHourIcon(h, d), 44)}
+            ${renderWeatherIconSvg(remainderHourIcon(h, dayByKey.get(h.dayKey) || d), 44)}
             <strong>${fmtTemp(hourTemp(h))}</strong>
             <span class="rem-rainline">${remIcon('drop', 11)}${num(h.rainChance, x => `${x}%`)}</span>
             <span>${snowyHour(h) ? `❄ ${Number.isFinite(h.snowfallIn) ? h.snowfallIn.toFixed(1) : '—'}"` : (Number.isFinite(h.precipIn) ? h.precipIn.toFixed(2) + '"' : '—')}</span>
