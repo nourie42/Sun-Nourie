@@ -56174,111 +56174,100 @@
       "name": "Holbein Irodori Artist Gouache - Russet Green, 15 ml tube",
       "recipient": "Angel",
       "retailerName": "BLICK Art Materials",
-      "sourceUrl": "https://www.dickblick.com/items/holbein-irodori-artist-gouache-russet-green-15-ml-tube/",
-      "preferredPrice": 8.04,
       "price": 8.04,
       "tier": "Stocking stuffers (<$10)",
-      "sourceType": "expansion-bot"
+      "sourceType": "expansion-bot",
+      "url": "https://www.dickblick.com/items/holbein-irodori-artist-gouache-russet-green-15-ml-tube/"
     },
     {
       "name": "Holbein Artists' Gouache - Gray 1, 15 ml tube",
       "recipient": "Angel",
       "retailerName": "BLICK Art Materials",
-      "sourceUrl": "https://www.dickblick.com/items/holbein-artists-gouache-gray-1-15-ml-tube/",
-      "preferredPrice": 8.04,
       "price": 8.04,
       "tier": "Stocking stuffers (<$10)",
-      "sourceType": "expansion-bot"
+      "sourceType": "expansion-bot",
+      "url": "https://www.dickblick.com/items/holbein-artists-gouache-gray-1-15-ml-tube/"
     },
     {
       "name": "Tobii Eye Tracker 5 - Head & Eye Tracking Gaming Peripheral for PC",
       "recipient": "Kish",
       "retailerName": "Amazon",
-      "sourceUrl": "https://www.amazon.com/dp/B0897GCBWW/ref=as_li_ss_tl",
-      "preferredPrice": 369.0,
       "price": 369.0,
       "tier": "Level 1 (best)",
-      "sourceType": "expansion-bot"
+      "sourceType": "expansion-bot",
+      "url": "https://www.amazon.com/dp/B0897GCBWW/ref=as_li_ss_tl"
     },
     {
       "name": "XREAL 1S AR/XR Glasses - 500\" Virtual Screen, 52\u00b0 FOV, Native 3DoF, Powered by X1 Chip",
       "recipient": "Kish",
       "retailerName": "Amazon",
-      "sourceUrl": "https://www.amazon.com/dp/B0GC56Z4CR/ref=aa_maas",
-      "preferredPrice": 449.0,
       "price": 449.0,
       "tier": "Level 1 (best)",
-      "sourceType": "expansion-bot"
+      "sourceType": "expansion-bot",
+      "url": "https://www.amazon.com/dp/B0GC56Z4CR/ref=aa_maas"
     },
     {
       "name": "Celestron Travel Scope 70 Portable Refractor Telescope with Backpack",
       "recipient": "Family",
       "retailerName": "Amazon",
-      "sourceUrl": "https://www.amazon.com/Celestron-Refractor-Telescope-Beginners-Astronomy/dp/B001TI9Y2M",
-      "preferredPrice": 89.99,
       "price": 89.99,
       "tier": "Level 2 (mid)",
-      "sourceType": "expansion-bot"
+      "sourceType": "expansion-bot",
+      "url": "https://www.amazon.com/Celestron-Refractor-Telescope-Beginners-Astronomy/dp/B001TI9Y2M"
     },
     {
       "name": "QUINN 1/2 in. Drive Extendable Breaker Bar",
       "recipient": "Bear",
       "retailerName": "Harbor Freight",
-      "sourceUrl": "https://www.harborfreight.com/58627.html",
-      "preferredPrice": 27.99,
       "price": 27.99,
       "tier": "Level 2 (mid)",
-      "sourceType": "expansion-bot"
+      "sourceType": "expansion-bot",
+      "url": "https://www.harborfreight.com/58627.html"
     },
     {
       "name": "Royal Talens Ecoline Watercolor Brushpen",
       "recipient": "Angel",
       "retailerName": "Texas Art",
-      "sourceUrl": "https://www.texasart.com/products/royal-talens-ecoline-watercolor-brushpens",
-      "preferredPrice": 4.11,
       "price": 4.11,
       "tier": "Stocking stuffers (<$10)",
-      "sourceType": "expansion-bot"
+      "sourceType": "expansion-bot",
+      "url": "https://www.texasart.com/products/royal-talens-ecoline-watercolor-brushpens"
     },
     {
       "name": "Kensington Expert Mouse TB800 EQ Wireless Trackball",
       "recipient": "Kish",
       "retailerName": "Amazon",
-      "sourceUrl": "https://www.amazon.com/dp/B0G2L19JPY",
-      "preferredPrice": 44.99,
       "price": 44.99,
       "tier": "Level 2 (mid)",
-      "sourceType": "expansion-bot"
+      "sourceType": "expansion-bot",
+      "url": "https://www.amazon.com/dp/B0G2L19JPY"
     },
     {
       "name": "Nendoroid Doll Sakura Miku: Hirohako 2025 Ver. (Hakodate)",
       "recipient": "Angel",
       "retailerName": "Gundam Planet",
-      "sourceUrl": "https://www.gundamplanet.com/products/nendoroid-doll-sakura-miku-hirohako-2025-ver-hakodate",
-      "preferredPrice": 90.95,
       "price": 90.95,
       "tier": "Level 2 (mid)",
-      "sourceType": "expansion-bot"
+      "sourceType": "expansion-bot",
+      "url": "https://www.gundamplanet.com/products/nendoroid-doll-sakura-miku-hirohako-2025-ver-hakodate"
     },
     {
       "name": "Weigh Safe 180 Hitch Dual Ball Hitch with Scale",
       "recipient": "Bear",
       "retailerName": "Weigh Safe",
-      "sourceUrl": "https://www.weigh-safe.com/product/weigh-safe-180-hitch/?attribute_drop-length=10",
-      "preferredPrice": 249.0,
       "price": 249.0,
       "tier": "Level 1 (best)",
-      "sourceType": "expansion-bot"
+      "sourceType": "expansion-bot",
+      "url": "https://www.weigh-safe.com/product/weigh-safe-180-hitch/?attribute_drop-length=10"
     },
     {
       "name": "Yale Assure Lock 2 Smart Lock Wi-Fi Deadbolt with Touchscreen Keypad and Fingerprint Access - Black Suede",
       "recipient": "Family",
       "retailerName": "Best Buy",
-      "sourceUrl": "https://www.bestbuy.com/product/yale-assure-lock-2-smart-lock-wi-fi-deadbolt-with-touchscreen-keypad--fingerprint-access-black-suede/6554595",
-      "preferredPrice": 174.99,
       "price": 174.99,
       "tier": "Level 1 (best)",
-      "sourceType": "expansion-bot"
+      "sourceType": "expansion-bot",
+      "url": "https://www.bestbuy.com/product/yale-assure-lock-2-smart-lock-wi-fi-deadbolt-with-touchscreen-keypad--fingerprint-access-black-suede/6554595"
     }
   ]
 }
