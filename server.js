@@ -54,7 +54,7 @@ if (!EXTRA_APPS_ENABLED) {
   const DISABLED_PREFIXES = [
     '/whats-up', '/whatsup', '/deal-lens', '/deal-desk', '/deal-intelligence',
     '/ai-council', '/fuel-atlas', '/distributors', '/household-pl',
-    '/nourie-enterprises', '/aadt', '/developments', '/scraper',
+    '/aadt', '/developments', '/scraper',
     '/gas-finder', '/gas-station-prospector', '/thermal', '/ai_job',
     '/signals', '/site-research', '/distributor-', '/site-aadt',
     '/site-address', '/site-autocomplete',
